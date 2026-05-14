@@ -25,20 +25,58 @@ export async function POST(
     const fraudStatus =
       body.fraud_status;
 
-    // PAYMENT SUCCESS
+    // CHECK TRANSACTION DULU
+    const {
+      data:
+        existingTransaction,
+    } =
+      await supabase
+        .from(
+          "transactions"
+        )
+        .select("*")
+        .eq(
+          "invoice_number",
+          orderId
+        )
+        .single();
+
+    // SUDAH PAID?
     if (
+      existingTransaction?.status ===
+      "PAID"
+    ) {
+      console.log(
+        "TRANSACTION ALREADY PAID"
+      );
+
+      return NextResponse.json({
+        success: true,
+        message:
+          "Already processed",
+      });
+    }
+
+    // PAYMENT SUCCESS
+    const isPaid =
       transactionStatus ===
         "settlement" ||
       (transactionStatus ===
         "capture" &&
         fraudStatus ===
-          "accept")
-    ) {
+          "accept");
+
+    if (isPaid) {
+      console.log(
+        "PAYMENT SUCCESS"
+      );
 
       // UPDATE TRANSACTION
       const {
         data:
           transaction,
+        error:
+          transactionError,
       } =
         await supabase
           .from(
@@ -59,7 +97,15 @@ export async function POST(
           .select()
           .single();
 
-      // AMBIL DATA LAPTOP
+      if (
+        transactionError
+      ) {
+        console.log(
+          transactionError
+        );
+      }
+
+      // UPDATE STOCK
       if (
         transaction?.laptop_id
       ) {
@@ -71,9 +117,7 @@ export async function POST(
             .from(
               "laptops"
             )
-            .select(
-              "*"
-            )
+            .select("*")
             .eq(
               "id",
               transaction.laptop_id
@@ -87,14 +131,16 @@ export async function POST(
             laptop.qty -
             1;
 
-          // UPDATE STOCK
           await supabase
             .from(
               "laptops"
             )
             .update({
               qty:
-                newQty,
+                Math.max(
+                  0,
+                  newQty
+                ),
 
               status:
                 newQty <=
@@ -114,12 +160,9 @@ export async function POST(
       }
     }
 
-    return NextResponse.json(
-      {
-        success:
-          true,
-      }
-    );
+    return NextResponse.json({
+      success: true,
+    });
   } catch (
     error
   ) {

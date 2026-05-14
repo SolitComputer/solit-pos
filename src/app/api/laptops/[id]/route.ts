@@ -1,193 +1,207 @@
 import { NextResponse }
-from "next/server";
+    from "next/server";
 
 import { supabase }
-from "@/services/supabase";
+    from "@/services/supabase";
 
 interface Props {
-  params: Promise<{
-    id: string;
-  }>;
+    params: Promise<{
+        id: string;
+    }>;
 }
 
 // GET LAPTOP
 export async function GET(
-  request: Request,
-  props: Props
+    request: Request,
+    props: Props
 ) {
-  try {
-    const params =
-      await props.params;
+    try {
+        const params =
+            await props.params;
 
-    const {
-      data,
-      error,
-    } =
-      await supabase
-        .from("laptops")
-        .select("*")
-        .eq(
-          "id",
-          params.id
-        )
-        .single();
+        const {
+            data,
+            error,
+        } =
+            await supabase
+                .from("laptops")
+                .select("*")
+                .eq(
+                    "id",
+                    params.id
+                )
+                .single();
 
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            error.message,
-        },
-        { status: 400 }
-      );
+        if (error) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        error.message,
+                },
+                { status: 400 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            data,
+        });
+    } catch {
+        return NextResponse.json(
+            {
+                success: false,
+            },
+            { status: 500 }
+        );
     }
-
-    return NextResponse.json({
-      success: true,
-      data,
-    });
-  } catch {
-    return NextResponse.json(
-      {
-        success: false,
-      },
-      { status: 500 }
-    );
-  }
 }
 
 // UPDATE LAPTOP
 export async function PUT(
-  request: Request,
-  props: Props
+    request: Request,
+    props: Props
 ) {
-  try {
-    const body =
-      await request.json();
+    try {
+        const body =
+            await request.json();
 
-    const params =
-      await props.params;
+        const params =
+            await props.params;
 
-    const {
-      data,
-      error,
-    } =
-      await supabase
-        .from("laptops")
-        .update({
-          laptop_name:
-            body.laptop_name,
+        const qty =
+            Number(body.qty);
 
-          brand:
-            body.brand,
+        const isReady =
+            qty > 0 &&
+            body.status !==
+            "BELUM_SIAP";
 
-          cpu:
-            body.cpu,
+        const {
+            data,
+            error,
+        } =
+            await supabase
+                .from(
+                    "laptops"
+                )
+                .update({
+                    laptop_name:
+                        body.laptop_name,
 
-          ram:
-            body.ram,
+                    brand:
+                        body.brand,
 
-          storage:
-            body.storage,
+                    cpu:
+                        body.cpu,
 
-          gpu:
-            body.gpu,
+                    ram:
+                        body.ram,
 
-          display:
-            body.display,
+                    storage:
+                        body.storage,
 
-          serial_number:
-            body.serial_number,
+                    gpu:
+                        body.gpu,
 
-          purchase_price:
-            body.purchase_price,
+                    display:
+                        body.display,
 
-          selling_price:
-            body.selling_price,
+                    serial_number:
+                        body.serial_number,
 
-          qty:
-            body.qty,
+                    condition_note:
+                        body.condition_note,
 
-          status:
-            body.status,
+                    purchase_price:
+                        body.purchase_price,
 
-          condition_note:
-            body.condition_note,
+                    selling_price:
+                        body.selling_price,
 
-          notes:
-            body.notes,
-        })
-        .eq(
-          "id",
-          params.id
-        )
-        .select()
-        .single();
+                    qty,
 
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            error.message,
-        },
-        { status: 400 }
-      );
+                    status:
+                        qty <= 0
+                            ? "SOLD"
+                            : "SIAP_JUAL",
+
+                    ready_to_sell:
+                        isReady,
+
+                    notes:
+                        body.notes,
+                })
+                .eq(
+                    "id",
+                    params.id
+                )
+                .select()
+                .single();
+
+        if (error) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        error.message,
+                },
+                { status: 400 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            data,
+        });
+    } catch {
+        return NextResponse.json(
+            {
+                success: false,
+            },
+            { status: 500 }
+        );
     }
-
-    return NextResponse.json({
-      success: true,
-      data,
-    });
-  } catch {
-    return NextResponse.json(
-      {
-        success: false,
-      },
-      { status: 500 }
-    );
-  }
 }
 
 // DELETE LAPTOP
 export async function DELETE(
-  request: Request,
-  props: Props
+    request: Request,
+    props: Props
 ) {
-  try {
-    const params =
-      await props.params;
+    try {
+        const params =
+            await props.params;
 
-    const { error } =
-      await supabase
-        .from("laptops")
-        .delete()
-        .eq(
-          "id",
-          params.id
+        const { error } =
+            await supabase
+                .from("laptops")
+                .delete()
+                .eq(
+                    "id",
+                    params.id
+                );
+
+        if (error) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        error.message,
+                },
+                { status: 400 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+        });
+    } catch {
+        return NextResponse.json(
+            {
+                success: false,
+            },
+            { status: 500 }
         );
-
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            error.message,
-        },
-        { status: 400 }
-      );
     }
-
-    return NextResponse.json({
-      success: true,
-    });
-  } catch {
-    return NextResponse.json(
-      {
-        success: false,
-      },
-      { status: 500 }
-    );
-  }
 }
