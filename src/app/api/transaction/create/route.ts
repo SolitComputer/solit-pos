@@ -35,6 +35,12 @@ export async function POST(
                 callbacks: {
                     finish:
                         `${process.env.NEXT_PUBLIC_APP_URL}/receipt/${invoice_number}`,
+
+                    pending:
+                        `${process.env.NEXT_PUBLIC_APP_URL}/payment/${invoice_number}`,
+
+                    error:
+                        `${process.env.NEXT_PUBLIC_APP_URL}/payment/${invoice_number}`,
                 },
             } as any);
 
