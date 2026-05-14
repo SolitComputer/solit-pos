@@ -14,7 +14,6 @@ export async function POST(
         const invoice_number =
             generateInvoice();
 
-        // CREATE MIDTRANS TRANSACTION
         const midtransTransaction =
             await snap.createTransaction({
                 transaction_details: {
@@ -31,6 +30,11 @@ export async function POST(
 
                     phone:
                         body.customer_phone,
+                },
+
+                callbacks: {
+                    finish:
+                        `${process.env.NEXT_PUBLIC_APP_URL}/receipt/${invoice_number}`,
                 },
             } as any);
 
@@ -49,11 +53,35 @@ export async function POST(
                     customer_name:
                         body.customer_name,
 
+                    company_name:
+                        body.company_name,
+
                     customer_phone:
                         body.customer_phone,
 
                     laptop_name:
                         body.laptop_name,
+
+                    serial_number:
+                        body.serial_number,
+
+                    software_request:
+                        body.software_request,
+
+                    pickup_method:
+                        body.pickup_method,
+
+                    pickup_date:
+                        body.pickup_date,
+
+                    pickup_time:
+                        body.pickup_time,
+
+                    pickup_location:
+                        body.pickup_location,
+
+                    source_platform:
+                        body.source_platform,
 
                     amount:
                         body.amount,
