@@ -56,6 +56,9 @@ export async function POST(
                 .insert({
                     invoice_number,
 
+                    laptop_id:
+                        body.laptop_id,
+
                     customer_name:
                         body.customer_name,
 

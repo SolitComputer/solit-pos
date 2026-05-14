@@ -1,7 +1,8 @@
-import crypto from "crypto";
-import { NextResponse } from "next/server";
+import { NextResponse }
+from "next/server";
 
-import { supabase } from "@/services/supabase";
+import { supabase }
+from "@/services/supabase";
 
 export async function POST(
   request: Request
@@ -15,70 +16,30 @@ export async function POST(
       body
     );
 
-    const {
-      order_id,
-      status_code,
-      gross_amount,
-      signature_key,
-      transaction_status,
-    } = body;
+    const orderId =
+      body.order_id;
 
-    const serverKey =
-      process.env
-        .MIDTRANS_SERVER_KEY!;
+    const transactionStatus =
+      body.transaction_status;
 
-    const hashed =
-      crypto
-        .createHash("sha512")
-        .update(
-          order_id +
-            status_code +
-            gross_amount +
-            serverKey
-        )
-        .digest("hex");
+    const fraudStatus =
+      body.fraud_status;
 
-    console.log(
-      "HASHED:",
-      hashed
-    );
-
-    console.log(
-      "SIGNATURE:",
-      signature_key
-    );
-
-    // VERIFY
+    // PAYMENT SUCCESS
     if (
-      hashed !==
-      signature_key
-    ) {
-      console.log(
-        "INVALID SIGNATURE"
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Invalid signature",
-        },
-        { status: 401 }
-      );
-    }
-
-    console.log(
-      "STATUS:",
-      transaction_status
-    );
-
-    if (
-      transaction_status ===
+      transactionStatus ===
         "settlement" ||
-      transaction_status ===
-        "capture"
+      (transactionStatus ===
+        "capture" &&
+        fraudStatus ===
+          "accept")
     ) {
-      const { error } =
+
+      // UPDATE TRANSACTION
+      const {
+        data:
+          transaction,
+      } =
         await supabase
           .from(
             "transactions"
@@ -88,30 +49,93 @@ export async function POST(
               "PAID",
 
             paid_at:
-              new Date().toISOString(),
+              new Date()
+                .toISOString(),
           })
           .eq(
             "invoice_number",
-            order_id
-          );
+            orderId
+          )
+          .select()
+          .single();
 
-      console.log(
-        "UPDATE ERROR:",
-        error
-      );
+      // AMBIL DATA LAPTOP
+      if (
+        transaction?.laptop_id
+      ) {
+        const {
+          data:
+            laptop,
+        } =
+          await supabase
+            .from(
+              "laptops"
+            )
+            .select(
+              "*"
+            )
+            .eq(
+              "id",
+              transaction.laptop_id
+            )
+            .single();
+
+        if (
+          laptop
+        ) {
+          const newQty =
+            laptop.qty -
+            1;
+
+          // UPDATE STOCK
+          await supabase
+            .from(
+              "laptops"
+            )
+            .update({
+              qty:
+                newQty,
+
+              status:
+                newQty <=
+                0
+                  ? "SOLD"
+                  : laptop.status,
+
+              ready_to_sell:
+                newQty >
+                0,
+            })
+            .eq(
+              "id",
+              laptop.id
+            );
+        }
+      }
     }
-
-    return NextResponse.json({
-      success: true,
-    });
-  } catch (error) {
-    console.error(error);
 
     return NextResponse.json(
       {
-        success: false,
+        success:
+          true,
+      }
+    );
+  } catch (
+    error
+  ) {
+    console.error(
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success:
+          false,
       },
-      { status: 500 }
+      {
+        status:
+          500,
+      }
     );
   }
 }

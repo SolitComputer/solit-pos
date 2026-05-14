@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useForm } from "react-hook-form";
 
@@ -17,14 +17,35 @@ import { Input } from "@/components/ui/input";
 
 import { Button } from "@/components/ui/button";
 
+interface Laptop {
+    id: string;
+    laptop_name: string;
+    cpu: string;
+    ram: string;
+    storage: string;
+    serial_number: string;
+    selling_price: number;
+}
+
 export default function CreatePaymentPage() {
     const [step, setStep] =
         useState(1);
+
+    const [
+        laptops,
+        setLaptops,
+    ] = useState<
+        Laptop[]
+    >([]);
 
     const {
         register,
         handleSubmit,
         watch,
+        setValue,
+        formState: {
+            errors,
+        },
     } =
         useForm<CreatePaymentType>({
             resolver:
@@ -33,11 +54,18 @@ export default function CreatePaymentPage() {
                 ),
 
             defaultValues: {
+                company_name:
+                    "Solit 03",
+
                 payment_method:
                     "QRIS",
 
                 pickup_method:
                     "DATANG",
+
+
+                source_platform:
+                    "Instagram",
             },
         });
 
@@ -45,6 +73,36 @@ export default function CreatePaymentPage() {
         watch(
             "pickup_method"
         );
+
+    const selectedLaptopId =
+        watch(
+            "laptop_id"
+        );
+
+    const selectedLaptop =
+        laptops.find(
+            (item) =>
+                item.id ===
+                selectedLaptopId
+        );
+
+    useEffect(() => {
+        if (!selectedLaptop)
+            return;
+
+        setValue(
+            "laptop_name",
+            selectedLaptop.laptop_name
+        );
+
+        setValue(
+            "serial_number",
+            selectedLaptop.serial_number
+        );
+    }, [
+        selectedLaptop,
+        setValue,
+    ]);
 
     const onSubmit = async (
         data: CreatePaymentType
@@ -91,6 +149,25 @@ export default function CreatePaymentPage() {
         }
     };
 
+    useEffect(() => {
+        fetchLaptops();
+    }, []);
+
+    const fetchLaptops =
+        async () => {
+            const response =
+                await fetch(
+                    "/api/laptops/ready"
+                );
+
+            const result =
+                await response.json();
+
+            setLaptops(
+                result.data
+            );
+        };
+
     return (
         <main className="min-h-screen bg-slate-100 p-4">
             <Card className="max-w-md mx-auto p-5 rounded-3xl shadow-xl">
@@ -111,8 +188,8 @@ export default function CreatePaymentPage() {
                             <div
                                 key={item}
                                 className={`h-2 flex-1 rounded-full ${step >= item
-                                        ? "bg-black"
-                                        : "bg-slate-200"
+                                    ? "bg-black"
+                                    : "bg-slate-200"
                                     }`}
                             />
                         )
@@ -136,12 +213,28 @@ export default function CreatePaymentPage() {
                                 )}
                             />
 
-                            <Input
-                                placeholder="Perusahaan (Opsional)"
-                                {...register(
-                                    "company_name"
+                            <div>
+                                <label className="text-sm font-medium">
+                                    Perusahaan
+                                </label>
+
+                                <Input
+                                    placeholder="Nama perusahaan"
+                                    {...register(
+                                        "company_name"
+                                    )}
+                                />
+
+                                {errors.company_name && (
+                                    <p className="text-red-500 text-sm mt-1">
+                                        {
+                                            errors
+                                                .company_name
+                                                .message
+                                        }
+                                    </p>
                                 )}
-                            />
+                            </div>
 
                             <Input
                                 placeholder="WhatsApp"
@@ -150,12 +243,108 @@ export default function CreatePaymentPage() {
                                 )}
                             />
 
-                            <Input
-                                placeholder="Tahu Solit dari mana?"
-                                {...register(
-                                    "source_platform"
+                            <div>
+                                <label className="text-sm font-medium">
+                                    Tahu Solit dari Mana?
+                                </label>
+
+                                <select
+                                    {...register(
+                                        "source_platform"
+                                    )}
+                                    className="
+      w-full
+      border
+      rounded-xl
+      h-12
+      px-3
+      bg-white
+    "
+                                >
+                                    <option value="Instagram">
+                                        Instagram
+                                    </option>
+
+                                    <option value="TikTok">
+                                        TikTok
+                                    </option>
+
+                                    <option value="Facebook">
+                                        Facebook
+                                    </option>
+
+                                    <option value="WhatsApp">
+                                        WhatsApp
+                                    </option>
+
+                                    <option value="Google">
+                                        Google
+                                    </option>
+
+                                    <option value="Shopee">
+                                        Shopee
+                                    </option>
+
+                                    <option value="Tokopedia">
+                                        Tokopedia
+                                    </option>
+
+                                    <option value="Teman">
+                                        Teman
+                                    </option>
+
+                                    <option value="Lainnya">
+                                        Lainnya
+                                    </option>
+                                </select>
+
+                                {selectedLaptop && (
+                                    <div className="bg-slate-50 rounded-2xl p-4">
+
+                                        <p>
+                                            <strong>
+                                                Laptop:
+                                            </strong>{" "}
+                                            {
+                                                selectedLaptop.laptop_name
+                                            }
+                                        </p>
+
+                                        <p>
+                                            <strong>
+                                                SN:
+                                            </strong>{" "}
+                                            {
+                                                selectedLaptop.serial_number
+                                            }
+                                        </p>
+
+                                        <p>
+                                            <strong>
+                                                Spek:
+                                            </strong>{" "}
+                                            {
+                                                selectedLaptop.cpu
+                                            }
+                                            {" | "}
+                                            {
+                                                selectedLaptop.ram
+                                            }
+                                            {" | "}
+                                            {
+                                                selectedLaptop.storage
+                                            }
+                                        </p>
+
+                                        <p className="font-bold text-green-600 mt-2">
+                                            Rp
+                                            {selectedLaptop.selling_price.toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </p>
+                                    </div>
                                 )}
-                            />
+                            </div>
 
                             <Button
                                 type="button"
@@ -172,15 +361,109 @@ export default function CreatePaymentPage() {
                     {/* STEP 2 */}
                     {step === 2 && (
                         <>
-                            <Input
-                                placeholder="Merk Laptop"
+                            <select
+                                {...register(
+                                    "laptop_id"
+                                )}
+                                className="
+    w-full
+    h-12
+    border
+    rounded-xl
+    px-3
+    bg-white
+  "
+                            >
+                                <option value="">
+                                    Pilih Laptop
+                                </option>
+
+                                {laptops.map(
+                                    (item) => (
+                                        <option
+                                            key={
+                                                item.id
+                                            }
+                                            value={
+                                                item.id
+                                            }
+                                        >
+                                            {
+                                                item.laptop_name
+                                            }
+                                            {" | "}
+                                            {item.cpu}
+                                            {" | "}
+                                            {item.ram}
+                                            {" | "}
+                                            {
+                                                item.storage
+                                            }
+                                            {" | Rp"}
+                                            {item.selling_price.toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </option>
+                                    )
+                                )}
+                            </select>
+
+                            {selectedLaptop && (
+                                <div className="bg-slate-50 rounded-2xl p-4">
+
+                                    <p>
+                                        <strong>
+                                            Laptop:
+                                        </strong>{" "}
+                                        {
+                                            selectedLaptop.laptop_name
+                                        }
+                                    </p>
+
+                                    <p>
+                                        <strong>
+                                            SN:
+                                        </strong>{" "}
+                                        {
+                                            selectedLaptop.serial_number
+                                        }
+                                    </p>
+
+                                    <p>
+                                        <strong>
+                                            Spek:
+                                        </strong>{" "}
+                                        {
+                                            selectedLaptop.cpu
+                                        }
+                                        {" | "}
+                                        {
+                                            selectedLaptop.ram
+                                        }
+                                        {" | "}
+                                        {
+                                            selectedLaptop.storage
+                                        }
+                                    </p>
+
+                                    <p className="font-bold text-green-600 mt-2">
+                                        Rp
+                                        {selectedLaptop.selling_price.toLocaleString(
+                                            "id-ID"
+                                        )}
+                                    </p>
+                                </div>
+                            )}
+
+                            <input
+                                type="hidden"
                                 {...register(
                                     "laptop_name"
                                 )}
                             />
 
-                            <Input
-                                placeholder="Serial Number"
+                            <input
+                                type="hidden"
                                 {...register(
                                     "serial_number"
                                 )}
@@ -298,7 +581,6 @@ export default function CreatePaymentPage() {
                                     }
                                 )}
                             />
-
                             <select
                                 {...register(
                                     "payment_method"

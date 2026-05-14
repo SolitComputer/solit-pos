@@ -10,7 +10,8 @@ export const createPaymentSchema =
       ),
 
     company_name:
-      z.string().optional(),
+      z.string()
+        .optional(),
 
     customer_phone: z
       .string()
@@ -19,33 +20,50 @@ export const createPaymentSchema =
         "Nomor HP tidak valid"
       ),
 
-    laptop_name: z
+    laptop_id: z
       .string()
       .min(
-        3,
-        "Merk laptop wajib diisi"
+        1,
+        "Laptop wajib dipilih"
       ),
 
+    laptop_name:
+      z.string(),
+
     serial_number:
-      z.string().optional(),
+      z.string(),
 
     software_request:
-      z.string().optional(),
+      z.string()
+        .optional(),
 
     pickup_method:
       z.string(),
 
     pickup_date:
-      z.string().optional(),
+      z.string()
+        .min(
+          1,
+          "Tanggal wajib diisi"
+        ),
 
     pickup_time:
-      z.string().optional(),
+      z.string()
+        .min(
+          1,
+          "Jam wajib diisi"
+        ),
 
     pickup_location:
-      z.string().optional(),
+      z.string()
+        .optional(),
 
     source_platform:
-      z.string().optional(),
+      z.string()
+        .min(
+          1,
+          "Pilih sumber customer"
+        ),
 
     amount: z
       .number({
@@ -54,7 +72,7 @@ export const createPaymentSchema =
       })
       .min(
         1000,
-        "Harga wajib diisi"
+        "Harga minimal Rp1.000"
       ),
 
     payment_method:
@@ -65,8 +83,30 @@ export const createPaymentSchema =
       ]),
 
     notes:
-      z.string().optional(),
-  });
+      z.string()
+        .optional(),
+  })
+  .superRefine(
+    (data, ctx) => {
+      if (
+        data.pickup_method ===
+          "DIANTAR" &&
+        !data.pickup_location
+      ) {
+        ctx.addIssue({
+          code:
+            "custom",
+
+          path: [
+            "pickup_location",
+          ],
+
+          message:
+            "Lokasi antar wajib diisi",
+        });
+      }
+    }
+  );
 
 export type CreatePaymentType =
   z.infer<
