@@ -201,8 +201,8 @@ export default function Page() {
                   <div className="text-right">
 
                     <h3 className="font-bold">
-                      RpLo
-                      {item.amount?.tocaleString(
+                      Rp
+                      {item.amount?.toLocaleString(
                         "id-ID"
                       )}
                     </h3>
