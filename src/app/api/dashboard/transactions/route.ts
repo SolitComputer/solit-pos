@@ -6,6 +6,7 @@ from "@/services/supabase";
 
 export async function GET() {
   try {
+
     const {
       data,
       error,
@@ -41,10 +42,20 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      success: true,
+      success:
+        true,
+
       data,
     });
-  } catch {
+
+  } catch (
+    error
+  ) {
+
+    console.log(
+      error
+    );
+
     return NextResponse.json(
       {
         success:

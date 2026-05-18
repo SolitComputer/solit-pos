@@ -25,6 +25,35 @@ export default async function Page(
             )
             .single();
 
+    const whatsappMessage =
+        encodeURIComponent(`
+Halo ${data?.customer_name}
+
+Pembayaran laptop Anda berhasil ✅
+
+INVOICE
+${data?.invoice_number}
+
+Laptop:
+${data?.laptop_name}
+
+Total:
+Rp${data?.amount?.toLocaleString(
+            "id-ID"
+        )}
+
+Status:
+LUNAS
+
+Terima kasih telah berbelanja di Solit 03 🙏
+`);
+
+    const whatsappUrl =
+        `https://wa.me/${data?.customer_phone?.replace(
+            /^0/,
+            "62"
+        )}?text=${whatsappMessage}`;
+
     if (
         !data ||
         data.status !==
@@ -240,6 +269,26 @@ export default async function Page(
                         </div>
                     </section>
                 </div>
+
+                <a
+                    href={
+                        whatsappUrl
+                    }
+                    target="_blank"
+                    className="
+    mt-6
+    bg-green-500
+    text-white
+    rounded-2xl
+    h-12
+    flex
+    items-center
+    justify-center
+    font-semibold
+  "
+                >
+                    Kirim ke WhatsApp
+                </a>
 
                 {/* FOOTER */}
                 <div className="bg-slate-50 p-5 text-center border-t">

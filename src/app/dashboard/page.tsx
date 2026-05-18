@@ -6,17 +6,26 @@ import {
 } from "react";
 
 interface Stats {
-  totalRevenue:
-    number;
+  todayRevenue:
+  number;
 
-  totalSold:
-    number;
+  todayTransactions:
+  number;
 
-  pendingCount:
-    number;
+  laptopReady:
+  number;
 
-  stockReady:
-    number;
+  pendingPayments:
+  number;
+}
+
+interface Transaction {
+  id: string;
+  customer_name: string;
+  laptop_name: string;
+  amount: number;
+  status: string;
+  created_at: string;
 }
 
 export default function Page() {
@@ -25,16 +34,14 @@ export default function Page() {
     stats,
     setStats,
   ] =
-    useState<
-      Stats
-    >();
+    useState<Stats>();
 
   const [
     transactions,
     setTransactions,
   ] =
     useState<
-      any[]
+      Transaction[]
     >([]);
 
   useEffect(() => {
@@ -44,6 +51,7 @@ export default function Page() {
 
   const fetchStats =
     async () => {
+
       const response =
         await fetch(
           "/api/dashboard/stats"
@@ -59,6 +67,7 @@ export default function Page() {
 
   const fetchTransactions =
     async () => {
+
       const response =
         await fetch(
           "/api/dashboard/transactions"
@@ -73,160 +82,190 @@ export default function Page() {
     };
 
   return (
-    <main className="min-h-screen bg-slate-100 p-5">
+    <main className="p-5">
 
-      <div className="max-w-7xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">
+        Dashboard
+      </h1>
 
-        <h1 className="text-3xl font-bold mb-6">
-          Dashboard
-        </h1>
+      <div className="grid md:grid-cols-4 gap-4">
 
-        {/* CARDS */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-3xl p-5 shadow">
 
-          <div className="bg-white rounded-3xl p-5 shadow-md">
-            <p className="text-slate-500">
-              Pendapatan Hari Ini
-            </p>
+          <p className="text-slate-500 text-sm">
+            Omzet Hari Ini
+          </p>
 
-            <h2 className="text-2xl font-bold text-green-600">
-              Rp
-              {stats?.totalRevenue?.toLocaleString(
-                "id-ID"
-              )}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl p-5 shadow-md">
-            <p className="text-slate-500">
-              Laptop Terjual
-            </p>
-
-            <h2 className="text-2xl font-bold">
-              {
-                stats?.totalSold
-              }
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl p-5 shadow-md">
-            <p className="text-slate-500">
-              Pending
-            </p>
-
-            <h2 className="text-2xl font-bold text-yellow-600">
-              {
-                stats?.pendingCount
-              }
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl p-5 shadow-md">
-            <p className="text-slate-500">
-              Stock Ready
-            </p>
-
-            <h2 className="text-2xl font-bold text-blue-600">
-              {
-                stats?.stockReady
-              }
-            </h2>
-          </div>
+          <h2 className="text-2xl font-bold mt-2 text-green-600">
+            Rp
+            {stats?.todayRevenue?.toLocaleString(
+              "id-ID"
+            )}
+          </h2>
         </div>
 
-        {/* QUICK MENU */}
-        <div className="flex flex-wrap gap-3 mb-8">
+        <div className="bg-white rounded-3xl p-5 shadow">
 
-          <a
-            href="/payment/create"
-            className="bg-black text-white px-5 py-3 rounded-2xl"
-          >
-            + Buat Pembayaran
-          </a>
+          <p className="text-slate-500 text-sm">
+            Transaksi Hari Ini
+          </p>
 
-          <a
-            href="/dashboard/laptops"
-            className="bg-white border px-5 py-3 rounded-2xl"
-          >
-            Data Laptop
-          </a>
-
-          <a
-            href="/dashboard/laptops/create"
-            className="bg-white border px-5 py-3 rounded-2xl"
-          >
-            + Tambah Laptop
-          </a>
+          <h2 className="text-2xl font-bold mt-2">
+            {
+              stats?.todayTransactions
+            }
+          </h2>
         </div>
 
-        {/* TRANSAKSI */}
-        <div className="bg-white rounded-3xl p-5 shadow-md">
+        <div className="bg-white rounded-3xl p-5 shadow">
 
-          <h2 className="font-bold text-xl mb-5">
+          <p className="text-slate-500 text-sm">
+            Laptop Ready
+          </p>
+
+          <h2 className="text-2xl font-bold mt-2">
+            {
+              stats?.laptopReady
+            }
+          </h2>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 shadow">
+
+          <p className="text-slate-500 text-sm">
+            Pending Payment
+          </p>
+
+          <h2 className="text-2xl font-bold mt-2 text-orange-500">
+            {
+              stats?.pendingPayments
+            }
+          </h2>
+        </div>
+
+      </div>
+
+      <div className="mt-8 bg-white rounded-3xl p-5 shadow">
+
+        <div className="flex justify-between items-center mb-5">
+
+          <h2 className="text-xl font-bold">
             Transaksi Terbaru
           </h2>
 
-          <div className="space-y-4">
+          <a
+            href="/dashboard/transactions"
+            className="text-sm text-blue-600"
+          >
+            Lihat Semua
+          </a>
+        </div>
 
-            {transactions.map(
-              (
-                item
-              ) => (
-                <div
-                  key={
-                    item.id
-                  }
-                  className="flex justify-between border-b pb-4"
-                >
-                  <div>
-                    <h3 className="font-semibold">
+        <div className="overflow-x-auto">
+
+          <table className="w-full">
+
+            <thead>
+
+              <tr className="border-b text-left text-slate-500">
+
+                <th className="py-3">
+                  Customer
+                </th>
+
+                <th>
+                  Laptop
+                </th>
+
+                <th>
+                  Total
+                </th>
+
+                <th>
+                  Status
+                </th>
+
+                <th>
+                  Tanggal
+                </th>
+
+              </tr>
+
+            </thead>
+
+            <tbody>
+
+              {transactions.map(
+                (
+                  item
+                ) => (
+                  <tr
+                    key={
+                      item.id
+                    }
+                    className="border-b"
+                  >
+
+                    <td className="py-4 font-medium">
                       {
                         item.customer_name
                       }
-                    </h3>
+                    </td>
 
-                    <p className="text-slate-500 text-sm">
+                    <td>
                       {
                         item.laptop_name
                       }
-                    </p>
+                    </td>
 
-                    <p className="text-xs text-slate-400">
-                      {
-                        item.invoice_number
-                      }
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-
-                    <h3 className="font-bold">
+                    <td className="font-semibold">
                       Rp
-                      {item.amount?.toLocaleString(
+                      {item.amount.toLocaleString(
                         "id-ID"
                       )}
-                    </h3>
+                    </td>
 
-                    <span
-                      className={`
-                        px-3 py-1 rounded-full text-xs font-semibold
-                        ${
-                          item.status ===
-                          "PAID"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
+                    <td>
+
+                      <span
+                        className={`
+                    px-3
+                    py-1
+                    rounded-full
+                    text-sm
+                    font-medium
+                    ${item.status ===
+                            "PAID"
+                            ? "bg-green-100 text-green-600"
+                            : "bg-orange-100 text-orange-600"
+                          }
+                  `}
+                      >
+                        {
+                          item.status
                         }
-                      `}
-                    >
-                      {
-                        item.status
-                      }
-                    </span>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
+                      </span>
+
+                    </td>
+
+                    <td className="text-slate-500 text-sm">
+
+                      {new Date(
+                        item.created_at
+                      ).toLocaleDateString(
+                        "id-ID"
+                      )}
+
+                    </td>
+
+                  </tr>
+                )
+              )}
+
+            </tbody>
+
+          </table>
+
         </div>
       </div>
     </main>

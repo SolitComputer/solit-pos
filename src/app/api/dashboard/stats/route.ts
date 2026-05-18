@@ -5,26 +5,23 @@ import { supabase }
 from "@/services/supabase";
 
 export async function GET() {
+
   try {
 
-    // HARI INI
     const today =
       new Date();
 
-    today.setHours(
-      0,
-      0,
-      0,
-      0
-    );
+    const startToday =
+      new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate()
+      ).toISOString();
 
-    const todayISO =
-      today.toISOString();
-
-    // TRANSAKSI PAID
+    // TRANSACTION TODAY
     const {
       data:
-        paidTransactions,
+        todayTransactions,
     } =
       await supabase
         .from(
@@ -36,52 +33,46 @@ export async function GET() {
           "PAID"
         )
         .gte(
-          "created_at",
-          todayISO
+          "paid_at",
+          startToday
         );
 
-    // TRANSAKSI PENDING
+    // PENDING
     const {
-      count:
-        pendingCount,
+      data:
+        pendingTransactions,
     } =
       await supabase
         .from(
           "transactions"
         )
-        .select("*", {
-          count:
-            "exact",
-          head:
-            true,
-        })
+        .select("*")
         .eq(
           "status",
           "PENDING"
         );
 
-    // STOCK READY
+    // READY LAPTOP
     const {
-      count:
-        stockReady,
+      data:
+        laptops,
     } =
       await supabase
         .from(
           "laptops"
         )
-        .select("*", {
-          count:
-            "exact",
-          head:
-            true,
-        })
+        .select("*")
+        .eq(
+          "status",
+          "SIAP_JUAL"
+        )
         .gt(
           "qty",
           0
         );
 
-    const totalRevenue =
-      paidTransactions?.reduce(
+    const todayRevenue =
+      todayTransactions?.reduce(
         (
           acc,
           item
@@ -91,30 +82,31 @@ export async function GET() {
         0
       ) || 0;
 
-    const totalSold =
-      paidTransactions?.length ||
-      0;
-
     return NextResponse.json({
-      success: true,
+      success:
+        true,
 
       data: {
-        totalRevenue,
+        todayRevenue,
 
-        totalSold,
-
-        pendingCount:
-          pendingCount ||
+        todayTransactions:
+          todayTransactions?.length ||
           0,
 
-        stockReady:
-          stockReady ||
+        laptopReady:
+          laptops?.length ||
+          0,
+
+        pendingPayments:
+          pendingTransactions?.length ||
           0,
       },
     });
+
   } catch (
     error
   ) {
+
     console.log(
       error
     );
