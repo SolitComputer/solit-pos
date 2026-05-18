@@ -4,10 +4,14 @@ from "next/server";
 import { supabase }
 from "@/services/supabase";
 
+import { sendWhatsapp }
+from "@/service/whatsapp";
+
 export async function POST(
   request: Request
 ) {
   try {
+
     const body =
       await request.json();
 
@@ -25,7 +29,7 @@ export async function POST(
     const fraudStatus =
       body.fraud_status;
 
-    // CHECK TRANSACTION DULU
+    // CHECK TRANSACTION
     const {
       data:
         existingTransaction,
@@ -46,6 +50,7 @@ export async function POST(
       existingTransaction?.status ===
       "PAID"
     ) {
+
       console.log(
         "TRANSACTION ALREADY PAID"
       );
@@ -61,12 +66,16 @@ export async function POST(
     const isPaid =
       transactionStatus ===
         "settlement" ||
-      (transactionStatus ===
-        "capture" &&
+
+      (
+        transactionStatus ===
+          "capture" &&
         fraudStatus ===
-          "accept");
+          "accept"
+      );
 
     if (isPaid) {
+
       console.log(
         "PAYMENT SUCCESS"
       );
@@ -109,6 +118,7 @@ export async function POST(
       if (
         transaction?.laptop_id
       ) {
+
         const {
           data:
             laptop,
@@ -127,9 +137,9 @@ export async function POST(
         if (
           laptop
         ) {
+
           const newQty =
-            laptop.qty -
-            1;
+            laptop.qty - 1;
 
           await supabase
             .from(
@@ -143,14 +153,12 @@ export async function POST(
                 ),
 
               status:
-                newQty <=
-                0
+                newQty <= 0
                   ? "SOLD"
                   : laptop.status,
 
               ready_to_sell:
-                newQty >
-                0,
+                newQty > 0,
             })
             .eq(
               "id",
@@ -158,14 +166,52 @@ export async function POST(
             );
         }
       }
+
+      // AUTO SEND WA
+      if (
+        transaction?.customer_phone
+      ) {
+
+        const phone =
+          transaction.customer_phone
+            .replace(
+              /^0/,
+              "62"
+            );
+
+        await sendWhatsapp(
+          phone,
+`Halo ${transaction.customer_name} 👋
+
+Pembayaran Anda telah berhasil dan dinyatakan *LUNAS* ✅
+
+🧾 Invoice:
+${transaction.invoice_number}
+
+💻 Laptop:
+${transaction.laptop_name}
+
+💰 Total:
+Rp${transaction.amount.toLocaleString("id-ID")}
+
+Silakan simpan invoice berikut:
+${process.env.NEXT_PUBLIC_APP_URL}/receipt/${transaction.invoice_number}
+
+Terima kasih telah berbelanja di Solit 03 🙏`
+        );
+
+        console.log(
+          "WA SUCCESS"
+        );
+      }
     }
 
     return NextResponse.json({
       success: true,
     });
-  } catch (
-    error
-  ) {
+
+  } catch (error) {
+
     console.error(
       error
     );

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { generateInvoice } from "@/lib/invoice";
 import { snap } from "@/services/midtrans";
-import { sendWhatsapp } from "@/service/whatsapp";
 
 export async function POST(
     request: Request
@@ -123,30 +122,6 @@ export async function POST(
                 { status: 400 }
             );
         }
-
-        await sendWhatsapp(
-            body.customer_phone,
-            `Halo ${body.customer_name}
-
-Pembayaran laptop Anda telah dibuat ✅
-
-Invoice:
-${invoice_number}
-
-Laptop:
-${body.laptop_name}
-
-Total:
-Rp${body.amount.toLocaleString("id-ID")}
-
-Silakan lakukan pembayaran melalui link berikut:
-
-${process.env.NEXT_PUBLIC_APP_URL}/payment/${invoice_number}
-
-Terima kasih 🙏
-`
-        );
-
         return NextResponse.json({
             success: true,
             data,
