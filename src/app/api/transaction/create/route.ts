@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { generateInvoice } from "@/lib/invoice";
+import {
+    getCurrentUser
+}
+    from "@/lib/auth";
 
 export async function POST(
     request: Request
@@ -9,6 +13,27 @@ export async function POST(
 
         const body =
             await request.json();
+
+        const user =
+            await getCurrentUser();
+
+        console.log(
+            "CURRENT USER:",
+            user
+        );
+
+        if (!user) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message:
+                        "Unauthorized",
+                },
+                {
+                    status: 401,
+                }
+            );
+        }
 
         const invoice_number =
             generateInvoice();
@@ -86,6 +111,12 @@ export async function POST(
             .insert({
 
                 invoice_number,
+
+                sales_id:
+                    user.id,
+
+                sales_name:
+                    user.name,
 
                 laptop_id:
                     body.laptop_id,

@@ -1,14 +1,14 @@
 import { NextResponse }
-from "next/server";
+    from "next/server";
 
 import bcrypt
-from "bcryptjs";
+    from "bcryptjs";
 
 import jwt
-from "jsonwebtoken";
+    from "jsonwebtoken";
 
 import { supabase }
-from "@/services/supabase";
+    from "@/services/supabase";
 
 export async function POST(
     request: Request
@@ -91,16 +91,16 @@ export async function POST(
                     id:
                         user.id,
 
+                    name:
+                        user.name,
+
                     role:
                         user.role,
-
-                    email:
-                        user.email,
                 },
 
                 process.env
                     .JWT_SECRET ||
-                    "secret",
+                "secret",
 
                 {
                     expiresIn:
@@ -174,7 +174,7 @@ export async function POST(
         return response;
 
     } catch (
-        error
+    error
     ) {
 
         console.error(

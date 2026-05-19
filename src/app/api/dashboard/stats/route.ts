@@ -19,7 +19,7 @@ export async function GET() {
             ).toISOString();
 
         // =====================
-        // TRANSACTION TODAY
+        // TODAY TRANSACTION
         // =====================
         const {
             data:
@@ -61,7 +61,7 @@ export async function GET() {
                 );
 
         // =====================
-        // CALCULATION
+        // REVENUE
         // =====================
         const todayRevenue =
             todayTransactions?.reduce(
@@ -77,6 +77,9 @@ export async function GET() {
                 0
             ) || 0;
 
+        // =====================
+        // PROFIT
+        // =====================
         const todayProfit =
             todayTransactions?.reduce(
                 (
@@ -91,6 +94,9 @@ export async function GET() {
                 0
             ) || 0;
 
+        // =====================
+        // STOCK
+        // =====================
         const stockTotal =
             laptops?.reduce(
                 (
@@ -104,6 +110,205 @@ export async function GET() {
                     ),
                 0
             ) || 0;
+
+        // =====================
+        // TOP SALES
+        // =====================
+        const salesMap:
+            Record<
+                string,
+                {
+                    total:
+                    number;
+
+                    profit:
+                    number;
+                }
+            > = {};
+
+        todayTransactions?.forEach(
+            (
+                item
+            ) => {
+
+                const sales =
+                    item.sales_name ||
+                    "Unknown";
+
+                if (
+                    !salesMap[
+                    sales
+                    ]
+                ) {
+                    salesMap[
+                        sales
+                    ] = {
+                        total:
+                            0,
+
+                        profit:
+                            0,
+                    };
+                }
+
+                salesMap[
+                    sales
+                ].total += 1;
+
+                salesMap[
+                    sales
+                ].profit +=
+                    item.other ||
+                    0;
+            }
+        );
+
+        const topSales =
+            Object.entries(
+                salesMap
+            )
+                .map(
+                    (
+                        [
+                            name,
+                            data,
+                        ]
+                    ) => ({
+                        name,
+                        total:
+                            data.total,
+                        profit:
+                            data.profit,
+                    })
+                )
+                .sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        b.total -
+                        a.total
+                )
+                .slice(
+                    0,
+                    5
+                );
+
+        // =====================
+        // TOP SOURCE
+        // =====================
+        const sourceMap:
+            Record<
+                string,
+                number
+            > = {};
+
+        todayTransactions?.forEach(
+            (
+                item
+            ) => {
+
+                const source =
+                    item.source_platform ||
+                    "Unknown";
+
+                sourceMap[
+                    source
+                ] =
+                    (
+                        sourceMap[
+                        source
+                        ] ||
+                        0
+                    ) + 1;
+            }
+        );
+
+        const topSources =
+            Object.entries(
+                sourceMap
+            )
+                .map(
+                    (
+                        [
+                            name,
+                            total,
+                        ]
+                    ) => ({
+                        name,
+                        total,
+                    })
+                )
+                .sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        b.total -
+                        a.total
+                )
+                .slice(
+                    0,
+                    5
+                );
+
+        // =====================
+        // TOP LAPTOP
+        // =====================
+        const laptopMap:
+            Record<
+                string,
+                number
+            > = {};
+
+        todayTransactions?.forEach(
+            (
+                item
+            ) => {
+
+                const laptop =
+                    item.laptop_name ||
+                    "Unknown";
+
+                laptopMap[
+                    laptop
+                ] =
+                    (
+                        laptopMap[
+                        laptop
+                        ] ||
+                        0
+                    ) + 1;
+            }
+        );
+
+        const topLaptop =
+            Object.entries(
+                laptopMap
+            )
+                .map(
+                    (
+                        [
+                            name,
+                            total,
+                        ]
+                    ) => ({
+                        name,
+                        total,
+                    })
+                )
+                .sort(
+                    (
+                        a,
+                        b
+                    ) =>
+                        b.total -
+                        a.total
+                )
+                .slice(
+                    0,
+                    5
+                );
 
         return NextResponse.json({
             success:
@@ -124,6 +329,12 @@ export async function GET() {
                     0,
 
                 stockTotal,
+
+                topSales,
+
+                topSources,
+
+                topLaptop,
             },
         });
 
