@@ -7,7 +7,7 @@ import type {
 } from "next/server";
 
 import jwt
-from "jsonwebtoken";
+  from "jsonwebtoken";
 
 export function proxy(
   request: NextRequest
@@ -22,15 +22,10 @@ export function proxy(
     request.nextUrl
       .pathname;
 
-  // PUBLIC ROUTES
-  const publicRoutes =
-    [
-      "/login",
-      "/api/auth/login",
-      "/receipt",
-      "/payment",
-      "/api/webhook",
-    ];
+  const publicRoutes = [
+    "/login",
+    "/api/auth/login",
+  ];
 
   const isPublic =
     publicRoutes.some(
@@ -42,11 +37,30 @@ export function proxy(
         )
     );
 
+  // ===================
+  // CUSTOMER PUBLIC PAGE
+  // ===================
+  const isCustomerPage =
+    pathname.startsWith("/receipt/") &&
+
+    pathname !==
+    "/payment/create"
+
+    ||
+
+    pathname.startsWith(
+      "/receipt/"
+    );
+
+  // ===================
   // BELUM LOGIN
+  // ===================
   if (
     !token &&
-    !isPublic
+    !isPublic &&
+    !isCustomerPage
   ) {
+
     return NextResponse.redirect(
       new URL(
         "/login",
@@ -55,7 +69,9 @@ export function proxy(
     );
   }
 
+  // ===================
   // SUDAH LOGIN
+  // ===================
   if (token) {
 
     try {
@@ -65,33 +81,20 @@ export function proxy(
           token,
           process.env
             .JWT_SECRET ||
-            "secret"
+          "secret"
         ) as {
           role:
-            string;
+          string;
         };
 
-      // SALES BLOCK
-      if (
-        user.role ===
-          "SALES" &&
-        pathname.startsWith(
-          "/dashboard"
-        )
-      ) {
-        return NextResponse.redirect(
-          new URL(
-            "/payment/create",
-            request.url
-          )
-        );
-      }
-
-      // ADMIN BLOCK LOGIN
+      // ===================
+      // BLOCK LOGIN PAGE
+      // ===================
       if (
         pathname ===
-          "/login"
+        "/login"
       ) {
+
         return NextResponse.redirect(
           new URL(
             user.role ===
@@ -103,14 +106,68 @@ export function proxy(
         );
       }
 
+      // ===================
+      // SALES ACCESS
+      // ===================
+      if (
+        user.role ===
+        "SALES"
+      ) {
+
+        const allowedRoutes = [
+          "/transaction/create",
+          "/receipt/",
+        ];
+
+        const canAccess =
+          allowedRoutes.some(
+            (
+              route
+            ) =>
+              pathname.startsWith(
+                route
+              )
+          );
+
+        if (
+          !canAccess
+        ) {
+
+          return NextResponse.redirect(
+            new URL(
+              "/payment/create",
+              request.url
+            )
+          );
+        }
+      }
+
+      // ===================
+      // ADMIN ACCESS
+      // ===================
+      if (
+        user.role ===
+        "ADMIN"
+      ) {
+
+        return NextResponse.next();
+      }
+
     } catch {
 
-      return NextResponse.redirect(
-        new URL(
-          "/login",
-          request.url
-        )
+      const response =
+        NextResponse.redirect(
+          new URL(
+            "/login",
+            request.url
+          )
+        );
+
+      response.cookies.delete(
+        "token"
       );
+
+      return response;
     }
   }
 
@@ -118,11 +175,12 @@ export function proxy(
 }
 
 export const config =
-  {
-    matcher:
-      [
-        "/dashboard/:path*",
-        "/payment/:path*",
-        "/login",
-      ],
-  };
+{
+  matcher:
+    [
+      "/dashboard/:path*",
+      "/payment/:path*",
+      "/receipt/:path*",
+      "/login",
+    ],
+};

@@ -58,11 +58,10 @@ export default function CreatePaymentPage() {
                     "Solit 03",
 
                 payment_method:
-                    "QRIS",
+                    "CASH",
 
                 pickup_method:
                     "DATANG",
-
 
                 source_platform:
                     "Instagram",
@@ -139,7 +138,7 @@ export default function CreatePaymentPage() {
             }
 
             window.location.href =
-                `/payment/${result.data.invoice_number}`;
+                `/receipt/${result.data.invoice_number}`;
         } catch (error) {
             console.log(error);
 
@@ -167,6 +166,15 @@ export default function CreatePaymentPage() {
                 result.data
             );
         };
+
+    const dealPrice =
+        watch("amount");
+
+    const other =
+        selectedLaptop
+            ? (dealPrice || 0) -
+            selectedLaptop.selling_price
+            : 0;
 
     return (
         <main className="min-h-screen bg-slate-100 p-4">
@@ -299,49 +307,93 @@ export default function CreatePaymentPage() {
                                 </select>
 
                                 {selectedLaptop && (
-                                    <div className="bg-slate-50 rounded-2xl p-4">
+                                    <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
 
-                                        <p>
-                                            <strong>
-                                                Laptop:
-                                            </strong>{" "}
-                                            {
-                                                selectedLaptop.laptop_name
-                                            }
-                                        </p>
+                                        <div>
+                                            <p className="font-semibold">
+                                                {selectedLaptop.laptop_name}
+                                            </p>
 
-                                        <p>
-                                            <strong>
+                                            <p className="text-sm text-slate-500">
                                                 SN:
-                                            </strong>{" "}
-                                            {
-                                                selectedLaptop.serial_number
-                                            }
-                                        </p>
+                                                {" "}
+                                                {
+                                                    selectedLaptop.serial_number
+                                                }
+                                            </p>
 
-                                        <p>
-                                            <strong>
-                                                Spek:
-                                            </strong>{" "}
-                                            {
-                                                selectedLaptop.cpu
-                                            }
-                                            {" | "}
-                                            {
-                                                selectedLaptop.ram
-                                            }
-                                            {" | "}
-                                            {
-                                                selectedLaptop.storage
-                                            }
-                                        </p>
+                                            <p className="text-sm text-slate-500">
+                                                {
+                                                    selectedLaptop.cpu
+                                                }
+                                                {" | "}
+                                                {
+                                                    selectedLaptop.ram
+                                                }
+                                                {" | "}
+                                                {
+                                                    selectedLaptop.storage
+                                                }
+                                            </p>
+                                        </div>
 
-                                        <p className="font-bold text-green-600 mt-2">
-                                            Rp
-                                            {selectedLaptop.selling_price.toLocaleString(
-                                                "id-ID"
-                                            )}
-                                        </p>
+                                        <div className="border-t pt-3 space-y-2">
+
+                                            <div className="flex justify-between text-sm">
+                                                <span>
+                                                    Harga Inventory
+                                                </span>
+
+                                                <span className="font-semibold">
+                                                    Rp
+                                                    {selectedLaptop.selling_price.toLocaleString(
+                                                        "id-ID"
+                                                    )}
+                                                </span>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-sm font-medium">
+                                                    Harga Deal
+                                                </label>
+
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Masukkan harga deal"
+                                                    {...register(
+                                                        "amount",
+                                                        {
+                                                            valueAsNumber: true,
+                                                        }
+                                                    )}
+                                                />
+                                            </div>
+
+                                            <div className="flex justify-between border-t pt-3">
+
+                                                <span>
+                                                    Other
+                                                </span>
+
+                                                <span
+                                                    className={`font-bold ${other >= 0
+                                                            ? "text-green-600"
+                                                            : "text-red-600"
+                                                        }`}
+                                                >
+                                                    {other >= 0
+                                                        ? "+"
+                                                        : "-"}
+                                                    Rp
+                                                    {Math.abs(
+                                                        other
+                                                    ).toLocaleString(
+                                                        "id-ID"
+                                                    )}
+                                                </span>
+                                            </div>
+
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -366,13 +418,13 @@ export default function CreatePaymentPage() {
                                     "laptop_id"
                                 )}
                                 className="
-    w-full
-    h-12
-    border
-    rounded-xl
-    px-3
-    bg-white
-  "
+                                    w-full
+                                    h-12
+                                    border
+                                    rounded-xl
+                                    px-3
+                                    bg-white
+                                "
                             >
                                 <option value="">
                                     Pilih Laptop
@@ -581,22 +633,92 @@ export default function CreatePaymentPage() {
                                     }
                                 )}
                             />
+
+                            {selectedLaptop && (
+                                <div className="bg-slate-50 rounded-2xl p-4 text-sm">
+
+                                    <div className="flex justify-between">
+                                        <span>
+                                            Harga Inventory
+                                        </span>
+
+                                        <span className="font-semibold">
+                                            Rp
+                                            {selectedLaptop.selling_price.toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between mt-2">
+                                        <span>
+                                            Harga Deal
+                                        </span>
+
+                                        <span className="font-semibold">
+                                            Rp
+                                            {(dealPrice || 0).toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </span>
+                                    </div>
+
+                                    <div className="border-t mt-3 pt-3 flex justify-between">
+
+                                        <span>
+                                            Other
+                                        </span>
+
+                                        <span
+                                            className={`font-bold ${other >= 0
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                                }`}
+                                        >
+                                            {other >= 0 ? "+" : "-"}
+                                            Rp
+                                            {Math.abs(
+                                                other
+                                            ).toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </span>
+
+                                    </div>
+
+                                </div>
+                            )}
+
                             <select
                                 {...register(
                                     "payment_method"
                                 )}
-                                className="w-full h-11 rounded-md border px-3"
+                                className="
+                                    w-full
+                                    h-11
+                                    rounded-md
+                                    border
+                                    px-3
+                                "
                             >
-                                <option value="QRIS">
-                                    QRIS
+                                <option value="CASH">
+                                    Cash
                                 </option>
 
                                 <option value="TRANSFER">
                                     Transfer
                                 </option>
 
-                                <option value="CASH">
-                                    Cash
+                                <option value="DP">
+                                    DP
+                                </option>
+
+                                <option value="CICILAN">
+                                    Cicilan
+                                </option>
+
+                                <option value="LAINNYA">
+                                    Lainnya
                                 </option>
                             </select>
 
@@ -623,7 +745,7 @@ export default function CreatePaymentPage() {
                                     type="submit"
                                     className="flex-1"
                                 >
-                                    Generate QRIS
+                                    Simpan Transaksi
                                 </Button>
                             </div>
                         </>
