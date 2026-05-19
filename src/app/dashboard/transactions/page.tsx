@@ -129,134 +129,299 @@ export default function Page() {
 
           <div className="overflow-x-auto">
 
-            <table className="w-full">
+            <div className="space-y-5">
 
-              <thead className="bg-slate-100">
+              {transactions?.map(
+                (item) => (
 
-                <tr className="text-left">
+                  <div
+                    key={item.id}
+                    className="
+          bg-white
+          rounded-3xl
+          shadow-md
+          p-5
+          border
+        "
+                  >
 
-                  <th className="p-4">
-                    Invoice
-                  </th>
+                    {/* HEADER */}
+                    <div className="flex justify-between items-start">
 
-                  <th className="p-4">
-                    Customer
-                  </th>
+                      <div>
 
-                  <th className="p-4">
-                    Laptop
-                  </th>
-
-                  <th className="p-4">
-                    WA
-                  </th>
-
-                  <th className="p-4">
-                    Total
-                  </th>
-
-                  <th className="p-4">
-                    Status
-                  </th>
-
-                  <th className="p-4">
-                    Tanggal
-                  </th>
-
-                  <th className="p-4">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {transactions.map(
-                  (
-                    item
-                  ) => (
-                    <tr
-                      key={
-                        item.id
-                      }
-                      className="border-t"
-                    >
-                      <td className="p-4 font-semibold">
-                        {
-                          item.invoice_number
-                        }
-                      </td>
-
-                      <td className="p-4">
-                        {
-                          item.customer_name
-                        }
-                      </td>
-
-                      <td className="p-4">
-                        {
-                          item.laptop_name
-                        }
-                      </td>
-
-                      <td className="p-4">
-                        {
-                          item.customer_phone
-                        }
-                      </td>
-
-                      <td className="p-4 font-semibold">
-                        Rp
-                        {item.amount?.toLocaleString(
-                          "id-ID"
-                        )}
-                      </td>
-
-                      <td className="p-4">
-
-                        <span
-                          className={`
-                          px-3 py-1 rounded-full text-xs font-semibold
-                          ${
-                            item.status ===
-                            "PAID"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }
-                        `}
-                        >
+                        <h2 className="font-bold text-lg">
                           {
-                            item.status
+                            item.customer_name
                           }
-                        </span>
+                        </h2>
 
-                      </td>
+                        <p className="text-sm text-slate-500">
+                          {
+                            item.customer_phone
+                          }
+                        </p>
 
-                      <td className="p-4 text-sm text-slate-500">
+                        <p className="text-sm text-slate-400">
+                          {
+                            item.invoice_number
+                          }
+                        </p>
+
+                      </div>
+
+                      <span
+                        className={`
+              px-4 py-2 rounded-full text-sm font-semibold
+              ${item.status ===
+                            "PAID"
+                            ? "bg-green-100 text-green-600"
+                            : "bg-red-100 text-red-600"
+                          }
+            `}
+                      >
+                        {item.status}
+                      </span>
+
+                    </div>
+
+                    {/* LAPTOP */}
+                    <div className="mt-5 grid md:grid-cols-2 gap-4">
+
+                      <div>
+
+                        <h3 className="font-semibold mb-2">
+                          Laptop
+                        </h3>
+
+                        <p>
+                          {
+                            item.laptop_name
+                          }
+                        </p>
+
+                        <p className="text-sm text-slate-500">
+                          SN:
+                          {" "}
+                          {
+                            item.serial_number
+                          }
+                        </p>
+
+                        <p className="text-sm text-slate-500">
+                          Software:
+                          {" "}
+                          {
+                            item.software_request ||
+                            "-"
+                          }
+                        </p>
+
+                      </div>
+
+                      <div>
+
+                        <h3 className="font-semibold mb-2">
+                          Payment
+                        </h3>
+
+                        <p>
+                          Method:
+                          {" "}
+                          {
+                            item.payment_method
+                          }
+                        </p>
+
+                        <p>
+                          Harga Inventory:
+                          {" "}
+                          <span className="font-semibold">
+                            Rp
+                            {(item.inventory_price || 0)
+                              .toLocaleString(
+                                "id-ID"
+                              )}
+                          </span>
+                        </p>
+
+                        <p>
+                          Harga Deal:
+                          {" "}
+                          <span className="font-semibold">
+                            Rp
+                            {(item.deal_price || item.amount)
+                              .toLocaleString(
+                                "id-ID"
+                              )}
+                          </span>
+                        </p>
+
+                        <p className="text-green-600 font-semibold">
+                          Profit:
+                          {" "}
+                          +
+                          Rp
+                          {(item.other || 0)
+                            .toLocaleString(
+                              "id-ID"
+                            )}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                    {/* PICKUP */}
+                    <div className="mt-5 grid md:grid-cols-3 gap-4 text-sm">
+
+                      <div>
+                        <p className="font-semibold">
+                          Pickup
+                        </p>
+
+                        <p>
+                          {
+                            item.pickup_method
+                          }
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold">
+                          Jadwal
+                        </p>
+
+                        <p>
+                          {
+                            item.pickup_date
+                          }
+                          {" "}
+                          {
+                            item.pickup_time
+                          }
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-semibold">
+                          Source
+                        </p>
+
+                        <p>
+                          {
+                            item.source_platform
+                          }
+                        </p>
+                      </div>
+
+                    </div>
+
+                    {/* NOTES */}
+                    {item.notes && (
+                      <div className="mt-5">
+
+                        <p className="font-semibold">
+                          Notes
+                        </p>
+
+                        <p className="text-slate-600">
+                          {
+                            item.notes
+                          }
+                        </p>
+
+                      </div>
+                    )}
+
+                    {/* PHOTO + GPS */}
+                    <div className="mt-5 flex gap-4 flex-wrap">
+
+                      {item.payment_photo && (
+
+                        <div>
+
+                          <p className="font-semibold text-sm mb-2">
+                            Bukti Pembayaran
+                          </p>
+
+                          <img
+                            src={
+                              item.payment_photo
+                            }
+                            alt="payment"
+                            className="
+                  w-32
+                  h-32
+                  rounded-2xl
+                  object-cover
+                  border
+                "
+                          />
+
+                        </div>
+                      )}
+
+                      {item.latitude &&
+                        item.longitude && (
+
+                          <div>
+
+                            <p className="font-semibold text-sm mb-2">
+                              GPS
+                            </p>
+
+                            <a
+                              href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
+                              target="_blank"
+                              className="
+                    bg-blue-600
+                    text-white
+                    px-4
+                    py-2
+                    rounded-xl
+                    inline-block
+                  "
+                            >
+                              Lihat Lokasi
+                            </a>
+
+                          </div>
+                        )}
+
+                    </div>
+
+                    {/* FOOTER */}
+                    <div className="mt-5 pt-4 border-t flex justify-between items-center">
+
+                      <p className="text-sm text-slate-500">
                         {new Date(
                           item.created_at
-                        ).toLocaleDateString(
+                        ).toLocaleString(
                           "id-ID"
                         )}
-                      </td>
+                      </p>
 
-                      <td className="p-4">
+                      <a
+                        href={`/receipt/${item.invoice_number}`}
+                        className="
+              bg-black
+              text-white
+              px-4
+              py-2
+              rounded-xl
+            "
+                      >
+                        Receipt
+                      </a>
 
-                        <a
-                          href={`/receipt/${item.invoice_number}`}
-                          target="_blank"
-                          className="bg-black text-white px-4 py-2 rounded-xl"
-                        >
-                          Lihat
-                        </a>
+                    </div>
 
-                      </td>
-                    </tr>
-                  )
-                )}
+                  </div>
+                )
+              )}
 
-              </tbody>
-            </table>
+            </div>
           </div>
         </div>
       </div>

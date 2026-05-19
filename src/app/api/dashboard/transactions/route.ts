@@ -1,10 +1,11 @@
 import { NextResponse }
-from "next/server";
+  from "next/server";
 
 import { supabase }
-from "@/services/supabase";
+  from "@/services/supabase";
 
 export async function GET() {
+
   try {
 
     const {
@@ -26,6 +27,7 @@ export async function GET() {
         .limit(10);
 
     if (error) {
+
       return NextResponse.json(
         {
           success:
@@ -45,11 +47,12 @@ export async function GET() {
       success:
         true,
 
-      data,
+      data:
+        data || [],
     });
 
   } catch (
-    error
+  error
   ) {
 
     console.log(

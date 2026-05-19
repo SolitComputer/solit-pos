@@ -17,6 +17,9 @@ import { Input } from "@/components/ui/input";
 
 import { Button } from "@/components/ui/button";
 
+import { supabase }
+    from "@/services/supabase";
+
 interface Laptop {
     id: string;
     laptop_name: string;
@@ -32,11 +35,33 @@ export default function CreatePaymentPage() {
         useState(1);
 
     const [
+        paymentPhoto,
+        setPaymentPhoto
+    ] = useState<
+        File | null
+    >(null);
+
+    const [
         laptops,
         setLaptops,
     ] = useState<
         Laptop[]
     >([]);
+
+    const [
+        latitude,
+        setLatitude
+    ] = useState("");
+
+    const [
+        longitude,
+        setLongitude
+    ] = useState("");
+
+    const [
+        gpsLoading,
+        setGpsLoading
+    ] = useState(false);
 
     const {
         register,
@@ -103,33 +128,179 @@ export default function CreatePaymentPage() {
         setValue,
     ]);
 
+    const getLocation =
+        () => {
+
+            setGpsLoading(
+                true
+            );
+
+            navigator.geolocation.getCurrentPosition(
+
+                (
+                    position
+                ) => {
+
+                    setLatitude(
+                        String(
+                            position.coords.latitude
+                        )
+                    );
+
+                    setLongitude(
+                        String(
+                            position.coords.longitude
+                        )
+                    );
+
+                    setGpsLoading(
+                        false
+                    );
+                },
+
+                () => {
+
+                    alert(
+                        "GPS wajib diaktifkan"
+                    );
+
+                    setGpsLoading(
+                        false
+                    );
+                },
+
+                {
+                    enableHighAccuracy:
+                        true,
+                }
+            );
+        };
+
     const onSubmit = async (
         data: CreatePaymentType
     ) => {
+
         try {
+
+            // ====================
+            // VALIDASI
+            // ====================
+            if (
+                !paymentPhoto
+            ) {
+                alert(
+                    "Foto pembayaran wajib diupload"
+                );
+
+                return;
+            }
+
+            if (
+                !latitude ||
+                !longitude
+            ) {
+                alert(
+                    "GPS wajib diambil"
+                );
+
+                return;
+            }
+
+            // ====================
+            // UPLOAD PHOTO
+            // ====================
+            const fileName =
+                `${Date.now()}-${paymentPhoto.name}`;
+
+            const {
+                error:
+                uploadError,
+            } =
+                await supabase
+                    .storage
+                    .from(
+                        "payment-proof"
+                    )
+                    .upload(
+                        fileName,
+                        paymentPhoto
+                    );
+
+            if (
+                uploadError
+            ) {
+
+                console.log(
+                    uploadError
+                );
+
+                alert(
+                    "Upload foto gagal"
+                );
+
+                return;
+            }
+
+            // ====================
+            // GET PUBLIC URL
+            // ====================
+            const {
+                data:
+                imageData,
+            } =
+                supabase
+                    .storage
+                    .from(
+                        "payment-proof"
+                    )
+                    .getPublicUrl(
+                        fileName
+                    );
+
+            // ====================
+            // SAVE TRANSACTION
+            // ====================
             const response =
                 await fetch(
                     "/api/transaction/create",
                     {
-                        method: "POST",
+                        method:
+                            "POST",
 
-                        headers: {
+                        headers:
+                        {
                             "Content-Type":
                                 "application/json",
                         },
 
-                        body: JSON.stringify(
-                            data
-                        ),
+                        body:
+                            JSON.stringify(
+                                {
+                                    ...data,
+
+                                    payment_photo:
+                                        imageData.publicUrl,
+
+                                    latitude,
+
+                                    longitude,
+                                }
+                            ),
                     }
                 );
 
             const result =
                 await response.json();
 
+            console.log(
+                "RESULT:",
+                result
+            );
+
             if (
                 !result.success
             ) {
+
                 alert(
                     result.message
                 );
@@ -139,8 +310,14 @@ export default function CreatePaymentPage() {
 
             window.location.href =
                 `/receipt/${result.data.invoice_number}`;
-        } catch (error) {
-            console.log(error);
+
+        } catch (
+        error
+        ) {
+
+            console.log(
+                error
+            );
 
             alert(
                 "Terjadi kesalahan"
@@ -648,6 +825,73 @@ export default function CreatePaymentPage() {
                                     Lainnya
                                 </option>
                             </select>
+
+                            <div>
+                                <label className="text-sm font-medium">
+                                    Foto Bukti Pembayaran
+                                </label>
+
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="
+            w-full
+            border
+            rounded-xl
+            p-3
+            bg-white
+        "
+                                    onChange={(e) =>
+                                        setPaymentPhoto(
+                                            e.target
+                                                .files?.[0] ||
+                                            null
+                                        )
+                                    }
+                                />
+
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Wajib upload foto uang /
+                                    transfer
+                                </p>
+                            </div>
+
+                            <div className="border rounded-xl p-4">
+
+                                <div className="flex justify-between items-center">
+
+                                    <div>
+
+                                        <p className="font-medium">
+                                            GPS Lokasi
+                                        </p>
+
+                                        <p className="text-xs text-slate-500">
+
+                                            {latitude
+                                                ? "GPS berhasil diambil"
+                                                : "GPS wajib aktif"}
+
+                                        </p>
+
+                                    </div>
+
+                                    <Button
+                                        type="button"
+                                        onClick={
+                                            getLocation
+                                        }
+                                    >
+                                        {gpsLoading
+                                            ? "Loading..."
+                                            : latitude
+                                                ? "Diambil"
+                                                : "Ambil GPS"}
+                                    </Button>
+
+                                </div>
+
+                            </div>
 
                             <Input
                                 placeholder="Catatan"
