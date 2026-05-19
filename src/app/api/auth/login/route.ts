@@ -1,14 +1,14 @@
 import { NextResponse }
-    from "next/server";
+from "next/server";
 
 import bcrypt
-    from "bcryptjs";
+from "bcryptjs";
 
 import jwt
-    from "jsonwebtoken";
+from "jsonwebtoken";
 
 import { supabase }
-    from "@/services/supabase";
+from "@/services/supabase";
 
 export async function POST(
     request: Request
@@ -23,19 +23,20 @@ export async function POST(
             password,
         } = body;
 
+        // ======================
         // CARI USER
+        // ======================
         const {
             data: user,
             error,
-        } =
-            await supabase
-                .from("users")
-                .select("*")
-                .eq(
-                    "email",
-                    email
-                )
-                .single();
+        } = await supabase
+            .from("users")
+            .select("*")
+            .eq(
+                "email",
+                email
+            )
+            .single();
 
         if (
             error ||
@@ -56,16 +57,16 @@ export async function POST(
             );
         }
 
+        // ======================
         // CHECK PASSWORD
+        // ======================
         const isMatch =
             await bcrypt.compare(
                 password,
                 user.password
             );
 
-        if (
-            !isMatch
-        ) {
+        if (!isMatch) {
             return NextResponse.json(
                 {
                     success:
@@ -81,7 +82,9 @@ export async function POST(
             );
         }
 
-        // JWT TOKEN
+        // ======================
+        // GENERATE JWT
+        // ======================
         const token =
             jwt.sign(
                 {
@@ -90,11 +93,14 @@ export async function POST(
 
                     role:
                         user.role,
+
+                    email:
+                        user.email,
                 },
 
                 process.env
                     .JWT_SECRET ||
-                "secret",
+                    "secret",
 
                 {
                     expiresIn:
@@ -102,31 +108,60 @@ export async function POST(
                 }
             );
 
+        console.log(
+            "LOGIN SUCCESS:",
+            user.role
+        );
+
+        // ======================
+        // RESPONSE
+        // ======================
         const response =
-            NextResponse.json({
-                success:
-                    true,
+            NextResponse.json(
+                {
+                    success:
+                        true,
 
-                user: {
-                    name:
-                        user.name,
+                    redirect:
+                        user.role ===
+                            "ADMIN"
+                            ? "/dashboard"
+                            : "/payment/create",
 
-                    role:
-                        user.role,
+                    user: {
+                        name:
+                            user.name,
+
+                        role:
+                            user.role,
+                    },
                 },
-            });
+                {
+                    status:
+                        200,
+                }
+            );
 
+        // ======================
+        // SET COOKIE
+        // ======================
         response.cookies.set(
             "token",
             token,
             {
-                httpOnly: true,
+                httpOnly:
+                    true,
 
-                secure: false,
+                secure:
+                    process.env
+                        .NODE_ENV ===
+                    "production",
 
-                sameSite: "lax",
+                sameSite:
+                    "lax",
 
-                path: "/",
+                path:
+                    "/",
 
                 maxAge:
                     60 *
@@ -136,18 +171,14 @@ export async function POST(
             }
         );
 
-        console.log(
-            "LOGIN SUCCESS:",
-            user.role
-        );
-
         return response;
 
     } catch (
-    error
+        error
     ) {
 
-        console.log(
+        console.error(
+            "LOGIN ERROR:",
             error
         );
 
@@ -155,6 +186,9 @@ export async function POST(
             {
                 success:
                     false,
+
+                message:
+                    "Internal server error",
             },
             {
                 status:

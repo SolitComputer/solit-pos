@@ -6,6 +6,7 @@ export async function POST(
   request: Request
 ) {
   try {
+
     const body =
       await request.json();
 
@@ -13,7 +14,7 @@ export async function POST(
       generateInvoice();
 
     // ==========================
-    // GET LAPTOP PRICE
+    // GET LAPTOP
     // ==========================
     const {
       data: laptop,
@@ -27,7 +28,10 @@ export async function POST(
       )
       .single();
 
-    if (laptopError || !laptop) {
+    if (
+      laptopError ||
+      !laptop
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -39,13 +43,33 @@ export async function POST(
     }
 
     // ==========================
+    // VALIDASI STOCK
+    // ==========================
+    if (
+      laptop.qty <= 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Stock laptop habis",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ==========================
     // PRICE LOGIC
     // ==========================
     const inventory_price =
-      laptop.selling_price || 0;
+      Number(
+        laptop.selling_price
+      ) || 0;
 
     const deal_price =
-      Number(body.amount) || 0;
+      Number(
+        body.amount
+      ) || 0;
 
     const other =
       deal_price -
@@ -60,6 +84,7 @@ export async function POST(
     } = await supabase
       .from("transactions")
       .insert({
+
         invoice_number,
 
         laptop_id:
@@ -75,11 +100,10 @@ export async function POST(
           body.customer_phone,
 
         laptop_name:
-          laptop.name ||
-          body.laptop_name,
+          laptop.laptop_name,
 
         serial_number:
-          body.serial_number,
+          laptop.serial_number,
 
         software_request:
           body.software_request,
@@ -99,14 +123,11 @@ export async function POST(
         source_platform:
           body.source_platform,
 
-        // ==========================
-        // PRICE DATA
-        // ==========================
+        // PRICE
         inventory_price,
         deal_price,
         other,
 
-        // amount tetap dipakai
         amount:
           deal_price,
 
@@ -116,7 +137,6 @@ export async function POST(
         notes:
           body.notes,
 
-        // MANUAL PAYMENT
         status:
           "PAID",
 
@@ -128,7 +148,10 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error(error);
+
+      console.error(
+        error
+      );
 
       return NextResponse.json(
         {
@@ -141,24 +164,55 @@ export async function POST(
     }
 
     // ==========================
-    // UPDATE LAPTOP STATUS
+    // UPDATE STOCK
     // ==========================
-    await supabase
-      .from("laptops")
-      .update({
-        status: "SOLD",
-      })
-      .eq(
-        "id",
-        body.laptop_id
+    const newQty =
+      laptop.qty - 1;
+
+    const newStatus =
+      newQty <= 0
+        ? "SOLD"
+        : "SIAP_JUAL";
+
+    const {
+      error:
+        updateError,
+    } =
+      await supabase
+        .from("laptops")
+        .update({
+          qty:
+            newQty,
+
+          status:
+            newStatus,
+        })
+        .eq(
+          "id",
+          body.laptop_id
+        );
+
+    if (
+      updateError
+    ) {
+      console.error(
+        "UPDATE STOCK ERROR:",
+        updateError
       );
+    }
 
     return NextResponse.json({
       success: true,
       data,
     });
-  } catch (error) {
-    console.error(error);
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      error
+    );
 
     return NextResponse.json(
       {

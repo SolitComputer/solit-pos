@@ -305,105 +305,27 @@ export default function CreatePaymentPage() {
                                         Lainnya
                                     </option>
                                 </select>
-
-                                {selectedLaptop && (
-                                    <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
-
-                                        <div>
-                                            <p className="font-semibold">
-                                                {selectedLaptop.laptop_name}
-                                            </p>
-
-                                            <p className="text-sm text-slate-500">
-                                                SN:
-                                                {" "}
-                                                {
-                                                    selectedLaptop.serial_number
-                                                }
-                                            </p>
-
-                                            <p className="text-sm text-slate-500">
-                                                {
-                                                    selectedLaptop.cpu
-                                                }
-                                                {" | "}
-                                                {
-                                                    selectedLaptop.ram
-                                                }
-                                                {" | "}
-                                                {
-                                                    selectedLaptop.storage
-                                                }
-                                            </p>
-                                        </div>
-
-                                        <div className="border-t pt-3 space-y-2">
-
-                                            <div className="flex justify-between text-sm">
-                                                <span>
-                                                    Harga Inventory
-                                                </span>
-
-                                                <span className="font-semibold">
-                                                    Rp
-                                                    {selectedLaptop.selling_price.toLocaleString(
-                                                        "id-ID"
-                                                    )}
-                                                </span>
-                                            </div>
-
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Harga Deal
-                                                </label>
-
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Masukkan harga deal"
-                                                    {...register(
-                                                        "amount",
-                                                        {
-                                                            valueAsNumber: true,
-                                                        }
-                                                    )}
-                                                />
-                                            </div>
-
-                                            <div className="flex justify-between border-t pt-3">
-
-                                                <span>
-                                                    Other
-                                                </span>
-
-                                                <span
-                                                    className={`font-bold ${other >= 0
-                                                            ? "text-green-600"
-                                                            : "text-red-600"
-                                                        }`}
-                                                >
-                                                    {other >= 0
-                                                        ? "+"
-                                                        : "-"}
-                                                    Rp
-                                                    {Math.abs(
-                                                        other
-                                                    ).toLocaleString(
-                                                        "id-ID"
-                                                    )}
-                                                </span>
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             <Button
                                 type="button"
                                 className="w-full"
-                                onClick={() =>
-                                    setStep(2)
-                                }
+                                onClick={() => {
+
+                                    if (
+                                        !watch(
+                                            "customer_name"
+                                        )
+                                    ) {
+                                        alert(
+                                            "Isi nama customer dulu"
+                                        );
+
+                                        return;
+                                    }
+
+                                    setStep(2);
+                                }}
                             >
                                 Lanjut
                             </Button>
@@ -418,13 +340,13 @@ export default function CreatePaymentPage() {
                                     "laptop_id"
                                 )}
                                 className="
-                                    w-full
-                                    h-12
-                                    border
-                                    rounded-xl
-                                    px-3
-                                    bg-white
-                                "
+                w-full
+                h-12
+                border
+                rounded-xl
+                px-3
+                bg-white
+            "
                             >
                                 <option value="">
                                     Pilih Laptop
@@ -433,12 +355,8 @@ export default function CreatePaymentPage() {
                                 {laptops.map(
                                     (item) => (
                                         <option
-                                            key={
-                                                item.id
-                                            }
-                                            value={
-                                                item.id
-                                            }
+                                            key={item.id}
+                                            value={item.id}
                                         >
                                             {
                                                 item.laptop_name
@@ -460,53 +378,6 @@ export default function CreatePaymentPage() {
                                 )}
                             </select>
 
-                            {selectedLaptop && (
-                                <div className="bg-slate-50 rounded-2xl p-4">
-
-                                    <p>
-                                        <strong>
-                                            Laptop:
-                                        </strong>{" "}
-                                        {
-                                            selectedLaptop.laptop_name
-                                        }
-                                    </p>
-
-                                    <p>
-                                        <strong>
-                                            SN:
-                                        </strong>{" "}
-                                        {
-                                            selectedLaptop.serial_number
-                                        }
-                                    </p>
-
-                                    <p>
-                                        <strong>
-                                            Spek:
-                                        </strong>{" "}
-                                        {
-                                            selectedLaptop.cpu
-                                        }
-                                        {" | "}
-                                        {
-                                            selectedLaptop.ram
-                                        }
-                                        {" | "}
-                                        {
-                                            selectedLaptop.storage
-                                        }
-                                    </p>
-
-                                    <p className="font-bold text-green-600 mt-2">
-                                        Rp
-                                        {selectedLaptop.selling_price.toLocaleString(
-                                            "id-ID"
-                                        )}
-                                    </p>
-                                </div>
-                            )}
-
                             <input
                                 type="hidden"
                                 {...register(
@@ -520,6 +391,101 @@ export default function CreatePaymentPage() {
                                     "serial_number"
                                 )}
                             />
+
+                            {selectedLaptop && (
+                                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+
+                                    <div>
+                                        <p className="font-semibold text-lg">
+                                            {
+                                                selectedLaptop.laptop_name
+                                            }
+                                        </p>
+
+                                        <p className="text-sm text-slate-500">
+                                            SN:
+                                            {" "}
+                                            {
+                                                selectedLaptop.serial_number
+                                            }
+                                        </p>
+
+                                        <p className="text-sm text-slate-500">
+                                            {
+                                                selectedLaptop.cpu
+                                            }
+                                            {" | "}
+                                            {
+                                                selectedLaptop.ram
+                                            }
+                                            {" | "}
+                                            {
+                                                selectedLaptop.storage
+                                            }
+                                        </p>
+                                    </div>
+
+                                    <div className="border-t pt-3">
+
+                                        <div className="flex justify-between text-sm">
+                                            <span>
+                                                Harga Inventory
+                                            </span>
+
+                                            <span className="font-semibold">
+                                                Rp
+                                                {selectedLaptop.selling_price.toLocaleString(
+                                                    "id-ID"
+                                                )}
+                                            </span>
+                                        </div>
+
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Harga Deal
+                                        </label>
+
+                                        <Input
+                                            type="number"
+                                            placeholder="Masukkan harga deal"
+                                            {...register(
+                                                "amount",
+                                                {
+                                                    valueAsNumber: true,
+                                                }
+                                            )}
+                                        />
+                                    </div>
+
+                                    <div className="border-t pt-3 flex justify-between">
+
+                                        <span>
+                                            Other
+                                        </span>
+
+                                        <span
+                                            className={`font-bold ${other >= 0
+                                                ? "text-green-600"
+                                                : "text-red-600"
+                                                }`}
+                                        >
+                                            {other >= 0
+                                                ? "+"
+                                                : "-"}
+
+                                            Rp
+                                            {Math.abs(
+                                                other
+                                            ).toLocaleString(
+                                                "id-ID"
+                                            )}
+                                        </span>
+
+                                    </div>
+                                </div>
+                            )}
 
                             <Input
                                 placeholder="Request Software"
@@ -543,9 +509,32 @@ export default function CreatePaymentPage() {
                                 <Button
                                     type="button"
                                     className="flex-1"
-                                    onClick={() =>
-                                        setStep(3)
-                                    }
+                                    onClick={() => {
+
+                                        if (
+                                            !selectedLaptop
+                                        ) {
+                                            alert(
+                                                "Pilih laptop dulu"
+                                            );
+
+                                            return;
+                                        }
+
+                                        if (
+                                            !watch(
+                                                "amount"
+                                            )
+                                        ) {
+                                            alert(
+                                                "Masukkan harga deal"
+                                            );
+
+                                            return;
+                                        }
+
+                                        setStep(3);
+                                    }}
                                 >
                                     Lanjut
                                 </Button>
@@ -623,71 +612,9 @@ export default function CreatePaymentPage() {
                     {/* STEP 4 */}
                     {step === 4 && (
                         <>
-                            <Input
-                                type="number"
-                                placeholder="Harga Deal"
-                                {...register(
-                                    "amount",
-                                    {
-                                        valueAsNumber: true,
-                                    }
-                                )}
-                            />
 
-                            {selectedLaptop && (
-                                <div className="bg-slate-50 rounded-2xl p-4 text-sm">
 
-                                    <div className="flex justify-between">
-                                        <span>
-                                            Harga Inventory
-                                        </span>
 
-                                        <span className="font-semibold">
-                                            Rp
-                                            {selectedLaptop.selling_price.toLocaleString(
-                                                "id-ID"
-                                            )}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex justify-between mt-2">
-                                        <span>
-                                            Harga Deal
-                                        </span>
-
-                                        <span className="font-semibold">
-                                            Rp
-                                            {(dealPrice || 0).toLocaleString(
-                                                "id-ID"
-                                            )}
-                                        </span>
-                                    </div>
-
-                                    <div className="border-t mt-3 pt-3 flex justify-between">
-
-                                        <span>
-                                            Other
-                                        </span>
-
-                                        <span
-                                            className={`font-bold ${other >= 0
-                                                ? "text-green-600"
-                                                : "text-red-600"
-                                                }`}
-                                        >
-                                            {other >= 0 ? "+" : "-"}
-                                            Rp
-                                            {Math.abs(
-                                                other
-                                            ).toLocaleString(
-                                                "id-ID"
-                                            )}
-                                        </span>
-
-                                    </div>
-
-                                </div>
-                            )}
 
                             <select
                                 {...register(
