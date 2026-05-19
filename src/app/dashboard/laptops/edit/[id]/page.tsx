@@ -1,258 +1,178 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
-
-import { Input }
-from "@/components/ui/input";
-
-import { Button }
-from "@/components/ui/button";
-
-import { Card }
-from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
 export default function Page() {
-  const router =
-    useRouter();
-
-  const params =
-    useParams();
-
-  const id =
-    params.id;
-
-  const [
-    form,
-    setForm,
-  ] = useState<any>(
-    null
-  );
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id;
+  const [form, setForm] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchLaptop();
   }, []);
 
-  const fetchLaptop =
-    async () => {
-      const response =
-        await fetch(
-          `/api/laptops/${id}`
-        );
+  const fetchLaptop = async () => {
+    try {
+      const response = await fetch(`/api/laptops/${id}`);
+      const result = await response.json();
+      setForm(result.data);
+    } catch (error) {
+      console.error(error);
+      alert("Gagal memuat data laptop");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const result =
-        await response.json();
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-      setForm(
-        result.data
-      );
-    };
-
-  const handleChange =
-    (
-      e:
-        React.ChangeEvent<
-          HTMLInputElement |
-          HTMLSelectElement
-        >
-    ) => {
-      setForm({
-        ...form,
-
-        [
-          e.target.name
-        ]:
-          e.target.value,
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/laptops/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          purchase_price: Number(form.purchase_price),
+          selling_price: Number(form.selling_price),
+          qty: Number(form.qty),
+        }),
       });
-    };
-
-  const handleSubmit =
-    async (
-      e:
-        React.FormEvent
-    ) => {
-      e.preventDefault();
-
-      const response =
-        await fetch(
-          `/api/laptops/${id}`,
-          {
-            method:
-              "PUT",
-
-            headers:
-              {
-                "Content-Type":
-                  "application/json",
-              },
-
-            body:
-              JSON.stringify(
-                {
-                  ...form,
-
-                  purchase_price:
-                    Number(
-                      form.purchase_price
-                    ),
-
-                  selling_price:
-                    Number(
-                      form.selling_price
-                    ),
-
-                  qty:
-                    Number(
-                      form.qty
-                    ),
-                }
-              ),
-          }
-        );
-
-      const result =
-        await response.json();
-
-      if (
-        !result.success
-      ) {
-        alert(
-          result.message
-        );
-
+      const result = await response.json();
+      if (!result.success) {
+        alert(result.message);
         return;
       }
+      alert("Laptop berhasil diupdate");
+      router.push("/dashboard/laptops");
+    } catch (error) {
+      console.error(error);
+      alert("Terjadi kesalahan");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      alert(
-        "Laptop berhasil diupdate"
-      );
-
-      router.push(
-        "/dashboard/laptops"
-      );
-    };
-
-  if (!form)
+  // Skeleton form edit
+  if (isLoading) {
     return (
-      <div>
-        Loading...
-      </div>
+      <main className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm animate-pulse">
+            <div className="h-6 bg-gray-100 rounded w-32 mb-6"></div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {Array(7)
+                .fill(0)
+                .map((_, i) => (
+                  <div key={i} className="h-10 bg-gray-100 rounded-lg"></div>
+                ))}
+              <div className="md:col-span-2 h-10 bg-gray-100 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </main>
     );
+  }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-5">
+    <main className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <h1 className="text-xl md:text-2xl font-semibold text-gray-800 tracking-tight mb-6">
+            Edit Laptop
+          </h1>
 
-      <Card className="max-w-3xl mx-auto p-6 rounded-3xl">
+          <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="laptop_name"
+              placeholder="Nama Laptop"
+              value={form?.laptop_name || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+              required
+            />
+            <input
+              type="text"
+              name="cpu"
+              placeholder="CPU"
+              value={form?.cpu || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+            />
+            <input
+              type="text"
+              name="ram"
+              placeholder="RAM"
+              value={form?.ram || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+            />
+            <input
+              type="text"
+              name="storage"
+              placeholder="Storage"
+              value={form?.storage || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+            />
+            <input
+              type="number"
+              name="purchase_price"
+              placeholder="Harga Modal"
+              value={form?.purchase_price || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+            />
+            <input
+              type="number"
+              name="selling_price"
+              placeholder="Harga Jual"
+              value={form?.selling_price || ""}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+              required
+            />
+            <input
+              type="number"
+              name="qty"
+              placeholder="Stock"
+              value={form?.qty || 0}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
+              required
+            />
+            <select
+              name="status"
+              value={form?.status || "SIAP_JUAL"}
+              onChange={handleChange}
+              className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50 focus:outline-none focus:ring-1 focus:ring-gray-300"
+            >
+              <option value="SIAP_JUAL">Siap Jual</option>
+              <option value="BELUM_SIAP">Belum Siap</option>
+              <option value="SERVICE">Service</option>
+            </select>
 
-        <h1 className="text-3xl font-bold mb-5">
-          Edit Laptop
-        </h1>
-
-        <form
-          onSubmit={
-            handleSubmit
-          }
-          className="grid md:grid-cols-2 gap-4"
-        >
-
-          <Input
-            name="laptop_name"
-            value={
-              form.laptop_name
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <Input
-            name="cpu"
-            value={
-              form.cpu
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <Input
-            name="ram"
-            value={
-              form.ram
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <Input
-            name="storage"
-            value={
-              form.storage
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <Input
-            name="selling_price"
-            value={
-              form.selling_price
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <Input
-            name="qty"
-            value={
-              form.qty
-            }
-            onChange={
-              handleChange
-            }
-          />
-
-          <select
-            name="status"
-            value={
-              form.status
-            }
-            onChange={
-              handleChange
-            }
-            className="h-11 border rounded-xl px-3"
-          >
-            <option value="SIAP_JUAL">
-              SIAP JUAL
-            </option>
-
-            <option value="BELUM_SIAP">
-              BELUM SIAP
-            </option>
-
-            <option value="SERVICE">
-              SERVICE
-            </option>
-          </select>
-
-          <div className="md:col-span-2">
-
-            <Button className="w-full">
-              Simpan
-            </Button>
-          </div>
-        </form>
-      </Card>
+            <div className="md:col-span-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
   );
 }
