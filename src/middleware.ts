@@ -23,6 +23,16 @@ export async function middleware(
     const pathname =
         request.nextUrl.pathname;
 
+    console.log(
+        "PATH:",
+        pathname
+    );
+
+    console.log(
+        "TOKEN:",
+        !!token
+    );
+
     // ====================
     // PUBLIC ROUTES
     // ====================
@@ -72,11 +82,20 @@ export async function middleware(
 
         try {
 
+            const jwtSecret =
+                process.env
+                    .JWT_SECRET ||
+                "secret";
+
+            console.log(
+                "JWT SECRET EXISTS:",
+                !!jwtSecret
+            );
+
             const secret =
                 new TextEncoder()
                     .encode(
-                        process.env
-                            .JWT_SECRET
+                        jwtSecret
                     );
 
             const {
@@ -90,7 +109,19 @@ export async function middleware(
             user =
                 payload;
 
-        } catch {
+            console.log(
+                "USER:",
+                user
+            );
+
+        } catch (
+            error
+        ) {
+
+            console.log(
+                "JWT ERROR:",
+                error
+            );
 
             const response =
                 NextResponse.redirect(
@@ -119,7 +150,7 @@ export async function middleware(
 
         return NextResponse.redirect(
             new URL(
-                user.role ===
+                user?.role ===
                     "ADMIN"
                     ? "/dashboard"
                     : "/payment/create",
@@ -164,17 +195,6 @@ export async function middleware(
                 )
             );
         }
-    }
-
-    // ====================
-    // ADMIN ACCESS
-    // ====================
-    if (
-        user?.role ===
-        "ADMIN"
-    ) {
-
-        return NextResponse.next();
     }
 
     return NextResponse.next();
