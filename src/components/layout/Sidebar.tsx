@@ -8,7 +8,7 @@ const menuIcons: Record<string, string> = {
   Dashboard: "📊",
   Riwayat: "📜",
   "Data Laptop": "💻",
-  "Tambah Laptop": "➕",
+  // "Tambah Laptop": "➕",
   "Buat Payment": "💳",
 };
 
@@ -45,7 +45,7 @@ export default function Sidebar() {
     { name: "Dashboard", href: "/dashboard" },
     { name: "Riwayat", href: "/dashboard/transactions" },
     { name: "Data Laptop", href: "/dashboard/laptops" },
-    { name: "Tambah Laptop", href: "/dashboard/laptops/create" },
+    // { name: "Tambah Laptop", href: "/dashboard/laptops/create" },
     { name: "Buat Payment", href: "/payment/create" },
   ];
 
