@@ -8,7 +8,6 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
       return false;
     }
 
-    // Normalisasi nomor
     let normalized = target.replace(/\D/g, "");
     if (normalized.startsWith("0")) {
       normalized = "62" + normalized.slice(1);
@@ -17,10 +16,10 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
     }
 
     console.log(`[Fonnte] Mengirim ke: ${normalized}`);
+    console.log(`[Fonnte] API Key exists: ${!!process.env.WHATSAPP_API_KEY}`);
 
-    // Fetch dengan timeout dan retry
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 detik timeout
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15 detik
 
     const res = await fetch("https://api.fonnte.com/send", {
       method: "POST",
@@ -28,33 +27,42 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
         Authorization: process.env.WHATSAPP_API_KEY || "",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ target: normalized, message }),
+      body: JSON.stringify({
+        target: normalized,
+        message
+      }),
       signal: controller.signal,
-      cache: "no-store",
     });
 
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
 
-    const result = await res.json().catch(() => ({}));
+    const result = await res.json().catch((e) => {
+      console.error("[Fonnte] Gagal parse JSON response");
+      return {};
+    });
+
+    console.log(`[Fonnte] HTTP Status: ${res.status}`);
+    console.log(`[Fonnte] Response dari Fonnte:`, JSON.stringify(result, null, 2));
 
     if (!res.ok || result.status === false) {
-      console.error("[Fonnte] Gagal:", {
+      console.error("[Fonnte] ❌ GAGAL mengirim WA", {
         status: res.status,
-        result,
+        fonnte_status: result.status,
+        fonnte_message: result.message || result.detail,
         target: normalized,
       });
       return false;
     }
 
-    console.log(`[Fonnte] ✅ Berhasil terkirim ke ${normalized}`);
+    console.log(`[Fonnte] ✅ BERHASIL terkirim ke ${normalized}`);
     return true;
+
   } catch (error: any) {
-    console.error("[Fonnte] EXCEPTION:", error.name, "-", error.message);
-    
-    if (error.name === 'AbortError') {
-      console.error("[Fonnte] Timeout - koneksi terlalu lama");
-    }
-    
+    console.error("[Fonnte] ❌ EXCEPTION:", {
+      name: error.name,
+      message: error.message,
+      cause: error.cause || "unknown"
+    });
     return false;
   }
 }
@@ -83,11 +91,11 @@ export function buildPaymentMessage(data: {
   const scheduleInfo =
     data.pickup_date
       ? `📅 Tanggal: ${new Date(data.pickup_date).toLocaleDateString("id-ID", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })}${data.pickup_time ? `\n⏰ Jam: ${data.pickup_time}` : ""}`
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}${data.pickup_time ? `\n⏰ Jam: ${data.pickup_time}` : ""}`
       : "";
 
   return (
