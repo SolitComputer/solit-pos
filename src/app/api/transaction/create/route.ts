@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { generateInvoice } from "@/lib/invoice";
+import { sendWhatsapp } from "@/service/whatsapp";
 
 async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
         const body = await req.json();
-
-        // user sudah dijamin ada dan valid oleh withAuth
-        // tidak perlu cek ulang
 
         const invoice_number = generateInvoice();
 
@@ -104,6 +102,47 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             console.error("UPDATE STOCK ERROR:", updateError);
         }
 
+        // ==========================
+        // KIRIM WHATSAPP OTOMATIS
+        // ==========================
+        if (body.customer_phone) {
+            const pickupInfo = body.pickup_method === "DIANTAR"
+                ? `📍 Alamat: ${body.pickup_location || "-"}`
+                : `🏪 Datang ke toko`;
+
+            const pickupDate = body.pickup_date
+                ? new Date(body.pickup_date).toLocaleDateString("id-ID", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                })
+                : null;
+
+            const message =
+                `Halo *${body.customer_name}* 👋\n\n` +
+                `✅ Pembayaran laptop Anda telah *berhasil dikonfirmasi!*\n\n` +
+                `━━━━━━━━━━━━━━━\n` +
+                `📋 *INVOICE: ${invoice_number}*\n` +
+                `━━━━━━━━━━━━━━━\n\n` +
+                `💻 *Laptop:* ${laptop.laptop_name}\n` +
+                (laptop.serial_number ? `🔢 *SN:* ${laptop.serial_number}\n` : "") +
+                (body.software_request ? `💿 *Software:* ${body.software_request}\n` : "") +
+                `\n💰 *Total:* Rp${deal_price.toLocaleString("id-ID")}\n` +
+                `💳 *Metode:* ${body.payment_method}\n` +
+                `🏷️ *Status:* LUNAS\n\n` +
+                `━━━━━━━━━━━━━━━\n` +
+                `📦 *Info Pengambilan*\n` +
+                `${pickupInfo}\n` +
+                (pickupDate ? `📅 Tanggal: ${pickupDate}\n` : "") +
+                (body.pickup_time ? `⏰ Jam: ${body.pickup_time}\n` : "") +
+                `━━━━━━━━━━━━━━━\n\n` +
+                `Terima kasih sudah berbelanja di *Solit 03* 🙏\n` +
+                `_Sawangan, Depok_`;
+
+            // Fire-and-forget: tidak block response meski WA gagal
+            sendWhatsapp(body.customer_phone, message).catch((err) => {
+                console.error("[WA] Error:", err);
+            });
+        }
+
         return NextResponse.json({ success: true, data });
     } catch (error) {
         console.error(error);
@@ -114,5 +153,4 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     }
 }
 
-// ADMIN + SALES boleh buat transaksi
 export const POST = withAuth(handler);
