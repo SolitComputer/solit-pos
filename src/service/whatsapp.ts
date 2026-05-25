@@ -8,6 +8,7 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
       return false;
     }
 
+    // Normalisasi nomor
     let normalized = target.replace(/\D/g, "");
     if (normalized.startsWith("0")) {
       normalized = "62" + normalized.slice(1);
@@ -15,8 +16,11 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
       normalized = "62" + normalized;
     }
 
-    console.log(`[Fonnte] Production Debug → Mengirim ke: ${normalized}`);
-    console.log(`[Fonnte] API Key exists: ${!!process.env.WHATSAPP_API_KEY}`);
+    console.log(`[Fonnte] Mengirim ke: ${normalized}`);
+
+    // Fetch dengan timeout dan retry
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 detik timeout
 
     const res = await fetch("https://api.fonnte.com/send", {
       method: "POST",
@@ -25,27 +29,32 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ target: normalized, message }),
+      signal: controller.signal,
+      cache: "no-store",
     });
+
+    clearTimeout(timeoutId);
 
     const result = await res.json().catch(() => ({}));
 
-    console.log(`[Fonnte] Response Status: ${res.status}`);
-    console.log(`[Fonnte] Response Body:`, result);
-
     if (!res.ok || result.status === false) {
-      console.error("[Fonnte] GAGAL di Production:", {
+      console.error("[Fonnte] Gagal:", {
         status: res.status,
         result,
         target: normalized,
-        hasApiKey: !!process.env.WHATSAPP_API_KEY,
       });
       return false;
     }
 
-    console.log(`[Fonnte] ✅ BERHASIL terkirim ke ${normalized}`);
+    console.log(`[Fonnte] ✅ Berhasil terkirim ke ${normalized}`);
     return true;
   } catch (error: any) {
-    console.error("[Fonnte] EXCEPTION di Production:", error.message || error);
+    console.error("[Fonnte] EXCEPTION:", error.name, "-", error.message);
+    
+    if (error.name === 'AbortError') {
+      console.error("[Fonnte] Timeout - koneksi terlalu lama");
+    }
+    
     return false;
   }
 }
