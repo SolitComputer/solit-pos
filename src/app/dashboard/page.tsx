@@ -314,7 +314,7 @@ function StatCard({
 }) {
   return (
     <div className={`
-      bg-white rounded-2xl border p-4 shadow-sm hover:shadow-md transition
+      bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition
       ${span2 ? "col-span-2 lg:col-span-2" : "col-span-1"}
     `}>
       <div className="flex items-start justify-between gap-2">
