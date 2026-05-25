@@ -1,11 +1,28 @@
 /**
  * Kirim pesan WhatsApp via Fonnte API
- * Docs: https://fonnte.com/docs
  */
 export async function sendWhatsapp(target: string, message: string): Promise<boolean> {
   try {
-    // Normalisasi nomor: 08xx → 628xx
-    const normalized = target.replace(/^0/, "62").replace(/\D/g, "");
+    if (!target || !message) {
+      console.warn("[Fonnte] Target atau message kosong");
+      return false;
+    }
+
+    // Normalisasi nomor
+    let normalized = target.replace(/\D/g, "");
+
+    if (normalized.startsWith("0")) {
+      normalized = "62" + normalized.slice(1);
+    } else if (!normalized.startsWith("62")) {
+      normalized = "62" + normalized;
+    }
+
+    if (normalized.length < 10) {
+      console.warn("[Fonnte] Nomor tidak valid:", target);
+      return false;
+    }
+
+    console.log(`[Fonnte] Mengirim ke ${normalized}`);
 
     const res = await fetch("https://api.fonnte.com/send", {
       method: "POST",
@@ -16,21 +33,24 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
       body: JSON.stringify({
         target: normalized,
         message,
-        countryCode: "62",
       }),
     });
 
-    const result = await res.json();
+    const result = await res.json().catch(() => ({}));
 
     if (!res.ok || result.status === false) {
-      console.error("[Fonnte] Gagal kirim WA:", result);
+      console.error("[Fonnte] Gagal:", {
+        status: res.status,
+        result,
+        target: normalized,
+      });
       return false;
     }
 
-    console.log("[Fonnte] WA terkirim ke:", normalized);
+    console.log(`[Fonnte] ✅ Berhasil terkirim ke ${normalized}`);
     return true;
-  } catch (error) {
-    console.error("[Fonnte] Error:", error);
+  } catch (error: any) {
+    console.error("[Fonnte] Error:", error.message || error);
     return false;
   }
 }
