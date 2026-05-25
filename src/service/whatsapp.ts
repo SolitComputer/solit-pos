@@ -8,21 +8,15 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
       return false;
     }
 
-    // Normalisasi nomor
     let normalized = target.replace(/\D/g, "");
-
     if (normalized.startsWith("0")) {
       normalized = "62" + normalized.slice(1);
     } else if (!normalized.startsWith("62")) {
       normalized = "62" + normalized;
     }
 
-    if (normalized.length < 10) {
-      console.warn("[Fonnte] Nomor tidak valid:", target);
-      return false;
-    }
-
-    console.log(`[Fonnte] Mengirim ke ${normalized}`);
+    console.log(`[Fonnte] Production Debug → Mengirim ke: ${normalized}`);
+    console.log(`[Fonnte] API Key exists: ${!!process.env.WHATSAPP_API_KEY}`);
 
     const res = await fetch("https://api.fonnte.com/send", {
       method: "POST",
@@ -30,27 +24,28 @@ export async function sendWhatsapp(target: string, message: string): Promise<boo
         Authorization: process.env.WHATSAPP_API_KEY || "",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        target: normalized,
-        message,
-      }),
+      body: JSON.stringify({ target: normalized, message }),
     });
 
     const result = await res.json().catch(() => ({}));
 
+    console.log(`[Fonnte] Response Status: ${res.status}`);
+    console.log(`[Fonnte] Response Body:`, result);
+
     if (!res.ok || result.status === false) {
-      console.error("[Fonnte] Gagal:", {
+      console.error("[Fonnte] GAGAL di Production:", {
         status: res.status,
         result,
         target: normalized,
+        hasApiKey: !!process.env.WHATSAPP_API_KEY,
       });
       return false;
     }
 
-    console.log(`[Fonnte] ✅ Berhasil terkirim ke ${normalized}`);
+    console.log(`[Fonnte] ✅ BERHASIL terkirim ke ${normalized}`);
     return true;
   } catch (error: any) {
-    console.error("[Fonnte] Error:", error.message || error);
+    console.error("[Fonnte] EXCEPTION di Production:", error.message || error);
     return false;
   }
 }

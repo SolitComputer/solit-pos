@@ -95,18 +95,18 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 software_request: body.software_request,
             });
 
-            console.log("📱 Mengirim WA ke:", body.customer_phone);
+            console.log("📱 [Production] Mulai kirim WA ke:", body.customer_phone);
 
             sendWhatsapp(body.customer_phone, message)
                 .then(sent => {
                     if (sent) {
-                        console.log("✅ WhatsApp berhasil terkirim");
+                        console.log("✅ [Production] WhatsApp BERHASIL terkirim");
                     } else {
-                        console.warn("⚠️ WhatsApp gagal terkirim");
+                        console.warn("⚠️ [Production] WhatsApp GAGAL terkirim");
                     }
                 })
                 .catch(err => {
-                    console.error("❌ Error kirim WA:", err);
+                    console.error("❌ [Production] Error kirim WA:", err);
                 });
         }
 
