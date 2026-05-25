@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { withAuth } from "@/lib/auth";
 
-export async function POST(request: Request) {
+async function handler(req: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await req.json();
 
-    // Cek apakah serial_number sudah ada
     if (body.serial_number) {
       const { data: existing } = await supabase
         .from("laptops")
@@ -14,10 +14,13 @@ export async function POST(request: Request) {
         .single();
 
       if (existing) {
-        return NextResponse.json({
-          success: false,
-          message: "Serial Number ini sudah terdaftar. Tidak boleh duplikat.",
-        }, { status: 409 });
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Serial Number ini sudah terdaftar. Tidak boleh duplikat.",
+          },
+          { status: 409 }
+        );
       }
     }
 
@@ -43,18 +46,21 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({
-        success: false,
-        message: error.message,
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({
-      success: false,
-      message: "Terjadi kesalahan server",
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Terjadi kesalahan server" },
+      { status: 500 }
+    );
   }
 }
+
+// ADMIN only
+export const POST = withAuth(handler, ["ADMIN"]);

@@ -3,9 +3,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
 interface Laptop {
     id: string;
     laptop_name: string;
@@ -442,23 +439,21 @@ export default function Page() {
         const MAX_WIDTH = 45;
         const PADDING = 2;
 
-        ws.columns.forEach(col => {
+        ws.columns.forEach((col, colIndex) => {
             let maxLen = col.header ? String(col.header).length : 0;
 
-            col.eachCell?.({ includeEmpty: false }, cell => {
-                let cellText = "";
-                if (cell.value === null || cell.value === undefined) return;
-                if (typeof cell.value === "object" && "formula" in (cell.value as object)) {
-                    cellText = String(col.header ?? "");
-                } else if (cell.value instanceof Date) {
-                    cellText = cell.value.toLocaleDateString("id-ID");
-                } else {
-                    cellText = String(cell.value);
+            filteredLaptops.forEach((item) => {
+                const rowNum = filteredLaptops.indexOf(item) + 2;
+                const cell = ws.getCell(rowNum, colIndex + 1);
+                if (cell.value !== null && cell.value !== undefined) {
+                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object)
+                        ? String(col.header ?? "")
+                        : String(cell.value);
+                    if (cellText.length > maxLen) maxLen = cellText.length;
                 }
-                if (cellText.length > maxLen) maxLen = cellText.length;
             });
 
-            col.width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, maxLen + PADDING));
+            col.width = Math.min(45, Math.max(8, maxLen + 2));
         });
 
         const buffer = await wb.xlsx.writeBuffer();

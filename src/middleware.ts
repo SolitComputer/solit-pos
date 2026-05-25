@@ -1,210 +1,72 @@
-import {
-    NextResponse,
-} from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { verifyToken, ROUTE_PERMISSIONS, UserRole } from "@/lib/auth";
 
-import type {
-    NextRequest,
-} from "next/server";
+const PUBLIC_ROUTES = ["/login", "/api/auth/login"];
+const PUBLIC_PREFIXES = ["/receipt/"];
 
-import {
-    jwtVerify
-}
-from "jose";
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const token = request.cookies.get("token")?.value;
 
-export async function middleware(
-    request: NextRequest
-) {
-
-    const token =
-        request.cookies.get(
-            "token"
-        )?.value;
-
-    const pathname =
-        request.nextUrl.pathname;
-
-    console.log(
-        "PATH:",
-        pathname
-    );
-
-    console.log(
-        "TOKEN:",
-        !!token
-    );
-
-    // ====================
-    // PUBLIC ROUTES
-    // ====================
-    const publicRoutes = [
-        "/login",
-        "/api/auth/login",
-    ];
-
-    const isPublic =
-        publicRoutes.includes(
-            pathname
-        );
-
-    // ====================
-    // PUBLIC RECEIPT
-    // ====================
-    const isReceipt =
-        pathname.startsWith(
-            "/receipt/"
-        );
-
-    // ====================
-    // BELUM LOGIN
-    // ====================
-    if (
-        !token &&
-        !isPublic &&
-        !isReceipt
-    ) {
-
+  if (PUBLIC_ROUTES.includes(pathname)) {
+    if (token && pathname === "/login") {
+      const user = await verifyToken(token);
+      if (user) {
         return NextResponse.redirect(
-            new URL(
-                "/login",
-                request.url
-            )
+          new URL(
+            user.role === "ADMIN" ? "/dashboard" : "/payment/create",
+            request.url
+          )
         );
+      }
     }
-
-    // ====================
-    // VERIFY JWT
-    // ====================
-    let user:
-        any =
-        null;
-
-    if (token) {
-
-        try {
-
-            const jwtSecret =
-                process.env
-                    .JWT_SECRET ||
-                "secret";
-
-            console.log(
-                "JWT SECRET EXISTS:",
-                !!jwtSecret
-            );
-
-            const secret =
-                new TextEncoder()
-                    .encode(
-                        jwtSecret
-                    );
-
-            const {
-                payload,
-            } =
-                await jwtVerify(
-                    token,
-                    secret
-                );
-
-            user =
-                payload;
-
-            console.log(
-                "USER:",
-                user
-            );
-
-        } catch (
-            error
-        ) {
-
-            console.log(
-                "JWT ERROR:",
-                error
-            );
-
-            const response =
-                NextResponse.redirect(
-                    new URL(
-                        "/login",
-                        request.url
-                    )
-                );
-
-            response.cookies.delete(
-                "token"
-            );
-
-            return response;
-        }
-    }
-
-    // ====================
-    // LOGIN REDIRECT
-    // ====================
-    if (
-        token &&
-        pathname ===
-        "/login"
-    ) {
-
-        return NextResponse.redirect(
-            new URL(
-                user?.role ===
-                    "ADMIN"
-                    ? "/dashboard"
-                    : "/payment/create",
-                request.url
-            )
-        );
-    }
-
-    // ====================
-    // SALES ACCESS
-    // ====================
-    if (
-        user?.role ===
-        "SALES"
-    ) {
-
-        const salesAllowed =
-            [
-                "/payment/create",
-                "/dashboard/transactions",
-                "/receipt/",
-            ];
-
-        const canAccess =
-            salesAllowed.some(
-                (
-                    route
-                ) =>
-                    pathname.startsWith(
-                        route
-                    )
-            );
-
-        if (
-            !canAccess
-        ) {
-
-            return NextResponse.redirect(
-                new URL(
-                    "/payment/create",
-                    request.url
-                )
-            );
-        }
-    }
-
     return NextResponse.next();
+  }
+
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const user = await verifyToken(token);
+  if (!user) {
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    response.cookies.delete("token");
+    return response;
+  }
+
+  const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
+    .filter((route) => pathname.startsWith(route))
+    .sort((a, b) => b.length - a.length)[0];
+
+  if (matchedRoute) {
+    const allowed = ROUTE_PERMISSIONS[matchedRoute];
+    if (!allowed.includes(user.role as UserRole)) {
+      const fallback = user.role === "ADMIN" ? "/dashboard" : "/payment/create";
+      return NextResponse.redirect(new URL(fallback, request.url));
+    }
+  }
+
+  const response = NextResponse.next();
+  response.headers.set("x-user-id", user.id);
+  response.headers.set("x-user-role", user.role);
+  return response;
 }
 
 export const config = {
-    matcher: [
-        "/dashboard/:path*",
-        "/payment/:path*",
-        "/receipt/:path*",
-        "/login",
-    ],
+  matcher: [
+    "/dashboard/:path*",
+    "/payment/:path*",
+    "/receipt/:path*",
+    "/login",
+    "/api/laptops/:path*",
+    "/api/dashboard/:path*",
+    "/api/transaction/:path*",
+  ],
 };

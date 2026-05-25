@@ -1,68 +1,82 @@
-import jwt
-    from "jsonwebtoken";
+import { jwtVerify } from "jose";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-import {
-    cookies
+export type UserRole = "ADMIN" | "SALES";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  role: UserRole;
 }
-    from "next/headers";
 
-export async function
-    getCurrentUser() {
+const getSecret = () =>
+  new TextEncoder().encode(process.env.JWT_SECRET || "secret");
 
-    try {
+export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
+  "/dashboard/laptops": ["ADMIN"],
+  "/dashboard/transactions": ["ADMIN", "SALES"],
+  "/dashboard": ["ADMIN"],
+  "/payment/create": ["ADMIN", "SALES"],
+};
 
-        const cookieStore =
-            await cookies();
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+    if (!token) return null;
 
-        const token =
-            cookieStore.get(
-                "token"
-            )?.value;
+    const { payload } = await jwtVerify(token, getSecret());
+    return payload as unknown as AuthUser;
+  } catch {
+    return null;
+  }
+}
 
-        console.log(
-            "TOKEN:",
-            token
-        );
+export async function verifyToken(token: string): Promise<AuthUser | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    return payload as unknown as AuthUser;
+  } catch {
+    return null;
+  }
+}
 
-        if (
-            !token
-        ) {
-            return null;
-        }
+type RouteHandler = (
+  req: NextRequest,
+  props: any,   
+  user: AuthUser
+) => Promise<NextResponse> | NextResponse;
 
-        const user =
-            jwt.verify(
-                token,
-                process.env
-                    .JWT_SECRET ||
-                "secret"
-            ) as {
-                id:
-                string;
+export function withAuth(handler: RouteHandler, allowedRoles?: UserRole[]) {
+  return async (req: NextRequest, ctx: { params: any }) => {
+    const token = req.cookies.get("token")?.value;
 
-                name:
-                string;
-
-                role:
-                string;
-            };
-
-        console.log(
-            "USER:",
-            user
-        );
-
-        return user;
-
-    } catch (
-    error
-    ) {
-
-        console.log(
-            "AUTH ERROR:",
-            error
-        );
-
-        return null;
+    if (!token) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
     }
+
+    const user = await verifyToken(token);
+
+    if (!user) {
+      const res = NextResponse.json(
+        { success: false, message: "Token tidak valid" },
+        { status: 401 }
+      );
+      res.cookies.delete("token");
+      return res;
+    }
+
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden: akses ditolak" },
+        { status: 403 }
+      );
+    }
+
+    return handler(req, ctx, user);
+  };
 }

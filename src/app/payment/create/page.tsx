@@ -25,28 +25,25 @@ export default function CreatePaymentPage() {
   const [longitude, setLongitude] = useState("");
   const [gpsLoading, setGpsLoading] = useState(false);
   const [isLoadingLaptops, setIsLoadingLaptops] = useState(true);
+  const [rawDealPrice, setRawDealPrice] = useState<number>(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<CreatePaymentType>({
-    resolver: zodResolver(createPaymentSchema),
-    defaultValues: {
-      company_name: "Solit 03",
-      payment_method: "CASH",
-      pickup_method: "DATANG",
-      source_platform: "Instagram",
-    },
-  });
+  const { register, handleSubmit, watch, setValue, formState: { errors } } =
+    useForm<CreatePaymentType>({
+      resolver: zodResolver(createPaymentSchema),
+      defaultValues: {
+        company_name: "Solit 03",
+        payment_method: "CASH",
+        pickup_method: "DATANG",
+        source_platform: "Instagram",
+      },
+    });
 
   const pickupMethod = watch("pickup_method");
   const selectedLaptopId = watch("laptop_id");
   const selectedLaptop = laptops.find((item) => item.id === selectedLaptopId);
-  const dealPrice = watch("amount");
-  const other = selectedLaptop ? (dealPrice || 0) - selectedLaptop.selling_price : 0;
+  const dealPrice = rawDealPrice;
+  const other = selectedLaptop ? dealPrice - selectedLaptop.selling_price : 0;
 
   useEffect(() => {
     if (!selectedLaptop) return;
@@ -58,11 +55,10 @@ export default function CreatePaymentPage() {
     const fetchLaptops = async () => {
       setIsLoadingLaptops(true);
       try {
-        const response = await fetch("/api/laptops/ready");
-        const result = await response.json();
+        const res = await fetch("/api/laptops/ready");
+        const result = await res.json();
         setLaptops(result.data || []);
-      } catch (error) {
-        console.error(error);
+      } catch {
         setLaptops([]);
       } finally {
         setIsLoadingLaptops(false);
@@ -74,9 +70,9 @@ export default function CreatePaymentPage() {
   const getLocation = () => {
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(String(position.coords.latitude));
-        setLongitude(String(position.coords.longitude));
+      (pos) => {
+        setLatitude(String(pos.coords.latitude));
+        setLongitude(String(pos.coords.longitude));
         setGpsLoading(false);
       },
       () => {
@@ -88,31 +84,22 @@ export default function CreatePaymentPage() {
   };
 
   const onSubmit = async (data: CreatePaymentType) => {
-    try {
-      if (!paymentPhoto) {
-        alert("Foto pembayaran wajib diupload");
-        return;
-      }
-      if (!latitude || !longitude) {
-        alert("GPS wajib diambil");
-        return;
-      }
+    if (!paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
+    if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
 
+    setSubmitting(true);
+    try {
       const fileName = `${Date.now()}-${paymentPhoto.name}`;
       const { error: uploadError } = await supabase.storage
         .from("payment-proof")
         .upload(fileName, paymentPhoto);
-      if (uploadError) {
-        console.log(uploadError);
-        alert("Upload foto gagal");
-        return;
-      }
+      if (uploadError) { alert("Upload foto gagal"); return; }
 
       const { data: imageData } = supabase.storage
         .from("payment-proof")
         .getPublicUrl(fileName);
 
-      const response = await fetch("/api/transaction/create", {
+      const res = await fetch("/api/transaction/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -122,231 +109,258 @@ export default function CreatePaymentPage() {
           longitude,
         }),
       });
-      const result = await response.json();
-      if (!result.success) {
-        alert(result.message);
-        return;
-      }
+      const result = await res.json();
+      if (!result.success) { alert(result.message); return; }
       window.location.href = `/receipt/${result.data.invoice_number}`;
-    } catch (error) {
-      console.log(error);
+    } catch {
       alert("Terjadi kesalahan");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const inputClass =
-    "border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50 w-full";
+    "border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] bg-white w-full transition";
   const selectClass =
-    "border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50 focus:outline-none focus:ring-1 focus:ring-gray-300 w-full";
+    "border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] w-full transition";
+  const btnSecondary =
+    "flex-1 bg-white text-gray-600 border border-gray-200 rounded-xl h-11 font-medium hover:bg-gray-50 active:scale-[0.98] transition-all text-sm";
+  const btnPrimary =
+    "flex-1 bg-[#1a1a2e] text-white rounded-xl h-11 font-medium hover:bg-[#16213e] active:scale-[0.98] transition-all text-sm";
 
-  const FormContent = () => (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-800 tracking-tight">Buat Payment</h1>
-        <p className="text-gray-500 text-sm mb-4">Isi data pemesanan laptop</p>
+  const stepLabels = ["Data Pembeli", "Laptop & Harga", "Pengambilan", "Pembayaran"];
 
-        {/* Step Indicator */}
-        <div className="flex gap-2 mb-5">
-          {[1, 2, 3, 4].map((item) => (
-            <div
-              key={item}
-              className={`h-1.5 flex-1 rounded-full transition-all ${step >= item ? "bg-gray-700" : "bg-gray-200"}`}
-            />
-          ))}
-        </div>
+  return (
+    <DashboardLayout>
+      <div className="max-w-lg mx-auto">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* STEP 1 */}
-          {step === 1 && (
-            <>
-              <input type="text" placeholder="Atas Nama" className={inputClass} {...register("customer_name")} />
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Perusahaan</label>
-                <input type="text" placeholder="Nama perusahaan" className={inputClass} {...register("company_name")} />
-                {errors.company_name && <p className="text-red-500 text-xs mt-1">{errors.company_name.message}</p>}
-              </div>
-              <input type="text" placeholder="WhatsApp" className={inputClass} {...register("customer_phone")} />
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Tahu Solit dari Mana?</label>
-                <select className={selectClass} {...register("source_platform")}>
-                  <option value="Instagram">Instagram</option>
-                  <option value="TikTok">TikTok</option>
-                  <option value="Facebook">Facebook</option>
-                  <option value="WhatsApp">WhatsApp</option>
-                  <option value="Google">Google</option>
-                  <option value="Shopee">Shopee</option>
-                  <option value="Tokopedia">Tokopedia</option>
-                  <option value="Teman">Teman</option>
-                  <option value="Lainnya">Lainnya</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!watch("customer_name")) {
-                    alert("Isi nama customer dulu");
-                    return;
-                  }
-                  setStep(2);
-                }}
-                className="w-full bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition shadow-sm"
-              >
-                Lanjut
-              </button>
-            </>
-          )}
+          {/* Header */}
+          <div className="mb-5">
+            <h1 className="text-lg font-bold text-[#1a1a2e] tracking-tight">Buat Payment</h1>
+            <p className="text-gray-400 text-xs mt-0.5">{stepLabels[step - 1]}</p>
+          </div>
 
-          {/* STEP 2 */}
-          {step === 2 && (
-            <>
-              {isLoadingLaptops ? (
-                <div className="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
-              ) : (
-                <select className={selectClass} {...register("laptop_id")}>
-                  <option value="">Pilih Laptop</option>
-                  {laptops.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.laptop_name} | {item.cpu} | {item.ram} | {item.storage} | Rp{item.selling_price.toLocaleString("id-ID")}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <input type="hidden" {...register("laptop_name")} />
-              <input type="hidden" {...register("serial_number")} />
+          {/* Step indicator */}
+          <div className="flex gap-1.5 mb-6">
+            {[1, 2, 3, 4].map((item) => (
+              <div
+                key={item}
+                className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > item
+                    ? "bg-[#1a1a2e]"
+                    : step === item
+                      ? "bg-[#1a1a2e]/50"
+                      : "bg-gray-200"
+                  }`}
+              />
+            ))}
+          </div>
 
-              {selectedLaptop && (
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-100">
-                  <div>
-                    <p className="font-semibold text-gray-800">{selectedLaptop.laptop_name}</p>
-                    <p className="text-xs text-gray-500">SN: {selectedLaptop.serial_number}</p>
-                    <p className="text-xs text-gray-500">
-                      {selectedLaptop.cpu} | {selectedLaptop.ram} | {selectedLaptop.storage}
-                    </p>
-                  </div>
-                  <div className="border-t border-gray-200 pt-2 flex justify-between text-sm">
-                    <span className="text-gray-600">Harga Inventory</span>
-                    <span className="font-medium text-gray-800">Rp{selectedLaptop.selling_price.toLocaleString("id-ID")}</span>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Harga Deal</label>
-                    <input type="number" placeholder="Masukkan harga deal" className={inputClass} {...register("amount", { valueAsNumber: true })} />
-                  </div>
-                  <div className="border-t border-gray-200 pt-2 flex justify-between text-sm">
-                    <span className="text-gray-600">Other</span>
-                    <span className={`font-medium ${other >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {other >= 0 ? "+" : "-"} Rp{Math.abs(other).toLocaleString("id-ID")}
-                    </span>
-                  </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+
+            {/* STEP 1 */}
+            {step === 1 && (
+              <>
+                <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
+                <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />
+                <input type="tel" placeholder="No. WhatsApp *" className={inputClass} {...register("customer_phone")} />
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Tahu Solit dari mana?</label>
+                  <select className={selectClass} {...register("source_platform")}>
+                    {["Instagram", "TikTok", "Facebook", "WhatsApp", "Google", "Shopee", "Tokopedia", "Teman", "Lainnya"].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
-              )}
-
-              <input type="text" placeholder="Request Software" className={inputClass} {...register("software_request")} />
-
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setStep(1)} className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition">
-                  Kembali
-                </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (!selectedLaptop) {
-                      alert("Pilih laptop dulu");
-                      return;
-                    }
-                    if (!watch("amount")) {
-                      alert("Masukkan harga deal");
-                      return;
-                    }
-                    setStep(3);
+                    if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
+                    setStep(2);
                   }}
-                  className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition"
+                  className={`w-full ${btnPrimary}`}
                 >
-                  Lanjut
+                  Lanjut →
                 </button>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {/* STEP 3 */}
-          {step === 3 && (
-            <>
-              <select className={selectClass} {...register("pickup_method")}>
-                <option value="DATANG">Datang ke toko</option>
-                <option value="DIANTAR">Diantar</option>
-              </select>
-              <input type="date" className={inputClass} {...register("pickup_date")} />
-              <input type="time" className={inputClass} {...register("pickup_time")} />
-              {pickupMethod === "DIANTAR" && (
-                <input type="text" placeholder="Lokasi Antar" className={inputClass} {...register("pickup_location")} />
-              )}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setStep(2)} className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition">
-                  Kembali
-                </button>
-                <button type="button" onClick={() => setStep(4)} className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition">
-                  Lanjut
-                </button>
-              </div>
-            </>
-          )}
+            {/* STEP 2 */}
+            {step === 2 && (
+              <>
+                {isLoadingLaptops ? (
+                  <div className="h-11 bg-gray-100 rounded-xl animate-pulse" />
+                ) : (
+                  <select className={selectClass} {...register("laptop_id")}>
+                    <option value="">Pilih Laptop</option>
+                    {laptops.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.laptop_name} — {item.ram}/{item.storage} — Rp{item.selling_price.toLocaleString("id-ID")}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input type="hidden" {...register("laptop_name")} />
+                <input type="hidden" {...register("serial_number")} />
 
-          {/* STEP 4 */}
-          {step === 4 && (
-            <>
-              <select className={selectClass} {...register("payment_method")}>
-                <option value="CASH">Cash</option>
-                <option value="TRANSFER">Transfer</option>
-                <option value="DP">DP</option>
-                <option value="CICILAN">Cicilan</option>
-                <option value="LAINNYA">Lainnya</option>
-              </select>
+                {selectedLaptop && (
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 border border-gray-100">
+                    <div>
+                      <p className="font-semibold text-[#1a1a2e] text-sm">{selectedLaptop.laptop_name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        SN: {selectedLaptop.serial_number} · {selectedLaptop.cpu} · {selectedLaptop.ram} · {selectedLaptop.storage}
+                      </p>
+                    </div>
+                    <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
+                      <span className="text-gray-500">Harga inventory</span>
+                      <span className="font-medium text-gray-800">Rp{selectedLaptop.selling_price.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 mb-1.5 block">Harga Deal *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Masukkan harga deal"
+                        className={inputClass}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          const num = raw ? Number(raw) : 0;
+                          setRawDealPrice(num);
+                          setValue("amount", num);
+                        }}
+                        onBlur={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                        }}
+                        onFocus={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          e.target.value = raw;
+                        }}
+                      />
+                    </div>
+                    {rawDealPrice > 0 && (
+                      <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
+                        <span className="text-gray-500">Selisih</span>
+                        <span className={`font-semibold ${other >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                          {other >= 0 ? "+" : ""}Rp{other.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Foto Bukti Pembayaran</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="border border-gray-200 rounded-lg p-2 text-sm w-full bg-gray-50/50 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-                  onChange={(e) => setPaymentPhoto(e.target.files?.[0] || null)}
-                />
-                <p className="text-xs text-gray-400 mt-1">Wajib upload foto uang / transfer</p>
-              </div>
+                <input type="text" placeholder="Request Software" className={inputClass} {...register("software_request")} />
 
-              <div className="border border-gray-100 rounded-lg p-3 flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
-                  <p className="text-xs text-gray-500">{latitude ? "GPS berhasil diambil" : "GPS wajib aktif"}</p>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setStep(1)} className={btnSecondary}>← Kembali</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedLaptop) { alert("Pilih laptop dulu"); return; }
+                      if (!watch("amount")) { alert("Masukkan harga deal"); return; }
+                      setStep(3);
+                    }}
+                    className={btnPrimary}
+                  >
+                    Lanjut →
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={getLocation}
-                  className="bg-white text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 transition"
-                >
-                  {gpsLoading ? "Loading..." : latitude ? "Diambil" : "Ambil GPS"}
-                </button>
-              </div>
+              </>
+            )}
 
-              <input type="text" placeholder="Catatan" className={inputClass} {...register("notes")} />
+            {/* STEP 3 */}
+            {step === 3 && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Metode Pengambilan</label>
+                  <select className={selectClass} {...register("pickup_method")}>
+                    <option value="DATANG">Datang ke toko</option>
+                    <option value="DIANTAR">Diantar</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Tanggal</label>
+                  <input type="date" className={inputClass} {...register("pickup_date")} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Jam</label>
+                  <input type="time" className={inputClass} {...register("pickup_time")} />
+                </div>
+                {pickupMethod === "DIANTAR" && (
+                  <input type="text" placeholder="Alamat pengiriman" className={inputClass} {...register("pickup_location")} />
+                )}
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setStep(2)} className={btnSecondary}>← Kembali</button>
+                  <button type="button" onClick={() => setStep(4)} className={btnPrimary}>Lanjut →</button>
+                </div>
+              </>
+            )}
 
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setStep(3)} className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition">
-                  Kembali
-                </button>
-                <button type="submit" className="flex-1 bg-white text-gray-700 border border-gray-200 rounded-lg h-10 font-medium hover:bg-gray-50 transition shadow-sm">
-                  Simpan Transaksi
-                </button>
-              </div>
-            </>
-          )}
-        </form>
+            {/* STEP 4 */}
+            {step === 4 && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Metode Pembayaran</label>
+                  <select className={selectClass} {...register("payment_method")}>
+                    <option value="CASH">Cash</option>
+                    <option value="TRANSFER">Transfer</option>
+                    <option value="DP">DP</option>
+                    <option value="CICILAN">Cicilan</option>
+                    <option value="LAINNYA">Lainnya</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-400 mb-1.5 block">Foto Bukti Pembayaran *</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
+                    onChange={(e) => setPaymentPhoto(e.target.files?.[0] || null)}
+                  />
+                  {paymentPhoto && (
+                    <p className="text-xs text-emerald-600 mt-1">✓ {paymentPhoto.name}</p>
+                  )}
+                </div>
+
+                <div className="border border-gray-200 rounded-xl p-4 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {latitude ? `✓ Koordinat berhasil diambil` : "Wajib diambil sebelum simpan"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={getLocation}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
+                      }`}
+                  >
+                    {gpsLoading ? "..." : latitude ? "✓ Diambil" : "Ambil GPS"}
+                  </button>
+                </div>
+
+                <input type="text" placeholder="Catatan (opsional)" className={inputClass} {...register("notes")} />
+
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setStep(3)} className={btnSecondary}>← Kembali</button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`${btnPrimary} disabled:opacity-50`}
+                  >
+                    {submitting ? "Menyimpan..." : "Simpan Transaksi"}
+                  </button>
+                </div>
+              </>
+            )}
+
+          </form>
+        </div>
       </div>
-    </div>
-  );
-
-  // Bungkus dengan DashboardLayout agar ada sidebar dan logout
-  return (
-    <DashboardLayout>
-      <FormContent />
     </DashboardLayout>
   );
 }
