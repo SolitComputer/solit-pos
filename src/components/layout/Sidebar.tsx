@@ -68,7 +68,7 @@ function SidebarContent({
   onLogout: () => void;
 }) {
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden ">
       {/* Header */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
@@ -153,7 +153,7 @@ function SidebarContent({
       </nav>
 
       {/* Logout */}
-      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
+      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0 ">
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all group"
