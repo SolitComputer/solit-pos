@@ -27,7 +27,6 @@ interface Transaction {
   created_at: string;
 }
 
-/* ─── Shimmer skeleton atom ─────────────────────────────────────────────── */
 const Shimmer = ({
   w,
   h,
@@ -54,7 +53,6 @@ const Shimmer = ({
   />
 );
 
-/* ─── Photo modal ────────────────────────────────────────────────────────── */
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
