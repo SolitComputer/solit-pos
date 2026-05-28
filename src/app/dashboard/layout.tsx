@@ -8,7 +8,7 @@ export default function Layout({
   React.ReactNode;
 }) {
   return (
-    <main>
+    <main className="p-4 lg:p-6 space-y-6">
       {children}
     </main>
   );
