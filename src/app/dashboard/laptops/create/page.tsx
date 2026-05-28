@@ -134,13 +134,66 @@ export default function Page() {
                 onChange={handleChange}
                 className="border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition bg-gray-50/50"
               />
-              <input
-                type="text"
-                name="serial_number"
-                placeholder="Serial Number"
-                onChange={handleChange}
-                className="border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition bg-gray-50/50"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="serial_number"
+                  placeholder="Serial Number"
+                  value={form.serial_number}
+                  onChange={handleChange}
+                  className="flex-1 border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 transition bg-gray-50/50"
+                />
+
+                {/* CEK SN */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!form.serial_number) {
+                      alert("Masukkan serial number dulu");
+                      return;
+                    }
+
+                    window.open(
+                      `https://www.google.com/search?q=${encodeURIComponent(
+                        form.serial_number + " laptop"
+                      )}`,
+                      "_blank"
+                    );
+                  }}
+                  className="px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+                >
+                  Cek SN
+                </button>
+
+                {/* CEK ID LAPTOP */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const keyword = [
+                      form.brand,
+                      form.laptop_name,
+                      form.cpu,
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    if (!keyword) {
+                      alert("Isi minimal brand atau nama laptop dulu");
+                      return;
+                    }
+
+                    window.open(
+                      `https://www.google.com/search?q=${encodeURIComponent(
+                        keyword
+                      )}`,
+                      "_blank"
+                    );
+                  }}
+                  className="px-4 h-11 rounded-xl border border-gray-200 bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition whitespace-nowrap"
+                >
+                  Cek ID
+                </button>
+              </div>
               <input
                 type="number"
                 name="purchase_price"

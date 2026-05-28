@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import Link from "next/link";
 
 interface Laptop {
     id: string;
@@ -391,7 +392,7 @@ export default function Page() {
             `}</style>
 
             {/* Top progress bar while loading */}
-           
+
 
             <DashboardLayout>
                 <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -541,6 +542,13 @@ export default function Page() {
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <Link
+                                                                    href={`/dashboard/laptops/${item.id}/units`}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+                                                                >
+                                                                    Units
+                                                                </Link>
                                                                 <button
                                                                     onClick={() => openEdit(item)}
                                                                     className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
@@ -851,9 +859,9 @@ function SkeletonTable() {
         { w: "200px" },          // Spesifikasi (chips)
         { w: "110px" },          // Serial (mono)
         { w: "100px", align: "right" }, // Harga Jual
-        { w: "40px",  align: "right" }, // Stok
+        { w: "40px", align: "right" }, // Stok
         { w: "80px" },           // Status (badge)
-        { w: "80px",  align: "right" }, // Aksi
+        { w: "80px", align: "right" }, // Aksi
     ];
 
     // Each row has slightly varied widths for natural look
