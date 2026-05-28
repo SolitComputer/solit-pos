@@ -55,6 +55,34 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Shimmer atom
+// ─────────────────────────────────────────────────────────────────────────────
+const Shimmer = ({
+    w,
+    h,
+    r = "8px",
+    style = {},
+}: {
+    w?: string | number;
+    h: string | number;
+    r?: string;
+    style?: React.CSSProperties;
+}) => (
+    <div
+        style={{
+            width: w ?? "100%",
+            height: h,
+            borderRadius: r,
+            background: "linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%)",
+            backgroundSize: "600px 100%",
+            animation: "sk-shimmer 1.4s infinite linear",
+            flexShrink: 0,
+            ...style,
+        }}
+    />
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Page() {
@@ -64,7 +92,6 @@ export default function Page() {
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterBrand, setFilterBrand] = useState("ALL");
 
-    // Modal state
     const [modalMode, setModalMode] = useState<ModalMode>(null);
     const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
     const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
@@ -73,7 +100,6 @@ export default function Page() {
 
     useEffect(() => { fetchLaptops(); }, []);
 
-    // Lock body scroll when modal open
     useEffect(() => {
         document.body.style.overflow = modalMode ? "hidden" : "";
         return () => { document.body.style.overflow = ""; };
@@ -170,7 +196,6 @@ export default function Page() {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormLoading(true);
-
         try {
             const res = await fetch("/api/laptops/create", {
                 method: "POST",
@@ -182,14 +207,8 @@ export default function Page() {
                     qty: Number(formData.qty),
                 }),
             });
-
             const result = await res.json();
-
-            if (!result.success) {
-                alert(result.message || "Gagal menambahkan laptop");
-                return;
-            }
-
+            if (!result.success) { alert(result.message || "Gagal menambahkan laptop"); return; }
             closeModal();
             fetchLaptops();
             alert("Laptop berhasil ditambahkan ✅");
@@ -243,47 +262,29 @@ export default function Page() {
             pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
         });
 
-        // ── Color palette ──────────────────────────────────────────────────────
         const COLOR = {
-            headerBg: "FF1E293B",      // slate-900 (gelap)
-            headerFg: "FFFFFFFF",      // putih
-            siapBg: "FFD1FAE5",        // emerald-100
-            siapFg: "FF065F46",        // emerald-900
-            belumBg: "FFFEF3C7",       // amber-100
-            belumFg: "FF78350F",       // amber-900
-            serviceBg: "FFDBEAFE",     // blue-100
-            serviceFg: "FF1E3A5F",     // blue-900
-            rowEven: "FFF8FAFC",
-            rowOdd: "FFFFFFFF",
-            totalBg: "FFEFF6FF",       // blue-50 (summary row)
-            totalFg: "FF1E40AF",       // blue-800
-            borderColor: "FFE2E8F0",   // slate-200
-            profitFg: "FF065F46",      // emerald-900 (margin positif)
-            lossFg: "FF991B1B",        // red-800 (margin negatif)
-            subTextFg: "FF64748B",     // slate-500
+            headerBg: "FF1E293B", headerFg: "FFFFFFFF",
+            siapBg: "FFD1FAE5", siapFg: "FF065F46",
+            belumBg: "FFFEF3C7", belumFg: "FF78350F",
+            serviceBg: "FFDBEAFE", serviceFg: "FF1E3A5F",
+            rowEven: "FFF8FAFC", rowOdd: "FFFFFFFF",
+            totalBg: "FFEFF6FF", totalFg: "FF1E40AF",
+            borderColor: "FFE2E8F0", profitFg: "FF065F46",
+            lossFg: "FF991B1B", subTextFg: "FF64748B",
         };
 
         ws.columns = [
-            { header: "No", key: "no" },
-            { header: "Nama Laptop", key: "nama" },
-            { header: "Brand", key: "brand" },
-            { header: "CPU", key: "cpu" },
-            { header: "RAM", key: "ram" },
-            { header: "Storage", key: "storage" },
-            { header: "GPU", key: "gpu" },
-            { header: "Display", key: "display" },
-            { header: "Serial Number", key: "serial" },
-            { header: "Kondisi", key: "kondisi" },
-            { header: "Harga Modal", key: "harga_modal" },
-            { header: "Harga Jual", key: "harga_jual" },
-            { header: "Margin", key: "margin" },
-            { header: "Stok", key: "stok" },
-            { header: "Status", key: "status" },
-            { header: "Notes", key: "notes" },
+            { header: "No", key: "no" }, { header: "Nama Laptop", key: "nama" },
+            { header: "Brand", key: "brand" }, { header: "CPU", key: "cpu" },
+            { header: "RAM", key: "ram" }, { header: "Storage", key: "storage" },
+            { header: "GPU", key: "gpu" }, { header: "Display", key: "display" },
+            { header: "Serial Number", key: "serial" }, { header: "Kondisi", key: "kondisi" },
+            { header: "Harga Modal", key: "harga_modal" }, { header: "Harga Jual", key: "harga_jual" },
+            { header: "Margin", key: "margin" }, { header: "Stok", key: "stok" },
+            { header: "Status", key: "status" }, { header: "Notes", key: "notes" },
             { header: "Tgl Masuk", key: "created" },
         ];
 
-        // ── Header row styling ─────────────────────────────────────────────────
         const headerRow = ws.getRow(1);
         headerRow.height = 30;
         headerRow.eachCell(cell => {
@@ -298,169 +299,79 @@ export default function Page() {
             cell.alignment = { horizontal: "center", vertical: "middle", wrapText: false };
         });
 
-        // ── Data rows ──────────────────────────────────────────────────────────
         filteredLaptops.forEach((item, idx) => {
             const isEven = idx % 2 === 0;
             const rowBg = isEven ? COLOR.rowEven : COLOR.rowOdd;
             const margin = (item.selling_price || 0) - (item.purchase_price || 0);
-            const statusMap: Record<string, string> = {
-                SIAP_JUAL: "Siap Jual",
-                BELUM_SIAP: "Belum Siap",
-                SERVICE: "Service",
-            };
+            const statusMap: Record<string, string> = { SIAP_JUAL: "Siap Jual", BELUM_SIAP: "Belum Siap", SERVICE: "Service" };
 
             const row = ws.addRow({
-                no: idx + 1,
-                nama: item.laptop_name || "",
-                brand: item.brand || "",
-                cpu: item.cpu || "",
-                ram: item.ram || "",
-                storage: item.storage || "",
-                gpu: item.gpu || "",
-                display: item.display || "",
-                serial: item.serial_number || "",
-                kondisi: item.condition_note || "",
-                harga_modal: item.purchase_price || 0,
-                harga_jual: item.selling_price || 0,
-                margin,
-                stok: item.qty ?? 0,
-                status: statusMap[item.status] || item.status,
-                notes: item.notes || "",
-                created: new Date(item.created_at).toLocaleDateString("id-ID", {
-                    day: "2-digit", month: "short", year: "numeric",
-                }),
+                no: idx + 1, nama: item.laptop_name || "", brand: item.brand || "",
+                cpu: item.cpu || "", ram: item.ram || "", storage: item.storage || "",
+                gpu: item.gpu || "", display: item.display || "", serial: item.serial_number || "",
+                kondisi: item.condition_note || "", harga_modal: item.purchase_price || 0,
+                harga_jual: item.selling_price || 0, margin, stok: item.qty ?? 0,
+                status: statusMap[item.status] || item.status, notes: item.notes || "",
+                created: new Date(item.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
             });
 
             row.height = 22;
-
             row.eachCell((cell, colNum) => {
                 const key = ws.getColumn(colNum).key as string;
-
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-
-                cell.border = {
-                    top: { style: "hair", color: { argb: COLOR.borderColor } },
-                    left: { style: "hair", color: { argb: COLOR.borderColor } },
-                    bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-                    right: { style: "hair", color: { argb: COLOR.borderColor } },
-                };
-
+                cell.border = { top: { style: "hair", color: { argb: COLOR.borderColor } }, left: { style: "hair", color: { argb: COLOR.borderColor } }, bottom: { style: "hair", color: { argb: COLOR.borderColor } }, right: { style: "hair", color: { argb: COLOR.borderColor } } };
                 cell.font = { size: 10, name: "Arial" };
-
-                if (key === "no") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                } else if (key === "harga_modal" || key === "harga_jual") {
-                    cell.numFmt = '"Rp "#,##0';
-                    cell.alignment = { horizontal: "right", vertical: "middle" };
-                } else if (key === "margin") {
-                    cell.numFmt = '"Rp "#,##0';
-                    cell.alignment = { horizontal: "right", vertical: "middle" };
-                    cell.font = {
-                        size: 10, name: "Arial", bold: true,
-                        color: { argb: margin >= 0 ? COLOR.profitFg : COLOR.lossFg },
-                    };
-                } else if (key === "stok") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if ((item.qty ?? 0) === 0) {
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF991B1B" } };
-                    }
-                } else if (key === "status") {
+                if (key === "no") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } }; }
+                else if (key === "harga_modal" || key === "harga_jual") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; }
+                else if (key === "margin") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: margin >= 0 ? COLOR.profitFg : COLOR.lossFg } }; }
+                else if (key === "stok") { cell.alignment = { horizontal: "center", vertical: "middle" }; if ((item.qty ?? 0) === 0) cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF991B1B" } }; }
+                else if (key === "status") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                     const s = item.status;
-                    if (s === "SIAP_JUAL") {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } };
-                    } else if (s === "BELUM_SIAP") {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.belumBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.belumFg } };
-                    } else if (s === "SERVICE") {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.serviceBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.serviceFg } };
-                    }
-                } else if (key === "nama") {
-                    cell.alignment = { horizontal: "left", vertical: "middle" };
-                    cell.font = { size: 10, name: "Arial", bold: true };
-                } else if (key === "serial") {
-                    cell.alignment = { horizontal: "left", vertical: "middle" };
-                    cell.font = { size: 9, name: "Courier New", color: { argb: COLOR.subTextFg } };
-                } else if (key === "created") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font = { size: 9, name: "Arial", color: { argb: COLOR.subTextFg } };
-                } else {
-                    cell.alignment = { horizontal: "left", vertical: "middle" };
+                    if (s === "SIAP_JUAL") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } }; }
+                    else if (s === "BELUM_SIAP") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.belumBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.belumFg } }; }
+                    else if (s === "SERVICE") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.serviceBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.serviceFg } }; }
                 }
+                else if (key === "nama") { cell.alignment = { horizontal: "left", vertical: "middle" }; cell.font = { size: 10, name: "Arial", bold: true }; }
+                else if (key === "serial") { cell.alignment = { horizontal: "left", vertical: "middle" }; cell.font = { size: 9, name: "Courier New", color: { argb: COLOR.subTextFg } }; }
+                else if (key === "created") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 9, name: "Arial", color: { argb: COLOR.subTextFg } }; }
+                else { cell.alignment = { horizontal: "left", vertical: "middle" }; }
             });
         });
 
         const dataStart = 2;
         const dataEnd = filteredLaptops.length + 1;
-
         const totalRow = ws.addRow({
-            no: "",
-            nama: `TOTAL  (${filteredLaptops.length} unit)`,
-            brand: "",
-            cpu: "",
-            ram: "",
-            storage: "",
-            gpu: "",
-            display: "",
-            serial: "",
-            kondisi: "",
-            harga_modal: { formula: `SUM(K${dataStart}:K${dataEnd})` },
-            harga_jual: { formula: `SUM(L${dataStart}:L${dataEnd})` },
-            margin: { formula: `SUM(M${dataStart}:M${dataEnd})` },
-            stok: { formula: `SUM(N${dataStart}:N${dataEnd})` },
-            status: "",
-            notes: "",
-            created: "",
+            no: "", nama: `TOTAL  (${filteredLaptops.length} unit)`, brand: "", cpu: "", ram: "", storage: "", gpu: "", display: "", serial: "", kondisi: "",
+            harga_modal: { formula: `SUM(K${dataStart}:K${dataEnd})` }, harga_jual: { formula: `SUM(L${dataStart}:L${dataEnd})` },
+            margin: { formula: `SUM(M${dataStart}:M${dataEnd})` }, stok: { formula: `SUM(N${dataStart}:N${dataEnd})` },
+            status: "", notes: "", created: "",
         });
-
         totalRow.height = 26;
         totalRow.eachCell(cell => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.totalBg } };
             cell.font = { bold: true, size: 10, name: "Arial", color: { argb: COLOR.totalFg } };
-            cell.border = {
-                top: { style: "medium", color: { argb: "FF93C5FD" } },
-                left: { style: "hair", color: { argb: COLOR.borderColor } },
-                bottom: { style: "medium", color: { argb: "FF93C5FD" } },
-                right: { style: "hair", color: { argb: COLOR.borderColor } },
-            };
+            cell.border = { top: { style: "medium", color: { argb: "FF93C5FD" } }, left: { style: "hair", color: { argb: COLOR.borderColor } }, bottom: { style: "medium", color: { argb: "FF93C5FD" } }, right: { style: "hair", color: { argb: COLOR.borderColor } } };
         });
-
         const totalRowNum = dataEnd + 1;
-        ["K", "L", "M"].forEach(col => {
-            ws.getCell(`${col}${totalRowNum}`).numFmt = '"Rp "#,##0';
-            ws.getCell(`${col}${totalRowNum}`).alignment = { horizontal: "right", vertical: "middle" };
-        });
+        ["K", "L", "M"].forEach(col => { ws.getCell(`${col}${totalRowNum}`).numFmt = '"Rp "#,##0'; ws.getCell(`${col}${totalRowNum}`).alignment = { horizontal: "right", vertical: "middle" }; });
         ws.getCell(`N${totalRowNum}`).alignment = { horizontal: "center", vertical: "middle" };
         ws.getCell(`B${totalRowNum}`).alignment = { horizontal: "left", vertical: "middle" };
-
-        const MIN_WIDTH = 8;
-        const MAX_WIDTH = 45;
-        const PADDING = 2;
-
         ws.columns.forEach((col, colIndex) => {
             let maxLen = col.header ? String(col.header).length : 0;
-
             filteredLaptops.forEach((item) => {
                 const rowNum = filteredLaptops.indexOf(item) + 2;
                 const cell = ws.getCell(rowNum, colIndex + 1);
                 if (cell.value !== null && cell.value !== undefined) {
-                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object)
-                        ? String(col.header ?? "")
-                        : String(cell.value);
+                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object) ? String(col.header ?? "") : String(cell.value);
                     if (cellText.length > maxLen) maxLen = cellText.length;
                 }
             });
-
             col.width = Math.min(45, Math.max(8, maxLen + 2));
         });
 
         const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = `data_laptop_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -471,13 +382,18 @@ export default function Page() {
 
     return (
         <>
-            {isLoading && (
-                <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-100">
-                    <div className="h-full bg-[#1a1a2e] animate-[loading_1.5s_ease-in-out_infinite]" />
-                </div>
-            )}
-            <DashboardLayout>
+            {/* Inject shimmer keyframe once */}
+            <style>{`
+                @keyframes sk-shimmer {
+                    0%   { background-position: -600px 0; }
+                    100% { background-position:  600px 0; }
+                }
+            `}</style>
 
+            {/* Top progress bar while loading */}
+           
+
+            <DashboardLayout>
                 <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
                     <div className="max-w-full mx-auto space-y-5">
 
@@ -623,7 +539,6 @@ export default function Page() {
                                                                 <span className="text-gray-400 text-xs">{item.status}</span>
                                                             )}
                                                         </td>
-                                                        {/* Stop propagation so row click doesn't open detail when clicking action buttons */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <button
@@ -658,12 +573,12 @@ export default function Page() {
                     </div>
                 </main>
 
-                {/* ────────────────────────────────────────────────────────── MODALS ── */}
+                {/* ────────────────────────────────────────────────── MODALS ── */}
 
                 {/* Detail Modal */}
                 <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
                     {detailLoading ? (
-                        <ModalSkeleton />
+                        <ModalDetailSkeleton />
                     ) : selectedLaptop ? (
                         <div className="space-y-5">
                             {/* Hero card */}
@@ -703,7 +618,7 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Specs grid */}
+                            {/* Specs */}
                             <div>
                                 <SectionLabel>Spesifikasi</SectionLabel>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -926,6 +841,191 @@ export default function Page() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Skeleton — Table (page load)
+// ─────────────────────────────────────────────────────────────────────────────
+function SkeletonTable() {
+    // Column widths roughly mirror real columns
+    const cols: Array<{ w: string; align?: string }> = [
+        { w: "140px" },          // Nama Laptop
+        { w: "70px" },           // Brand
+        { w: "200px" },          // Spesifikasi (chips)
+        { w: "110px" },          // Serial (mono)
+        { w: "100px", align: "right" }, // Harga Jual
+        { w: "40px",  align: "right" }, // Stok
+        { w: "80px" },           // Status (badge)
+        { w: "80px",  align: "right" }, // Aksi
+    ];
+
+    // Each row has slightly varied widths for natural look
+    const rowVariants = [
+        [130, 55, null, 95, 90, 20, 70, 0],
+        [155, 40, null, 80, 85, 20, 70, 0],
+        [120, 60, null, 100, 95, 20, 70, 0],
+        [140, 50, null, 90, 80, 20, 70, 0],
+        [165, 45, null, 85, 90, 20, 70, 0],
+        [125, 55, null, 95, 88, 20, 70, 0],
+    ];
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="bg-gray-50/80 border-b border-gray-100">
+                            {cols.map((col, i) => (
+                                <th key={i} className={`px-4 py-3 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                                    <Shimmer w={col.w} h={11} />
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                        {rowVariants.map((row, r) => (
+                            <tr key={r}>
+                                {/* Nama Laptop */}
+                                <td className="px-4 py-3.5">
+                                    <Shimmer w={row[0]!} h={14} />
+                                </td>
+                                {/* Brand */}
+                                <td className="px-4 py-3.5">
+                                    <Shimmer w={row[1]!} h={13} />
+                                </td>
+                                {/* Spesifikasi — chips */}
+                                <td className="px-4 py-3.5">
+                                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                        {[52, 36, 44, 60].map((cw, ci) => (
+                                            <Shimmer key={ci} w={cw} h={20} r="5px" />
+                                        ))}
+                                    </div>
+                                </td>
+                                {/* Serial */}
+                                <td className="px-4 py-3.5">
+                                    <Shimmer w={row[3]!} h={12} r="5px" />
+                                </td>
+                                {/* Harga Jual */}
+                                <td className="px-4 py-3.5">
+                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                        <Shimmer w={row[4]!} h={14} />
+                                    </div>
+                                </td>
+                                {/* Stok */}
+                                <td className="px-4 py-3.5">
+                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                        <Shimmer w={row[5]!} h={14} />
+                                    </div>
+                                </td>
+                                {/* Status — badge pill */}
+                                <td className="px-4 py-3.5">
+                                    <Shimmer w={row[6]!} h={24} r="99px" />
+                                </td>
+                                {/* Aksi */}
+                                <td className="px-4 py-3.5">
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                        <Shimmer w={36} h={28} r="8px" />
+                                        <Shimmer w={44} h={28} r="8px" />
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {/* Footer count bar */}
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
+                <Shimmer w={160} h={11} />
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton — Detail Modal (while fetching fresh data)
+// ─────────────────────────────────────────────────────────────────────────────
+function ModalDetailSkeleton() {
+    return (
+        <div className="space-y-5">
+            {/* Hero card */}
+            <div
+                style={{
+                    display: "flex",
+                    gap: 16,
+                    padding: 16,
+                    background: "#f9fafb",
+                    borderRadius: 12,
+                    border: "1px solid #f3f4f6",
+                    alignItems: "flex-start",
+                }}
+            >
+                {/* Icon box */}
+                <Shimmer w={48} h={48} r="12px" />
+
+                {/* Name + brand + badge */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, paddingTop: 2 }}>
+                    <Shimmer w="75%" h={16} />
+                    <Shimmer w="35%" h={12} />
+                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                        <Shimmer w={72} h={22} r="99px" />
+                        <Shimmer w={90} h={22} r="99px" />
+                    </div>
+                </div>
+
+                {/* Price + stock (right side) */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                    <Shimmer w={50} h={11} />
+                    <Shimmer w={110} h={24} />
+                    <Shimmer w={60} h={11} style={{ marginTop: 2 }} />
+                </div>
+            </div>
+
+            {/* Section label: Spesifikasi */}
+            <div>
+                <Shimmer w={80} h={11} style={{ marginBottom: 10 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                    {[
+                        { lw: 25, vw: "80%" },
+                        { lw: 25, vw: "55%" },
+                        { lw: 45, vw: "70%" },
+                        { lw: 25, vw: "90%" },
+                        { lw: 40, vw: "65%" },
+                        { lw: 70, vw: "100%" },
+                    ].map((cell, i) => (
+                        <div key={i} style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #f3f4f6" }}>
+                            <Shimmer w={cell.lw} h={10} style={{ marginBottom: 6 }} />
+                            <Shimmer w={cell.vw} h={14} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Section label: Keuangan */}
+            <div>
+                <Shimmer w={65} h={11} style={{ marginBottom: 10 }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {[
+                        { lw: 65, vw: "80%" },
+                        { lw: 45, vw: "60%" },
+                    ].map((cell, i) => (
+                        <div key={i} style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #f3f4f6" }}>
+                            <Shimmer w={cell.lw} h={10} style={{ marginBottom: 6 }} />
+                            <Shimmer w={cell.vw} h={14} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Footer bar */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
+                <Shimmer w={110} h={11} />
+                <div style={{ display: "flex", gap: 8 }}>
+                    <Shimmer w={50} h={30} r="8px" />
+                    <Shimmer w={56} h={30} r="8px" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Modal Component
 // ─────────────────────────────────────────────────────────────────────────────
 function Modal({
@@ -954,19 +1054,15 @@ function Modal({
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={e => { if (e.target === overlayRef.current) onClose(); }}
         >
-            {/* Backdrop */}
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-            {/* Panel */}
             <div
                 className={`
-          relative bg-white w-full shadow-2xl flex flex-col
-          rounded-t-2xl sm:rounded-2xl
-          ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"}
-          max-h-[92dvh] sm:max-h-[88vh]
-        `}
+                    relative bg-white w-full shadow-2xl flex flex-col
+                    rounded-t-2xl sm:rounded-2xl
+                    ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"}
+                    max-h-[92dvh] sm:max-h-[88vh]
+                `}
             >
-                {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                     <h2 className="font-semibold text-gray-800 text-base truncate pr-4">{title}</h2>
                     <button
@@ -979,7 +1075,6 @@ function Modal({
                         </svg>
                     </button>
                 </div>
-                {/* Scrollable body */}
                 <div className="overflow-y-auto flex-1 px-5 py-5">
                     {children}
                 </div>
@@ -1033,57 +1128,5 @@ function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInput
             {...props}
             className={`w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition ${className}`}
         />
-    );
-}
-
-function SkeletonTable() {
-    return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                            {Array(8).fill(0).map((_, i) => (
-                                <th key={i} className="px-4 py-3"><div className="h-3 bg-gray-200 rounded w-16" /></th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {Array(5).fill(0).map((_, r) => (
-                            <tr key={r}>
-                                {Array(8).fill(0).map((_, c) => (
-                                    <td key={c} className="px-4 py-3.5"><div className="h-4 bg-gray-100 rounded" /></td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-function ModalSkeleton() {
-    return (
-        <div className="animate-pulse space-y-5">
-            <div className="flex gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-12 h-12 bg-gray-200 rounded-xl flex-shrink-0" />
-                <div className="flex-1 space-y-2 pt-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded w-1/3" />
-                    <div className="h-5 bg-gray-100 rounded-full w-20 mt-2" />
-                </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-                {Array(6).fill(0).map((_, i) => (
-                    <div key={i} className="h-16 bg-gray-100 rounded-lg" />
-                ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-                {Array(2).fill(0).map((_, i) => (
-                    <div key={i} className="h-14 bg-gray-100 rounded-lg" />
-                ))}
-            </div>
-        </div>
     );
 }
