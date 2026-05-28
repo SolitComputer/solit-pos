@@ -62,20 +62,20 @@ export default function Page() {
       {/* Subtle glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-white/[0.02] blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-sm">
-        {/* Logo area */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-white rounded-2xl mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="8" height="8" rx="1.5" fill="#0f0f0f" />
-              <rect x="13" y="3" width="8" height="8" rx="1.5" fill="#0f0f0f" opacity="0.4" />
-              <rect x="3" y="13" width="8" height="8" rx="1.5" fill="#0f0f0f" opacity="0.4" />
-              <rect x="13" y="13" width="8" height="8" rx="1.5" fill="#0f0f0f" />
-            </svg>
-          </div>
-          <h1 className="text-white text-2xl font-bold tracking-tight">Solit POS</h1>
-          <p className="text-white/40 text-sm mt-1">Masuk ke akun kamu</p>
-        </div>
+     <div className="relative w-full max-w-sm">
+  {/* Logo area */}
+  <div className="mb-8 text-center">
+    <div className="inline-flex items-center justify-center w-12 h-12 bg-white rounded-2xl mb-4 overflow-hidden">
+      <img
+        src="/assets/solit03.jpeg"
+        alt="Logo Solit"
+        className="w-full h-full object-cover"
+      />
+    </div>
+    <h1 className="text-white text-2xl font-bold tracking-tight">Solit POS</h1>
+    <p className="text-white/40 text-sm mt-1">Masuk ke akun kamu</p>
+  </div>
+
 
         {/* Card */}
         <div className="bg-white/[0.05] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
