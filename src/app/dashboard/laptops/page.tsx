@@ -471,6 +471,11 @@ export default function Page() {
 
     return (
         <>
+            {isLoading && (
+                <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-100">
+                    <div className="h-full bg-[#1a1a2e] animate-[loading_1.5s_ease-in-out_infinite]" />
+                </div>
+            )}
             <DashboardLayout>
 
                 <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">

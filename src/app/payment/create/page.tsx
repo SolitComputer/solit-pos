@@ -125,9 +125,10 @@ export default function CreatePaymentPage() {
 
     try {
       const compressed = await imageCompression(file, {
-        maxSizeMB: 0.3,
-        maxWidthOrHeight: 1280,
+        maxSizeMB: 0.1,         
+        maxWidthOrHeight: 800,  
         useWebWorker: true,
+        initialQuality: 0.7,    
       });
 
       const result = new File([compressed], file.name, { type: compressed.type });
