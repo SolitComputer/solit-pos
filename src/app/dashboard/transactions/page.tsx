@@ -161,11 +161,10 @@ export default function Page() {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${
-                hasActiveFilter
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${hasActiveFilter
                   ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                   : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
+                }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -188,11 +187,10 @@ export default function Page() {
                   <button
                     key={s}
                     onClick={() => setStatus(s)}
-                    className={`h-9 rounded-xl text-xs font-semibold border transition ${
-                      status === s
+                    className={`h-9 rounded-xl text-xs font-semibold border transition ${status === s
                         ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                         : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     {s === "ALL" ? "Semua" : s}
                   </button>
@@ -326,6 +324,11 @@ function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url
               <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold flex-shrink-0 ${statusMap[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
                 {item.status}
               </span>
+              {item.sales_name && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium flex-shrink-0">
+                  👤 {item.sales_name}
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-0.5 font-mono">{item.invoice_number}</p>
             <p className="text-xs text-gray-500 mt-0.5 truncate">{item.laptop_name}</p>
