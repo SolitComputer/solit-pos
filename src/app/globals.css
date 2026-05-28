@@ -6,8 +6,6 @@ body {
   padding: 0;
   box-sizing: border-box;
   background: #f8fafc;
-  height: 100%;
-  overflow: hidden;
 }
 
 * {
