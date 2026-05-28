@@ -199,10 +199,10 @@ export default function Sidebar() {
   const menus = loading
     ? []
     : user?.role === "ADMIN"
-      ? adminMenus
-      : user?.role === "OPERATOR"
-        ? operatorMenus
-        : salesMenus;
+    ? adminMenus
+    : user?.role === "OPERATOR"
+    ? operatorMenus
+    : salesMenus;
 
   const contentProps = { user, loading, menus, pathname, onLogout: handleLogout };
 
