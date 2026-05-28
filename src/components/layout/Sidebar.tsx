@@ -68,9 +68,9 @@ function SidebarContent({
   onLogout: () => void;
 }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-4 pt-5 pb-4">
+      <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center flex-shrink-0">
@@ -120,10 +120,10 @@ function SidebarContent({
         )}
       </div>
 
-      <div className="mx-4 h-px bg-gray-100" />
+      <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
-      {/* Nav */}
-      <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
+      {/* Nav — no overflow scroll, just fills remaining space */}
+      <nav className="flex-1 py-3 px-3 space-y-0.5">
         {loading ? (
           [1, 2, 3].map((i) => (
             <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse mb-1" />
@@ -152,8 +152,8 @@ function SidebarContent({
         )}
       </nav>
 
-      {/* Logout - always visible */}
-      <div className="p-3 border-t border-gray-100">
+      {/* Logout */}
+      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all group"
@@ -239,7 +239,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Desktop */}
-      <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0">
+      <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden">
         <SidebarContent {...contentProps} />
       </aside>
     </>
