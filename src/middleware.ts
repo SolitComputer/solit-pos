@@ -15,7 +15,11 @@ export async function middleware(request: NextRequest) {
       if (user) {
         return NextResponse.redirect(
           new URL(
-            user.role === "ADMIN" ? "/dashboard" : "/payment/create",
+            user.role === "ADMIN"
+              ? "/dashboard"
+              : user.role === "OPERATOR"
+                ? "/dashboard/laptops"
+                : "/payment/create",
             request.url
           )
         );
@@ -48,8 +52,22 @@ export async function middleware(request: NextRequest) {
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     if (!allowed.includes(user.role as UserRole)) {
-      const fallback = user.role === "ADMIN" ? "/dashboard" : "/payment/create";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback =
+        user.role === "ADMIN"
+          ? "/dashboard"
+          : user.role === "OPERATOR"
+            ? "/dashboard/laptops"
+            : "/payment/create";
+      return NextResponse.redirect(
+        new URL(
+          user.role === "ADMIN"
+            ? "/dashboard"
+            : user.role === "OPERATOR"
+              ? "/dashboard/laptops"
+              : "/payment/create",
+          request.url
+        )
+      );
     }
   }
 

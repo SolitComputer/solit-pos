@@ -48,7 +48,7 @@ export async function GET() {
     });
 
   } catch {
-    return NextResponse.json(
+    return NextResponse .json(
       {
         success:
           false,

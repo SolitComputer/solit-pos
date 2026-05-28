@@ -2,7 +2,7 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export type UserRole = "ADMIN" | "SALES";
+export type UserRole = "ADMIN" | "SALES" | "OPERATOR";
 
 export interface AuthUser {
   id: string;
@@ -14,10 +14,10 @@ const getSecret = () =>
   new TextEncoder().encode(process.env.JWT_SECRET || "secret");
 
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/dashboard/laptops": ["ADMIN"],
-  "/dashboard/transactions": ["ADMIN", "SALES"],
-  "/dashboard": ["ADMIN"],
-  "/payment/create": ["ADMIN", "SALES"],
+  "/dashboard/laptops": ["ADMIN", "OPERATOR"],      
+  "/dashboard/transactions": ["ADMIN", "SALES"],      
+  "/dashboard": ["ADMIN", "OPERATOR"],                
+  "/payment/create": ["ADMIN", "SALES"],              
 };
 
 export async function getCurrentUser(): Promise<AuthUser | null> {

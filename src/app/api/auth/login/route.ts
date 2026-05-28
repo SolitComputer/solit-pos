@@ -116,31 +116,26 @@ export async function POST(
         // ======================
         // RESPONSE
         // ======================
-        const response =
-            NextResponse.json(
-                {
-                    success:
-                        true,
+        const redirect =
+            user.role === "ADMIN"
+                ? "/dashboard"
+                : user.role === "OPERATOR"
+                    ? "/dashboard/laptops"
+                    : "/payment/create";
 
-                    redirect:
-                        user.role ===
-                            "ADMIN"
-                            ? "/dashboard"
-                            : "/payment/create",
-
-                    user: {
-                        name:
-                            user.name,
-
-                        role:
-                            user.role,
-                    },
+        const response = NextResponse.json(
+            {
+                success: true,
+                redirect,
+                user: {
+                    name: user.name,
+                    role: user.role,
                 },
-                {
-                    status:
-                        200,
-                }
-            );
+            },
+            {
+                status: 200,
+            }
+        );
 
         // ======================
         // SET COOKIE

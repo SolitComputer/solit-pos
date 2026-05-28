@@ -2,69 +2,62 @@
  * Kirim pesan WhatsApp via Fonnte API
  */
 export async function sendWhatsapp(target: string, message: string): Promise<boolean> {
-  try {
-    if (!target || !message) {
-      console.warn("[Fonnte] Target atau message kosong");
-      return false;
-    }
+  const maxRetries = 3;
+  let lastError: any;
 
-    let normalized = target.replace(/\D/g, "");
-    if (normalized.startsWith("0")) {
-      normalized = "62" + normalized.slice(1);
-    } else if (!normalized.startsWith("62")) {
-      normalized = "62" + normalized;
-    }
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (!target || !message) {
+        console.warn("[Fonnte] Target atau message kosong");
+        return false;
+      }
 
-    console.log(`[Fonnte] Mengirim ke: ${normalized}`);
-    console.log(`[Fonnte] API Key exists: ${!!process.env.WHATSAPP_API_KEY}`);
+      let normalized = target.replace(/\D/g, "");
+      if (normalized.startsWith("0")) normalized = "62" + normalized.slice(1);
+      else if (!normalized.startsWith("62")) normalized = "62" + normalized;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15 detik
+      console.log(`[Fonnte] Attempt ${attempt}/${maxRetries} → ${normalized}`);
 
-    const res = await fetch("https://api.fonnte.com/send", {
-      method: "POST",
-      headers: {
-        Authorization: process.env.WHATSAPP_API_KEY || "",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        target: normalized,
-        message
-      }),
-      signal: controller.signal,
-    });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000); // 12 detik
 
-    clearTimeout(timeout);
-
-    const result = await res.json().catch((e) => {
-      console.error("[Fonnte] Gagal parse JSON response");
-      return {};
-    });
-
-    console.log(`[Fonnte] HTTP Status: ${res.status}`);
-    console.log(`[Fonnte] Response dari Fonnte:`, JSON.stringify(result, null, 2));
-
-    if (!res.ok || result.status === false) {
-      console.error("[Fonnte] ❌ GAGAL mengirim WA", {
-        status: res.status,
-        fonnte_status: result.status,
-        fonnte_message: result.message || result.detail,
-        target: normalized,
+      const res = await fetch("https://api.fonnte.com/send", {
+        method: "POST",
+        headers: {
+          Authorization: process.env.WHATSAPP_API_KEY || "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ target: normalized, message }),
+        signal: controller.signal,
       });
-      return false;
+
+      clearTimeout(timeout);
+
+      const result = await res.json().catch(() => ({}));
+
+      console.log(`[Fonnte] Status: ${res.status} | Response:`, result);
+
+      if (!res.ok || result.status === false) {
+        console.error(`[Fonnte] Gagal (Attempt ${attempt})`, result);
+        lastError = result;
+        continue; // coba lagi
+      }
+
+      console.log(`[Fonnte] ✅ BERHASIL terkirim ke ${normalized}`);
+      return true;
+
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Fonnte] Error Attempt ${attempt}:`, error.name, "-", error.message);
+      
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 1000 * attempt)); // backoff
+      }
     }
-
-    console.log(`[Fonnte] ✅ BERHASIL terkirim ke ${normalized}`);
-    return true;
-
-  } catch (error: any) {
-    console.error("[Fonnte] ❌ EXCEPTION:", {
-      name: error.name,
-      message: error.message,
-      cause: error.cause || "unknown"
-    });
-    return false;
   }
+
+  console.error("[Fonnte] ❌ GAGAL setelah semua retry", lastError);
+  return false;
 }
 
 /**

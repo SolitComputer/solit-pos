@@ -1,27 +1,65 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+
+function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/70 hover:text-white transition flex items-center gap-1.5 text-sm"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          Tutup (Esc)
+        </button>
+        <img src={url} alt="Bukti pembayaran" className="w-full rounded-2xl shadow-2xl" />
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center justify-center gap-2 text-white/60 hover:text-white text-xs transition"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+            <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          Buka di tab baru
+        </a>
+      </div>
+    </div>
+  );
+}
 
 export default function Page() {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [photoModal, setPhotoModal] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Filter states
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("ALL");
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
-
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Fetch all transactions once
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  useEffect(() => { fetchTransactions(); }, []);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
@@ -29,73 +67,46 @@ export default function Page() {
       const response = await fetch(`/api/transaction?search=&status=ALL`);
       const result = await response.json();
       setAllTransactions(result.data || []);
-    } catch (error) {
-      console.error(error);
+    } catch {
       setAllTransactions([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Apply all filters (client-side)
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions];
-
-    // Search filter (invoice, customer, phone, laptop)
-    if (search.trim() !== "") {
+    if (search.trim()) {
       const term = search.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.invoice_number?.toLowerCase().includes(term) ||
-          item.customer_name?.toLowerCase().includes(term) ||
-          item.customer_phone?.toLowerCase().includes(term) ||
-          item.laptop_name?.toLowerCase().includes(term)
+      filtered = filtered.filter((item) =>
+        item.invoice_number?.toLowerCase().includes(term) ||
+        item.customer_name?.toLowerCase().includes(term) ||
+        item.customer_phone?.toLowerCase().includes(term) ||
+        item.laptop_name?.toLowerCase().includes(term)
       );
     }
-
-    // Status filter
-    if (status !== "ALL") {
-      filtered = filtered.filter((item) => item.status === status);
-    }
-
-    // Date range filter (created_at)
+    if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
     if (dateFrom) {
-      const from = new Date(dateFrom);
-      from.setHours(0, 0, 0, 0);
+      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
       filtered = filtered.filter((item) => new Date(item.created_at) >= from);
     }
     if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
+      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
       filtered = filtered.filter((item) => new Date(item.created_at) <= to);
     }
-
-    // Payment method filter
-    if (paymentMethod !== "ALL") {
-      filtered = filtered.filter((item) => item.payment_method === paymentMethod);
-    }
-
-    // Source platform filter
-    if (sourcePlatform !== "ALL") {
-      filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
-    }
-
+    if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
+    if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
     return filtered;
   }, [allTransactions, search, status, dateFrom, dateTo, paymentMethod, sourcePlatform]);
 
-  // Pagination logic
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredTransactions.slice(start, start + itemsPerPage);
   }, [filteredTransactions, currentPage]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, status, dateFrom, dateTo, paymentMethod, sourcePlatform]);
+  useEffect(() => { setCurrentPage(1); }, [search, status, dateFrom, dateTo, paymentMethod, sourcePlatform]);
 
-  // Get unique values for filter dropdowns
   const uniquePaymentMethods = useMemo(() => {
     const methods = new Set(allTransactions.map((t) => t.payment_method).filter(Boolean));
     return ["ALL", ...Array.from(methods)];
@@ -106,256 +117,308 @@ export default function Page() {
     return ["ALL", ...Array.from(sources)];
   }, [allTransactions]);
 
-  // Skeleton card (compact)
-  const TransactionSkeleton = () => (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm animate-pulse">
-      <div className="flex justify-between items-start">
-        <div className="space-y-1">
-          <div className="h-4 bg-gray-100 rounded w-28"></div>
-          <div className="h-3 bg-gray-100 rounded w-36"></div>
-          <div className="h-3 bg-gray-100 rounded w-24"></div>
-        </div>
-        <div className="h-5 bg-gray-100 rounded-full w-16"></div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <div className="h-3 bg-gray-100 rounded w-16"></div>
-          <div className="h-4 bg-gray-100 rounded w-32"></div>
-          <div className="h-3 bg-gray-100 rounded w-40"></div>
-        </div>
-        <div className="space-y-1">
-          <div className="h-3 bg-gray-100 rounded w-16"></div>
-          <div className="h-3 bg-gray-100 rounded w-28"></div>
-          <div className="h-3 bg-gray-100 rounded w-32"></div>
-        </div>
-      </div>
-      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
-        <div className="h-3 bg-gray-100 rounded w-24"></div>
-        <div className="h-6 bg-gray-100 rounded w-16"></div>
-      </div>
-    </div>
-  );
+  const hasActiveFilter = status !== "ALL" || dateFrom || dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL";
+
+  const resetFilters = () => {
+    setSearch(""); setStatus("ALL"); setDateFrom(""); setDateTo("");
+    setPaymentMethod("ALL"); setSourcePlatform("ALL");
+  };
+
+  const inputCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
+  const selectCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <DashboardLayout>
+      {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
+
+      <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl md:text-2xl font-semibold text-gray-800 tracking-tight">Riwayat Transaksi</h1>
-          <a
-            href="/dashboard"
-            className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm"
-          >
-            Dashboard
-          </a>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Riwayat Transaksi</h1>
+          <div className="flex items-center gap-2">
+            {!isLoading && (
+              <span className="text-xs text-gray-400 font-medium bg-gray-100 px-2.5 py-1 rounded-full">
+                {filteredTransactions.length} transaksi
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Filter Section */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mb-5">
-          {/* Baris 1: search & status */}
-          <div className="grid md:grid-cols-2 gap-3 mb-3">
-            <input
-              type="text"
-              placeholder="Cari invoice / customer / WA / laptop"
-              className="border border-gray-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-gray-50/50"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select
-              className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50 focus:outline-none focus:ring-1 focus:ring-gray-300"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="ALL">Semua Status</option>
-              <option value="PAID">Paid</option>
-              <option value="PENDING">Pending</option>
-              <option value="FAILED">Failed</option>
-            </select>
-          </div>
-          {/* Baris 2: filter tambahan (tanggal, payment method, source) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="flex gap-2">
+        {/* Search + Filter toggle */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
               <input
-                type="date"
-                placeholder="Dari tanggal"
-                className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50 w-full"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-              <input
-                type="date"
-                placeholder="Sampai tanggal"
-                className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50 w-full"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
+                type="text"
+                placeholder="Cari invoice, customer, WA, laptop..."
+                className="w-full border border-gray-200 rounded-xl h-10 pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <select
-              className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
-              {uniquePaymentMethods.map((method) => (
-                <option key={method} value={method}>
-                  {method === "ALL" ? "Semua Metode" : method}
-                </option>
-              ))}
-            </select>
-            <select
-              className="border border-gray-200 rounded-lg h-10 px-3 text-sm bg-gray-50/50"
-              value={sourcePlatform}
-              onChange={(e) => setSourcePlatform(e.target.value)}
-            >
-              {uniqueSourcePlatforms.map((source) => (
-                <option key={source} value={source}>
-                  {source === "ALL" ? "Semua Source" : source}
-                </option>
-              ))}
-            </select>
             <button
-              onClick={() => {
-                setSearch("");
-                setStatus("ALL");
-                setDateFrom("");
-                setDateTo("");
-                setPaymentMethod("ALL");
-                setSourcePlatform("ALL");
-              }}
-              className="bg-gray-100 text-gray-700 rounded-lg h-10 px-3 text-sm hover:bg-gray-200 transition"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${
+                hasActiveFilter
+                  ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              }`}
             >
-              Reset Filter
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filter
+              {hasActiveFilter && (
+                <span className="bg-white/30 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">
+                  {[status !== "ALL", dateFrom, dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL"].filter(Boolean).length}
+                </span>
+              )}
             </button>
           </div>
+
+          {/* Expandable filters */}
+          {showFilters && (
+            <div className="pt-3 border-t border-gray-100 space-y-3">
+              {/* Status */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {["ALL", "PAID", "PENDING", "FAILED"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatus(s)}
+                    className={`h-9 rounded-xl text-xs font-semibold border transition ${
+                      status === s
+                        ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s === "ALL" ? "Semua" : s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Dari tanggal</label>
+                  <input type="date" className={inputCls} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Sampai tanggal</label>
+                  <input type="date" className={inputCls} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Method & Source */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Metode bayar</label>
+                  <select className={selectCls} value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                    {uniquePaymentMethods.map((m) => (
+                      <option key={m} value={m}>{m === "ALL" ? "Semua Metode" : m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Sumber</label>
+                  <select className={selectCls} value={sourcePlatform} onChange={(e) => setSourcePlatform(e.target.value)}>
+                    {uniqueSourcePlatforms.map((s) => (
+                      <option key={s} value={s}>{s === "ALL" ? "Semua Source" : s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {hasActiveFilter && (
+                <button
+                  onClick={resetFilters}
+                  className="w-full h-9 text-sm text-gray-500 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium"
+                >
+                  Reset semua filter
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* List Transaksi */}
-        <div className="space-y-3">
+        {/* List */}
+        <div className="space-y-2.5">
           {isLoading ? (
-            Array(3).fill(0).map((_, i) => <TransactionSkeleton key={i} />)
+            Array(4).fill(0).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse space-y-3">
+                <div className="flex justify-between">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 bg-gray-100 rounded w-36" />
+                    <div className="h-3 bg-gray-100 rounded w-24" />
+                  </div>
+                  <div className="h-5 bg-gray-100 rounded-full w-14" />
+                </div>
+                <div className="h-3 bg-gray-100 rounded w-full" />
+                <div className="h-3 bg-gray-100 rounded w-3/4" />
+              </div>
+            ))
           ) : paginatedTransactions.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-8 text-center shadow-sm">
-              <p className="text-gray-500 text-sm">Tidak ada transaksi yang sesuai filter</p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+              <p className="text-2xl mb-2">🔍</p>
+              <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi</p>
+              <p className="text-gray-400 text-xs mt-1">Coba ubah filter atau kata pencarian</p>
             </div>
           ) : (
             paginatedTransactions.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all duration-200"
-              >
-                {/* Baris 1: Customer & Status */}
-                <div className="flex justify-between items-start flex-wrap gap-2">
-                  <div>
-                    <h2 className="font-semibold text-gray-800 text-base">{item.customer_name}</h2>
-                    <p className="text-xs text-gray-500">{item.customer_phone}</p>
-                    <p className="text-xs text-gray-400 font-mono">{item.invoice_number}</p>
-                  </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      item.status === "PAID"
-                        ? "bg-gray-100 text-gray-700"
-                        : item.status === "PENDING"
-                        ? "bg-gray-100 text-gray-600"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-
-                {/* Baris 2: Laptop & Payment */}
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400">Laptop</p>
-                    <p className="font-medium text-gray-800">{item.laptop_name}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-500 mt-0.5">
-                      <span>SN: {item.serial_number}</span>
-                      <span>Software: {item.software_request || "-"}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Payment</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0 text-xs">
-                      <span className="text-gray-600">Method: {item.payment_method}</span>
-                      <span className="text-gray-800 font-medium">Deal: Rp {(item.deal_price || item.amount).toLocaleString("id-ID")}</span>
-                      <span className="text-gray-600">Profit: + Rp {(item.other || 0).toLocaleString("id-ID")}</span>
-                    </div>
-                    {item.inventory_price > 0 && (
-                      <p className="text-xs text-gray-500">Modal: Rp {item.inventory_price.toLocaleString("id-ID")}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Baris 3: Pickup, Jadwal, Source */}
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-                  <span>📦 {item.pickup_method}</span>
-                  <span>📅 {item.pickup_date} {item.pickup_time}</span>
-                  <span>🔗 {item.source_platform}</span>
-                </div>
-
-                {/* Notes */}
-                {item.notes && (
-                  <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded-lg">
-                    <span className="font-medium">Notes:</span> {item.notes}
-                  </div>
-                )}
-
-                {/* Photo & GPS */}
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  {item.payment_photo && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">Bukti:</span>
-                      <img src={item.payment_photo} alt="payment" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
-                    </div>
-                  )}
-                  {item.latitude && item.longitude && (
-                    <a
-                      href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-lg text-xs hover:bg-gray-200 transition"
-                    >
-                      📍 Maps
-                    </a>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="mt-3 pt-2 border-t border-gray-100 flex justify-between items-center text-xs">
-                  <span className="text-gray-400">{new Date(item.created_at).toLocaleString("id-ID")}</span>
-                  <a
-                    href={`/receipt/${item.invoice_number}`}
-                    className="bg-white text-gray-700 border border-gray-200 px-3 py-1 rounded-lg text-xs font-medium hover:bg-gray-50 transition shadow-sm"
-                  >
-                    Receipt
-                  </a>
-                </div>
-              </div>
+              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} />
             ))
           )}
         </div>
 
         {/* Pagination */}
-        {!isLoading && filteredTransactions.length > 0 && (
-          <div className="flex justify-center items-center gap-2 mt-6 flex-wrap">
+        {!isLoading && filteredTransactions.length > itemsPerPage && (
+          <div className="flex items-center justify-between pt-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition font-medium"
             >
-              Previous
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Sebelumnya
             </button>
-            <span className="text-sm text-gray-600">
-              Halaman {currentPage} dari {totalPages}
+            <span className="text-sm text-gray-500 font-medium">
+              {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition font-medium"
             >
-              Next
+              Selanjutnya
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
         )}
       </div>
-    </main>
+    </DashboardLayout>
+  );
+}
+
+function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusMap: Record<string, string> = {
+    PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    PENDING: "bg-amber-50 text-amber-700 border-amber-200",
+    FAILED: "bg-red-50 text-red-600 border-red-200",
+    CANCELLED: "bg-red-50 text-red-600 border-red-200",
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      {/* Main row */}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-bold text-gray-800 text-sm">{item.customer_name}</h2>
+              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold flex-shrink-0 ${statusMap[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                {item.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{item.invoice_number}</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{item.laptop_name}</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-sm font-bold text-gray-800">Rp{(item.deal_price || item.amount).toLocaleString("id-ID")}</p>
+            <p className="text-xs text-emerald-600 font-medium">+Rp{(item.other || 0).toLocaleString("id-ID")}</p>
+          </div>
+        </div>
+
+        {/* Compact info */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs text-gray-500">
+          <span>{item.customer_phone}</span>
+          <span className="text-gray-200">·</span>
+          <span>{item.payment_method}</span>
+          <span className="text-gray-200">·</span>
+          <span>{item.source_platform}</span>
+          <span className="text-gray-200">·</span>
+          <span>{new Date(item.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
+        </div>
+      </div>
+
+      {/* Footer actions */}
+      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {item.payment_photo && (
+            <button
+              onClick={() => onPhotoClick(item.payment_photo)}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition font-medium"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              Bukti
+            </button>
+          )}
+          {item.latitude && item.longitude && (
+            <a
+              href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 transition font-medium"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              Maps
+            </a>
+          )}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
+          >
+            {expanded ? "Sembunyikan" : "Detail"}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${expanded ? "rotate-180" : ""}`}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+        <a
+          href={`/receipt/${item.invoice_number}`}
+          className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
+        >
+          Receipt
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </a>
+      </div>
+
+      {/* Expandable detail */}
+      {expanded && (
+        <div className="px-4 py-3 border-t border-gray-100 bg-white space-y-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <div><span className="text-gray-400">SN:</span> <span className="text-gray-700 font-medium">{item.serial_number || "-"}</span></div>
+            <div><span className="text-gray-400">Software:</span> <span className="text-gray-700">{item.software_request || "-"}</span></div>
+            <div><span className="text-gray-400">Pickup:</span> <span className="text-gray-700">{item.pickup_method}</span></div>
+            <div><span className="text-gray-400">Jadwal:</span> <span className="text-gray-700">{item.pickup_date || "-"} {item.pickup_time || ""}</span></div>
+            {item.inventory_price > 0 && (
+              <div><span className="text-gray-400">Modal:</span> <span className="text-gray-700">Rp{item.inventory_price.toLocaleString("id-ID")}</span></div>
+            )}
+            {item.pickup_location && (
+              <div className="col-span-2"><span className="text-gray-400">Alamat:</span> <span className="text-gray-700">{item.pickup_location}</span></div>
+            )}
+          </div>
+          {item.notes && (
+            <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
+              <span className="font-semibold text-gray-500">Catatan: </span>{item.notes}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
