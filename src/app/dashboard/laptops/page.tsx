@@ -510,8 +510,13 @@ export default function Page() {
                                                             {fmt(item.selling_price)}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right">
-                                                            <span className={`font-medium ${item.qty === 0 ? "text-red-500" : "text-gray-700"}`}>
-                                                                {item.qty}
+                                                            <span
+                                                                className={`font-medium ${(item.qty ?? 0) === 0
+                                                                        ? "text-red-500"
+                                                                        : "text-gray-700"
+                                                                    }`}
+                                                            >
+                                                                {item.qty ?? 0}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
@@ -614,8 +619,8 @@ export default function Page() {
                                     <p className="text-xl font-bold text-gray-900 mt-0.5">{fmt(selectedLaptop.selling_price)}</p>
                                     <p className="text-xs text-gray-400 mt-1.5">
                                         Stok:{" "}
-                                        <span className={`font-semibold ${selectedLaptop.qty === 0 ? "text-red-500" : "text-gray-700"}`}>
-                                            {selectedLaptop.qty}
+                                        <span className={`font-semibold ${(selectedLaptop.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>
+                                            {selectedLaptop.qty ?? 0}
                                         </span>
                                         <span className="text-gray-300 ml-1">(dari units)</span>
                                     </p>

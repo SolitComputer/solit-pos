@@ -29,6 +29,9 @@ export const createPaymentSchema =
 
     laptop_name:
       z.string(),
+      
+    unit_id:
+      z.string(),
 
     serial_number:
       z.string(),
@@ -86,27 +89,27 @@ export const createPaymentSchema =
       z.string()
         .optional(),
   })
-  .superRefine(
-    (data, ctx) => {
-      if (
-        data.pickup_method ===
+    .superRefine(
+      (data, ctx) => {
+        if (
+          data.pickup_method ===
           "DIANTAR" &&
-        !data.pickup_location
-      ) {
-        ctx.addIssue({
-          code:
-            "custom",
+          !data.pickup_location
+        ) {
+          ctx.addIssue({
+            code:
+              "custom",
 
-          path: [
-            "pickup_location",
-          ],
+            path: [
+              "pickup_location",
+            ],
 
-          message:
-            "Lokasi antar wajib diisi",
-        });
+            message:
+              "Lokasi antar wajib diisi",
+          });
+        }
       }
-    }
-  );
+    );
 
 export type CreatePaymentType =
   z.infer<
