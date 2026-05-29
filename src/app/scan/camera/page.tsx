@@ -78,7 +78,7 @@ export default function CameraScanPage() {
             }
 
             router.push(
-                `/dashboard/laptops/${data.data.laptop.id}`
+                `/scan/${encodeURIComponent(sn)}`
             );
         } catch {
             alert("Gagal scan");
