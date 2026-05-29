@@ -85,14 +85,13 @@ function SidebarContent({
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                <rect x="3" y="3" width="8" height="8" rx="1.5" />
-                <rect x="13" y="3" width="8" height="8" rx="1.5" opacity="0.5" />
-                <rect x="3" y="13" width="8" height="8" rx="1.5" opacity="0.5" />
-                <rect x="13" y="13" width="8" height="8" rx="1.5" />
-              </svg>
-            </div>
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0">
+            <img
+              src="/assets/solit03.jpeg"
+              alt="Logo Solit"
+              className="w-full h-full object-cover"
+            />
+          </div>
             <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
           </div>
           {onClose && (

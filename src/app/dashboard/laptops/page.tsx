@@ -26,8 +26,6 @@ interface Laptop {
 
 type ModalMode = "detail" | "create" | "edit" | null;
 
-// serial_number & purchase_price dihapus dari form laptop
-// qty & status di-manage otomatis via units
 const EMPTY_FORM = {
     laptop_name: "",
     brand: "",
@@ -41,9 +39,6 @@ const EMPTY_FORM = {
     notes: "",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
@@ -53,20 +48,33 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Sold" },
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shimmer atom
-// ─────────────────────────────────────────────────────────────────────────────
 const Shimmer = ({
-    w, h, r = "8px", style = {},
+    w,
+    h,
+    r = "8px",
+    style = {},
+    className = "",
 }: {
-    w?: string | number; h: string | number; r?: string; style?: React.CSSProperties;
+    w?: string | number;
+    h: string | number;
+    r?: string;
+    style?: React.CSSProperties;
+    className?: string;
 }) => (
-    <div style={{
-        width: w ?? "100%", height: h, borderRadius: r,
-        background: "linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%)",
-        backgroundSize: "600px 100%", animation: "sk-shimmer 1.4s infinite linear",
-        flexShrink: 0, ...style,
-    }} />
+    <div
+        className={className}
+        style={{
+            width: w ?? "100%",
+            height: h,
+            borderRadius: r,
+            background:
+                "linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%)",
+            backgroundSize: "600px 100%",
+            animation: "sk-shimmer 1.4s infinite linear",
+            flexShrink: 0,
+            ...style,
+        }}
+    />
 );
 
 export default function Page() {
@@ -125,7 +133,6 @@ export default function Page() {
         return ["ALL", ...Array.from(b)];
     }, [laptops]);
 
-    // ── Modal openers ─────────────────────────────────────────────────────────
     const openCreate = () => {
         setFormData({ ...EMPTY_FORM });
         setModalMode("create");
@@ -163,7 +170,6 @@ export default function Page() {
 
     const closeModal = () => { setModalMode(null); setSelectedLaptop(null); };
 
-    // ── Form handlers ─────────────────────────────────────────────────────────
     const handleFormChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
     ) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -382,30 +388,39 @@ export default function Page() {
             `}</style>
 
             <DashboardLayout>
-                <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-                    <div className="max-w-full mx-auto space-y-5">
+                <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
+                    <div className="max-w-full mx-auto space-y-6">
 
-                        {/* ── Header ── */}
-                        <div className="flex flex-wrap items-end justify-between gap-3">
+                        {/* ── Header yang lebih premium ── */}
+                        <div className="flex flex-wrap items-end justify-between gap-4">
                             <div>
-                                <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 tracking-tight">Data Laptop</h1>
-                                <p className="text-xs text-gray-400 mt-0.5">Kelola inventaris laptop Anda</p>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                                            <line x1="8" y1="21" x2="16" y2="21" />
+                                            <line x1="12" y1="17" x2="12" y2="21" />
+                                        </svg>
+                                    </div>
+                                    <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] tracking-tight">Data Laptop</h1>
+                                </div>
+                                <p className="text-gray-500 text-sm ml-9">Kelola inventaris laptop Anda dengan mudah</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={exportToExcel}
-                                    className="inline-flex items-center gap-1.5 bg-white text-gray-600 border border-gray-200 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
                                 >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     Export Excel
                                 </button>
                                 <button
                                     onClick={openCreate}
-                                    className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition shadow-sm"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] rounded-xl text-sm font-medium text-white hover:bg-[#16213e] transition-all shadow-sm"
                                 >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                     </svg>
                                     Tambah Laptop
@@ -413,23 +428,23 @@ export default function Page() {
                             </div>
                         </div>
 
-                        {/* ── Filter Bar ── */}
-                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                                <div className="relative sm:col-span-2 xl:col-span-1">
-                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {/* ── Filter Bar yang lebih segar ── */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="relative lg:col-span-1">
+                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                                     </svg>
                                     <input
                                         type="text"
                                         placeholder="Cari nama, brand, CPU..."
-                                        className="w-full pl-9 pr-3 h-10 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition"
+                                        className="w-full pl-9 pr-3 h-10 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
                                         value={search}
                                         onChange={e => setSearch(e.target.value)}
                                     />
                                 </div>
                                 <select
-                                    className="h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 transition"
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={filterStatus}
                                     onChange={e => setFilterStatus(e.target.value)}
                                 >
@@ -440,7 +455,7 @@ export default function Page() {
                                     <option value="SOLD">Sold</option>
                                 </select>
                                 <select
-                                    className="h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 transition"
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={filterBrand}
                                     onChange={e => setFilterBrand(e.target.value)}
                                 >
@@ -450,24 +465,24 @@ export default function Page() {
                                 </select>
                                 <button
                                     onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterBrand("ALL"); }}
-                                    className="h-10 bg-gray-100 text-gray-600 rounded-lg px-3 text-sm font-medium hover:bg-gray-200 transition"
+                                    className="h-10 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 transition"
                                 >
                                     Reset Filter
                                 </button>
                             </div>
                         </div>
 
-                        {/* ── Table ── */}
+                        {/* ── Table dengan desain modern ── */}
                         {isLoading ? (
                             <SkeletonTable />
                         ) : filteredLaptops.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-20 text-center">
-                                <div className="text-3xl mb-3">💻</div>
-                                <p className="text-gray-500 text-sm font-medium">Tidak ada laptop ditemukan</p>
-                                <p className="text-gray-400 text-xs mt-1">Coba ubah filter atau tambah laptop baru</p>
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
+                                <div className="text-4xl mb-3">💻</div>
+                                <p className="text-gray-500 font-medium">Tidak ada laptop ditemukan</p>
+                                <p className="text-gray-400 text-sm mt-1">Coba ubah filter atau tambah laptop baru</p>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
@@ -487,11 +502,11 @@ export default function Page() {
                                                 return (
                                                     <tr
                                                         key={item.id}
-                                                        className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
+                                                        className="group hover:bg-gray-50/80 transition-colors cursor-pointer"
                                                         onClick={() => openDetail(item)}
                                                     >
                                                         <td className="px-4 py-3.5 max-w-[200px]">
-                                                            <span className="block font-medium text-gray-800 truncate group-hover:text-blue-700 transition-colors" title={item.laptop_name}>
+                                                            <span className="block font-semibold text-gray-800 truncate group-hover:text-[#1a1a2e] transition-colors" title={item.laptop_name}>
                                                                 {item.laptop_name}
                                                             </span>
                                                         </td>
@@ -499,7 +514,7 @@ export default function Page() {
                                                             {item.brand || <span className="text-gray-300">—</span>}
                                                         </td>
                                                         <td className="px-4 py-3.5 min-w-[220px]">
-                                                            <div className="flex flex-wrap gap-1">
+                                                            <div className="flex flex-wrap gap-1.5">
                                                                 {item.cpu && <Chip>{item.cpu}</Chip>}
                                                                 {item.ram && <Chip>{item.ram}</Chip>}
                                                                 {item.storage && <Chip>{item.storage}</Chip>}
@@ -522,7 +537,7 @@ export default function Page() {
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             {s ? (
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot} flex-shrink-0`} />
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                                                                     {s.label}
                                                                 </span>
                                                             ) : (
@@ -545,19 +560,19 @@ export default function Page() {
                                                                 <Link
                                                                     href={`/dashboard/laptops/${item.id}/units`}
                                                                     onClick={e => e.stopPropagation()}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+                                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                                                                 >
                                                                     Units
                                                                 </Link>
                                                                 <button
                                                                     onClick={() => openEdit(item)}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
                                                                 >
                                                                     Edit
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleDelete(item.id)}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
+                                                                    className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
                                                                 >
                                                                     Hapus
                                                                 </button>
@@ -570,34 +585,29 @@ export default function Page() {
                                     </table>
                                 </div>
                                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
-                                    <span className="text-xs text-gray-400">
-                                        Menampilkan{" "}
-                                        <span className="font-medium text-gray-600">{filteredLaptops.length}</span> dari{" "}
-                                        <span className="font-medium text-gray-600">{laptops.length}</span> laptop
-                                    </span>
+                                    <p className="text-xs text-gray-500">
+                                        Menampilkan <span className="font-semibold text-gray-700">{filteredLaptops.length}</span> dari <span className="font-semibold text-gray-700">{laptops.length}</span> laptop
+                                    </p>
                                 </div>
                             </div>
                         )}
                     </div>
                 </main>
 
-                {/* ────────────────────────────────────────────────── MODALS ── */}
-
-                {/* Detail Modal */}
+                {/* ── Modal Detail ── */}
                 <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
                     {detailLoading ? (
                         <ModalDetailSkeleton />
                     ) : selectedLaptop ? (
-                        <div className="space-y-5">
-                            {/* Hero card */}
-                            <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-2xl flex-shrink-0">
+                        <div className="space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-start gap-5 p-5 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-100">
+                                <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl">
                                     💻
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-gray-900 text-base leading-snug">{selectedLaptop.laptop_name}</h3>
+                                    <h3 className="font-bold text-gray-900 text-lg">{selectedLaptop.laptop_name}</h3>
                                     <p className="text-sm text-gray-500 mt-0.5">{selectedLaptop.brand || "—"}</p>
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                    <div className="flex flex-wrap gap-2 mt-3">
                                         {(() => {
                                             const s = STATUS_STYLE[selectedLaptop.status];
                                             return s ? (
@@ -614,7 +624,7 @@ export default function Page() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="sm:text-right flex-shrink-0 pt-0.5">
+                                <div className="sm:text-right flex-shrink-0">
                                     <p className="text-xs text-gray-400">Harga Jual</p>
                                     <p className="text-xl font-bold text-gray-900 mt-0.5">{fmt(selectedLaptop.selling_price)}</p>
                                     <p className="text-xs text-gray-400 mt-1.5">
@@ -627,10 +637,9 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Specs */}
                             <div>
-                                <SectionLabel>Spesifikasi</SectionLabel>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                <SectionLabel>Spesifikasi Teknis</SectionLabel>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     {[
                                         { label: "CPU", value: selectedLaptop.cpu },
                                         { label: "RAM", value: selectedLaptop.ram },
@@ -638,9 +647,9 @@ export default function Page() {
                                         { label: "GPU", value: selectedLaptop.gpu },
                                         { label: "Display", value: selectedLaptop.display },
                                     ].map(({ label, value }) => (
-                                        <div key={label} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                            <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-                                            <p className="text-sm font-medium text-gray-700 break-all">
+                                        <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                            <p className="text-xs text-gray-400 mb-1">{label}</p>
+                                            <p className="text-sm font-medium text-gray-800 break-all">
                                                 {value || <span className="text-gray-300 font-normal">—</span>}
                                             </p>
                                         </div>
@@ -648,34 +657,31 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Info: stok dikelola via units */}
-                            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5">
-                                <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="flex items-start gap-3 bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+                                <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <div>
-                                    <p className="text-xs font-semibold text-blue-700">Stok & harga modal dikelola per-unit</p>
-                                    <p className="text-xs text-blue-500 mt-0.5">
-                                        Setiap unit punya SN, grade, dan harga modal masing-masing.
-                                        Klik <span className="font-semibold">Lihat Units</span> untuk mengelolanya.
+                                    <p className="text-sm font-semibold text-blue-700">Stok & harga modal dikelola per-unit</p>
+                                    <p className="text-xs text-blue-600 mt-0.5">
+                                        Setiap unit punya SN, grade, dan harga modal sendiri. Klik <span className="font-semibold">Lihat Units</span> untuk mengelolanya.
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Notes */}
                             {(selectedLaptop.condition_note || selectedLaptop.notes) && (
                                 <div>
                                     <SectionLabel>Catatan</SectionLabel>
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         {selectedLaptop.condition_note && (
-                                            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                                                <p className="text-xs text-amber-600 font-semibold mb-1">Kondisi Umum</p>
+                                            <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
+                                                <p className="text-xs font-semibold text-amber-600 mb-1">Kondisi Umum</p>
                                                 <p className="text-sm text-amber-900">{selectedLaptop.condition_note}</p>
                                             </div>
                                         )}
                                         {selectedLaptop.notes && (
-                                            <div className="bg-gray-50 border border-gray-100 rounded-lg p-3">
-                                                <p className="text-xs text-gray-400 font-semibold mb-1">Notes</p>
+                                            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                                                <p className="text-xs font-semibold text-gray-400 mb-1">Catatan Tambahan</p>
                                                 <p className="text-sm text-gray-700">{selectedLaptop.notes}</p>
                                             </div>
                                         )}
@@ -683,29 +689,28 @@ export default function Page() {
                                 </div>
                             )}
 
-                            {/* Footer */}
                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <p className="text-xs text-gray-400">
-                                    {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", {
+                                    Ditambahkan {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", {
                                         day: "2-digit", month: "long", year: "numeric",
                                     })}
                                 </p>
                                 <div className="flex gap-2">
                                     <Link
                                         href={`/dashboard/laptops/${selectedLaptop.id}/units`}
-                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+                                        className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition"
                                     >
                                         Lihat Units
                                     </Link>
                                     <button
                                         onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                        className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition"
                                     >
                                         Edit
                                     </button>
                                     <button
                                         onClick={() => handleDelete(selectedLaptop.id)}
-                                        className="px-3 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
+                                        className="px-4 py-2 text-sm font-medium text-red-500 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition"
                                     >
                                         Hapus
                                     </button>
@@ -715,15 +720,14 @@ export default function Page() {
                     ) : null}
                 </Modal>
 
-                {/* Create Modal */}
-                <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop" size="md">
-                    <form onSubmit={handleCreate} className="space-y-4">
-                        {/* Info banner */}
-                        <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-lg p-3">
-                            <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* ── Modal Create ── */}
+                <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="md">
+                    <form onSubmit={handleCreate} className="space-y-5">
+                        <div className="flex items-start gap-3 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
+                            <svg className="w-4 h-4 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <p className="text-xs text-blue-600">
+                            <p className="text-xs text-blue-700">
                                 SN, grade, harga modal, dan stok dikelola per-unit setelah laptop dibuat.
                             </p>
                         </div>
@@ -759,64 +763,64 @@ export default function Page() {
                         </FormField>
                         <FormField label="Catatan">
                             <textarea name="notes" placeholder="Catatan tambahan..." value={formData.notes} onChange={handleFormChange} rows={2}
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition resize-none" />
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none" />
                         </FormField>
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex gap-3 pt-2">
                             <button type="button" onClick={closeModal}
-                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
                                 Batal
                             </button>
                             <button type="submit" disabled={formLoading}
-                                className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition disabled:opacity-50">
                                 {formLoading ? "Menyimpan..." : "Buat Laptop"}
                             </button>
                         </div>
                     </form>
                 </Modal>
 
-                {/* Edit Modal */}
-                <Modal open={modalMode === "edit"} onClose={closeModal} title={`Edit — ${selectedLaptop?.laptop_name || ""}`} size="md">
-                    <form onSubmit={handleEdit} className="space-y-4">
+                {/* ── Modal Edit ── */}
+                <Modal open={modalMode === "edit"} onClose={closeModal} title={`Edit Laptop`} size="md">
+                    <form onSubmit={handleEdit} className="space-y-5">
                         <FormGrid>
                             <FormField label="Nama Laptop" required>
-                                <Input name="laptop_name" placeholder="Nama Laptop" value={formData.laptop_name} onChange={handleFormChange} required />
+                                <Input name="laptop_name" value={formData.laptop_name} onChange={handleFormChange} required />
                             </FormField>
                             <FormField label="Brand">
-                                <Input name="brand" placeholder="Brand" value={formData.brand} onChange={handleFormChange} />
+                                <Input name="brand" value={formData.brand} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="CPU">
-                                <Input name="cpu" placeholder="CPU" value={formData.cpu} onChange={handleFormChange} />
+                                <Input name="cpu" value={formData.cpu} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="RAM">
-                                <Input name="ram" placeholder="RAM" value={formData.ram} onChange={handleFormChange} />
+                                <Input name="ram" value={formData.ram} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="Storage">
-                                <Input name="storage" placeholder="Storage" value={formData.storage} onChange={handleFormChange} />
+                                <Input name="storage" value={formData.storage} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="GPU">
-                                <Input name="gpu" placeholder="GPU" value={formData.gpu} onChange={handleFormChange} />
+                                <Input name="gpu" value={formData.gpu} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="Display">
-                                <Input name="display" placeholder="Display" value={formData.display} onChange={handleFormChange} />
+                                <Input name="display" value={formData.display} onChange={handleFormChange} />
                             </FormField>
                             <FormField label="Harga Jual (default)" required>
-                                <Input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required />
+                                <Input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required />
                             </FormField>
                         </FormGrid>
                         <FormField label="Kondisi Umum">
-                            <Input name="condition_note" placeholder="Kondisi laptop" value={formData.condition_note} onChange={handleFormChange} />
+                            <Input name="condition_note" value={formData.condition_note} onChange={handleFormChange} />
                         </FormField>
                         <FormField label="Catatan">
-                            <textarea name="notes" placeholder="Catatan tambahan..." value={formData.notes} onChange={handleFormChange} rows={2}
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition resize-none" />
+                            <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={2}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none" />
                         </FormField>
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex gap-3 pt-2">
                             <button type="button" onClick={closeModal}
-                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
                                 Batal
                             </button>
                             <button type="submit" disabled={formLoading}
-                                className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition disabled:opacity-50">
                                 {formLoading ? "Menyimpan..." : "Simpan Perubahan"}
                             </button>
                         </div>
@@ -835,12 +839,12 @@ export default function Page() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Skeleton — Table
+// Skeleton & UI Helpers (tidak berubah logika, hanya perbaikan visual)
 // ─────────────────────────────────────────────────────────────────────────────
 function SkeletonTable() {
     const rowVariants = [130, 155, 120, 140, 165, 125];
     return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
@@ -857,15 +861,11 @@ function SkeletonTable() {
                             <tr key={r}>
                                 <td className="px-4 py-3.5"><Shimmer w={w} h={14} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
-                                <td className="px-4 py-3.5">
-                                    <div style={{ display: "flex", gap: 4 }}>
-                                        {[52, 36, 44].map((cw, ci) => <Shimmer key={ci} w={cw} h={20} r="5px" />)}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end" }}><Shimmer w={90} h={14} /></div></td>
-                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end" }}><Shimmer w={20} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex gap-2"><Shimmer w={52} h={20} r="6px" /><Shimmer w={36} h={20} r="6px" /><Shimmer w={44} h={20} r="6px" /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
-                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end gap-2"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
                             </tr>
                         ))}
                     </tbody>
@@ -878,54 +878,20 @@ function SkeletonTable() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton — Detail Modal
-// ─────────────────────────────────────────────────────────────────────────────
 function ModalDetailSkeleton() {
     return (
-        <div className="space-y-5">
-            <div style={{ display: "flex", gap: 16, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #f3f4f6", alignItems: "flex-start" }}>
-                <Shimmer w={48} h={48} r="12px" />
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, paddingTop: 2 }}>
-                    <Shimmer w="75%" h={16} />
-                    <Shimmer w="35%" h={12} />
-                    <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                        <Shimmer w={72} h={22} r="99px" />
-                        <Shimmer w={90} h={22} r="99px" />
-                    </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                    <Shimmer w={50} h={11} />
-                    <Shimmer w={110} h={24} />
-                    <Shimmer w={60} h={11} style={{ marginTop: 2 }} />
-                </div>
+        <div className="space-y-6">
+            <div className="flex gap-5 p-5 bg-gray-50 rounded-xl border border-gray-100">
+                <Shimmer w={56} h={56} r="12px" />
+                <div className="flex-1 space-y-2"><Shimmer w="70%" h={18} /><Shimmer w="40%" h={14} /><div className="flex gap-2 mt-2"><Shimmer w={80} h={24} r="99px" /><Shimmer w={90} h={24} r="99px" /></div></div>
+                <div className="text-right space-y-1"><Shimmer w={60} h={10} /><Shimmer w={100} h={24} /></div>
             </div>
-            <div>
-                <Shimmer w={80} h={11} style={{ marginBottom: 10 }} />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                    {[{ lw: 25, vw: "80%" }, { lw: 25, vw: "55%" }, { lw: 45, vw: "70%" }, { lw: 25, vw: "90%" }, { lw: 40, vw: "65%" }].map((cell, i) => (
-                        <div key={i} style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #f3f4f6" }}>
-                            <Shimmer w={cell.lw} h={10} style={{ marginBottom: 6 }} />
-                            <Shimmer w={cell.vw} h={14} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
-                <Shimmer w={110} h={11} />
-                <div style={{ display: "flex", gap: 8 }}>
-                    <Shimmer w={72} h={30} r="8px" />
-                    <Shimmer w={50} h={30} r="8px" />
-                    <Shimmer w={56} h={30} r="8px" />
-                </div>
-            </div>
+            <div><Shimmer w={120} h={11} className="mb-2" /><div className="grid grid-cols-3 gap-3"><div className="bg-gray-50 p-3 rounded-xl border"><Shimmer w={40} h={10} className="mb-1" /><Shimmer w="80%" h={14} /></div><div className="bg-gray-50 p-3 rounded-xl border"><Shimmer w={40} h={10} className="mb-1" /><Shimmer w="70%" h={14} /></div><div className="bg-gray-50 p-3 rounded-xl border"><Shimmer w={50} h={10} className="mb-1" /><Shimmer w="90%" h={14} /></div></div></div>
+            <div className="flex justify-between pt-3 border-t"><Shimmer w={100} h={11} /><div className="flex gap-2"><Shimmer w={80} h={32} r="10px" /><Shimmer w={60} h={32} r="10px" /></div></div>
         </div>
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Modal Component
-// ─────────────────────────────────────────────────────────────────────────────
 function Modal({ open, onClose, title, children, size = "md" }: {
     open: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: "md" | "lg";
 }) {
@@ -940,25 +906,22 @@ function Modal({ open, onClose, title, children, size = "md" }: {
     return (
         <div ref={overlayRef} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={e => { if (e.target === overlayRef.current) onClose(); }}>
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh]`}>
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-                    <h2 className="font-semibold text-gray-800 text-base truncate pr-4">{title}</h2>
-                    <button onClick={onClose} className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-all" />
+            <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh] overflow-hidden`}>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0 bg-white/95 backdrop-blur-sm">
+                    <h2 className="font-semibold text-gray-800 text-base truncate">{title}</h2>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div className="overflow-y-auto flex-1 px-5 py-5">{children}</div>
+                <div className="overflow-y-auto flex-1 px-5 py-6">{children}</div>
             </div>
         </div>
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
     return (
         <th className={`px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
@@ -966,29 +929,32 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         </th>
     );
 }
+
 function Chip({ children }: { children: React.ReactNode }) {
-    return <span className="inline-block bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">{children}</span>;
+    return <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md font-mono">{children}</span>;
 }
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{children}</p>;
 }
+
 function FormGrid({ children }: { children: React.ReactNode }) {
-    return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>;
+    return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
+
 function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
         <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-            </label>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
             {children}
         </div>
     );
 }
+
 function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
     return (
         <input {...props}
-            className={`w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition ${className}`}
+            className={`w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition ${className}`}
         />
     );
 }

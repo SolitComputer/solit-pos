@@ -291,7 +291,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                                         )
                                     )}
                                     <Link
-                                        href={`/dashboard/laptops/${result.laptop.id}`}
+                                        href={`/dashboard/laptops/${result.laptop.id}/units`}
                                         className="flex items-center justify-center gap-1.5 h-9 px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 transition whitespace-nowrap"
                                     >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
