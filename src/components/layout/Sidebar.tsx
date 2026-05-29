@@ -17,6 +17,15 @@ const menuIcons: Record<string, React.ReactNode> = {
       <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
     </svg>
   ),
+  Scanner: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 7V5a1 1 0 011-1h2" />
+      <path d="M20 7V5a1 1 0 00-1-1h-2" />
+      <path d="M4 17v2a1 1 0 001 1h2" />
+      <path d="M20 17v2a1 1 0 01-1 1h-2" />
+      <path d="M7 12h10" />
+    </svg>
+  ),
   "Data Laptop": (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
@@ -34,16 +43,19 @@ const adminMenus = [
   { name: "Riwayat", href: "/dashboard/transactions" },
   { name: "Data Laptop", href: "/dashboard/laptops" },
   { name: "Buat Payment", href: "/payment/create" },
+  { name: "Scanner", href: "/scan" },
 ];
 
 const salesMenus = [
   { name: "Buat Payment", href: "/payment/create" },
   { name: "Riwayat", href: "/dashboard/transactions" },
+  { name: "Scanner", href: "/scan" },
 ];
 
 const operatorMenus = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Data Laptop", href: "/dashboard/laptops" },
+  { name: "Scanner", href: "/scan" },
 ];
 
 const roleColors: Record<string, string> = {
@@ -199,10 +211,10 @@ export default function Sidebar() {
   const menus = loading
     ? []
     : user?.role === "ADMIN"
-    ? adminMenus
-    : user?.role === "OPERATOR"
-    ? operatorMenus
-    : salesMenus;
+      ? adminMenus
+      : user?.role === "OPERATOR"
+        ? operatorMenus
+        : salesMenus;
 
   const contentProps = { user, loading, menus, pathname, onLogout: handleLogout };
 

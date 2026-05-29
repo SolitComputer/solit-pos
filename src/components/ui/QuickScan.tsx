@@ -1,15 +1,3 @@
-// C:\solit-pos\src\components\ui\QuickScan.tsx
-//
-// Komponen Quick Scan untuk penjualan cepat.
-// Dipasang di halaman dashboard/laptops/page.tsx (di atas tabel).
-//
-// Fitur:
-// - Input SN manual → tekan Enter atau klik Cari → muncul popup data unit
-// - Jika SIAP_JUAL + role SALES/ADMIN → tombol "Jual Sekarang"
-// - Jika role lain → hanya "Lihat Detail"
-// - Auto-focus saat halaman dibuka (cocok untuk barcode scanner USB/Bluetooth
-//   yang mengirim karakter + Enter)
-
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -45,18 +33,17 @@ const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const GRADE_COLOR = {
     A: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-    B: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200" },
-    C: { bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200" },
+    B: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+    C: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200" },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string }> = {
-    SIAP_JUAL:  { label: "Siap Jual",  dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    BELUM_SIAP: { label: "Belum Siap", dot: "bg-amber-400",   badge: "bg-amber-50 text-amber-700 border-amber-200" },
-    SERVICE:    { label: "Service",    dot: "bg-blue-500",    badge: "bg-blue-50 text-blue-700 border-blue-200" },
-    SOLD:       { label: "Terjual",    dot: "bg-gray-400",    badge: "bg-gray-100 text-gray-500 border-gray-200" },
+    SIAP_JUAL: { label: "Siap Jual", dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    BELUM_SIAP: { label: "Belum Siap", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" },
+    SERVICE: { label: "Service", dot: "bg-blue-500", badge: "bg-blue-50 text-blue-700 border-blue-200" },
+    SOLD: { label: "Terjual", dot: "bg-gray-400", badge: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function QuickScan({ user }: { user: AuthUser | null }) {
     const router = useRouter();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -67,9 +54,10 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
     const [error, setError] = useState<string | null>(null);
     const [showResult, setShowResult] = useState(false);
 
-    const canSell = user?.role === "ADMIN" || user?.role === "SALES" || user?.role === "OPERATOR";
+    const canSell =
+        user?.role === "ADMIN" ||
+        user?.role === "SALES";
 
-    // Auto-focus input (agar scanner USB/BT langsung ketik ke sini)
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
@@ -122,9 +110,9 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
     const handleSell = () => {
         if (!result) return;
         const params = new URLSearchParams({
-            unit_id:   result.id,
+            unit_id: result.id,
             laptop_id: result.laptop.id,
-            sn:        result.serial_number,
+            sn: result.serial_number,
         });
         router.push(`/payment/create?${params.toString()}`);
     };
@@ -222,7 +210,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
 
                     {/* Success result */}
                     {!loading && result && (() => {
-                        const grade  = GRADE_COLOR[result.grade] || GRADE_COLOR.A;
+                        const grade = GRADE_COLOR[result.grade] || GRADE_COLOR.A;
                         const status = STATUS_CONFIG[result.status] || STATUS_CONFIG.BELUM_SIAP;
                         const canSellThisUnit = canSell && result.status === "SIAP_JUAL";
 
@@ -303,14 +291,14 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                                         )
                                     )}
                                     <Link
-                                        href={`/dashboard/laptops/${result.laptop.id}/units`}
+                                        href={`/dashboard/laptops/${result.laptop.id}`}
                                         className="flex items-center justify-center gap-1.5 h-9 px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 transition whitespace-nowrap"
                                     >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
-                                        Lihat Units
+                                        Lihat Data
                                     </Link>
                                 </div>
                             </div>
