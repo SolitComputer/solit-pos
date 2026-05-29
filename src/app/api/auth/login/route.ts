@@ -10,6 +10,9 @@ import jwt
 import { supabase }
     from "@/services/supabase";
 
+import { ROLE_DEFAULT_REDIRECT, UserRole } from "@/lib/auth";
+
+
 export async function POST(
     request: Request
 ) {
@@ -116,12 +119,8 @@ export async function POST(
         // ======================
         // RESPONSE
         // ======================
-        const redirect =
-            user.role === "ADMIN"
-                ? "/dashboard"
-                : user.role === "OPERATOR"
-                    ? "/dashboard/laptops"
-                    : "/payment/create";
+        const redirect = ROLE_DEFAULT_REDIRECT[user.role as UserRole] ?? "/payment/create";
+
 
         const response = NextResponse.json(
             {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   useEffect(() => {
@@ -58,6 +59,22 @@ export default function Page() {
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(r => setUserRole(r.user?.role ?? null))
+      .catch(() => setUserRole(null));
+  }, []);
+
+  const canEditTransaction = userRole
+    ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)
+    : false;
+
+  const canSeeFinancials = userRole
+    ? hasPermission(userRole, ["ADMIN", "ACCOUNTING"])
+    : false;
 
   useEffect(() => { fetchTransactions(); }, []);
 
@@ -162,8 +179,8 @@ export default function Page() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${hasActiveFilter
-                  ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                 }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -188,8 +205,8 @@ export default function Page() {
                     key={s}
                     onClick={() => setStatus(s)}
                     className={`h-9 rounded-xl text-xs font-semibold border transition ${status === s
-                        ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
-                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                      ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                      : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     {s === "ALL" ? "Semua" : s}
@@ -265,7 +282,13 @@ export default function Page() {
             </div>
           ) : (
             paginatedTransactions.map((item) => (
-              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} />
+              <TransactionCard
+                key={item.id}
+                item={item}
+                onPhotoClick={setPhotoModal}
+                canEditTransaction={canEditTransaction}
+                canSeeFinancials={canSeeFinancials}
+              />
             ))
           )}
         </div>
@@ -303,7 +326,17 @@ export default function Page() {
   );
 }
 
-function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url: string) => void }) {
+function TransactionCard({
+  item,
+  onPhotoClick,
+  canEditTransaction,
+  canSeeFinancials,
+}: {
+  item: any;
+  onPhotoClick: (url: string) => void;
+  canEditTransaction: boolean;
+  canSeeFinancials: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const statusMap: Record<string, string> = {
@@ -334,8 +367,15 @@ function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url
             <p className="text-xs text-gray-500 mt-0.5 truncate">{item.laptop_name}</p>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-sm font-bold text-gray-800">Rp{(item.deal_price || item.amount).toLocaleString("id-ID")}</p>
-            <p className="text-xs text-emerald-600 font-medium">+Rp{(item.other || 0).toLocaleString("id-ID")}</p>
+            <p className="text-sm font-bold text-gray-800">
+              Rp{(item.deal_price || item.amount).toLocaleString("id-ID")}
+            </p>
+            {/* Profit hanya untuk ADMIN & ACCOUNTING */}
+            {canSeeFinancials && (
+              <p className="text-xs text-emerald-600 font-medium">
+                +Rp{(item.other || 0).toLocaleString("id-ID")}
+              </p>
+            )}
           </div>
         </div>
 
@@ -352,7 +392,9 @@ function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url
       </div>
 
       {/* Footer actions */}
+      {/* Footer actions */}
       <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        {/* Kiri: Bukti, Maps, Detail */}
         <div className="flex items-center gap-2">
           {item.payment_photo && (
             <button
@@ -360,7 +402,8 @@ function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url
               className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition font-medium"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" />
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
               </svg>
               Bukti
@@ -384,44 +427,69 @@ function TransactionCard({ item, onPhotoClick }: { item: any; onPhotoClick: (url
             className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
           >
             {expanded ? "Sembunyikan" : "Detail"}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${expanded ? "rotate-180" : ""}`}>
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2"
+              className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+            >
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
         </div>
-        <a
-          href={`/receipt/${item.invoice_number}`}
-          className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
-        >
-          Receipt
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </a>
-      </div>
 
-      {/* Expandable detail */}
-      {expanded && (
-        <div className="px-4 py-3 border-t border-gray-100 bg-white space-y-2">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-            <div><span className="text-gray-400">SN:</span> <span className="text-gray-700 font-medium">{item.serial_number || "-"}</span></div>
-            <div><span className="text-gray-400">Software:</span> <span className="text-gray-700">{item.software_request || "-"}</span></div>
-            <div><span className="text-gray-400">Pickup:</span> <span className="text-gray-700">{item.pickup_method}</span></div>
-            <div><span className="text-gray-400">Jadwal:</span> <span className="text-gray-700">{item.pickup_date || "-"} {item.pickup_time || ""}</span></div>
-            {item.inventory_price > 0 && (
-              <div><span className="text-gray-400">Modal:</span> <span className="text-gray-700">Rp{item.inventory_price.toLocaleString("id-ID")}</span></div>
-            )}
-            {item.pickup_location && (
-              <div className="col-span-2"><span className="text-gray-400">Alamat:</span> <span className="text-gray-700">{item.pickup_location}</span></div>
+        {/* Kanan: Edit (jika punya akses) + Receipt */}
+        <div className="flex items-center gap-2">
+          {canEditTransaction && (
+            <a
+              href={`/payment/${item.invoice_number}`}
+              className="text-xs font-semibold text-amber-600 hover:text-amber-800 transition flex items-center gap-1"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              Edit
+            </a>
+          )}
+          <a
+            href={`/receipt/${item.invoice_number}`}
+            className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
+          >
+            Receipt
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </a>
+        </div >
+      </div >
+
+
+      {
+        expanded && (
+          <div className="px-4 py-3 border-t border-gray-100 bg-white space-y-2">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              <div><span className="text-gray-400">SN:</span> <span className="text-gray-700 font-medium">{item.serial_number || "-"}</span></div>
+              <div><span className="text-gray-400">Software:</span> <span className="text-gray-700">{item.software_request || "-"}</span></div>
+              <div><span className="text-gray-400">Pickup:</span> <span className="text-gray-700">{item.pickup_method}</span></div>
+              <div><span className="text-gray-400">Jadwal:</span> <span className="text-gray-700">{item.pickup_date || "-"} {item.pickup_time || ""}</span></div>
+              {canSeeFinancials && item.inventory_price > 0 && (
+                <div>
+                  <span className="text-gray-400">Modal:</span>{" "}
+                  <span className="text-gray-700">Rp{item.inventory_price.toLocaleString("id-ID")}</span>
+                </div>
+              )}
+              {item.pickup_location && (
+                <div className="col-span-2"><span className="text-gray-400">Alamat:</span> <span className="text-gray-700">{item.pickup_location}</span></div>
+              )}
+            </div>
+            {item.notes && (
+              <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
+                <span className="font-semibold text-gray-500">Catatan: </span>{item.notes}
+              </div>
             )}
           </div>
-          {item.notes && (
-            <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
-              <span className="font-semibold text-gray-500">Catatan: </span>{item.notes}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

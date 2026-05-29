@@ -1,25 +1,32 @@
+
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-export type UserRole = "ADMIN" | "SALES" | "OPERATOR";
+// Re-export semua dari permissions agar import lama tidak perlu diubah
+export type { UserRole } from "@/lib/permissions";
+export {
+  ROLE_DEFAULT_REDIRECT,
+  ROUTE_PERMISSIONS,
+  PERMISSIONS,
+  hasPermission,
+} from "@/lib/permissions";
 
 export interface AuthUser {
   id: string;
   name: string;
-  role: UserRole;
+  role: import("@/lib/permissions").UserRole;
 }
 
+// ======================
+// JWT SECRET
+// ======================
 const getSecret = () =>
   new TextEncoder().encode(process.env.JWT_SECRET || "secret");
 
-export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/dashboard/laptops": ["ADMIN", "OPERATOR"],      
-  "/dashboard/transactions": ["ADMIN", "SALES"],      
-  "/dashboard": ["ADMIN", "OPERATOR"],                
-  "/payment/create": ["ADMIN", "SALES"],              
-};
-
+// ======================
+// GET CURRENT USER (Server Component only)
+// ======================
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const cookieStore = await cookies();
@@ -33,6 +40,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
+// ======================
+// VERIFY TOKEN (Middleware only)
+// ======================
 export async function verifyToken(token: string): Promise<AuthUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
@@ -42,13 +52,16 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
   }
 }
 
+// ======================
+// withAuth — API Route Wrapper
+// ======================
 type RouteHandler = (
   req: NextRequest,
-  props: any,   
+  props: any,
   user: AuthUser
 ) => Promise<NextResponse> | NextResponse;
 
-export function withAuth(handler: RouteHandler, allowedRoles?: UserRole[]) {
+export function withAuth(handler: RouteHandler, allowedRoles?: import("@/lib/permissions").UserRole[]) {
   return async (req: NextRequest, ctx: { params: any }) => {
     const token = req.cookies.get("token")?.value;
 

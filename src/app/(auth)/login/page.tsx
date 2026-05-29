@@ -28,14 +28,9 @@ export default function Page() {
         setError(result.message || "Login gagal");
         return;
       }
+      // GANTI blok setTimeout:
       setTimeout(() => {
-        if (result.user?.role === "ADMIN") {
-          window.location.href = "/dashboard";
-        } else if (result.user?.role === "OPERATOR") {
-          window.location.href = "/dashboard/laptops";
-        } else {
-          window.location.href = "/payment/create";
-        }
+        window.location.href = result.redirect ?? "/payment/create";
       }, 300);
     } catch {
       setError("Terjadi kesalahan koneksi");
@@ -63,7 +58,7 @@ export default function Page() {
       <div className="relative w-full max-w-lg z-10">
         {/* Floating card with glassmorphism */}
         <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/40 hover:border-white/20 transition-all duration-500">
-          
+
           {/* Logo area with glow */}
           <div className="flex flex-col items-center mb-10">
             <div className="relative group">

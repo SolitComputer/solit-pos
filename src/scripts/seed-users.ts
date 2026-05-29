@@ -6,23 +6,48 @@ dotenv.config({ path: ".env.local" });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, 
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 const users = [
-  {
-    name: "Rafi Solit",
-    email: "rafi@solit.com",
-    password: "rafi123",
-    role: "SALES",
-  },
+  // ADMIN / CEO
+  { name: "Rei",    email: "Admin@gmail.com",          password: "Rei@Solit25",    role: "ADMIN" },
+
+  { name: "Salam",  email: "salam.kds@solit-pos.com",  password: "Salam@Sales25",  role: "KEPALA_SALES" },
+
+  // CREW SALES
+  { name: "Yulfa",  email: "yulfa.crew@solit-pos.com", password: "Yulfa@Crew25",   role: "CREW_SALES" },
+  { name: "Revin",  email: "revin.crew@solit-pos.com", password: "Revin@Crew25",   role: "CREW_SALES" },
+  { name: "Resti",  email: "resti.crew@solit-pos.com", password: "Resti@Crew25",   role: "CREW_SALES" },
+  { name: "Fitri",  email: "fitri.crew@solit-pos.com", password: "Fitri@Crew25",   role: "CREW_SALES" },
+
+  // PENGELOLA BARANG
+  { name: "Yoga",   email: "yoga.pgb@solit-pos.com",   password: "Yoga@Barang25",  role: "PENGELOLA_BARANG" },
+  { name: "Rafi",   email: "rafi.pgb@solit-pos.com",   password: "Rafi@Barang25",  role: "PENGELOLA_BARANG" },
+
+  // ACCOUNTING
+  { name: "Rayhan", email: "rayhan.acc@solit-pos.com", password: "Rayhan@Acc25",   role: "ACCOUNTING" },
 ];
 
 async function seed() {
   console.log("🌱 Mulai seeding users...\n");
 
+  // ── Hapus user lama dengan role yang sudah tidak dipakai ──
+  const { error: deleteError } = await supabase
+    .from("users")
+    .delete()
+    .in("role", ["OPERATOR", "SALES"]);
+
+  if (deleteError) {
+    console.error("❌ Gagal hapus user lama:", deleteError.message);
+  } else {
+    console.log("🗑️  User lama (OPERATOR/SALES) dihapus\n");
+  }
+
+  // ── Upsert setiap user ──
   for (const user of users) {
-    // Cek apakah email sudah ada
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+
     const { data: existing } = await supabase
       .from("users")
       .select("id")
@@ -30,19 +55,30 @@ async function seed() {
       .single();
 
     if (existing) {
-      console.log(`⏭️  Skip: ${user.email} sudah ada`);
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          name:     user.name,
+          role:     user.role,
+          password: hashedPassword,
+        })
+        .eq("email", user.email);
+
+      if (updateError) {
+        console.error(`❌ Gagal update ${user.email}:`, updateError.message);
+      } else {
+        console.log(`🔄 Updated  | ${user.role.padEnd(17)} | ${user.email} | Pass: ${user.password}`);
+      }
       continue;
     }
-
-    const hashedPassword = await bcrypt.hash(user.password, 10);
 
     const { data, error } = await supabase
       .from("users")
       .insert({
-        name: user.name,
-        email: user.email,
+        name:     user.name,
+        email:    user.email,
         password: hashedPassword,
-        role: user.role,
+        role:     user.role,
       })
       .select("id, name, email, role")
       .single();
@@ -50,10 +86,17 @@ async function seed() {
     if (error) {
       console.error(`❌ Gagal insert ${user.email}:`, error.message);
     } else {
-      console.log(`✅ Berhasil: ${data.email} | Role: ${data.role} | ID: ${data.id}`);
+      console.log(`✅ Berhasil | ${data.role.padEnd(17)} | ${data.email} | Pass: ${user.password}`);
     }
   }
 
+  console.log("\n─────────────────────────────────────────────────────────");
+  console.log("📋 RINGKASAN AKUN:");
+  console.log("─────────────────────────────────────────────────────────");
+  users.forEach((u) => {
+    console.log(`  ${u.role.padEnd(17)} | ${u.name.padEnd(8)} | ${u.email.padEnd(28)} | ${u.password}`);
+  });
+  console.log("─────────────────────────────────────────────────────────");
   console.log("\n✨ Seeding selesai!");
   process.exit(0);
 }

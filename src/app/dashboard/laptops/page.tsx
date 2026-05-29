@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
+import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
 interface Laptop {
     id: string;
@@ -90,8 +91,20 @@ export default function Page() {
     const [formLoading, setFormLoading] = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
+    const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+    const canEditLaptop = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
+    const canCreateLaptop = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
+    const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"]) : false;
 
     useEffect(() => { fetchLaptops(); }, []);
+
+    useEffect(() => {
+        fetch("/api/auth/me")
+            .then(r => r.json())
+            .then(r => setUserRole(r.user?.role ?? null))
+            .catch(() => setUserRole(null));
+    }, []);
 
     useEffect(() => {
         document.body.style.overflow = modalMode ? "hidden" : "";
@@ -406,25 +419,30 @@ export default function Page() {
                                 </div>
                                 <p className="text-gray-500 text-sm ml-9">Kelola inventaris laptop Anda dengan mudah</p>
                             </div>
+                            {/* ── Header buttons — GANTI BAGIAN INI ── */}
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={exportToExcel}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Export Excel
-                                </button>
-                                <button
-                                    onClick={openCreate}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] rounded-xl text-sm font-medium text-white hover:bg-[#16213e] transition-all shadow-sm"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Tambah Laptop
-                                </button>
+                                {canExport && (
+                                    <button
+                                        onClick={exportToExcel}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Export Excel
+                                    </button>
+                                )}
+                                {canCreateLaptop && (
+                                    <button
+                                        onClick={openCreate}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] rounded-xl text-sm font-medium text-white hover:bg-[#16213e] transition-all shadow-sm"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Tambah Laptop
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -505,14 +523,17 @@ export default function Page() {
                                                         className="group hover:bg-gray-50/80 transition-colors cursor-pointer"
                                                         onClick={() => openDetail(item)}
                                                     >
+                                                        {/* Nama */}
                                                         <td className="px-4 py-3.5 max-w-[200px]">
                                                             <span className="block font-semibold text-gray-800 truncate group-hover:text-[#1a1a2e] transition-colors" title={item.laptop_name}>
                                                                 {item.laptop_name}
                                                             </span>
                                                         </td>
+                                                        {/* Brand */}
                                                         <td className="px-4 py-3.5 text-gray-500 whitespace-nowrap">
                                                             {item.brand || <span className="text-gray-300">—</span>}
                                                         </td>
+                                                        {/* Spesifikasi */}
                                                         <td className="px-4 py-3.5 min-w-[220px]">
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {item.cpu && <Chip>{item.cpu}</Chip>}
@@ -521,19 +542,17 @@ export default function Page() {
                                                                 {item.gpu && <Chip>{item.gpu}</Chip>}
                                                             </div>
                                                         </td>
+                                                        {/* Harga Jual */}
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                                                             {fmt(item.selling_price)}
                                                         </td>
+                                                        {/* Stok */}
                                                         <td className="px-4 py-3.5 text-right">
-                                                            <span
-                                                                className={`font-medium ${(item.qty ?? 0) === 0
-                                                                        ? "text-red-500"
-                                                                        : "text-gray-700"
-                                                                    }`}
-                                                            >
+                                                            <span className={`font-medium ${(item.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>
                                                                 {item.qty ?? 0}
                                                             </span>
                                                         </td>
+                                                        {/* Status */}
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             {s ? (
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -544,19 +563,21 @@ export default function Page() {
                                                                 <span className="text-gray-400 text-xs">{item.status}</span>
                                                             )}
                                                         </td>
+                                                        {/* Aksi */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                {/* Barcode — semua role */}
                                                                 <button
                                                                     onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
                                                                     className="px-2 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                                                                     title="Lihat Barcode"
                                                                 >
-                                                                    {/* Icon barcode */}
                                                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                                                                             d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
                                                                     </svg>
                                                                 </button>
+                                                                {/* Units — semua role */}
                                                                 <Link
                                                                     href={`/dashboard/laptops/${item.id}/units`}
                                                                     onClick={e => e.stopPropagation()}
@@ -564,18 +585,24 @@ export default function Page() {
                                                                 >
                                                                     Units
                                                                 </Link>
-                                                                <button
-                                                                    onClick={() => openEdit(item)}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
-                                                                >
-                                                                    Edit
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDelete(item.id)}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
-                                                                >
-                                                                    Hapus
-                                                                </button>
+                                                                {/* Edit — hanya ADMIN & PENGELOLA_BARANG */}
+                                                                {canEditLaptop && (
+                                                                    <button
+                                                                        onClick={() => openEdit(item)}
+                                                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                )}
+                                                                {/* Hapus — hanya ADMIN & PENGELOLA_BARANG */}
+                                                                {canEditLaptop && (
+                                                                    <button
+                                                                        onClick={() => handleDelete(item.id)}
+                                                                        className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                                                                    >
+                                                                        Hapus
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -689,6 +716,7 @@ export default function Page() {
                                 </div>
                             )}
 
+                            {/* ── Detail modal footer — GANTI BAGIAN INI ── */}
                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <p className="text-xs text-gray-400">
                                     Ditambahkan {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", {
@@ -702,18 +730,22 @@ export default function Page() {
                                     >
                                         Lihat Units
                                     </Link>
-                                    <button
-                                        onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
-                                        className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(selectedLaptop.id)}
-                                        className="px-4 py-2 text-sm font-medium text-red-500 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition"
-                                    >
-                                        Hapus
-                                    </button>
+                                    {canEditLaptop && (
+                                        <button
+                                            onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
+                                            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                    {canEditLaptop && (
+                                        <button
+                                            onClick={() => handleDelete(selectedLaptop.id)}
+                                            className="px-4 py-2 text-sm font-medium text-red-500 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition"
+                                        >
+                                            Hapus
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

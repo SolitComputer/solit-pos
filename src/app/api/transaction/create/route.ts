@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
-import { withAuth, AuthUser } from "@/lib/auth";
+import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { generateInvoice } from "@/lib/invoice";
 import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 
@@ -179,4 +179,4 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     }
 }
 
-export const POST = withAuth(handler);
+export const POST = withAuth(handler, PERMISSIONS.CREATE_TRANSACTION);

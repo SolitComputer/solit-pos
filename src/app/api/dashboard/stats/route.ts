@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
-import { withAuth } from "@/lib/auth";
+import { PERMISSIONS, withAuth } from "@/lib/auth";
 
 async function handler(req: NextRequest) {
   try {
@@ -87,4 +87,4 @@ async function handler(req: NextRequest) {
 }
 
 // ADMIN only
-export const GET = withAuth(handler, ["ADMIN"]);
+export const GET = withAuth(handler, PERMISSIONS.VIEW_DASHBOARD);

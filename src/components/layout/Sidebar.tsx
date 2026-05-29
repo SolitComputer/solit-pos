@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { UserRole } from "@/lib/auth";
 
+// ─── Icons ───────────────────────────────────────────────────────────────────
 const menuIcons: Record<string, React.ReactNode> = {
   Dashboard: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -19,10 +21,8 @@ const menuIcons: Record<string, React.ReactNode> = {
   ),
   Scanner: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 7V5a1 1 0 011-1h2" />
-      <path d="M20 7V5a1 1 0 00-1-1h-2" />
-      <path d="M4 17v2a1 1 0 001 1h2" />
-      <path d="M20 17v2a1 1 0 01-1 1h-2" />
+      <path d="M4 7V5a1 1 0 011-1h2" /><path d="M20 7V5a1 1 0 00-1-1h-2" />
+      <path d="M4 17v2a1 1 0 001 1h2" /><path d="M20 17v2a1 1 0 01-1 1h-2" />
       <path d="M7 12h10" />
     </svg>
   ),
@@ -38,32 +38,44 @@ const menuIcons: Record<string, React.ReactNode> = {
   ),
 };
 
-const adminMenus = [
-  { name: "Dashboard", href: "/dashboard" },
-  { name: "Riwayat", href: "/dashboard/transactions" },
-  { name: "Data Laptop", href: "/dashboard/laptops" },
-  { name: "Buat Payment", href: "/payment/create" },
-  { name: "Scanner", href: "/scan" },
-];
-
-const salesMenus = [
-  { name: "Buat Payment", href: "/payment/create" },
-  { name: "Riwayat", href: "/dashboard/transactions" },
-  { name: "Scanner", href: "/scan" },
-];
-
-const operatorMenus = [
-  { name: "Dashboard", href: "/dashboard" },
-  { name: "Data Laptop", href: "/dashboard/laptops" },
-  { name: "Scanner", href: "/scan" },
-];
-
-const roleColors: Record<string, string> = {
-  ADMIN: "bg-violet-100 text-violet-700",
-  SALES: "bg-emerald-100 text-emerald-700",
-  OPERATOR: "bg-blue-100 text-blue-700",
+// ─── Menu per role ────────────────────────────────────────────────────────────
+const ROLE_MENUS: Record<UserRole, { name: string; href: string }[]> = {
+  ADMIN: [
+    { name: "Dashboard",    href: "/dashboard" },
+    { name: "Riwayat",      href: "/dashboard/transactions" },
+    { name: "Data Laptop",  href: "/dashboard/laptops" },
+    { name: "Buat Payment", href: "/payment/create" },
+    { name: "Scanner",      href: "/scan" },
+  ],
+  KEPALA_SALES: [
+    { name: "Buat Payment", href: "/payment/create" },
+    { name: "Riwayat",      href: "/dashboard/transactions" },
+    { name: "Scanner",      href: "/scan" },
+  ],
+  CREW_SALES: [
+    { name: "Buat Payment", href: "/payment/create" },
+    { name: "Scanner",      href: "/scan" },
+  ],
+  ACCOUNTING: [
+    { name: "Dashboard",    href: "/dashboard" },
+    { name: "Riwayat",      href: "/dashboard/transactions" },
+  ],
+  PENGELOLA_BARANG: [
+    { name: "Data Laptop",  href: "/dashboard/laptops" },
+    { name: "Scanner",      href: "/scan" },
+  ],
 };
 
+// ─── Role display label & badge color ────────────────────────────────────────
+const ROLE_META: Record<UserRole, { label: string; badge: string }> = {
+  ADMIN:            { label: "Admin / CEO",        badge: "bg-violet-100 text-violet-700" },
+  KEPALA_SALES:     { label: "Kepala Divisi Sales", badge: "bg-emerald-100 text-emerald-700" },
+  CREW_SALES:       { label: "Crew Sales",          badge: "bg-sky-100 text-sky-700" },
+  ACCOUNTING:       { label: "Accounting",          badge: "bg-amber-100 text-amber-700" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang",    badge: "bg-blue-100 text-blue-700" },
+};
+
+// ─── SidebarContent ───────────────────────────────────────────────────────────
 function SidebarContent({
   user,
   loading,
@@ -79,19 +91,17 @@ function SidebarContent({
   onClose?: () => void;
   onLogout: () => void;
 }) {
+  const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
+
   return (
-    <div className="flex flex-col h-full overflow-hidden ">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0">
-            <img
-              src="/assets/solit03.jpeg"
-              alt="Logo Solit"
-              className="w-full h-full object-cover"
-            />
-          </div>
+              <img src="/assets/solit03.jpeg" alt="Logo Solit" className="w-full h-full object-cover" />
+            </div>
             <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
           </div>
           {onClose && (
@@ -123,9 +133,11 @@ function SidebarContent({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${roleColors[user?.role] || "bg-gray-100 text-gray-500"}`}>
-                {user?.role || "—"}
-              </span>
+              {roleMeta && (
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${roleMeta.badge}`}>
+                  {roleMeta.label}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -133,7 +145,7 @@ function SidebarContent({
 
       <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
-      {/* Nav — no overflow scroll, just fills remaining space */}
+      {/* Nav */}
       <nav className="flex-1 py-3 px-3 space-y-0.5">
         {loading ? (
           [1, 2, 3].map((i) => (
@@ -141,7 +153,9 @@ function SidebarContent({
           ))
         ) : (
           menus.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
@@ -164,7 +178,7 @@ function SidebarContent({
       </nav>
 
       {/* Logout */}
-      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0 ">
+      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all group"
@@ -181,6 +195,7 @@ function SidebarContent({
   );
 }
 
+// ─── Main Sidebar ─────────────────────────────────────────────────────────────
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
@@ -207,13 +222,10 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const menus = loading
+  // Ambil menu berdasarkan role, fallback ke array kosong
+  const menus: { name: string; href: string }[] = loading
     ? []
-    : user?.role === "ADMIN"
-      ? adminMenus
-      : user?.role === "OPERATOR"
-        ? operatorMenus
-        : salesMenus;
+    : ROLE_MENUS[user?.role as UserRole] ?? [];
 
   const contentProps = { user, loading, menus, pathname, onLogout: handleLogout };
 

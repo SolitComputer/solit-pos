@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { UserRole } from "@/lib/permissions";
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ export default function Page() {
   const params = useParams();
   const invoice = params.invoice;
   const [status, setStatus] = useState("PENDING");
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -35,6 +37,24 @@ export default function Page() {
     return () => clearInterval(interval);
   }, [invoice]);
 
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(r => setUserRole(r.user?.role ?? null))
+      .catch(() => setUserRole(null));
+  }, []);
+
+  const backHref =
+    userRole === "CREW_SALES"
+      ? "/payment/create"
+      : userRole === "KEPALA_SALES"
+        ? "/payment/create"
+        : userRole === "PENGELOLA_BARANG"
+          ? "/dashboard/laptops"
+          : userRole === "ACCOUNTING"
+            ? "/dashboard"
+            : "/dashboard";
+
   const Content = () => (
     <div className="max-w-lg mx-auto mt-10">
       {status === "PAID" ? (
@@ -48,10 +68,12 @@ export default function Page() {
           <p className="text-gray-500 mt-2">Terima kasih, transaksi Anda telah lunas.</p>
           <p className="text-sm text-gray-400 mt-1">Invoice: {invoice}</p>
           <a
-            href="/dashboard"
+            href={backHref}
             className="inline-block mt-6 bg-white text-gray-700 border border-gray-200 rounded-lg px-5 py-2 text-sm font-medium hover:bg-gray-50 transition shadow-sm"
           >
-            Kembali ke Dashboard
+            {userRole === "CREW_SALES" || userRole === "KEPALA_SALES"
+              ? "Buat Transaksi Baru"
+              : "Kembali ke Dashboard"}
           </a>
         </div>
       ) : (

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
+import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
 interface LaptopUnit {
     id: string;
@@ -72,6 +73,16 @@ export default function UnitsPage() {
     const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
     const [formLoading, setFormLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState("ALL");
+    const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const canManageUnits = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
+    const canSeePriceInfo = userRole ? hasPermission(userRole, ["ADMIN", "PENGELOLA_BARANG", "ACCOUNTING"]) : false;
+
+    useEffect(() => {
+        fetch("/api/auth/me")
+            .then(r => r.json())
+            .then(r => setUserRole(r.user?.role ?? null))
+            .catch(() => setUserRole(null));
+    }, []);
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
@@ -232,15 +243,18 @@ export default function UnitsPage() {
                                     .filter(Boolean).join(" · ")}
                             </p>
                         </div>
-                        <button
-                            onClick={openCreate}
-                            className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition shadow-sm"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Tambah Unit
-                        </button>
+                        {/* GANTI: tampilkan hanya jika canManageUnits */}
+                        {canManageUnits && (
+                            <button
+                                onClick={openCreate}
+                                className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition shadow-sm"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Tambah Unit
+                            </button>
+                        )}
                     </div>
 
                     {/* Stats */}
@@ -273,8 +287,8 @@ export default function UnitsPage() {
                                     key={opt.value}
                                     onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterStatus === opt.value
-                                            ? "bg-gray-900 text-white border-gray-900"
-                                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                        ? "bg-gray-900 text-white border-gray-900"
+                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                         }`}
                                 >
                                     {opt.label}
@@ -432,8 +446,8 @@ export default function UnitsPage() {
                                                     type="button"
                                                     onClick={() => setFormData(prev => ({ ...prev, grade: g }))}
                                                     className={`p-3 rounded-xl border-2 text-left transition ${selected
-                                                            ? "border-gray-900 bg-gray-900"
-                                                            : "border-gray-200 hover:border-gray-300 bg-white"
+                                                        ? "border-gray-900 bg-gray-900"
+                                                        : "border-gray-200 hover:border-gray-300 bg-white"
                                                         }`}
                                                 >
                                                     <p className={`text-sm font-bold ${selected ? "text-white" : gs.badge.split(" ")[1]}`}>
@@ -486,7 +500,7 @@ export default function UnitsPage() {
                                     <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
                                         <span className="text-xs text-gray-400">Margin unit ini</span>
                                         <span className={`text-sm font-semibold tabular-nums ${Number(formData.selling_price) - Number(formData.purchase_price) >= 0
-                                                ? "text-emerald-600" : "text-red-500"
+                                            ? "text-emerald-600" : "text-red-500"
                                             }`}>
                                             {fmt(Number(formData.selling_price) - Number(formData.purchase_price))}
                                         </span>
