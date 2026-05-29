@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
+import BarcodeModal from "@/components/ui/BarcodeModal";
 
 interface Laptop {
     id: string;
@@ -68,9 +69,6 @@ const Shimmer = ({
     }} />
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
 export default function Page() {
     const [laptops, setLaptops] = useState<Laptop[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +81,7 @@ export default function Page() {
     const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
     const [formLoading, setFormLoading] = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
 
     useEffect(() => { fetchLaptops(); }, []);
 
@@ -527,6 +526,17 @@ export default function Page() {
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
+                                                                    className="px-2 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                                                    title="Lihat Barcode"
+                                                                >
+                                                                    {/* Icon barcode */}
+                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                                                            d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                                    </svg>
+                                                                </button>
                                                                 <Link
                                                                     href={`/dashboard/laptops/${item.id}/units`}
                                                                     onClick={e => e.stopPropagation()}
@@ -807,6 +817,13 @@ export default function Page() {
                         </div>
                     </form>
                 </Modal>
+                {barcodeTarget && (
+                    <BarcodeModal
+                        laptopId={barcodeTarget.id}
+                        laptopName={barcodeTarget.name}
+                        onClose={() => setBarcodeTarget(null)}
+                    />
+                )}
             </DashboardLayout>
         </>
     );
