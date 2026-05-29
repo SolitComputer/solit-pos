@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 
@@ -25,22 +25,26 @@ interface Laptop {
     cpu: string;
     ram: string;
     storage: string;
+    selling_price: number;
 }
 
-const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string }> = {
-    A: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Grade A", desc: "Sempurna, tanpa cacat" },
-    B: { badge: "bg-amber-50 text-amber-700 border-amber-200", label: "Grade B", desc: "Minus sedikit" },
-    C: { badge: "bg-red-50 text-red-700 border-red-200", label: "Grade C", desc: "Banyak minus" },
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+
+const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string; ring: string }> = {
+    A: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", ring: "border-emerald-500 bg-emerald-500", label: "Grade A", desc: "Sempurna / mulus" },
+    B: { badge: "bg-amber-50  text-amber-700  border-amber-200", ring: "border-amber-400  bg-amber-400", label: "Grade B", desc: "Minus sedikit" },
+    C: { badge: "bg-red-50    text-red-700    border-red-200", ring: "border-red-500    bg-red-500", label: "Grade C", desc: "Banyak minus" },
 };
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
-    SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
-    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+    BELUM_SIAP: { badge: "bg-amber-50  text-amber-700  border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
+    SERVICE: { badge: "bg-blue-50   text-blue-700   border-blue-200", dot: "bg-blue-500", label: "Service" },
+    SOLD: { badge: "bg-gray-100  text-gray-500   border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
-
-const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const EMPTY_FORM = {
     serial_number: "",
@@ -52,9 +56,11 @@ const EMPTY_FORM = {
     notes: "",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Page
+// ─────────────────────────────────────────────────────────────────────────────
 export default function UnitsPage() {
     const params = useParams();
-    const router = useRouter();
     const laptopId = params.id as string;
 
     const [laptop, setLaptop] = useState<Laptop | null>(null);
@@ -67,6 +73,7 @@ export default function UnitsPage() {
     const [formLoading, setFormLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState("ALL");
 
+    // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -78,22 +85,49 @@ export default function UnitsPage() {
             const unitsData = await unitsRes.json();
             if (laptopData.data) setLaptop(laptopData.data);
             if (unitsData.data) setUnits(unitsData.data);
-        } catch {
-            // ignore
-        } finally {
+        } catch { /* ignore */ } finally {
             setIsLoading(false);
         }
     }, [laptopId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    // ── Sync qty + status ke tabel laptops setelah mutasi ────────────────────
+    // Ini auto-update parent laptop berdasarkan state units terkini.
+    const syncLaptopStats = useCallback(async (latestUnits: LaptopUnit[]) => {
+        const siapCount = latestUnits.filter(u => u.status === "SIAP_JUAL").length;
+        const newStatus = siapCount > 0 ? "SIAP_JUAL" : latestUnits.length === 0 ? "BELUM_SIAP" : "SOLD";
+        try {
+            await fetch(`/api/laptops/${laptopId}/sync-units`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ qty: siapCount, status: newStatus }),
+            });
+        } catch { /* non-blocking */ }
+    }, [laptopId]);
+
+    // ── Filter ────────────────────────────────────────────────────────────────
     const filteredUnits = filterStatus === "ALL"
         ? units
         : units.filter(u => u.status === filterStatus);
 
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    const counts = {
+        total: units.length,
+        siap: units.filter(u => u.status === "SIAP_JUAL").length,
+        sold: units.filter(u => u.status === "SOLD").length,
+        service: units.filter(u => u.status === "SERVICE").length,
+        belum: units.filter(u => u.status === "BELUM_SIAP").length,
+    };
+
+    // ── Modal form ────────────────────────────────────────────────────────────
     const openCreate = () => {
         setEditingUnit(null);
-        setFormData({ ...EMPTY_FORM });
+        setFormData({
+            ...EMPTY_FORM,
+            // pre-fill harga jual dari parent laptop sebagai default
+            selling_price: laptop ? String(laptop.selling_price || "") : "",
+        });
         setShowForm(true);
     };
 
@@ -111,14 +145,11 @@ export default function UnitsPage() {
         setShowForm(true);
     };
 
-    const closeForm = () => {
-        setShowForm(false);
-        setEditingUnit(null);
-    };
+    const closeForm = () => { setShowForm(false); setEditingUnit(null); };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
+    const handleChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -143,8 +174,14 @@ export default function UnitsPage() {
             const result = await res.json();
             if (!result.success) { alert(result.message); return; }
 
+            // Ambil units terbaru lalu sync ke parent
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            const freshUnits: LaptopUnit[] = freshData.data || [];
+            setUnits(freshUnits);
+            await syncLaptopStats(freshUnits);
+
             closeForm();
-            fetchData();
         } catch {
             alert("Terjadi kesalahan");
         } finally {
@@ -156,17 +193,14 @@ export default function UnitsPage() {
         if (!confirm(`Hapus unit SN: ${unit.serial_number}?`)) return;
         try {
             await fetch(`/api/units/${unit.id}`, { method: "DELETE" });
-            fetchData();
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            const freshUnits: LaptopUnit[] = freshData.data || [];
+            setUnits(freshUnits);
+            await syncLaptopStats(freshUnits);
         } catch {
             alert("Gagal menghapus");
         }
-    };
-
-    const counts = {
-        total: units.length,
-        siap: units.filter(u => u.status === "SIAP_JUAL").length,
-        sold: units.filter(u => u.status === "SOLD").length,
-        service: units.filter(u => u.status === "SERVICE").length,
     };
 
     return (
@@ -176,12 +210,14 @@ export default function UnitsPage() {
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Link href="/dashboard/laptops" className="hover:text-gray-600 transition">Data Laptop</Link>
+                        <Link href="/dashboard/laptops" className="hover:text-gray-600 transition">
+                            Data Laptop
+                        </Link>
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                         <span className="text-gray-600 font-medium truncate">
-                            {isLoading ? "Memuat..." : laptop?.laptop_name || "Detail Unit"}
+                            {isLoading ? "Memuat..." : laptop?.laptop_name || "Units"}
                         </span>
                     </div>
 
@@ -192,7 +228,8 @@ export default function UnitsPage() {
                                 {laptop?.laptop_name || "—"}
                             </h1>
                             <p className="text-xs text-gray-400 mt-0.5">
-                                {laptop?.brand} · {laptop?.cpu} · {laptop?.ram} · {laptop?.storage}
+                                {[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage]
+                                    .filter(Boolean).join(" · ")}
                             </p>
                         </div>
                         <button
@@ -207,12 +244,13 @@ export default function UnitsPage() {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {[
                             { label: "Total Unit", value: counts.total, color: "text-gray-800" },
                             { label: "Siap Jual", value: counts.siap, color: "text-emerald-600" },
-                            { label: "Terjual", value: counts.sold, color: "text-gray-500" },
+                            { label: "Belum Siap", value: counts.belum, color: "text-amber-500" },
                             { label: "Service", value: counts.service, color: "text-blue-600" },
+                            { label: "Terjual", value: counts.sold, color: "text-gray-400" },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                                 <p className="text-xs text-gray-400 mb-1">{stat.label}</p>
@@ -221,15 +259,15 @@ export default function UnitsPage() {
                         ))}
                     </div>
 
-                    {/* Filter */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                    {/* Filter tabs */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                         <div className="flex flex-wrap gap-2">
                             {[
-                                { value: "ALL", label: "Semua" },
-                                { value: "SIAP_JUAL", label: "Siap Jual" },
-                                { value: "BELUM_SIAP", label: "Belum Siap" },
-                                { value: "SERVICE", label: "Service" },
-                                { value: "SOLD", label: "Terjual" },
+                                { value: "ALL", label: "Semua", count: units.length },
+                                { value: "SIAP_JUAL", label: "Siap Jual", count: counts.siap },
+                                { value: "BELUM_SIAP", label: "Belum Siap", count: counts.belum },
+                                { value: "SERVICE", label: "Service", count: counts.service },
+                                { value: "SOLD", label: "Terjual", count: counts.sold },
                             ].map(opt => (
                                 <button
                                     key={opt.value}
@@ -240,17 +278,15 @@ export default function UnitsPage() {
                                         }`}
                                 >
                                     {opt.label}
-                                    {opt.value !== "ALL" && (
-                                        <span className={`ml-1.5 ${filterStatus === opt.value ? "text-gray-300" : "text-gray-400"}`}>
-                                            ({units.filter(u => u.status === opt.value).length})
-                                        </span>
-                                    )}
+                                    <span className={`ml-1.5 tabular-nums ${filterStatus === opt.value ? "text-gray-400" : "text-gray-300"}`}>
+                                        {opt.count}
+                                    </span>
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Units Table */}
+                    {/* Table */}
                     {isLoading ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
@@ -282,37 +318,41 @@ export default function UnitsPage() {
                                             const margin = (unit.selling_price || 0) - (unit.purchase_price || 0);
                                             return (
                                                 <tr key={unit.id} className="hover:bg-gray-50/60 transition-colors group">
+                                                    {/* SN */}
                                                     <td className="px-4 py-3.5">
                                                         <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
                                                             {unit.serial_number}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3.5">
+                                                    {/* Grade */}
+                                                    <td className="px-4 py-3.5 whitespace-nowrap">
                                                         {g && (
-                                                            <div>
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${g.badge}`}>
-                                                                    {g.label}
-                                                                </span>
-                                                                <p className="text-xs text-gray-400 mt-0.5">{g.desc}</p>
-                                                            </div>
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold border ${g.badge}`}>
+                                                                {g.label}
+                                                            </span>
                                                         )}
                                                     </td>
+                                                    {/* Kondisi */}
                                                     <td className="px-4 py-3.5 max-w-[180px]">
                                                         <span className="text-xs text-gray-600 line-clamp-2">
                                                             {unit.condition_note || <span className="text-gray-300">—</span>}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right text-xs text-gray-500 whitespace-nowrap">
+                                                    {/* Harga Modal */}
+                                                    <td className="px-4 py-3.5 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">
                                                         {fmt(unit.purchase_price)}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
+                                                    {/* Harga Jual */}
+                                                    <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">
                                                         {fmt(unit.selling_price)}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    {/* Margin */}
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap tabular-nums">
                                                         <span className={`text-xs font-semibold ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                                                             {margin >= 0 ? "+" : ""}{fmt(margin)}
                                                         </span>
                                                     </td>
+                                                    {/* Status */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         {s && (
                                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -321,7 +361,8 @@ export default function UnitsPage() {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    {/* Aksi */}
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button
                                                                 onClick={() => openEdit(unit)}
@@ -345,7 +386,8 @@ export default function UnitsPage() {
                             </div>
                             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
                                 <span className="text-xs text-gray-400">
-                                    Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari{" "}
+                                    Menampilkan{" "}
+                                    <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari{" "}
                                     <span className="font-medium text-gray-600">{units.length}</span> unit
                                 </span>
                             </div>
@@ -354,11 +396,12 @@ export default function UnitsPage() {
                 </div>
             </main>
 
-            {/* Form Modal */}
+            {/* ────────────────────────────────────────────── FORM MODAL ── */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeForm} />
                     <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88vh]">
+                        {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                             <h2 className="font-semibold text-gray-800 text-base">
                                 {editingUnit ? `Edit Unit — ${editingUnit.serial_number}` : "Tambah Unit Baru"}
@@ -369,10 +412,12 @@ export default function UnitsPage() {
                                 </svg>
                             </button>
                         </div>
+
+                        {/* Body */}
                         <div className="overflow-y-auto flex-1 px-5 py-5">
                             <form onSubmit={handleSubmit} className="space-y-4">
 
-                                {/* Grade selector — visual */}
+                                {/* Grade — visual card selector */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-2">
                                         Grade <span className="text-red-400">*</span>
@@ -387,8 +432,8 @@ export default function UnitsPage() {
                                                     type="button"
                                                     onClick={() => setFormData(prev => ({ ...prev, grade: g }))}
                                                     className={`p-3 rounded-xl border-2 text-left transition ${selected
-                                                            ? "border-gray-900 bg-gray-900 text-white"
-                                                            : "border-gray-200 hover:border-gray-300"
+                                                            ? "border-gray-900 bg-gray-900"
+                                                            : "border-gray-200 hover:border-gray-300 bg-white"
                                                         }`}
                                                 >
                                                     <p className={`text-sm font-bold ${selected ? "text-white" : gs.badge.split(" ")[1]}`}>
@@ -403,22 +448,30 @@ export default function UnitsPage() {
                                     </div>
                                 </div>
 
+                                {/* Serial Number */}
                                 <FormField label="Serial Number" required>
                                     <div className="flex gap-2">
-                                        <Input name="serial_number" placeholder="Contoh: 0006151" value={formData.serial_number} onChange={handleChange} required />
+                                        <Input
+                                            name="serial_number"
+                                            placeholder="Contoh: 0006151"
+                                            value={formData.serial_number}
+                                            onChange={handleChange}
+                                            required
+                                        />
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 if (!formData.serial_number) { alert("Masukkan serial number dulu"); return; }
                                                 window.open(`https://www.google.com/search?q=${encodeURIComponent(formData.serial_number + " laptop")}`, "_blank");
                                             }}
-                                            className="px-3 h-10 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+                                            className="px-3 h-10 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap flex-shrink-0"
                                         >
                                             Cek SN
                                         </button>
                                     </div>
                                 </FormField>
 
+                                {/* Harga Modal + Harga Jual */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <FormField label="Harga Modal">
                                         <Input name="purchase_price" type="number" placeholder="0" value={formData.purchase_price} onChange={handleChange} />
@@ -428,9 +481,26 @@ export default function UnitsPage() {
                                     </FormField>
                                 </div>
 
+                                {/* Preview margin */}
+                                {formData.purchase_price && formData.selling_price && (
+                                    <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                                        <span className="text-xs text-gray-400">Margin unit ini</span>
+                                        <span className={`text-sm font-semibold tabular-nums ${Number(formData.selling_price) - Number(formData.purchase_price) >= 0
+                                                ? "text-emerald-600" : "text-red-500"
+                                            }`}>
+                                            {fmt(Number(formData.selling_price) - Number(formData.purchase_price))}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Status */}
                                 <FormField label="Status">
-                                    <select name="status" value={formData.status} onChange={handleChange}
-                                        className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition">
+                                    <select
+                                        name="status"
+                                        value={formData.status}
+                                        onChange={handleChange}
+                                        className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition"
+                                    >
                                         <option value="SIAP_JUAL">Siap Jual</option>
                                         <option value="BELUM_SIAP">Belum Siap</option>
                                         <option value="SERVICE">Service</option>
@@ -438,22 +508,42 @@ export default function UnitsPage() {
                                     </select>
                                 </FormField>
 
+                                {/* Catatan Kondisi */}
                                 <FormField label="Catatan Kondisi">
-                                    <Input name="condition_note" placeholder="Contoh: Ada goresan di body kiri, layar normal" value={formData.condition_note} onChange={handleChange} />
+                                    <Input
+                                        name="condition_note"
+                                        placeholder="Contoh: Ada goresan di body kiri, layar normal"
+                                        value={formData.condition_note}
+                                        onChange={handleChange}
+                                    />
                                 </FormField>
 
+                                {/* Notes Internal */}
                                 <FormField label="Notes Internal">
-                                    <textarea name="notes" placeholder="Catatan tambahan (opsional)" value={formData.notes} onChange={handleChange} rows={2}
-                                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition resize-none" />
+                                    <textarea
+                                        name="notes"
+                                        placeholder="Catatan tambahan (opsional)"
+                                        value={formData.notes}
+                                        onChange={handleChange}
+                                        rows={2}
+                                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition resize-none"
+                                    />
                                 </FormField>
 
+                                {/* Actions */}
                                 <div className="flex gap-2 pt-1">
-                                    <button type="button" onClick={closeForm}
-                                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+                                    <button
+                                        type="button"
+                                        onClick={closeForm}
+                                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+                                    >
                                         Batal
                                     </button>
-                                    <button type="submit" disabled={formLoading}
-                                        className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">
+                                    <button
+                                        type="submit"
+                                        disabled={formLoading}
+                                        className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
+                                    >
                                         {formLoading ? "Menyimpan..." : editingUnit ? "Simpan Perubahan" : "Tambah Unit"}
                                     </button>
                                 </div>
@@ -466,6 +556,9 @@ export default function UnitsPage() {
     );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton
+// ─────────────────────────────────────────────────────────────────────────────
 function SkeletonUnits() {
     return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
@@ -497,6 +590,9 @@ function SkeletonUnits() {
     );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
     return (
         <th className={`px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
@@ -504,7 +600,6 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         </th>
     );
 }
-
 function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
         <div>
@@ -515,7 +610,6 @@ function FormField({ label, children, required }: { label: string; children: Rea
         </div>
     );
 }
-
 function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
     return (
         <input {...props}

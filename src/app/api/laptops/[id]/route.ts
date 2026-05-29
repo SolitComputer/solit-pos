@@ -1,3 +1,8 @@
+// C:\solit-pos\src\app\api\laptops\[id]\route.ts
+//
+// PUT hanya update field spesifikasi + harga jual + catatan.
+// qty dan status TIDAK di-update dari sini — dikelola via sync-units.
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
@@ -16,26 +21,19 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 400 }
-      );
-    }
-
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
+
 async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const body = await req.json();
     const { id } = await props.params;
 
-    const qty = Number(body.qty);
-    const isReady = qty > 0 && body.status !== "BELUM_SIAP";
-
+    // qty dan status TIDAK diambil dari body — dikelola otomatis via sync-units
     const { data, error } = await supabase
       .from("laptops")
       .update({
@@ -46,26 +44,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         storage: body.storage,
         gpu: body.gpu,
         display: body.display,
-        serial_number: body.serial_number,
         condition_note: body.condition_note,
-        purchase_price: body.purchase_price,
-        selling_price: body.selling_price,
-        qty,
-        status: qty <= 0 ? "SOLD" : "SIAP_JUAL",
-        ready_to_sell: isReady,
+        selling_price: Number(body.selling_price),
         notes: body.notes,
       })
       .eq("id", id)
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 400 }
-      );
-    }
-
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
@@ -81,19 +68,13 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .delete()
       .eq("id", id);
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 400 }
-      );
-    }
-
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
 
-export const GET    = withAuth(getHandler);             
-export const PUT    = withAuth(putHandler, ["ADMIN"]);  
-export const DELETE = withAuth(deleteHandler, ["ADMIN"]); 
+export const GET = withAuth(getHandler);
+export const PUT = withAuth(putHandler, ["ADMIN"]);
+export const DELETE = withAuth(deleteHandler, ["ADMIN"]);

@@ -14,9 +14,7 @@ interface Laptop {
     storage: string;
     gpu: string;
     display: string;
-    serial_number: string;
     condition_note: string;
-    purchase_price: number;
     selling_price: number;
     qty: number;
     status: string;
@@ -27,6 +25,8 @@ interface Laptop {
 
 type ModalMode = "detail" | "create" | "edit" | null;
 
+// serial_number & purchase_price dihapus dari form laptop
+// qty & status di-manage otomatis via units
 const EMPTY_FORM = {
     laptop_name: "",
     brand: "",
@@ -35,11 +35,7 @@ const EMPTY_FORM = {
     storage: "",
     gpu: "",
     display: "",
-    serial_number: "",
-    purchase_price: "",
     selling_price: "",
-    qty: "1",
-    status: "SIAP_JUAL",
     condition_note: "",
     notes: "",
 };
@@ -53,34 +49,23 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
     BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
     SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
+    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Sold" },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shimmer atom
 // ─────────────────────────────────────────────────────────────────────────────
 const Shimmer = ({
-    w,
-    h,
-    r = "8px",
-    style = {},
+    w, h, r = "8px", style = {},
 }: {
-    w?: string | number;
-    h: string | number;
-    r?: string;
-    style?: React.CSSProperties;
+    w?: string | number; h: string | number; r?: string; style?: React.CSSProperties;
 }) => (
-    <div
-        style={{
-            width: w ?? "100%",
-            height: h,
-            borderRadius: r,
-            background: "linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%)",
-            backgroundSize: "600px 100%",
-            animation: "sk-shimmer 1.4s infinite linear",
-            flexShrink: 0,
-            ...style,
-        }}
-    />
+    <div style={{
+        width: w ?? "100%", height: h, borderRadius: r,
+        background: "linear-gradient(90deg,#f0f0f0 25%,#e4e4e4 50%,#f0f0f0 75%)",
+        backgroundSize: "600px 100%", animation: "sk-shimmer 1.4s infinite linear",
+        flexShrink: 0, ...style,
+    }} />
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,8 +113,7 @@ export default function Page() {
                 x.brand?.toLowerCase().includes(t) ||
                 x.cpu?.toLowerCase().includes(t) ||
                 x.ram?.toLowerCase().includes(t) ||
-                x.storage?.toLowerCase().includes(t) ||
-                x.serial_number?.toLowerCase().includes(t)
+                x.storage?.toLowerCase().includes(t)
             );
         }
         if (filterStatus !== "ALL") list = list.filter(x => x.status === filterStatus);
@@ -171,28 +155,19 @@ export default function Page() {
             storage: laptop.storage || "",
             gpu: laptop.gpu || "",
             display: laptop.display || "",
-            serial_number: laptop.serial_number || "",
-            purchase_price: String(laptop.purchase_price || ""),
             selling_price: String(laptop.selling_price || ""),
-            qty: String(laptop.qty ?? 1),
-            status: laptop.status || "SIAP_JUAL",
             condition_note: laptop.condition_note || "",
             notes: laptop.notes || "",
         });
         setModalMode("edit");
     };
 
-    const closeModal = () => {
-        setModalMode(null);
-        setSelectedLaptop(null);
-    };
+    const closeModal = () => { setModalMode(null); setSelectedLaptop(null); };
 
     // ── Form handlers ─────────────────────────────────────────────────────────
     const handleFormChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-    ) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    };
+    ) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -203,9 +178,7 @@ export default function Page() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...formData,
-                    purchase_price: Number(formData.purchase_price),
                     selling_price: Number(formData.selling_price),
-                    qty: Number(formData.qty),
                 }),
             });
             const result = await res.json();
@@ -230,9 +203,7 @@ export default function Page() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...formData,
-                    purchase_price: Number(formData.purchase_price),
                     selling_price: Number(formData.selling_price),
-                    qty: Number(formData.qty),
                 }),
             });
             const result = await res.json();
@@ -245,7 +216,7 @@ export default function Page() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Yakin ingin menghapus laptop ini?")) return;
+        if (!confirm("Yakin ingin menghapus laptop ini? Semua unit terkait juga akan terhapus.")) return;
         try {
             await fetch(`/api/laptops/${id}`, { method: "DELETE" });
             if (modalMode === "detail") closeModal();
@@ -275,14 +246,19 @@ export default function Page() {
         };
 
         ws.columns = [
-            { header: "No", key: "no" }, { header: "Nama Laptop", key: "nama" },
-            { header: "Brand", key: "brand" }, { header: "CPU", key: "cpu" },
-            { header: "RAM", key: "ram" }, { header: "Storage", key: "storage" },
-            { header: "GPU", key: "gpu" }, { header: "Display", key: "display" },
-            { header: "Serial Number", key: "serial" }, { header: "Kondisi", key: "kondisi" },
-            { header: "Harga Modal", key: "harga_modal" }, { header: "Harga Jual", key: "harga_jual" },
-            { header: "Margin", key: "margin" }, { header: "Stok", key: "stok" },
-            { header: "Status", key: "status" }, { header: "Notes", key: "notes" },
+            { header: "No", key: "no" },
+            { header: "Nama Laptop", key: "nama" },
+            { header: "Brand", key: "brand" },
+            { header: "CPU", key: "cpu" },
+            { header: "RAM", key: "ram" },
+            { header: "Storage", key: "storage" },
+            { header: "GPU", key: "gpu" },
+            { header: "Display", key: "display" },
+            { header: "Kondisi", key: "kondisi" },
+            { header: "Harga Jual", key: "harga_jual" },
+            { header: "Stok", key: "stok" },
+            { header: "Status", key: "status" },
+            { header: "Notes", key: "notes" },
             { header: "Tgl Masuk", key: "created" },
         ];
 
@@ -297,34 +273,48 @@ export default function Page() {
                 bottom: { style: "medium", color: { argb: "FF94A3B8" } },
                 right: { style: "thin", color: { argb: COLOR.borderColor } },
             };
-            cell.alignment = { horizontal: "center", vertical: "middle", wrapText: false };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
         filteredLaptops.forEach((item, idx) => {
             const isEven = idx % 2 === 0;
             const rowBg = isEven ? COLOR.rowEven : COLOR.rowOdd;
-            const margin = (item.selling_price || 0) - (item.purchase_price || 0);
-            const statusMap: Record<string, string> = { SIAP_JUAL: "Siap Jual", BELUM_SIAP: "Belum Siap", SERVICE: "Service" };
-
+            const statusMap: Record<string, string> = {
+                SIAP_JUAL: "Siap Jual", BELUM_SIAP: "Belum Siap", SERVICE: "Service", SOLD: "Sold",
+            };
             const row = ws.addRow({
-                no: idx + 1, nama: item.laptop_name || "", brand: item.brand || "",
-                cpu: item.cpu || "", ram: item.ram || "", storage: item.storage || "",
-                gpu: item.gpu || "", display: item.display || "", serial: item.serial_number || "",
-                kondisi: item.condition_note || "", harga_modal: item.purchase_price || 0,
-                harga_jual: item.selling_price || 0, margin, stok: item.qty ?? 0,
-                status: statusMap[item.status] || item.status, notes: item.notes || "",
-                created: new Date(item.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+                no: idx + 1,
+                nama: item.laptop_name || "",
+                brand: item.brand || "",
+                cpu: item.cpu || "",
+                ram: item.ram || "",
+                storage: item.storage || "",
+                gpu: item.gpu || "",
+                display: item.display || "",
+                kondisi: item.condition_note || "",
+                harga_jual: item.selling_price || 0,
+                stok: item.qty ?? 0,
+                status: statusMap[item.status] || item.status,
+                notes: item.notes || "",
+                created: new Date(item.created_at).toLocaleDateString("id-ID", {
+                    day: "2-digit", month: "short", year: "numeric",
+                }),
             });
 
             row.height = 22;
             row.eachCell((cell, colNum) => {
                 const key = ws.getColumn(colNum).key as string;
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-                cell.border = { top: { style: "hair", color: { argb: COLOR.borderColor } }, left: { style: "hair", color: { argb: COLOR.borderColor } }, bottom: { style: "hair", color: { argb: COLOR.borderColor } }, right: { style: "hair", color: { argb: COLOR.borderColor } } };
+                cell.border = {
+                    top: { style: "hair", color: { argb: COLOR.borderColor } },
+                    left: { style: "hair", color: { argb: COLOR.borderColor } },
+                    bottom: { style: "hair", color: { argb: COLOR.borderColor } },
+                    right: { style: "hair", color: { argb: COLOR.borderColor } },
+                };
                 cell.font = { size: 10, name: "Arial" };
+
                 if (key === "no") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } }; }
-                else if (key === "harga_modal" || key === "harga_jual") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; }
-                else if (key === "margin") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: margin >= 0 ? COLOR.profitFg : COLOR.lossFg } }; }
+                else if (key === "harga_jual") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; }
                 else if (key === "stok") { cell.alignment = { horizontal: "center", vertical: "middle" }; if ((item.qty ?? 0) === 0) cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF991B1B" } }; }
                 else if (key === "status") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -334,7 +324,6 @@ export default function Page() {
                     else if (s === "SERVICE") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.serviceBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.serviceFg } }; }
                 }
                 else if (key === "nama") { cell.alignment = { horizontal: "left", vertical: "middle" }; cell.font = { size: 10, name: "Arial", bold: true }; }
-                else if (key === "serial") { cell.alignment = { horizontal: "left", vertical: "middle" }; cell.font = { size: 9, name: "Courier New", color: { argb: COLOR.subTextFg } }; }
                 else if (key === "created") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 9, name: "Arial", color: { argb: COLOR.subTextFg } }; }
                 else { cell.alignment = { horizontal: "left", vertical: "middle" }; }
             });
@@ -343,28 +332,31 @@ export default function Page() {
         const dataStart = 2;
         const dataEnd = filteredLaptops.length + 1;
         const totalRow = ws.addRow({
-            no: "", nama: `TOTAL  (${filteredLaptops.length} unit)`, brand: "", cpu: "", ram: "", storage: "", gpu: "", display: "", serial: "", kondisi: "",
-            harga_modal: { formula: `SUM(K${dataStart}:K${dataEnd})` }, harga_jual: { formula: `SUM(L${dataStart}:L${dataEnd})` },
-            margin: { formula: `SUM(M${dataStart}:M${dataEnd})` }, stok: { formula: `SUM(N${dataStart}:N${dataEnd})` },
-            status: "", notes: "", created: "",
+            no: "", nama: `TOTAL  (${filteredLaptops.length} unit)`,
+            harga_jual: { formula: `SUM(J${dataStart}:J${dataEnd})` },
+            stok: { formula: `SUM(K${dataStart}:K${dataEnd})` },
         });
         totalRow.height = 26;
         totalRow.eachCell(cell => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.totalBg } };
             cell.font = { bold: true, size: 10, name: "Arial", color: { argb: COLOR.totalFg } };
-            cell.border = { top: { style: "medium", color: { argb: "FF93C5FD" } }, left: { style: "hair", color: { argb: COLOR.borderColor } }, bottom: { style: "medium", color: { argb: "FF93C5FD" } }, right: { style: "hair", color: { argb: COLOR.borderColor } } };
+            cell.border = {
+                top: { style: "medium", color: { argb: "FF93C5FD" } },
+                left: { style: "hair", color: { argb: COLOR.borderColor } },
+                bottom: { style: "medium", color: { argb: "FF93C5FD" } },
+                right: { style: "hair", color: { argb: COLOR.borderColor } },
+            };
         });
-        const totalRowNum = dataEnd + 1;
-        ["K", "L", "M"].forEach(col => { ws.getCell(`${col}${totalRowNum}`).numFmt = '"Rp "#,##0'; ws.getCell(`${col}${totalRowNum}`).alignment = { horizontal: "right", vertical: "middle" }; });
-        ws.getCell(`N${totalRowNum}`).alignment = { horizontal: "center", vertical: "middle" };
-        ws.getCell(`B${totalRowNum}`).alignment = { horizontal: "left", vertical: "middle" };
+
         ws.columns.forEach((col, colIndex) => {
             let maxLen = col.header ? String(col.header).length : 0;
             filteredLaptops.forEach((item) => {
                 const rowNum = filteredLaptops.indexOf(item) + 2;
                 const cell = ws.getCell(rowNum, colIndex + 1);
                 if (cell.value !== null && cell.value !== undefined) {
-                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object) ? String(col.header ?? "") : String(cell.value);
+                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object)
+                        ? String(col.header ?? "")
+                        : String(cell.value);
                     if (cellText.length > maxLen) maxLen = cellText.length;
                 }
             });
@@ -383,16 +375,12 @@ export default function Page() {
 
     return (
         <>
-            {/* Inject shimmer keyframe once */}
             <style>{`
                 @keyframes sk-shimmer {
                     0%   { background-position: -600px 0; }
                     100% { background-position:  600px 0; }
                 }
             `}</style>
-
-            {/* Top progress bar while loading */}
-
 
             <DashboardLayout>
                 <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -435,7 +423,7 @@ export default function Page() {
                                     </svg>
                                     <input
                                         type="text"
-                                        placeholder="Cari nama, brand, CPU, serial..."
+                                        placeholder="Cari nama, brand, CPU..."
                                         className="w-full pl-9 pr-3 h-10 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition"
                                         value={search}
                                         onChange={e => setSearch(e.target.value)}
@@ -450,6 +438,7 @@ export default function Page() {
                                     <option value="SIAP_JUAL">Siap Jual</option>
                                     <option value="BELUM_SIAP">Belum Siap</option>
                                     <option value="SERVICE">Service</option>
+                                    <option value="SOLD">Sold</option>
                                 </select>
                                 <select
                                     className="h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 transition"
@@ -487,7 +476,6 @@ export default function Page() {
                                                 <Th>Nama Laptop</Th>
                                                 <Th>Brand</Th>
                                                 <Th>Spesifikasi</Th>
-                                                <Th>Serial</Th>
                                                 <Th right>Harga Jual</Th>
                                                 <Th right>Stok</Th>
                                                 <Th>Status</Th>
@@ -518,9 +506,6 @@ export default function Page() {
                                                                 {item.storage && <Chip>{item.storage}</Chip>}
                                                                 {item.gpu && <Chip>{item.gpu}</Chip>}
                                                             </div>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 font-mono text-xs text-gray-400 whitespace-nowrap">
-                                                            {item.serial_number || <span className="text-gray-300">—</span>}
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                                                             {fmt(item.selling_price)}
@@ -622,6 +607,7 @@ export default function Page() {
                                         <span className={`font-semibold ${selectedLaptop.qty === 0 ? "text-red-500" : "text-gray-700"}`}>
                                             {selectedLaptop.qty}
                                         </span>
+                                        <span className="text-gray-300 ml-1">(dari units)</span>
                                     </p>
                                 </div>
                             </div>
@@ -636,7 +622,6 @@ export default function Page() {
                                         { label: "Storage", value: selectedLaptop.storage },
                                         { label: "GPU", value: selectedLaptop.gpu },
                                         { label: "Display", value: selectedLaptop.display },
-                                        { label: "Serial Number", value: selectedLaptop.serial_number },
                                     ].map(({ label, value }) => (
                                         <div key={label} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                                             <p className="text-xs text-gray-400 mb-0.5">{label}</p>
@@ -648,20 +633,17 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Financial */}
-                            <div>
-                                <SectionLabel>Keuangan</SectionLabel>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                        <p className="text-xs text-gray-400 mb-0.5">Harga Modal</p>
-                                        <p className="text-sm font-semibold text-gray-700">{fmt(selectedLaptop.purchase_price)}</p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                                        <p className="text-xs text-gray-400 mb-0.5">Margin</p>
-                                        <p className="text-sm font-semibold text-emerald-600">
-                                            {fmt(selectedLaptop.selling_price - selectedLaptop.purchase_price)}
-                                        </p>
-                                    </div>
+                            {/* Info: stok dikelola via units */}
+                            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5">
+                                <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <p className="text-xs font-semibold text-blue-700">Stok & harga modal dikelola per-unit</p>
+                                    <p className="text-xs text-blue-500 mt-0.5">
+                                        Setiap unit punya SN, grade, dan harga modal masing-masing.
+                                        Klik <span className="font-semibold">Lihat Units</span> untuk mengelolanya.
+                                    </p>
                                 </div>
                             </div>
 
@@ -672,7 +654,7 @@ export default function Page() {
                                     <div className="space-y-2">
                                         {selectedLaptop.condition_note && (
                                             <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                                                <p className="text-xs text-amber-600 font-semibold mb-1">Kondisi</p>
+                                                <p className="text-xs text-amber-600 font-semibold mb-1">Kondisi Umum</p>
                                                 <p className="text-sm text-amber-900">{selectedLaptop.condition_note}</p>
                                             </div>
                                         )}
@@ -694,8 +676,14 @@ export default function Page() {
                                     })}
                                 </p>
                                 <div className="flex gap-2">
+                                    <Link
+                                        href={`/dashboard/laptops/${selectedLaptop.id}/units`}
+                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition"
+                                    >
+                                        Lihat Units
+                                    </Link>
                                     <button
-                                        onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop), 60); }}
+                                        onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
                                         className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                                     >
                                         Edit
@@ -715,6 +703,16 @@ export default function Page() {
                 {/* Create Modal */}
                 <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop" size="md">
                     <form onSubmit={handleCreate} className="space-y-4">
+                        {/* Info banner */}
+                        <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                            <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-xs text-blue-600">
+                                SN, grade, harga modal, dan stok dikelola per-unit setelah laptop dibuat.
+                            </p>
+                        </div>
+
                         <FormGrid>
                             <FormField label="Nama Laptop" required>
                                 <Input name="laptop_name" placeholder="Contoh: MacBook Air M2" value={formData.laptop_name} onChange={handleFormChange} required />
@@ -737,28 +735,11 @@ export default function Page() {
                             <FormField label="Display">
                                 <Input name="display" placeholder='14" FHD IPS 144Hz' value={formData.display} onChange={handleFormChange} />
                             </FormField>
-                            <FormField label="Serial Number">
-                                <Input name="serial_number" placeholder="SN12345678" value={formData.serial_number} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Modal">
-                                <Input name="purchase_price" type="number" placeholder="0" value={formData.purchase_price} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Jual" required>
+                            <FormField label="Harga Jual (default)" required>
                                 <Input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required />
                             </FormField>
-                            <FormField label="Stok">
-                                <Input name="qty" type="number" placeholder="1" value={formData.qty} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Status">
-                                <select name="status" value={formData.status} onChange={handleFormChange}
-                                    className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition">
-                                    <option value="SIAP_JUAL">Siap Jual</option>
-                                    <option value="BELUM_SIAP">Belum Siap</option>
-                                    <option value="SERVICE">Service</option>
-                                </select>
-                            </FormField>
                         </FormGrid>
-                        <FormField label="Kondisi">
+                        <FormField label="Kondisi Umum">
                             <Input name="condition_note" placeholder="Mulus, normal pemakaian..." value={formData.condition_note} onChange={handleFormChange} />
                         </FormField>
                         <FormField label="Catatan">
@@ -772,7 +753,7 @@ export default function Page() {
                             </button>
                             <button type="submit" disabled={formLoading}
                                 className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                                {formLoading ? "Menyimpan..." : "Tambah Laptop"}
+                                {formLoading ? "Menyimpan..." : "Buat Laptop"}
                             </button>
                         </div>
                     </form>
@@ -803,28 +784,11 @@ export default function Page() {
                             <FormField label="Display">
                                 <Input name="display" placeholder="Display" value={formData.display} onChange={handleFormChange} />
                             </FormField>
-                            <FormField label="Serial Number">
-                                <Input name="serial_number" placeholder="Serial Number" value={formData.serial_number} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Modal">
-                                <Input name="purchase_price" type="number" placeholder="0" value={formData.purchase_price} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Jual" required>
+                            <FormField label="Harga Jual (default)" required>
                                 <Input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required />
                             </FormField>
-                            <FormField label="Stok">
-                                <Input name="qty" type="number" placeholder="0" value={formData.qty} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Status">
-                                <select name="status" value={formData.status} onChange={handleFormChange}
-                                    className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition">
-                                    <option value="SIAP_JUAL">Siap Jual</option>
-                                    <option value="BELUM_SIAP">Belum Siap</option>
-                                    <option value="SERVICE">Service</option>
-                                </select>
-                            </FormField>
                         </FormGrid>
-                        <FormField label="Kondisi">
+                        <FormField label="Kondisi Umum">
                             <Input name="condition_note" placeholder="Kondisi laptop" value={formData.condition_note} onChange={handleFormChange} />
                         </FormField>
                         <FormField label="Catatan">
@@ -849,96 +813,42 @@ export default function Page() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Skeleton — Table (page load)
+// Skeleton — Table
 // ─────────────────────────────────────────────────────────────────────────────
 function SkeletonTable() {
-    // Column widths roughly mirror real columns
-    const cols: Array<{ w: string; align?: string }> = [
-        { w: "140px" },          // Nama Laptop
-        { w: "70px" },           // Brand
-        { w: "200px" },          // Spesifikasi (chips)
-        { w: "110px" },          // Serial (mono)
-        { w: "100px", align: "right" }, // Harga Jual
-        { w: "40px", align: "right" }, // Stok
-        { w: "80px" },           // Status (badge)
-        { w: "80px", align: "right" }, // Aksi
-    ];
-
-    // Each row has slightly varied widths for natural look
-    const rowVariants = [
-        [130, 55, null, 95, 90, 20, 70, 0],
-        [155, 40, null, 80, 85, 20, 70, 0],
-        [120, 60, null, 100, 95, 20, 70, 0],
-        [140, 50, null, 90, 80, 20, 70, 0],
-        [165, 45, null, 85, 90, 20, 70, 0],
-        [125, 55, null, 95, 88, 20, 70, 0],
-    ];
-
+    const rowVariants = [130, 155, 120, 140, 165, 125];
     return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50/80 border-b border-gray-100">
-                            {cols.map((col, i) => (
-                                <th key={i} className={`px-4 py-3 ${col.align === "right" ? "text-right" : "text-left"}`}>
-                                    <Shimmer w={col.w} h={11} />
+                            {["Nama Laptop", "Brand", "Spesifikasi", "Harga Jual", "Stok", "Status", "Aksi"].map(h => (
+                                <th key={h} className="px-4 py-3 text-left">
+                                    <Shimmer w={80} h={11} />
                                 </th>
                             ))}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {rowVariants.map((row, r) => (
+                        {rowVariants.map((w, r) => (
                             <tr key={r}>
-                                {/* Nama Laptop */}
+                                <td className="px-4 py-3.5"><Shimmer w={w} h={14} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
                                 <td className="px-4 py-3.5">
-                                    <Shimmer w={row[0]!} h={14} />
-                                </td>
-                                {/* Brand */}
-                                <td className="px-4 py-3.5">
-                                    <Shimmer w={row[1]!} h={13} />
-                                </td>
-                                {/* Spesifikasi — chips */}
-                                <td className="px-4 py-3.5">
-                                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                        {[52, 36, 44, 60].map((cw, ci) => (
-                                            <Shimmer key={ci} w={cw} h={20} r="5px" />
-                                        ))}
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                        {[52, 36, 44].map((cw, ci) => <Shimmer key={ci} w={cw} h={20} r="5px" />)}
                                     </div>
                                 </td>
-                                {/* Serial */}
-                                <td className="px-4 py-3.5">
-                                    <Shimmer w={row[3]!} h={12} r="5px" />
-                                </td>
-                                {/* Harga Jual */}
-                                <td className="px-4 py-3.5">
-                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <Shimmer w={row[4]!} h={14} />
-                                    </div>
-                                </td>
-                                {/* Stok */}
-                                <td className="px-4 py-3.5">
-                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                        <Shimmer w={row[5]!} h={14} />
-                                    </div>
-                                </td>
-                                {/* Status — badge pill */}
-                                <td className="px-4 py-3.5">
-                                    <Shimmer w={row[6]!} h={24} r="99px" />
-                                </td>
-                                {/* Aksi */}
-                                <td className="px-4 py-3.5">
-                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                                        <Shimmer w={36} h={28} r="8px" />
-                                        <Shimmer w={44} h={28} r="8px" />
-                                    </div>
-                                </td>
+                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end" }}><Shimmer w={90} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end" }}><Shimmer w={20} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
+                                <td className="px-4 py-3.5"><div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-            {/* Footer count bar */}
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
                 <Shimmer w={160} h={11} />
             </div>
@@ -947,27 +857,13 @@ function SkeletonTable() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Skeleton — Detail Modal (while fetching fresh data)
+// Skeleton — Detail Modal
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalDetailSkeleton() {
     return (
         <div className="space-y-5">
-            {/* Hero card */}
-            <div
-                style={{
-                    display: "flex",
-                    gap: 16,
-                    padding: 16,
-                    background: "#f9fafb",
-                    borderRadius: 12,
-                    border: "1px solid #f3f4f6",
-                    alignItems: "flex-start",
-                }}
-            >
-                {/* Icon box */}
+            <div style={{ display: "flex", gap: 16, padding: 16, background: "#f9fafb", borderRadius: 12, border: "1px solid #f3f4f6", alignItems: "flex-start" }}>
                 <Shimmer w={48} h={48} r="12px" />
-
-                {/* Name + brand + badge */}
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, paddingTop: 2 }}>
                     <Shimmer w="75%" h={16} />
                     <Shimmer w="35%" h={12} />
@@ -976,27 +872,16 @@ function ModalDetailSkeleton() {
                         <Shimmer w={90} h={22} r="99px" />
                     </div>
                 </div>
-
-                {/* Price + stock (right side) */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <Shimmer w={50} h={11} />
                     <Shimmer w={110} h={24} />
                     <Shimmer w={60} h={11} style={{ marginTop: 2 }} />
                 </div>
             </div>
-
-            {/* Section label: Spesifikasi */}
             <div>
                 <Shimmer w={80} h={11} style={{ marginBottom: 10 }} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                    {[
-                        { lw: 25, vw: "80%" },
-                        { lw: 25, vw: "55%" },
-                        { lw: 45, vw: "70%" },
-                        { lw: 25, vw: "90%" },
-                        { lw: 40, vw: "65%" },
-                        { lw: 70, vw: "100%" },
-                    ].map((cell, i) => (
+                    {[{ lw: 25, vw: "80%" }, { lw: 25, vw: "55%" }, { lw: 45, vw: "70%" }, { lw: 25, vw: "90%" }, { lw: 40, vw: "65%" }].map((cell, i) => (
                         <div key={i} style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #f3f4f6" }}>
                             <Shimmer w={cell.lw} h={10} style={{ marginBottom: 6 }} />
                             <Shimmer w={cell.vw} h={14} />
@@ -1004,27 +889,10 @@ function ModalDetailSkeleton() {
                     ))}
                 </div>
             </div>
-
-            {/* Section label: Keuangan */}
-            <div>
-                <Shimmer w={65} h={11} style={{ marginBottom: 10 }} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {[
-                        { lw: 65, vw: "80%" },
-                        { lw: 45, vw: "60%" },
-                    ].map((cell, i) => (
-                        <div key={i} style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #f3f4f6" }}>
-                            <Shimmer w={cell.lw} h={10} style={{ marginBottom: 6 }} />
-                            <Shimmer w={cell.vw} h={14} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Footer bar */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid #f3f4f6" }}>
                 <Shimmer w={110} h={11} />
                 <div style={{ display: "flex", gap: 8 }}>
+                    <Shimmer w={72} h={30} r="8px" />
                     <Shimmer w={50} h={30} r="8px" />
                     <Shimmer w={56} h={30} r="8px" />
                 </div>
@@ -1036,63 +904,38 @@ function ModalDetailSkeleton() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal Component
 // ─────────────────────────────────────────────────────────────────────────────
-function Modal({
-    open, onClose, title, children, size = "md",
-}: {
-    open: boolean;
-    onClose: () => void;
-    title: string;
-    children: React.ReactNode;
-    size?: "md" | "lg";
+function Modal({ open, onClose, title, children, size = "md" }: {
+    open: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: "md" | "lg";
 }) {
     const overlayRef = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
     }, [open, onClose]);
-
     if (!open) return null;
-
     return (
-        <div
-            ref={overlayRef}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-            onClick={e => { if (e.target === overlayRef.current) onClose(); }}
-        >
+        <div ref={overlayRef} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={e => { if (e.target === overlayRef.current) onClose(); }}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div
-                className={`
-                    relative bg-white w-full shadow-2xl flex flex-col
-                    rounded-t-2xl sm:rounded-2xl
-                    ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"}
-                    max-h-[92dvh] sm:max-h-[88vh]
-                `}
-            >
+            <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh]`}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                     <h2 className="font-semibold text-gray-800 text-base truncate pr-4">{title}</h2>
-                    <button
-                        onClick={onClose}
-                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
-                        aria-label="Tutup"
-                    >
+                    <button onClick={onClose} className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div className="overflow-y-auto flex-1 px-5 py-5">
-                    {children}
-                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-5">{children}</div>
             </div>
         </div>
     );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Small reusable helpers
+// Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
     return (
@@ -1101,39 +944,28 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         </th>
     );
 }
-
 function Chip({ children }: { children: React.ReactNode }) {
-    return (
-        <span className="inline-block bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
-            {children}
-        </span>
-    );
+    return <span className="inline-block bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">{children}</span>;
 }
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{children}</p>;
 }
-
 function FormGrid({ children }: { children: React.ReactNode }) {
     return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>;
 }
-
 function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
         <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                {label}
-                {required && <span className="text-red-400 ml-0.5">*</span>}
+                {label}{required && <span className="text-red-400 ml-0.5">*</span>}
             </label>
             {children}
         </div>
     );
 }
-
 function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
     return (
-        <input
-            {...props}
+        <input {...props}
             className={`w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:bg-white transition ${className}`}
         />
     );
