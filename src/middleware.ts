@@ -9,6 +9,7 @@ import {
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
+const PUBLIC_API_ROUTES = ["/api/warranty/check"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -29,6 +30,11 @@ export async function middleware(request: NextRequest) {
 
   // ── Public prefixes ──
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // ── Public API routes (no auth required) ──
+  if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
@@ -79,7 +85,7 @@ export const config = {
     "/api/dashboard/:path*",
     "/api/transaction/:path*",
     "/api/units/:path*",
-    "/api/warranty/:path*",   
+    "/api/warranty/:path*",
     "/dashboard/warranty/:path*",
   ],
 };
