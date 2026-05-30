@@ -83,6 +83,8 @@ export default function CreatePaymentPage() {
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
     const [draftRestored, setDraftRestored] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingSubmitData, setPendingSubmitData] = useState<CreatePaymentType | null>(null);
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } =
         useForm<CreatePaymentType>({
@@ -338,6 +340,7 @@ export default function CreatePaymentPage() {
         if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
         if (!selectedUnit) { alert("Pilih unit / serial number dulu"); return; }
 
+        // Re-validasi unit masih SIAP_JUAL
         const checkRes = await fetch(
             `/api/units/search-sn?q=${encodeURIComponent(selectedUnit.serial_number)}`
         );
@@ -346,9 +349,7 @@ export default function CreatePaymentPage() {
             (u: any) => u.id === selectedUnit.id
         );
         if (!stillAvailable) {
-            alert(
-                `Unit SN: ${selectedUnit.serial_number} sudah tidak tersedia atau sudah terjual.\n\nSilakan pilih unit lain.`
-            );
+            alert(`Unit SN: ${selectedUnit.serial_number} sudah tidak tersedia.\n\nSilakan pilih unit lain.`);
             setSelectedUnit(null);
             setSelectedLaptop(null);
             setSnSearch("");
@@ -357,10 +358,17 @@ export default function CreatePaymentPage() {
             setValue("laptop_id", "");
             setValue("laptop_name", "");
             setStep(2);
-            setSubmitting(false);
             return;
         }
 
+        setPendingSubmitData(data);
+        setShowConfirmModal(true);
+    };
+
+    const handleConfirmedSubmit = async () => {
+        if (!pendingSubmitData || !selectedUnit || !paymentPhoto) return;
+
+        setShowConfirmModal(false);
         setSubmitting(true);
         try {
             const fileName = `${Date.now()}-${paymentPhoto.name}`;
@@ -377,7 +385,7 @@ export default function CreatePaymentPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    ...data,
+                    ...pendingSubmitData,
                     unit_id: selectedUnit.id,
                     laptop_id: selectedLaptop?.id,
                     serial_number: selectedUnit.serial_number,
@@ -396,6 +404,7 @@ export default function CreatePaymentPage() {
             alert("Terjadi kesalahan");
         } finally {
             setSubmitting(false);
+            setPendingSubmitData(null);
         }
     };
 
@@ -637,6 +646,8 @@ export default function CreatePaymentPage() {
                         </>
                     )}
 
+
+
                     {/* Step 2 dari scan: tampilkan info unit yang sudah pre-selected */}
                     {step === 2 && fromScan && (
                         // Ini tidak akan pernah muncul karena fromScan skip step 2
@@ -784,7 +795,156 @@ export default function CreatePaymentPage() {
                         </>
                     )}
                 </form>
+                {/* ── Modal Konfirmasi Transaksi ── */}
+                {showConfirmModal && selectedUnit && selectedLaptop && (
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        {/* Overlay */}
+                        <div
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={() => setShowConfirmModal(false)}
+                        />
+
+                        {/* Modal */}
+                        <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+
+                            {/* Header */}
+                            <div className="bg-[#1a1a2e] px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-white text-sm">Konfirmasi Transaksi</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Periksa detail sebelum menyimpan</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Body — ringkasan transaksi */}
+                            <div className="px-5 py-4 space-y-3">
+
+                                {/* Total harga — hero */}
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-xs text-emerald-600 font-medium">Total Pembayaran</p>
+                                        <p className="text-xl font-black text-emerald-700 mt-0.5">
+                                            Rp{rawDealPrice.toLocaleString("id-ID")}
+                                        </p>
+                                    </div>
+                                    <span className="text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+                                        {watch("payment_method")}
+                                    </span>
+                                </div>
+
+                                {/* Detail rows */}
+                                <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                                    <ConfirmRow icon="👤" label="Pembeli" value={watch("customer_name") || "—"} />
+                                    <ConfirmRow icon="📱" label="WhatsApp" value={watch("customer_phone") || "—"} />
+                                    <div className="h-px bg-gray-200" />
+                                    <ConfirmRow icon="💻" label="Laptop" value={selectedLaptop.laptop_name} bold />
+                                    <ConfirmRow
+                                        icon="🔢"
+                                        label="Serial Number"
+                                        value={selectedUnit.serial_number}
+                                        mono
+                                    />
+                                    <ConfirmRow
+                                        icon="⭐"
+                                        label="Grade"
+                                        value={`Grade ${selectedUnit.grade}`}
+                                    />
+                                    {watch("software_request") && (
+                                        <ConfirmRow icon="💿" label="Software" value={watch("software_request") || ""} />
+                                    )}
+                                    <div className="h-px bg-gray-200" />
+                                    <ConfirmRow
+                                        icon="📦"
+                                        label="Pengambilan"
+                                        value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"}
+                                    />
+                                    {watch("pickup_date") && (
+                                        <ConfirmRow
+                                            icon="📅"
+                                            label="Tanggal"
+                                            value={new Date(watch("pickup_date") || "").toLocaleDateString("id-ID", {
+                                                weekday: "short", day: "numeric", month: "short", year: "numeric"
+                                            })}
+                                        />
+                                    )}
+                                    {watch("pickup_time") && (
+                                        <ConfirmRow icon="⏰" label="Jam" value={watch("pickup_time") || ""} />
+                                    )}
+                                </div>
+
+                                {/* Warning */}
+                                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <p className="text-xs text-amber-700">
+                                        Transaksi yang sudah disimpan <span className="font-semibold">tidak dapat dibatalkan</span>. Pastikan semua data sudah benar.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Footer buttons */}
+                            <div className="px-5 pb-6 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition active:scale-[0.98]"
+                                >
+                                    Periksa Lagi
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmedSubmit}
+                                    disabled={submitting}
+                                    className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {submitting ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Menyimpan...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Ya, Simpan Transaksi
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
+        </div>
+    );
+}
+
+function ConfirmRow({
+    icon, label, value, bold, mono
+}: {
+    icon: string;
+    label: string;
+    value: string;
+    bold?: boolean;
+    mono?: boolean;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-sm">{icon}</span>
+                <span className="text-xs text-gray-400">{label}</span>
+            </div>
+            <span className={`text-xs text-right truncate max-w-[55%] ${bold ? "font-semibold text-gray-800" : "text-gray-600"} ${mono ? "font-mono" : ""}`}>
+                {value}
+            </span>
         </div>
     );
 }
@@ -835,8 +995,8 @@ function UnitInfoCard({
                     </span>
                     {/* Badge status */}
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${unit.status === "SIAP_JUAL"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-red-50 text-red-600 border-red-200"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-red-50 text-red-600 border-red-200"
                         }`}>
                         {unit.status === "SIAP_JUAL" ? "✓ Siap Jual" : `⚠ ${unit.status}`}
                     </span>
