@@ -1,14 +1,3 @@
-// C:\solit-pos\src\components\ui\BarcodeModal.tsx
-//
-// Modal untuk menampilkan + mencetak barcode unit.
-// Dipanggil dari laptops/page.tsx saat klik ikon barcode di row.
-//
-// Barcode = CODE128 dari serial_number unit yang berstatus SIAP_JUAL.
-// Jika ada beberapa unit SIAP_JUAL, ditampilkan semua (bisa cetak satu-satu).
-//
-// Dependencies: jsbarcode (npm install jsbarcode)
-// Atau gunakan canvas native — tidak perlu install package.
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -179,6 +168,146 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     drawBarcode(canvasRef.current, unit.serial_number);
   }, [unit.serial_number]);
 
+  // ✅ NEW: Render kartu lengkap ke canvas baru untuk download
+  const generateFullBarcodeCanvas = (): HTMLCanvasElement => {
+    const barcodeCanvas = canvasRef.current!;
+    const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;
+
+    const scale = 2; // retina / high-DPI
+    const cardW = 320;
+    const padding = 20;
+    const barcodeDisplayW = cardW - padding * 2;
+    const barcodeDisplayH = Math.round(barcodeCanvas.height * (barcodeDisplayW / barcodeCanvas.width));
+
+    // Hitung total tinggi kartu
+    const topPad = 20;
+    const nameH = 18;   // laptop name
+    const nameMB = 6;
+    const badgeH = 24;   // grade badge
+    const badgeMB = 16;
+    const barcodeH = barcodeDisplayH;
+    const barcodeMB = 10;
+    const snH = 16;   // serial number
+    const snMB = 10;
+    const priceH = 26;   // harga
+    const priceMB = 12;
+    const dividerMB = 12;
+    const urlH = 12;   // scan url
+    const bottomPad = 20;
+
+    const cardH =
+      topPad + nameH + nameMB + badgeH + badgeMB +
+      barcodeH + barcodeMB + snH + snMB +
+      priceH + priceMB + dividerMB + urlH + bottomPad;
+
+    const offscreen = document.createElement("canvas");
+    offscreen.width = cardW * scale;
+    offscreen.height = cardH * scale;
+
+    const ctx = offscreen.getContext("2d")!;
+    ctx.scale(scale, scale);
+
+    // ── Background putih + border ──
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, cardW, cardH);
+
+    // Border rounded — simulasi dengan stroke rect
+    ctx.strokeStyle = "#1a1a2e";
+    ctx.lineWidth = 2;
+    roundRect(ctx, 1, 1, cardW - 2, cardH - 2, 14);
+    ctx.stroke();
+
+    let y = topPad;
+
+    // ── Nama Laptop ──
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = `bold ${14}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    // Truncate kalau terlalu panjang
+    let displayName = laptopName;
+    while (ctx.measureText(displayName).width > cardW - padding * 2 && displayName.length > 0) {
+      displayName = displayName.slice(0, -1);
+    }
+    if (displayName !== laptopName) displayName = displayName.slice(0, -1) + "…";
+    ctx.fillText(displayName, cardW / 2, y);
+    y += nameH + nameMB;
+
+    // ── Grade Badge ──
+    const badgeText = `Grade ${unit.grade}`;
+    ctx.font = `bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    const badgeTextW = ctx.measureText(badgeText).width;
+    const badgePadX = 12;
+    const badgeW = badgeTextW + badgePadX * 2;
+    const badgeX = (cardW - badgeW) / 2;
+    const badgeRadius = badgeH / 2;
+
+    ctx.fillStyle = grade.bg;
+    roundRect(ctx, badgeX, y, badgeW, badgeH, badgeRadius);
+    ctx.fill();
+
+    ctx.strokeStyle = grade.border;
+    ctx.lineWidth = 1;
+    roundRect(ctx, badgeX, y, badgeW, badgeH, badgeRadius);
+    ctx.stroke();
+
+    ctx.fillStyle = grade.text;
+    ctx.textBaseline = "middle";
+    ctx.fillText(badgeText, cardW / 2, y + badgeH / 2);
+    y += badgeH + badgeMB;
+
+    // ── Barcode image ──
+    ctx.drawImage(barcodeCanvas, padding, y, barcodeDisplayW, barcodeDisplayH);
+    y += barcodeDisplayH + barcodeMB;
+
+    // ── Serial Number ──
+    ctx.fillStyle = "#6b7280";
+    ctx.font = `12px 'Courier New', monospace`;
+    ctx.textBaseline = "top";
+    ctx.textAlign = "center";
+    ctx.fillText(unit.serial_number, cardW / 2, y);
+    y += snH + snMB;
+
+    // ── Harga ──
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = `bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    ctx.fillText(fmt(unit.selling_price), cardW / 2, y);
+    y += priceH + priceMB;
+
+    // ── Divider dashed ──
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(cardW - padding, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    y += dividerMB;
+
+    // ── Scan URL ──
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = `9px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+    // Truncate URL kalau terlalu panjang
+    let displayUrl = scanUrl;
+    while (ctx.measureText(displayUrl).width > cardW - padding * 2 && displayUrl.length > 0) {
+      displayUrl = displayUrl.slice(0, -1);
+    }
+    if (displayUrl !== scanUrl) displayUrl = displayUrl.slice(0, -1) + "…";
+    ctx.fillText(displayUrl, cardW / 2, y);
+
+    return offscreen;
+  };
+
+  const handleDownload = () => {
+    if (!canvasRef.current) return;
+    const fullCanvas = generateFullBarcodeCanvas();
+    const link = document.createElement("a");
+    link.href = fullCanvas.toDataURL("image/png");
+    link.download = `barcode-${unit.serial_number}.png`;
+    link.click();
+  };
+
   const handlePrint = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -232,7 +361,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
           .barcode-img {
             width: 100%;
             max-width: 240px;
-            margin: 0 auto 12px;
+            margin: 0 auto 8px;
             display: block;
           }
           .sn {
@@ -282,16 +411,6 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     `);
     printWin.document.close();
   };
-
-  const handleDownload = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `barcode-${unit.serial_number}.png`;
-    link.click();
-  };
-
   const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;
 
   return (
@@ -364,34 +483,34 @@ function drawBarcode(canvas: HTMLCanvasElement | null, text: string) {
   const CODE128B_START = 104;
   const CODE128_STOP = 106;
   const CODE128_PATTERNS: Record<number, string> = {
-    0:"11011001100", 1:"11001101100", 2:"11001100110", 3:"10010011000",
-    4:"10010001100", 5:"10001001100", 6:"10011001000", 7:"10011000100",
-    8:"10001100100", 9:"11001001000", 10:"11001000100", 11:"11000100100",
-    12:"10110011100", 13:"10011011100", 14:"10011001110", 15:"10111001100",
-    16:"10011101100", 17:"10011100110", 18:"11001110010", 19:"11001011100",
-    20:"11001001110", 21:"11011100100", 22:"11001110100", 23:"11101101110",
-    24:"11101001100", 25:"11100101100", 26:"11100100110", 27:"11101100100",
-    28:"11100110100", 29:"11100110010", 30:"11011011000", 31:"11011000110",
-    32:"11000110110", 33:"10100011000", 34:"10001011000", 35:"10001000110",
-    36:"10110001000", 37:"10001101000", 38:"10001100010", 39:"11010001000",
-    40:"11000101000", 41:"11000100010", 42:"10110111000", 43:"10110001110",
-    44:"10001101110", 45:"10111011000", 46:"10111000110", 47:"10001110110",
-    48:"11101110110", 49:"11010001110", 50:"11000101110", 51:"11011101000",
-    52:"11011100010", 53:"11011101110", 54:"11101011000", 55:"11101000110",
-    56:"11100010110", 57:"11101101000", 58:"11101100010", 59:"11100011010",
-    60:"11101111010", 61:"11001000010", 62:"11110001010", 63:"10100110000",
-    64:"10100001100", 65:"10010110000", 66:"10010000110", 67:"10000101100",
-    68:"10000100110", 69:"10110010000", 70:"10110000100", 71:"10011010000",
-    72:"10011000010", 73:"10000110100", 74:"10000110010", 75:"11000010010",
-    76:"11001010000", 77:"11110111010", 78:"11000010100", 79:"10001111010",
-    80:"10100111100", 81:"10010111100", 82:"10010011110", 83:"10111100100",
-    84:"10011110100", 85:"10011110010", 86:"11110100100", 87:"11110010100",
-    88:"11110010010", 89:"11011011110", 90:"11011110110", 91:"11110110110",
-    92:"10101111000", 93:"10100011110", 94:"10001011110", 95:"10111101000",
-    96:"10111100010", 97:"11110101000", 98:"11110100010", 99:"10111011110",
-    100:"10111101110", 101:"11101011110", 102:"11110101110",
-    103:"11010000100", 104:"11010010000", 105:"11010011100",
-    106:"11000111010",
+    0: "11011001100", 1: "11001101100", 2: "11001100110", 3: "10010011000",
+    4: "10010001100", 5: "10001001100", 6: "10011001000", 7: "10011000100",
+    8: "10001100100", 9: "11001001000", 10: "11001000100", 11: "11000100100",
+    12: "10110011100", 13: "10011011100", 14: "10011001110", 15: "10111001100",
+    16: "10011101100", 17: "10011100110", 18: "11001110010", 19: "11001011100",
+    20: "11001001110", 21: "11011100100", 22: "11001110100", 23: "11101101110",
+    24: "11101001100", 25: "11100101100", 26: "11100100110", 27: "11101100100",
+    28: "11100110100", 29: "11100110010", 30: "11011011000", 31: "11011000110",
+    32: "11000110110", 33: "10100011000", 34: "10001011000", 35: "10001000110",
+    36: "10110001000", 37: "10001101000", 38: "10001100010", 39: "11010001000",
+    40: "11000101000", 41: "11000100010", 42: "10110111000", 43: "10110001110",
+    44: "10001101110", 45: "10111011000", 46: "10111000110", 47: "10001110110",
+    48: "11101110110", 49: "11010001110", 50: "11000101110", 51: "11011101000",
+    52: "11011100010", 53: "11011101110", 54: "11101011000", 55: "11101000110",
+    56: "11100010110", 57: "11101101000", 58: "11101100010", 59: "11100011010",
+    60: "11101111010", 61: "11001000010", 62: "11110001010", 63: "10100110000",
+    64: "10100001100", 65: "10010110000", 66: "10010000110", 67: "10000101100",
+    68: "10000100110", 69: "10110010000", 70: "10110000100", 71: "10011010000",
+    72: "10011000010", 73: "10000110100", 74: "10000110010", 75: "11000010010",
+    76: "11001010000", 77: "11110111010", 78: "11000010100", 79: "10001111010",
+    80: "10100111100", 81: "10010111100", 82: "10010011110", 83: "10111100100",
+    84: "10011110100", 85: "10011110010", 86: "11110100100", 87: "11110010100",
+    88: "11110010010", 89: "11011011110", 90: "11011110110", 91: "11110110110",
+    92: "10101111000", 93: "10100011110", 94: "10001011110", 95: "10111101000",
+    96: "10111100010", 97: "11110101000", 98: "11110100010", 99: "10111011110",
+    100: "10111101110", 101: "11101011110", 102: "11110101110",
+    103: "11010000100", 104: "11010010000", 105: "11010011100",
+    106: "11000111010",
   };
 
   const getCharCode = (c: string): number => {
@@ -434,6 +553,23 @@ function drawBarcode(canvas: HTMLCanvasElement | null, text: string) {
       ctx.fillRect(quietZone + i * moduleWidth, 0, moduleWidth, barHeight);
     }
   }
+}
+// ─── Helper: rounded rect path ────────────────────────────────────────────────
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
