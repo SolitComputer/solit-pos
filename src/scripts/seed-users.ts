@@ -15,7 +15,6 @@ const users = [
 
   { name: "Salam",  email: "salam.kds@solit-pos.com",  password: "Salam@Sales25",  role: "KEPALA_SALES" },
 
-  // CREW SALES
   { name: "Yulfa",  email: "yulfa.crew@solit-pos.com", password: "Yulfa@Crew25",   role: "CREW_SALES" },
   { name: "Revin",  email: "revin.crew@solit-pos.com", password: "Revin@Crew25",   role: "CREW_SALES" },
   { name: "Resti",  email: "resti.crew@solit-pos.com", password: "Resti@Crew25",   role: "CREW_SALES" },

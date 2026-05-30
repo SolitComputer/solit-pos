@@ -31,6 +31,23 @@ interface UnitOption {
     status: string;
 }
 
+const DRAFT_KEY = "payment_draft_v1";
+
+function saveDraft(data: object) {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+}
+
+function loadDraft(): Record<string, any> | null {
+    try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+
+function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function CreatePaymentPage() {
     const searchParams = useSearchParams();
@@ -60,9 +77,12 @@ export default function CreatePaymentPage() {
     // Selected state
     const [selectedLaptop, setSelectedLaptop] = useState<LaptopOption | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null);
+    const [snSearch, setSnSearch] = useState("");
+    const [snResults, setSnResults] = useState<(UnitOption & { laptop_name: string; laptop_id: string })[]>([]);
 
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const [draftRestored, setDraftRestored] = useState(false);
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } =
         useForm<CreatePaymentType>({
@@ -102,6 +122,70 @@ export default function CreatePaymentPage() {
             .then(r => setUserRole(r.user?.role ?? null))
             .catch(() => setUserRole(null));
     }, []);
+
+    // ── Restore draft dari localStorage ──────────────────────────────────────────
+    useEffect(() => {
+        if (fromScan) return;
+
+        const draft = loadDraft();
+        if (!draft) return;
+
+        const fields = [
+            "customer_name", "customer_phone", "company_name",
+            "source_platform", "pickup_method", "pickup_date",
+            "pickup_time", "pickup_location", "payment_method",
+            "software_request", "notes", "amount",
+        ] as const;
+
+        fields.forEach(field => {
+            if (draft[field] !== undefined) {
+                setValue(field as any, draft[field]);
+            }
+        });
+
+        if (draft._step) setStep(draft._step);
+
+        if (draft._selectedLaptop) setSelectedLaptop(draft._selectedLaptop);
+        if (draft._selectedUnit) {
+            const validateUnit = async () => {
+                try {
+                    const res = await fetch(
+                        `/api/units/search-sn?q=${encodeURIComponent(draft._selectedUnit.serial_number)}`
+                    );
+                    const result = await res.json();
+                    const stillValid = (result.data || []).find(
+                        (u: any) => u.id === draft._selectedUnit.id && u.status === "SIAP_JUAL"
+                    );
+                    if (stillValid) {
+                        setSelectedUnit(draft._selectedUnit);
+                        setSnSearch(draft._selectedUnit.serial_number || "");
+                    } else {
+                        console.warn("Unit dari draft sudah tidak SIAP_JUAL, di-reset");
+                    }
+                } catch {
+                }
+            };
+            validateUnit();
+        }
+        if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
+
+        setDraftRestored(true);
+    }, []);
+
+    const watchedFields = watch();
+    useEffect(() => {
+        if (fromScan) return;
+
+        const draft = {
+            ...watchedFields,
+            _step: step,
+            _selectedLaptop: selectedLaptop,
+            _selectedUnit: selectedUnit,
+            _rawDealPrice: rawDealPrice,
+            _savedAt: new Date().toISOString(),
+        };
+        saveDraft(draft);
+    }, [watchedFields, step, selectedLaptop, selectedUnit, rawDealPrice]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Jika dari scan: pre-load unit langsung ────────────────────────────────
     useEffect(() => {
@@ -201,6 +285,40 @@ export default function CreatePaymentPage() {
         setValue("serial_number", unit?.serial_number || "");
     };
 
+    // ── Handler search SN ─────────────────────────────────────────────────────
+    const handleSnSearch = useCallback(async (query: string) => {
+        if (query.length < 2) { setSnResults([]); return; }
+        setIsLoadingUnits(true);
+        try {
+            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(query)}`);
+            const result = await res.json();
+            setSnResults(result.data || []);
+        } catch {
+            setSnResults([]);
+        } finally {
+            setIsLoadingUnits(false);
+        }
+    }, []);
+
+    const handleSelectSnResult = (u: UnitOption & { laptop_name: string; laptop_id: string }) => {
+        setSelectedUnit(u);
+        setSelectedLaptop({
+            id: u.laptop_id,
+            laptop_name: u.laptop_name,
+            brand: "",
+            cpu: "",
+            ram: "",
+            storage: "",
+            selling_price: u.selling_price,
+            qty: 1,
+        });
+        setValue("unit_id", u.id);
+        setValue("serial_number", u.serial_number);
+        setValue("laptop_id", u.laptop_id);
+        setValue("laptop_name", u.laptop_name);
+        setSnResults([]); // tutup dropdown
+    };
+
     // ── GPS ───────────────────────────────────────────────────────────────────
     const getLocation = () => {
         setGpsLoading(true);
@@ -215,11 +333,33 @@ export default function CreatePaymentPage() {
         );
     };
 
-    // ── Submit ────────────────────────────────────────────────────────────────
     const onSubmit = async (data: CreatePaymentType) => {
         if (!paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
         if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
         if (!selectedUnit) { alert("Pilih unit / serial number dulu"); return; }
+
+        const checkRes = await fetch(
+            `/api/units/search-sn?q=${encodeURIComponent(selectedUnit.serial_number)}`
+        );
+        const checkResult = await checkRes.json();
+        const stillAvailable = (checkResult.data || []).find(
+            (u: any) => u.id === selectedUnit.id
+        );
+        if (!stillAvailable) {
+            alert(
+                `Unit SN: ${selectedUnit.serial_number} sudah tidak tersedia atau sudah terjual.\n\nSilakan pilih unit lain.`
+            );
+            setSelectedUnit(null);
+            setSelectedLaptop(null);
+            setSnSearch("");
+            setValue("unit_id", "");
+            setValue("serial_number", "");
+            setValue("laptop_id", "");
+            setValue("laptop_name", "");
+            setStep(2);
+            setSubmitting(false);
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -250,6 +390,7 @@ export default function CreatePaymentPage() {
             });
             const result = await res.json();
             if (!result.success) { alert(result.message); return; }
+            clearDraft();
             window.location.href = `/receipt/${result.invoice_number}`;
         } catch {
             alert("Terjadi kesalahan");
@@ -319,6 +460,27 @@ export default function CreatePaymentPage() {
                     </div>
                 )}
 
+                {draftRestored && !fromScan && (
+                    <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 mb-4">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <p className="text-xs font-semibold text-blue-700">Draft tersimpan dipulihkan</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                clearDraft();
+                                window.location.reload();
+                            }}
+                            className="text-xs text-blue-500 hover:text-blue-700 transition underline"
+                        >
+                            Mulai baru
+                        </button>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
                     {/* Hidden fields */}
                     <input type="hidden" {...register("laptop_id")} />
@@ -355,79 +517,100 @@ export default function CreatePaymentPage() {
                         </>
                     )}
 
-                    {/* ── STEP 2: Pilih Laptop + Unit (SN) ── */}
-                    {/* Step ini hanya muncul jika BUKAN dari scan barcode */}
+                    {/* ── STEP 2: Cari via SN langsung ── */}
                     {step === 2 && !fromScan && (
                         <>
-                            {/* Pilih Laptop */}
+                            {/* Search SN */}
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Pilih Laptop</label>
-                                {isLoadingLaptops ? (
-                                    <div className="h-11 bg-gray-100 rounded-xl animate-pulse" />
-                                ) : (
-                                    <select
-                                        className={selectClass}
-                                        value={selectedLaptop?.id || ""}
-                                        onChange={handleLaptopChange}
-                                    >
-                                        <option value="">— Pilih Laptop —</option>
-                                        {laptops.map((item) => (
-                                            <option key={item.id} value={item.id}>
-                                                {item.laptop_name}
-                                                {item.brand ? ` (${item.brand})` : ""}
-                                                {" — "}
-                                                {item.qty} unit tersedia
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-
-                            {/* Pilih Unit / SN — muncul setelah laptop dipilih */}
-                            {selectedLaptop && (
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1.5 block">
-                                        Pilih Unit (Serial Number)
-                                    </label>
-                                    {isLoadingUnits ? (
-                                        <div className="h-11 bg-gray-100 rounded-xl animate-pulse" />
-                                    ) : units.length === 0 ? (
-                                        <div className="h-11 border border-red-200 bg-red-50 rounded-xl flex items-center px-4">
-                                            <span className="text-sm text-red-500">Tidak ada unit SIAP_JUAL</span>
+                                <label className="text-xs text-gray-400 mb-1.5 block">
+                                    Cari Serial Number (SN)
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Ketik SN unit..."
+                                        className={inputClass}
+                                        value={snSearch}
+                                        onChange={(e) => {
+                                            setSnSearch(e.target.value);
+                                            handleSnSearch(e.target.value);
+                                        }}
+                                    />
+                                    {isLoadingUnits && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-[#1a1a2e] rounded-full animate-spin" />
                                         </div>
-                                    ) : (
-                                        <select
-                                            className={selectClass}
-                                            value={selectedUnit?.id || ""}
-                                            onChange={handleUnitChange}
-                                        >
-                                            <option value="">— Pilih Serial Number —</option>
-                                            {units.map((u) => (
-                                                <option key={u.id} value={u.id}>
-                                                    SN: {u.serial_number} · Grade {u.grade}
+                                    )}
+                                </div>
+
+                                {/* Dropdown hasil search */}
+                                {snResults.length > 0 && !selectedUnit && (
+                                    <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                        {snResults.map((u) => (
+                                            <button
+                                                key={u.id}
+                                                type="button"
+                                                onClick={() => handleSelectSnResult(u)}
+                                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0"
+                                            >
+                                                <p className="font-mono text-sm font-semibold text-[#1a1a2e]">
+                                                    {u.serial_number}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {u.laptop_name} · Grade {u.grade}
                                                     {u.selling_price
                                                         ? ` · Rp${u.selling_price.toLocaleString("id-ID")}`
                                                         : ""}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-                            )}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Tidak ditemukan */}
+                                {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && !selectedUnit && (
+                                    <p className="text-xs text-red-500 mt-1.5 px-1">
+                                        SN tidak ditemukan atau unit tidak SIAP_JUAL
+                                    </p>
+                                )}
+                            </div>
 
                             {/* Info card unit yang dipilih */}
                             {selectedLaptop && selectedUnit && (
-                                <UnitInfoCard
-                                    laptop={selectedLaptop}
-                                    unit={selectedUnit}
-                                    rawDealPrice={rawDealPrice}
-                                    setRawDealPrice={setRawDealPrice}
-                                    setValue={setValue}
-                                    other={other}
-                                    inputClass={inputClass}
-                                    canSeeMargin={canSeeMargin}
-                                />
+                                <>
+                                    {/* Tombol clear */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedUnit(null);
+                                            setSelectedLaptop(null);
+                                            setSnSearch("");
+                                            setSnResults([]);
+                                            setValue("unit_id", "");
+                                            setValue("serial_number", "");
+                                            setValue("laptop_id", "");
+                                            setValue("laptop_name", "");
+                                        }}
+                                        className="text-xs text-red-400 hover:text-red-500 transition flex items-center gap-1"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Ganti unit
+                                    </button>
+                                    <UnitInfoCard
+                                        laptop={selectedLaptop}
+                                        unit={selectedUnit}
+                                        rawDealPrice={rawDealPrice}
+                                        setRawDealPrice={setRawDealPrice}
+                                        setValue={setValue}
+                                        other={other}
+                                        inputClass={inputClass}
+                                        canSeeMargin={canSeeMargin}
+                                    />
+                                </>
                             )}
+
                             <input
                                 type="text"
                                 placeholder="Request Software (opsional)"
@@ -436,12 +619,13 @@ export default function CreatePaymentPage() {
                             />
 
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>
+                                    ← Kembali
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (!selectedLaptop) { alert("Pilih laptop dulu"); return; }
-                                        if (!selectedUnit) { alert("Pilih serial number unit dulu"); return; }
+                                        if (!selectedUnit) { alert("Cari dan pilih SN unit dulu"); return; }
                                         if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
                                         setStep(3);
                                     }}
@@ -640,15 +824,23 @@ function UnitInfoCard({
                 </p>
             </div>
 
-            {/* SN + Grade */}
             <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
                 <div className="flex-1">
                     <p className="text-xs text-gray-400 mb-0.5">Serial Number</p>
                     <p className="font-mono text-sm font-semibold text-[#1a1a2e]">{unit.serial_number}</p>
                 </div>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${gradeColor[unit.grade] || gradeColor.A}`}>
-                    Grade {unit.grade}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${gradeColor[unit.grade] || gradeColor.A}`}>
+                        Grade {unit.grade}
+                    </span>
+                    {/* Badge status */}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${unit.status === "SIAP_JUAL"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-red-50 text-red-600 border-red-200"
+                        }`}>
+                        {unit.status === "SIAP_JUAL" ? "✓ Siap Jual" : `⚠ ${unit.status}`}
+                    </span>
+                </div>
             </div>
 
             {/* Kondisi */}

@@ -84,6 +84,11 @@ export default function Page() {
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterBrand, setFilterBrand] = useState("ALL");
+    const [filterProcessor, setFilterProcessor] = useState("ALL");
+    const [filterRam, setFilterRam] = useState("ALL");
+    const [filterPriceRange, setFilterPriceRange] = useState("ALL");
+    const [sortBy, setSortBy] = useState("DEFAULT");
+    const [currentPage, setCurrentPage] = useState(1);
 
     const [modalMode, setModalMode] = useState<ModalMode>(null);
     const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
@@ -92,10 +97,12 @@ export default function Page() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const ITEMS_PER_PAGE = 15;
 
     const canEditLaptop = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
     const canCreateLaptop = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
     const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"]) : false;
+
 
     useEffect(() => { fetchLaptops(); }, []);
 
@@ -124,6 +131,14 @@ export default function Page() {
         }
     };
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
+
+
+
+
+    // Ganti seluruh blok useMemo filteredLaptops:
     const filteredLaptops = useMemo(() => {
         let list = [...laptops];
         if (search.trim()) {
@@ -138,8 +153,65 @@ export default function Page() {
         }
         if (filterStatus !== "ALL") list = list.filter(x => x.status === filterStatus);
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
+        if (filterProcessor !== "ALL") {
+            list = list.filter(x => x.cpu?.toLowerCase().includes(filterProcessor.toLowerCase()));
+        }
+        if (filterRam !== "ALL") list = list.filter(x => x.ram === filterRam);
+        if (filterPriceRange !== "ALL") {
+            const ranges: Record<string, [number, number]> = {
+                "1-2": [1_000_000, 2_000_000],
+                "2-3": [2_000_000, 3_000_000],
+                "3-4": [3_000_000, 4_000_000],
+                "4+": [4_000_000, Infinity],
+            };
+            const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
+            list = list.filter(x => x.selling_price >= min && x.selling_price < max);
+        }
+        switch (sortBy) {
+            case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
+            case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
+            case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
+            case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
+        }
         return list;
-    }, [laptops, search, filterStatus, filterBrand]);
+    }, [laptops, search, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
+
+    const totalPages = Math.ceil(filteredLaptops.length / ITEMS_PER_PAGE);
+
+    const paginatedLaptops = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredLaptops.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredLaptops, currentPage]);
+
+    const uniqueProcessors = useMemo(() => {
+        // Ekstrak tipe processor utama: Intel i3/i5/i7/i9, AMD Ryzen, Apple M
+        const types = new Set<string>();
+        laptops.forEach(x => {
+            const cpu = (x.cpu || "").toLowerCase();
+            if (cpu.includes("i3")) types.add("Intel i3");
+            else if (cpu.includes("i5")) types.add("Intel i5");
+            else if (cpu.includes("i7")) types.add("Intel i7");
+            else if (cpu.includes("i9")) types.add("Intel i9");
+            else if (cpu.includes("ryzen 3")) types.add("AMD Ryzen 3");
+            else if (cpu.includes("ryzen 5")) types.add("AMD Ryzen 5");
+            else if (cpu.includes("ryzen 7")) types.add("AMD Ryzen 7");
+            else if (cpu.includes("ryzen 9")) types.add("AMD Ryzen 9");
+            else if (cpu.includes("apple m") || cpu.includes("m1") || cpu.includes("m2") || cpu.includes("m3")) types.add("Apple Silicon");
+            else if (cpu.includes("celeron")) types.add("Intel Celeron");
+            else if (cpu.includes("pentium")) types.add("Intel Pentium");
+        });
+        return ["ALL", ...Array.from(types).sort()];
+    }, [laptops]);
+
+    const uniqueRams = useMemo(() => {
+        const r = new Set(laptops.map(x => x.ram).filter(Boolean));
+        return ["ALL", ...Array.from(r).sort((a, b) => {
+            const numA = parseInt(a) || 0;
+            const numB = parseInt(b) || 0;
+            return numA - numB;
+        })];
+    }, [laptops]);
 
     const uniqueBrands = useMemo(() => {
         const b = new Set(laptops.map(x => x.brand).filter(Boolean));
@@ -398,6 +470,20 @@ export default function Page() {
                     0%   { background-position: -600px 0; }
                     100% { background-position:  600px 0; }
                 }
+                .table-scroll::-webkit-scrollbar {
+                    height: 6px;
+                }
+                .table-scroll::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                    border-radius: 99px;
+                }
+                .table-scroll::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 99px;
+                }
+                .table-scroll::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
             `}</style>
 
             <DashboardLayout>
@@ -446,8 +532,9 @@ export default function Page() {
                             </div>
                         </div>
 
-                        {/* ── Filter Bar yang lebih segar ── */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        {/* ── Filter Bar ── */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+                            {/* Row 1: Search + Status + Brand + Reset */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div className="relative lg:col-span-1">
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,12 +569,102 @@ export default function Page() {
                                     ))}
                                 </select>
                                 <button
-                                    onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterBrand("ALL"); }}
+                                    onClick={() => {
+                                        setSearch("");
+                                        setFilterStatus("ALL");
+                                        setFilterBrand("ALL");
+                                        setFilterProcessor("ALL");
+                                        setFilterRam("ALL");
+                                        setFilterPriceRange("ALL");
+                                        setSortBy("DEFAULT");
+                                    }}
                                     className="h-10 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 transition"
                                 >
                                     Reset Filter
                                 </button>
                             </div>
+
+                            {/* Row 2: Processor + RAM + Price Range + Sort */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {/* Filter Processor */}
+                                <select
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
+                                    value={filterProcessor}
+                                    onChange={e => setFilterProcessor(e.target.value)}
+                                >
+                                    {uniqueProcessors.map(p => (
+                                        <option key={p} value={p}>{p === "ALL" ? "Semua Processor" : p}</option>
+                                    ))}
+                                </select>
+
+                                {/* Filter RAM */}
+                                <select
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
+                                    value={filterRam}
+                                    onChange={e => setFilterRam(e.target.value)}
+                                >
+                                    {uniqueRams.map(r => (
+                                        <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : r}</option>
+                                    ))}
+                                </select>
+
+                                {/* Filter Price Range */}
+                                <select
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
+                                    value={filterPriceRange}
+                                    onChange={e => setFilterPriceRange(e.target.value)}
+                                >
+                                    <option value="ALL">Semua Harga</option>
+                                    <option value="1-2">Rp 1 jt – 2 jt</option>
+                                    <option value="2-3">Rp 2 jt – 3 jt</option>
+                                    <option value="3-4">Rp 3 jt – 4 jt</option>
+                                    <option value="4+">Rp 4 jt ke atas</option>
+                                </select>
+
+                                {/* Sort By */}
+                                <select
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
+                                    value={sortBy}
+                                    onChange={e => setSortBy(e.target.value)}
+                                >
+                                    <option value="DEFAULT">Urutan Default</option>
+                                    <option value="AZ">A → Z</option>
+                                    <option value="ZA">Z → A</option>
+                                    <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                    <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                    <option value="SN">Urut SN</option>
+                                </select>
+                            </div>
+
+                            {/* Active filter chips — muncul kalau ada filter aktif */}
+                            {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                    {filterProcessor !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1a1a2e]/5 text-[#1a1a2e] text-xs font-medium rounded-full border border-[#1a1a2e]/10">
+                                            🖥 {filterProcessor}
+                                            <button onClick={() => setFilterProcessor("ALL")} className="hover:text-red-500 transition ml-0.5">×</button>
+                                        </span>
+                                    )}
+                                    {filterRam !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1a1a2e]/5 text-[#1a1a2e] text-xs font-medium rounded-full border border-[#1a1a2e]/10">
+                                            💾 RAM {filterRam}
+                                            <button onClick={() => setFilterRam("ALL")} className="hover:text-red-500 transition ml-0.5">×</button>
+                                        </span>
+                                    )}
+                                    {filterPriceRange !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1a1a2e]/5 text-[#1a1a2e] text-xs font-medium rounded-full border border-[#1a1a2e]/10">
+                                            💰 {filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`}
+                                            <button onClick={() => setFilterPriceRange("ALL")} className="hover:text-red-500 transition ml-0.5">×</button>
+                                        </span>
+                                    )}
+                                    {sortBy !== "DEFAULT" && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-full border border-blue-100">
+                                            ↕ {sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}
+                                            <button onClick={() => setSortBy("DEFAULT")} className="hover:text-red-500 transition ml-0.5">×</button>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Table dengan desain modern ── */}
@@ -501,13 +678,16 @@ export default function Page() {
                             </div>
                         ) : (
                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto table-scroll">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="bg-gray-50/80 border-b border-gray-100">
                                                 <Th>Nama Laptop</Th>
                                                 <Th>Brand</Th>
-                                                <Th>Spesifikasi</Th>
+                                                <Th>CPU</Th>
+                                                <Th>RAM</Th>
+                                                <Th>GPU</Th>
+                                                <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
                                                 <Th right>Stok</Th>
                                                 <Th>Status</Th>
@@ -515,7 +695,7 @@ export default function Page() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {filteredLaptops.map(item => {
+                                            {paginatedLaptops.map(item => {
                                                 const s = STATUS_STYLE[item.status];
                                                 return (
                                                     <tr
@@ -533,14 +713,29 @@ export default function Page() {
                                                         <td className="px-4 py-3.5 text-gray-500 whitespace-nowrap">
                                                             {item.brand || <span className="text-gray-300">—</span>}
                                                         </td>
-                                                        {/* Spesifikasi */}
-                                                        <td className="px-4 py-3.5 min-w-[220px]">
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {item.cpu && <Chip>{item.cpu}</Chip>}
-                                                                {item.ram && <Chip>{item.ram}</Chip>}
-                                                                {item.storage && <Chip>{item.storage}</Chip>}
-                                                                {item.gpu && <Chip>{item.gpu}</Chip>}
-                                                            </div>
+                                                        {/* CPU */}
+                                                        <td className="px-4 py-3.5 max-w-[160px]">
+                                                            <span className="block text-xs text-gray-700 font-medium truncate" title={item.cpu}>
+                                                                {item.cpu || <span className="text-gray-300">—</span>}
+                                                            </span>
+                                                        </td>
+                                                        {/* RAM */}
+                                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                                            <span className="text-xs font-medium text-gray-700">
+                                                                {item.ram || <span className="text-gray-300">—</span>}
+                                                            </span>
+                                                        </td>
+                                                        {/* GPU */}
+                                                        <td className="px-4 py-3.5 max-w-[140px]">
+                                                            <span className="block text-xs text-gray-600 truncate" title={item.gpu}>
+                                                                {item.gpu || <span className="text-gray-300">—</span>}
+                                                            </span>
+                                                        </td>
+                                                        {/* Storage */}
+                                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                                            <span className="text-xs font-medium text-gray-700">
+                                                                {item.storage || <span className="text-gray-300">—</span>}
+                                                            </span>
                                                         </td>
                                                         {/* Harga Jual */}
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
@@ -612,9 +807,86 @@ export default function Page() {
                                     </table>
                                 </div>
                                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
-                                    <p className="text-xs text-gray-500">
-                                        Menampilkan <span className="font-semibold text-gray-700">{filteredLaptops.length}</span> dari <span className="font-semibold text-gray-700">{laptops.length}</span> laptop
-                                    </p>
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                        {/* Info count */}
+                                        <p className="text-xs text-gray-500">
+                                            Menampilkan{" "}
+                                            <span className="font-semibold text-gray-700">
+                                                {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredLaptops.length)}
+                                            </span>
+                                            {" "}–{" "}
+                                            <span className="font-semibold text-gray-700">
+                                                {Math.min(currentPage * ITEMS_PER_PAGE, filteredLaptops.length)}
+                                            </span>
+                                            {" "}dari{" "}
+                                            <span className="font-semibold text-gray-700">{filteredLaptops.length}</span>
+                                            {" "}laptop
+                                            {laptops.length !== filteredLaptops.length && (
+                                                <span className="text-gray-400"> (difilter dari {laptops.length})</span>
+                                            )}
+                                        </p>
+
+                                        {/* Pagination controls */}
+                                        {totalPages > 1 && (
+                                            <div className="flex items-center gap-1">
+                                                {/* Prev */}
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                    disabled={currentPage === 1}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition text-sm"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                                    </svg>
+                                                </button>
+
+                                                {/* Page numbers */}
+                                                {(() => {
+                                                    const pages: (number | "...")[] = [];
+                                                    if (totalPages <= 7) {
+                                                        for (let i = 1; i <= totalPages; i++) pages.push(i);
+                                                    } else {
+                                                        pages.push(1);
+                                                        if (currentPage > 3) pages.push("...");
+                                                        const start = Math.max(2, currentPage - 1);
+                                                        const end = Math.min(totalPages - 1, currentPage + 1);
+                                                        for (let i = start; i <= end; i++) pages.push(i);
+                                                        if (currentPage < totalPages - 2) pages.push("...");
+                                                        pages.push(totalPages);
+                                                    }
+                                                    return pages.map((page, idx) =>
+                                                        page === "..." ? (
+                                                            <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">
+                                                                ···
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                key={page}
+                                                                onClick={() => setCurrentPage(page as number)}
+                                                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium transition ${currentPage === page
+                                                                    ? "bg-[#1a1a2e] text-white shadow-sm"
+                                                                    : "text-gray-600 hover:bg-gray-200"
+                                                                    }`}
+                                                            >
+                                                                {page}
+                                                            </button>
+                                                        )
+                                                    );
+                                                })()}
+
+                                                {/* Next */}
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                    disabled={currentPage === totalPages}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition text-sm"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -881,7 +1153,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50/80 border-b border-gray-100">
-                            {["Nama Laptop", "Brand", "Spesifikasi", "Harga Jual", "Stok", "Status", "Aksi"].map(h => (
+                            {["Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga Jual", "Stok", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3 text-left">
                                     <Shimmer w={80} h={11} />
                                 </th>
@@ -893,8 +1165,10 @@ function SkeletonTable() {
                             <tr key={r}>
                                 <td className="px-4 py-3.5"><Shimmer w={w} h={14} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
-                                <td className="px-4 py-3.5"><div className="flex gap-2"><Shimmer w={52} h={20} r="6px" /><Shimmer w={36} h={20} r="6px" /><Shimmer w={44} h={20} r="6px" /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><Shimmer w={100} h={13} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={40} h={13} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={80} h={13} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end gap-2"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
