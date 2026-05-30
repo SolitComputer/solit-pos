@@ -288,6 +288,7 @@ export default function Page() {
                 onPhotoClick={setPhotoModal}
                 canEditTransaction={canEditTransaction}
                 canSeeFinancials={canSeeFinancials}
+                onRestored={() => fetchTransactions()}
               />
             ))
           )}
@@ -331,13 +332,37 @@ function TransactionCard({
   onPhotoClick,
   canEditTransaction,
   canSeeFinancials,
+  onRestored, // ← tambah prop baru
 }: {
   item: any;
   onPhotoClick: (url: string) => void;
   canEditTransaction: boolean;
   canSeeFinancials: boolean;
+  onRestored: (invoice: string) => void; // ← callback setelah restore
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
+        method: "POST",
+      });
+      const result = await res.json();
+      if (!result.success) {
+        alert("Gagal restore: " + result.message);
+        return;
+      }
+      setShowRestoreModal(false);
+      onRestored(item.invoice_number); // refresh list
+    } catch {
+      alert("Terjadi kesalahan saat restore");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const statusMap: Record<string, string> = {
     PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -437,7 +462,7 @@ function TransactionCard({
           </button>
         </div>
 
-        {/* Kanan: Edit (jika punya akses) + Receipt */}
+        {/* Kanan: Edit + Restore + Receipt */}
         <div className="flex items-center gap-2">
           {canEditTransaction && (
             <a
@@ -451,6 +476,19 @@ function TransactionCard({
               Edit
             </a>
           )}
+
+          {/* Restore — hanya untuk PAID dan role yang bisa edit */}
+          {canEditTransaction && item.status === "PAID" && (
+            <button
+              onClick={() => setShowRestoreModal(true)}
+              className="text-xs font-semibold text-red-500 hover:text-red-700 transition flex items-center gap-1"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              Restore
+            </button>
+          )}
           <a
             href={`/receipt/${item.invoice_number}`}
             className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
@@ -460,7 +498,130 @@ function TransactionCard({
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </a>
-        </div >
+        </div>
+
+        {/* Modal konfirmasi restore */}
+        {showRestoreModal && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowRestoreModal(false)}
+            />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+
+              {/* Header */}
+              <div className="bg-red-600 px-5 py-4 flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-bold text-white text-sm">Restore Transaksi</p>
+                  <p className="text-xs text-red-100 mt-0.5">Batalkan & kembalikan stok unit</p>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-5 py-4 space-y-3">
+
+                {/* Info transaksi */}
+                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Invoice</span>
+                    <span className="font-mono font-semibold text-gray-700">{item.invoice_number}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Customer</span>
+                    <span className="font-semibold text-gray-700">{item.customer_name}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">Laptop</span>
+                    <span className="text-gray-700 text-right max-w-[55%] truncate">{item.laptop_name}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">SN</span>
+                    <span className="font-mono text-gray-700">{item.serial_number || "-"}</span>
+                  </div>
+                  <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                    <span className="text-gray-400">Harga</span>
+                    <span className="font-bold text-gray-800">
+                      Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Efek restore */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Yang akan terjadi:</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">1</span>
+                    Status transaksi berubah dari <span className="font-semibold text-emerald-600 mx-1">PAID</span> → <span className="font-semibold text-red-500 ml-1">CANCELLED</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">2</span>
+                    Stok unit SN <span className="font-mono font-semibold mx-1">{item.serial_number}</span> dikembalikan ke <span className="font-semibold text-emerald-600 ml-1">SIAP_JUAL</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">3</span>
+                    Qty laptop otomatis diperbarui
+                  </div>
+                </div>
+
+                {/* Warning */}
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <p className="text-xs text-amber-700">
+                    Aksi ini <span className="font-semibold">tidak dapat diurungkan</span>. Pastikan sudah berkoordinasi dengan tim terkait.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 pb-6 flex gap-3">
+                <button
+                  onClick={() => setShowRestoreModal(false)}
+                  disabled={restoring}
+                  className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                >
+                  Batal
+                </button>
+
+                <button
+                  onClick={handleRestore}
+                  disabled={restoring}
+                  className="flex-1 h-11 bg-emerald-600 text-black rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {restoring ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                        />
+                      </svg>
+                      Ya, Restore Transaksi
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div >
 
 

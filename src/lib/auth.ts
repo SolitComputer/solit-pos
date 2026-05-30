@@ -3,7 +3,6 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-// Re-export semua dari permissions agar import lama tidak perlu diubah
 export type { UserRole } from "@/lib/permissions";
 export {
   ROLE_DEFAULT_REDIRECT,

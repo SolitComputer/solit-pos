@@ -41,38 +41,45 @@ const menuIcons: Record<string, React.ReactNode> = {
 // ─── Menu per role ────────────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, { name: string; href: string }[]> = {
   ADMIN: [
-    { name: "Dashboard",    href: "/dashboard" },
-    { name: "Riwayat",      href: "/dashboard/transactions" },
-    { name: "Data Laptop",  href: "/dashboard/laptops" },
+    { name: "Dashboard", href: "/dashboard" },
+    { name: "Riwayat", href: "/dashboard/transactions" },
+    { name: "Data Laptop", href: "/dashboard/laptops" },
+    { name: "Garansi", href: "/dashboard/warranty" },
     { name: "Buat Payment", href: "/payment/create" },
-    { name: "Scanner",      href: "/scan" },
+    { name: "Scanner", href: "/scan" },
+  ],
+  TEKNISI: [
+    { name: "Data Laptop", href: "/dashboard/laptops" },
+    { name: "Garansi", href: "/dashboard/warranty" },
+    { name: "Scanner", href: "/scan" },
   ],
   KEPALA_SALES: [
     { name: "Buat Payment", href: "/payment/create" },
-    { name: "Riwayat",      href: "/dashboard/transactions" },
-    { name: "Scanner",      href: "/scan" },
+    { name: "Riwayat", href: "/dashboard/transactions" },
+    { name: "Scanner", href: "/scan" },
   ],
   CREW_SALES: [
     { name: "Buat Payment", href: "/payment/create" },
-    { name: "Scanner",      href: "/scan" },
+    { name: "Scanner", href: "/scan" },
   ],
   ACCOUNTING: [
-    { name: "Dashboard",    href: "/dashboard" },
-    { name: "Riwayat",      href: "/dashboard/transactions" },
+    { name: "Dashboard", href: "/dashboard" },
+    { name: "Riwayat", href: "/dashboard/transactions" },
   ],
   PENGELOLA_BARANG: [
-    { name: "Data Laptop",  href: "/dashboard/laptops" },
-    { name: "Scanner",      href: "/scan" },
+    { name: "Data Laptop", href: "/dashboard/laptops" },
+    { name: "Scanner", href: "/scan" },
   ],
 };
 
 // ─── Role display label & badge color ────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; badge: string }> = {
-  ADMIN:            { label: "Admin / CEO",        badge: "bg-violet-100 text-violet-700" },
-  KEPALA_SALES:     { label: "Kepala Divisi Sales", badge: "bg-emerald-100 text-emerald-700" },
-  CREW_SALES:       { label: "Crew Sales",          badge: "bg-sky-100 text-sky-700" },
-  ACCOUNTING:       { label: "Accounting",          badge: "bg-amber-100 text-amber-700" },
-  PENGELOLA_BARANG: { label: "Pengelola Barang",    badge: "bg-blue-100 text-blue-700" },
+  ADMIN: { label: "Admin / CEO", badge: "bg-violet-100 text-violet-700" },
+  KEPALA_SALES: { label: "Kepala Divisi Sales", badge: "bg-emerald-100 text-emerald-700" },
+  CREW_SALES: { label: "Crew Sales", badge: "bg-sky-100 text-sky-700" },
+  ACCOUNTING: { label: "Accounting", badge: "bg-amber-100 text-amber-700" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", badge: "bg-blue-100 text-blue-700" },
+  TEKNISI: { label: "Teknisi", badge: "bg-orange-100 text-orange-700" },
 };
 
 // ─── SidebarContent ───────────────────────────────────────────────────────────

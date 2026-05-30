@@ -10,28 +10,27 @@ const supabase = createClient(
 );
 
 const users = [
-  // ADMIN / CEO
-  { name: "Rei",    email: "Admin@gmail.com",          password: "Rei@Solit25",    role: "ADMIN" },
+  { name: "Rei", email: "Admin@gmail.com", password: "Rei@Solit25", role: "ADMIN" },
 
-  { name: "Salam",  email: "salam.kds@solit-pos.com",  password: "Salam@Sales25",  role: "KEPALA_SALES" },
+  { name: "Salam", email: "salam.kds@solit-pos.com", password: "Salam@Sales25", role: "KEPALA_SALES" },
 
-  { name: "Yulfa",  email: "yulfa.crew@solit-pos.com", password: "Yulfa@Crew25",   role: "CREW_SALES" },
-  { name: "Revin",  email: "revin.crew@solit-pos.com", password: "Revin@Crew25",   role: "CREW_SALES" },
-  { name: "Resti",  email: "resti.crew@solit-pos.com", password: "Resti@Crew25",   role: "CREW_SALES" },
-  { name: "Fitri",  email: "fitri.crew@solit-pos.com", password: "Fitri@Crew25",   role: "CREW_SALES" },
+  { name: "Yulfa", email: "yulfa.crew@solit-pos.com", password: "Yulfa@Crew25", role: "CREW_SALES" },
+  { name: "Revin", email: "revin.crew@solit-pos.com", password: "Revin@Crew25", role: "CREW_SALES" },
+  { name: "Resti", email: "resti.crew@solit-pos.com", password: "Resti@Crew25", role: "CREW_SALES" },
+  { name: "Fitri", email: "fitri.crew@solit-pos.com", password: "Fitri@Crew25", role: "CREW_SALES" },
 
-  // PENGELOLA BARANG
-  { name: "Yoga",   email: "yoga.pgb@solit-pos.com",   password: "Yoga@Barang25",  role: "PENGELOLA_BARANG" },
-  { name: "Rafi",   email: "rafi.pgb@solit-pos.com",   password: "Rafi@Barang25",  role: "PENGELOLA_BARANG" },
+  { name: "Yoga", email: "yoga.pgb@solit-pos.com", password: "Yoga@Barang25", role: "PENGELOLA_BARANG" },
+  { name: "Rafi", email: "rafi.pgb@solit-pos.com", password: "Rafi@Barang25", role: "PENGELOLA_BARANG" },
 
-  // ACCOUNTING
-  { name: "Rayhan", email: "rayhan.acc@solit-pos.com", password: "Rayhan@Acc25",   role: "ACCOUNTING" },
+  { name: "Rayhan", email: "rayhan.acc@solit-pos.com", password: "Rayhan@Acc25", role: "ACCOUNTING" },
+
+  { name: "David", email: "david.tek@solit-pos.com", password: "David@Tek25", role: "TEKNISI" },
 ];
 
 async function seed() {
   console.log("🌱 Mulai seeding users...\n");
 
-  // ── Hapus user lama dengan role yang sudah tidak dipakai ──
+  // Hapus user lama dengan role yang sudah tidak dipakai
   const { error: deleteError } = await supabase
     .from("users")
     .delete()
@@ -57,8 +56,8 @@ async function seed() {
       const { error: updateError } = await supabase
         .from("users")
         .update({
-          name:     user.name,
-          role:     user.role,
+          name: user.name,
+          role: user.role,
           password: hashedPassword,
         })
         .eq("email", user.email);
@@ -74,10 +73,10 @@ async function seed() {
     const { data, error } = await supabase
       .from("users")
       .insert({
-        name:     user.name,
-        email:    user.email,
+        name: user.name,
+        email: user.email,
         password: hashedPassword,
-        role:     user.role,
+        role: user.role,
       })
       .select("id, name, email, role")
       .single();

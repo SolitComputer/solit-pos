@@ -80,34 +80,31 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             .from("transactions")
             .insert({
                 invoice_number,
-                sales_id:        user.id,
-                sales_name:      user.name,
-                laptop_id:       laptop.id,
-                // unit_id tidak diinsert — kolom belum ada di tabel transactions
-                // Untuk menyimpannya, jalankan di Supabase SQL Editor:
-                // ALTER TABLE transactions ADD COLUMN unit_id uuid REFERENCES laptop_units(id);
-                customer_name:   body.customer_name,
-                company_name:    body.company_name,
-                customer_phone:  body.customer_phone,
-                laptop_name:     laptop.laptop_name,
-                serial_number:   unit.serial_number, // ← SN dari unit, BUKAN laptop
+                sales_id: user.id,
+                sales_name: user.name,
+                laptop_id: laptop.id,
+                customer_name: body.customer_name,
+                company_name: body.company_name,
+                customer_phone: body.customer_phone,
+                laptop_name: laptop.laptop_name,
+                serial_number: unit.serial_number,
                 software_request: body.software_request,
-                pickup_method:   body.pickup_method,
-                pickup_date:     body.pickup_date,
-                pickup_time:     body.pickup_time,
+                pickup_method: body.pickup_method,
+                pickup_date: body.pickup_date,
+                pickup_time: body.pickup_time,
                 pickup_location: body.pickup_location,
                 source_platform: body.source_platform,
                 inventory_price,
                 deal_price,
-                other:           deal_price - inventory_price,
-                amount:          deal_price,
-                payment_method:  body.payment_method,
-                payment_photo:   body.payment_photo,
-                latitude:        body.latitude,
-                longitude:       body.longitude,
-                notes:           body.notes,
-                status:          "PAID",
-                paid_at:         new Date().toISOString(),
+                other: Number(deal_price) - Number(inventory_price),
+                amount: deal_price,
+                payment_method: body.payment_method,
+                payment_photo: body.payment_photo,
+                latitude: body.latitude,
+                longitude: body.longitude,
+                notes: body.notes,
+                status: "PAID",
+                paid_at: new Date().toISOString(),
             })
             .select()
             .single();
@@ -120,13 +117,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             );
         }
 
-        // ── UPDATE STATUS UNIT → SOLD ─────────────────────────────────────
         await supabase
             .from("laptop_units")
             .update({ status: "SOLD" })
             .eq("id", unit.id);
 
-        // ── SYNC QTY LAPTOP (hitung ulang dari units yang masih SIAP_JUAL) ─
         const { data: remainingUnits } = await supabase
             .from("laptop_units")
             .select("id")
@@ -137,23 +132,43 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         await supabase
             .from("laptops")
             .update({
-                qty:    newQty,
+                qty: newQty,
                 status: newQty <= 0 ? "SOLD" : "SIAP_JUAL",
             })
             .eq("id", laptop.id);
 
+        const warrantyDuration = Number(body.warranty_duration) || 30;
+        const warrantyStart = new Date();
+        const warrantyEnd = new Date();
+        warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
+
+        await supabase.from("warranties").insert({
+            invoice_number: invoice_number,
+            serial_number: unit.serial_number.toUpperCase(),
+            customer_name: body.customer_name,
+            customer_phone: body.customer_phone || null,
+            laptop_name: laptop.laptop_name,
+            laptop_id: laptop.id,
+            unit_id: unit.id,
+            warranty_start: warrantyStart.toISOString().split("T")[0],
+            warranty_end: warrantyEnd.toISOString().split("T")[0],
+            warranty_duration: warrantyDuration,
+            status: "ACTIVE",
+            created_by: user.name,  
+        });
+
         // ── KIRIM WHATSAPP ────────────────────────────────────────────────
         if (body.customer_phone) {
             const message = buildPaymentMessage({
-                customer_name:  body.customer_name,
+                customer_name: body.customer_name,
                 invoice_number,
-                laptop_name:    laptop.laptop_name,
-                serial_number:  unit.serial_number,
-                amount:         deal_price,
+                laptop_name: laptop.laptop_name,
+                serial_number: unit.serial_number,
+                amount: deal_price,
                 payment_method: body.payment_method,
-                pickup_method:  body.pickup_method,
-                pickup_date:    body.pickup_date,
-                pickup_time:    body.pickup_time,
+                pickup_method: body.pickup_method,
+                pickup_date: body.pickup_date,
+                pickup_time: body.pickup_time,
                 pickup_location: body.pickup_location,
                 software_request: body.software_request,
             });

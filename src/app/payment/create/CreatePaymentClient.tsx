@@ -48,15 +48,12 @@ function clearDraft() {
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function CreatePaymentPage() {
     const searchParams = useSearchParams();
     const urlUnitId = searchParams.get("unit_id") || "";
     const urlLaptopId = searchParams.get("laptop_id") || "";
     const urlSn = searchParams.get("sn") || "";
 
-    // Jika datang dari scan barcode, mulai dari step 1 (data pembeli)
-    // tapi unit sudah pre-selected → step 2 akan di-skip
     const fromScan = Boolean(urlUnitId && urlSn);
 
     const [step, setStep] = useState(1);
@@ -65,6 +62,7 @@ export default function CreatePaymentPage() {
     const [longitude, setLongitude] = useState("");
     const [gpsLoading, setGpsLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [warrantyDuration, setWarrantyDuration] = useState<number>(30);
 
     // Laptop list
     const [laptops, setLaptops] = useState<LaptopOption[]>([]);
@@ -201,7 +199,6 @@ export default function CreatePaymentPage() {
                 const unit = result.data;
                 const laptop = unit.laptop;
 
-                // Set laptop
                 setSelectedLaptop({
                     id: laptop.id,
                     laptop_name: laptop.laptop_name,
@@ -213,7 +210,6 @@ export default function CreatePaymentPage() {
                     qty: 1,
                 });
 
-                // Set unit
                 setSelectedUnit({
                     id: unit.id,
                     serial_number: unit.serial_number,
@@ -223,7 +219,6 @@ export default function CreatePaymentPage() {
                     status: unit.status,
                 });
 
-                // Pre-fill hidden fields
                 setValue("laptop_name", laptop.laptop_name);
                 setValue("serial_number", unit.serial_number);
                 setValue("laptop_id", laptop.id);
@@ -237,7 +232,6 @@ export default function CreatePaymentPage() {
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
 
-    // ── Fetch units saat laptop dipilih manual ────────────────────────────────
     const fetchUnitsForLaptop = useCallback(async (laptopId: string) => {
         if (!laptopId) { setUnits([]); setSelectedUnit(null); return; }
         setIsLoadingUnits(true);
@@ -249,7 +243,6 @@ export default function CreatePaymentPage() {
                 (u: UnitOption) => u.status === "SIAP_JUAL"
             );
             setUnits(siap);
-            // Auto-select jika hanya 1 unit
             if (siap.length === 1) {
                 setSelectedUnit(siap[0]);
                 setValue("serial_number", siap[0].serial_number);
@@ -264,7 +257,6 @@ export default function CreatePaymentPage() {
         }
     }, [setValue]);
 
-    // ── Handler pilih laptop ──────────────────────────────────────────────────
     const handleLaptopChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value;
         const laptop = laptops.find(l => l.id === id) || null;
@@ -278,7 +270,6 @@ export default function CreatePaymentPage() {
         else setUnits([]);
     };
 
-    // ── Handler pilih unit (SN) ───────────────────────────────────────────────
     const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value;
         const unit = units.find(u => u.id === id) || null;
@@ -287,7 +278,6 @@ export default function CreatePaymentPage() {
         setValue("serial_number", unit?.serial_number || "");
     };
 
-    // ── Handler search SN ─────────────────────────────────────────────────────
     const handleSnSearch = useCallback(async (query: string) => {
         if (query.length < 2) { setSnResults([]); return; }
         setIsLoadingUnits(true);
@@ -318,10 +308,9 @@ export default function CreatePaymentPage() {
         setValue("serial_number", u.serial_number);
         setValue("laptop_id", u.laptop_id);
         setValue("laptop_name", u.laptop_name);
-        setSnResults([]); // tutup dropdown
+        setSnResults([]);
     };
 
-    // ── GPS ───────────────────────────────────────────────────────────────────
     const getLocation = () => {
         setGpsLoading(true);
         navigator.geolocation.getCurrentPosition(
@@ -394,6 +383,7 @@ export default function CreatePaymentPage() {
                     latitude,
                     longitude,
                     amount: rawDealPrice,
+                    warranty_duration: warrantyDuration,
                 }),
             });
             const result = await res.json();
@@ -752,6 +742,47 @@ export default function CreatePaymentPage() {
                             </div>
 
                             <div>
+                                <label className="text-xs text-gray-400 mb-1.5 block flex items-center gap-1.5">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                    </svg>
+                                    Durasi Garansi
+                                </label>
+                                <div className="flex gap-2">
+                                    {/* Quick select */}
+                                    {[7, 14, 30, 90].map(d => (
+                                        <button
+                                            key={d}
+                                            type="button"
+                                            onClick={() => setWarrantyDuration(d)}
+                                            className={`flex-1 h-10 rounded-xl border text-xs font-semibold transition ${warrantyDuration === d
+                                                ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                                                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            {d}h
+                                        </button>
+                                    ))}
+                                    {/* Custom input */}
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={warrantyDuration}
+                                            onChange={e => setWarrantyDuration(Number(e.target.value))}
+                                            className="w-full h-10 border border-gray-200 rounded-xl px-3 pr-8 text-xs text-center bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition"
+                                        />
+                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">hr</span>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1.5">
+                                    Garansi berlaku {warrantyDuration} hari sejak transaksi.
+                                    Teknisi akan mengelola detail garansi setelahnya.
+                                </p>
+                            </div>
+
+                            <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Foto Bukti Pembayaran *</label>
                                 <input
                                     type="file" accept="image/*" capture="environment"
@@ -876,6 +907,12 @@ export default function CreatePaymentPage() {
                                     {watch("pickup_time") && (
                                         <ConfirmRow icon="⏰" label="Jam" value={watch("pickup_time") || ""} />
                                     )}
+                                    <div className="h-px bg-gray-200" />
+                                    <ConfirmRow
+                                        icon="🛡️"
+                                        label="Garansi"
+                                        value={`${warrantyDuration} hari`}
+                                    />
                                 </div>
 
                                 {/* Warning */}
