@@ -170,7 +170,7 @@ export default function Page() {
               </svg>
               <input
                 type="text"
-                placeholder="Cari invoice, customer, WA, laptop..."
+                placeholder="Cari nota, customer, WA, laptop..."
                 className="w-full border border-gray-200 rounded-xl h-10 pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -528,7 +528,7 @@ function TransactionCard({
                 {/* Info transaksi */}
                 <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Invoice</span>
+                    <span className="text-gray-400">Nota</span>
                     <span className="font-mono font-semibold text-gray-700">{item.invoice_number}</span>
                   </div>
                   <div className="flex justify-between text-xs">

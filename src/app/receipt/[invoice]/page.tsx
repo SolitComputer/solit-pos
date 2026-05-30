@@ -9,25 +9,19 @@ interface Props {
 export default async function Page(props: Props) {
   const params = await props.params;
 
-  const { data } = await supabase
-    .from("transactions")
-    .select("*")
-    .eq("invoice_number", params.invoice)
-    .single();
-
-  const whatsappMessage = encodeURIComponent(
-    `Halo ${data?.customer_name} 👋\n\n` +
-    `✅ Pembayaran laptop Anda berhasil!\n\n` +
-    `📋 INVOICE: ${data?.invoice_number}\n\n` +
-    `💻 Laptop: ${data?.laptop_name}\n` +
-    `🔢 SN: ${data?.serial_number || "-"}\n` +
-    `💰 Total: Rp${data?.amount?.toLocaleString("id-ID")}\n` +
-    `🏷️ Status: LUNAS\n\n` +
-    `Terima kasih sudah berbelanja di Solit 03 🙏\n` +
-    `Sawangan, Depok`
-  );
-
-  const whatsappUrl = `https://wa.me/${data?.customer_phone?.replace(/^0/, "62")}?text=${whatsappMessage}`;
+  // ── Fetch transaksi + garansi paralel ────────────────────────────────────
+  const [{ data }, { data: warranty }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("invoice_number", params.invoice)
+      .single(),
+    supabase
+      .from("warranties")
+      .select("warranty_start, warranty_end, warranty_duration, status, notes")
+      .eq("invoice_number", params.invoice)
+      .single(),
+  ]);
 
   if (!data || data.status !== "PAID") {
     return (
@@ -40,10 +34,7 @@ export default async function Page(props: Props) {
           </div>
           <h1 className="text-xl font-bold text-gray-800">Menunggu Konfirmasi</h1>
           <p className="text-gray-500 text-sm">Pembayaran belum dikonfirmasi oleh admin.</p>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mt-2"
-          >
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition mt-2">
             ← Kembali ke Dashboard
           </Link>
         </div>
@@ -53,14 +44,35 @@ export default async function Page(props: Props) {
 
   const pickupDate = data.pickup_date
     ? new Date(data.pickup_date).toLocaleDateString("id-ID", {
-      weekday: "long", day: "numeric", month: "long", year: "numeric",
-    })
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+      })
+    : null;
+
+  // ── Format garansi ────────────────────────────────────────────────────────
+  const warrantyEndDate = warranty?.warranty_end
+    ? new Date(warranty.warranty_end).toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric",
+      })
+    : null;
+
+  const warrantyStartDate = warranty?.warranty_start
+    ? new Date(warranty.warranty_start).toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric",
+      })
+    : null;
+
+  // Hitung sisa hari garansi
+  const warrantyDaysLeft = warranty?.warranty_end
+    ? Math.ceil(
+        (new Date(warranty.warranty_end).setHours(0,0,0,0) - new Date().setHours(0,0,0,0))
+        / (1000 * 60 * 60 * 24)
+      )
     : null;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 py-8 px-4">
       {/* Back Button */}
-      <div className="max-w-md mx-auto mb-4">
+      <div className="max-w-md mx-auto mb-4 no-capture">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition bg-white/70 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/50 shadow-sm"
@@ -73,15 +85,13 @@ export default async function Page(props: Props) {
       </div>
 
       <div className="max-w-md mx-auto">
-        {/* Card Container */}
+        {/* ── RECEIPT CARD (yang di-screenshot) ── */}
         <div id="receipt-card" className="bg-white rounded-3xl shadow-2xl overflow-hidden">
 
-          {/* ── HEADER ── */}
+          {/* HEADER */}
           <div className="bg-[#0f172a] text-white relative overflow-hidden">
-            {/* Decorative circles */}
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/5 rounded-full" />
             <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-white/5 rounded-full" />
-
             <div className="relative p-6">
               <div className="flex justify-between items-start mb-6">
                 <div>
@@ -93,9 +103,8 @@ export default async function Page(props: Props) {
                   LUNAS
                 </div>
               </div>
-
               <div className="bg-white/10 rounded-2xl p-4">
-                <p className="text-slate-400 text-xs mb-1">Nomor Invoice</p>
+                <p className="text-slate-400 text-xs mb-1">Nomor Nota</p>
                 <p className="font-mono font-bold text-lg tracking-widest">{data.invoice_number}</p>
                 <p className="text-slate-400 text-xs mt-2">
                   {new Date(data.created_at).toLocaleDateString("id-ID", {
@@ -107,10 +116,10 @@ export default async function Page(props: Props) {
             </div>
           </div>
 
-          {/* ── BODY ── */}
+          {/* BODY */}
           <div className="p-6 space-y-5">
 
-            {/* Total Amount — Hero */}
+            {/* Total */}
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-center">
               <p className="text-emerald-600 text-sm font-medium">Total Pembayaran</p>
               <p className="text-3xl font-black text-emerald-700 mt-1">
@@ -119,14 +128,9 @@ export default async function Page(props: Props) {
               <p className="text-emerald-500 text-xs mt-1">{data.payment_method}</p>
             </div>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-dashed bg-gray-200" style={{ backgroundImage: "repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 6px, transparent 6px, transparent 12px)" }} />
-              <div className="text-gray-300 text-xs">✦</div>
-              <div className="flex-1 h-px bg-gray-200" style={{ backgroundImage: "repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 6px, transparent 6px, transparent 12px)" }} />
-            </div>
+            <Separator />
 
-            {/* Customer Info */}
+            {/* Customer */}
             <Section title="Data Pembeli" icon="👤">
               <InfoRow label="Nama" value={data.customer_name} bold />
               <InfoRow label="WhatsApp" value={data.customer_phone} />
@@ -135,7 +139,7 @@ export default async function Page(props: Props) {
 
             <Separator />
 
-            {/* Laptop Detail */}
+            {/* Laptop */}
             <Section title="Detail Laptop" icon="💻">
               <InfoRow label="Laptop" value={data.laptop_name} bold />
               {data.serial_number && (
@@ -156,6 +160,66 @@ export default async function Page(props: Props) {
               {data.pickup_location && <InfoRow label="Alamat" value={data.pickup_location} />}
             </Section>
 
+            {/* ── GARANSI SECTION ── */}
+            {warranty && (
+              <>
+                <Separator />
+                <Section title="Informasi Garansi" icon="🛡️">
+                  <div className={`rounded-xl p-4 border ${
+                    warrantyDaysLeft !== null && warrantyDaysLeft > 7
+                      ? "bg-emerald-50 border-emerald-200"
+                      : warrantyDaysLeft !== null && warrantyDaysLeft > 0
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-red-50 border-red-200"
+                  }`}>
+                    {/* Status badge */}
+                    <div className="flex items-center justify-between mb-3">
+                      
+                      <span className="text-xs text-gray-500">
+                        {warranty.warranty_duration} hari
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500">Mulai</span>
+                        <span className="font-medium text-gray-700">{warrantyStartDate}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-500">Berakhir</span>
+                        <span className={`font-bold ${
+                          warrantyDaysLeft !== null && warrantyDaysLeft > 7
+                            ? "text-emerald-700"
+                            : warrantyDaysLeft !== null && warrantyDaysLeft > 0
+                            ? "text-amber-700"
+                            : "text-red-700"
+                        }`}>
+                          {warrantyEndDate}
+                        </span>
+                      </div>
+                    </div>
+
+                    {warranty.notes && (
+                      <p className="text-xs text-gray-600 mt-2.5 pt-2.5 border-t border-gray-200">
+                        {warranty.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Link cek garansi */}
+                  <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-700">Cek Garansi Online</p>
+                      <p className="text-[10px] text-blue-500 mt-0.5">solit03.com/cek-garansi</p>
+                    </div>
+                    <div className="text-xs font-mono text-blue-600 bg-blue-100 px-2 py-1 rounded-lg">
+                      SN: {data.serial_number || "—"}
+                    </div>
+                  </div>
+                </Section>
+              </>
+            )}
+
             {data.notes && (
               <>
                 <Separator />
@@ -166,53 +230,58 @@ export default async function Page(props: Props) {
             )}
           </div>
 
-          <div className="px-6 pb-6 space-y-3">
-            <ReceiptActions
-              customerPhone={data.customer_phone || ""}
-              invoiceNumber={data.invoice_number}
-            />
-          </div>
-
           {/* Branding Footer */}
           <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 text-center">
             <p className="text-xs text-slate-400">
-              Terima kasih telah berbelanja di <span className="font-semibold text-slate-600">Solit 03</span>
+              Terima kasih telah berbelanja di{" "}
+              <span className="font-semibold text-slate-600">Solit 03</span>
             </p>
             <p className="text-xs text-slate-300 mt-0.5">Sawangan, Depok · solit03.com</p>
+          </div>
+
+          {/* Tombol aksi — tidak ikut screenshot */}
+          <div className="px-6 pb-6 pt-3 space-y-3 no-capture">
+            <ReceiptActions
+              customerPhone={data.customer_phone || ""}
+              invoiceNumber={data.invoice_number}
+              customerName={data.customer_name || ""}
+              laptopName={data.laptop_name || ""}
+              serialNumber={data.serial_number || ""}
+              amount={data.amount || 0}
+              paymentMethod={data.payment_method || ""}
+              pickupMethod={data.pickup_method || ""}
+              pickupDate={data.pickup_date || undefined}
+              pickupTime={data.pickup_time || undefined}
+              softwareRequest={data.software_request || undefined}
+              warrantyEnd={warranty?.warranty_end || undefined}
+              warrantyDaysLeft={warrantyDaysLeft ?? undefined}
+            />
           </div>
         </div>
 
         {/* Back link bawah */}
-        <div className="text-center mt-5">
-          <Link
-            href="/payment/create"
-            className="text-sm text-slate-400 hover:text-slate-600 transition"
-          >
+        <div className="text-center mt-5 no-capture">
+          <Link href="/payment/create" className="text-sm text-slate-400 hover:text-slate-600 transition">
             + Buat Transaksi Baru
           </Link>
         </div>
       </div>
 
-      {/* Print Styles */}
       <style>{`
         @media print {
           body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .no-print { display: none !important; }
+          #receipt-card, #receipt-card * { visibility: visible; }
+          .no-capture, .no-print { display: none !important; }
           @page { margin: 0; size: 80mm auto; }
         }
+        .no-capture { display: block; }
       `}</style>
     </main>
   );
 }
 
-// ── Helper Components ──────────────────────────────────────────────────────
-
-function Section({
-  title, icon, children,
-}: {
-  title: string; icon: string; children: React.ReactNode;
-}) {
+// ── Helper Components ─────────────────────────────────────────────────────────
+function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -224,11 +293,7 @@ function Section({
   );
 }
 
-function InfoRow({
-  label, value, bold, mono,
-}: {
-  label: string; value: string; bold?: boolean; mono?: boolean;
-}) {
+function InfoRow({ label, value, bold, mono }: { label: string; value: string; bold?: boolean; mono?: boolean }) {
   return (
     <div className="flex justify-between items-start gap-4">
       <span className="text-gray-400 text-sm flex-shrink-0">{label}</span>
@@ -243,9 +308,7 @@ function Separator() {
   return (
     <div
       className="h-px"
-      style={{
-        backgroundImage: "repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 6px, transparent 6px, transparent 12px)",
-      }}
+      style={{ backgroundImage: "repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 6px, transparent 6px, transparent 12px)" }}
     />
   );
 }
