@@ -78,7 +78,7 @@ const Shimmer = ({
     />
 );
 
-// ─── Reusable Modal Popup (ganti alert & confirm) ─────────────────────────────
+// ─── Alert Modal (tetap sama) ─────────────────────────────────────────────
 function AlertModal({
     message,
     onClose,
@@ -164,6 +164,7 @@ function ConfirmModal({
     );
 }
 
+// ─── PERBAIKAN: Delete Confirm Modal - Lebih Kecil & Rapi untuk Desktop ───
 function DeleteConfirmModal({
     laptop,
     unitCount,
@@ -187,75 +188,98 @@ function DeleteConfirmModal({
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
 
-                {/* Icon */}
-                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </div>
-
-                {/* Title */}
-                <h3 className="text-gray-800 font-semibold text-center text-sm mb-1">Hapus Laptop Permanen</h3>
-
-                {/* Warning banner — tampilkan jumlah units */}
-                {unitCount > 0 && (
-                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3 mt-2">
-                        <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                        <p className="text-xs text-amber-700">
-                            Laptop ini memiliki <span className="font-bold">{unitCount} unit</span> terdaftar.
-                            Semua unit dan garansi terkait akan <span className="font-bold">ikut terhapus permanen</span>.
-                        </p>
+            {/* Modal lebih kecil: max-w-sm → max-w-md, ukuran lebih proporsional */}
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                {/* Header dengan gradien merah tipis */}
+                <div className="bg-gradient-to-r from-red-50 to-red-100/50 px-5 py-4 border-b border-red-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="text-gray-800 font-bold text-lg">Hapus Laptop</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
+                        </div>
                     </div>
-                )}
-
-                {/* Konfirmasi ketik nama */}
-                <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-1.5">
-                        Ketik nama laptop untuk konfirmasi:
-                    </p>
-                    <p className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded mb-2 truncate">
-                        {laptop.laptop_name}
-                    </p>
-                    <input
-                        type="text"
-                        value={inputName}
-                        onChange={e => setInputName(e.target.value)}
-                        placeholder="Ketik nama laptop di atas..."
-                        className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 transition ${inputName.length > 0
-                            ? isMatch
-                                ? "border-emerald-400 focus:ring-emerald-200"
-                                : "border-red-300 focus:ring-red-200"
-                            : "border-gray-200 focus:ring-gray-200"
-                            }`}
-                        autoFocus
-                        onPaste={e => e.preventDefault()} // cegah paste
-                    />
-                    {inputName.length > 0 && !isMatch && (
-                        <p className="text-xs text-red-500 mt-1">Nama tidak cocok</p>
-                    )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-2">
-                    <button
-                        onClick={onCancel}
-                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        disabled={!isMatch}
-                        className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-semibold active:bg-red-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        Hapus Permanen
-                    </button>
+                {/* Content */}
+                <div className="p-5">
+                    {/* Nama Laptop */}
+                    <div className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
+                        <p className="text-xs text-gray-400 mb-1">Laptop yang akan dihapus</p>
+                        <p className="text-sm font-bold text-gray-800 truncate">{laptop.laptop_name}</p>
+                    </div>
+
+                    {/* Warning banner */}
+                    {unitCount > 0 && (
+                        <div className="flex items-start gap-2 bg-amber-50 border-l-4 border-l-amber-500 rounded-xl px-3 py-2.5 mb-4">
+                            <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <div>
+                                <p className="text-xs font-semibold text-amber-700">
+                                    Terdapat {unitCount} unit terdaftar
+                                </p>
+                                <p className="text-xs text-amber-600 mt-0.5">
+                                    Semua unit dan garansi terkait akan ikut terhapus
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Konfirmasi input */}
+                    <div className="mb-5">
+                        <label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                            Konfirmasi dengan mengetik nama laptop
+                        </label>
+                        <div className="bg-gray-100 rounded-lg px-3 py-1.5 mb-2">
+                            <code className="text-xs font-mono text-gray-700">{laptop.laptop_name}</code>
+                        </div>
+                        <input
+                            type="text"
+                            value={inputName}
+                            onChange={e => setInputName(e.target.value)}
+                            placeholder="Ketik nama laptop di atas..."
+                            className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 transition ${inputName.length > 0
+                                ? isMatch
+                                    ? "border-emerald-400 focus:ring-emerald-200"
+                                    : "border-red-300 focus:ring-red-200"
+                                : "border-gray-200 focus:ring-gray-200"
+                                }`}
+                            autoFocus
+                        />
+                        {inputName.length > 0 && !isMatch && (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Nama tidak cocok
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={onCancel}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={!isMatch}
+                            className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                        >
+                            Hapus Permanen
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -334,10 +358,6 @@ export default function Page() {
         setCurrentPage(1);
     }, [search, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
 
-
-
-
-    // Ganti seluruh blok useMemo filteredLaptops:
     const filteredLaptops = useMemo(() => {
         let list = [...laptops];
         if (search.trim()) {
@@ -384,7 +404,6 @@ export default function Page() {
     }, [filteredLaptops, currentPage]);
 
     const uniqueProcessors = useMemo(() => {
-        // Ekstrak tipe processor utama: Intel i3/i5/i7/i9, AMD Ryzen, Apple M
         const types = new Set<string>();
         laptops.forEach(x => {
             const cpu = (x.cpu || "").toLowerCase();
@@ -482,7 +501,6 @@ export default function Page() {
         }
     };
 
-    // handleEdit — ganti alert
     const handleEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedLaptop) return;
@@ -515,12 +533,12 @@ export default function Page() {
             const res = await fetch(`/api/laptops/${id}/units`);
             const result = await res.json();
             const unitCount = result.data?.length ?? 0;
-
             setDeleteConfirmModal({ laptop, unitCount });
         } catch {
             setDeleteConfirmModal({ laptop, unitCount: laptop.qty ?? 0 });
         }
     };
+
     const exportToExcel = async () => {
         const wb = new ExcelJS.Workbook();
         wb.creator = "Solit Inventory";
@@ -677,19 +695,62 @@ export default function Page() {
                     0%   { background-position: -600px 0; }
                     100% { background-position:  600px 0; }
                 }
-                .table-scroll::-webkit-scrollbar {
-                    height: 6px;
+                
+                /* Scrollbar styling yang lebih profesional */
+                .table-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: #cbd5e1 #f1f5f9;
                 }
+                
+                .table-scroll::-webkit-scrollbar {
+                    height: 8px;
+                    width: 8px;
+                }
+                
                 .table-scroll::-webkit-scrollbar-track {
                     background: #f1f5f9;
-                    border-radius: 99px;
+                    border-radius: 10px;
                 }
+                
                 .table-scroll::-webkit-scrollbar-thumb {
                     background: #cbd5e1;
-                    border-radius: 99px;
+                    border-radius: 10px;
+                    transition: background 0.2s;
                 }
+                
                 .table-scroll::-webkit-scrollbar-thumb:hover {
                     background: #94a3b8;
+                }
+                
+                .table-scroll::-webkit-scrollbar-corner {
+                    background: transparent;
+                }
+                
+                /* Table styling yang lebih rapi */
+                .data-table {
+                    border-collapse: separate;
+                    border-spacing: 0;
+                    width: 100%;
+                }
+                
+                .data-table th {
+                    position: sticky;
+                    top: 0;
+                    background: #f8fafc;
+                    z-index: 10;
+                }
+                
+                .data-table td {
+                    vertical-align: middle;
+                }
+                
+                /* Hover effect yang smooth */
+                .data-row {
+                    transition: all 0.2s ease;
+                }
+                
+                .data-row:hover {
+                    background-color: #f8fafc;
                 }
             `}</style>
 
@@ -697,22 +758,24 @@ export default function Page() {
                 <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
                     <div className="max-w-full mx-auto space-y-6">
 
-                        {/* ── Header yang lebih premium ── */}
+                        {/* Header dengan desain lebih premium */}
                         <div className="flex flex-wrap items-end justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-xl flex items-center justify-center shadow-sm">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                                             <rect x="2" y="3" width="20" height="14" rx="2" />
                                             <line x1="8" y1="21" x2="16" y2="21" />
                                             <line x1="12" y1="17" x2="12" y2="21" />
                                         </svg>
                                     </div>
-                                    <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] tracking-tight">Data Laptop</h1>
+                                    <div>
+                                        <h1 className="text-xl sm:text-2xl font-bold text-[#1a1a2e] tracking-tight">Data Laptop</h1>
+                                        <p className="text-xs text-gray-400 mt-0.5">Kelola inventaris laptop dengan mudah</p>
+                                    </div>
                                 </div>
-                                <p className="text-gray-500 text-sm ml-9">Kelola inventaris laptop Anda dengan mudah</p>
                             </div>
-                            {/* ── Header buttons — GANTI BAGIAN INI ── */}
+
                             <div className="flex items-center gap-2">
                                 {canExport && (
                                     <button
@@ -728,7 +791,7 @@ export default function Page() {
                                 {canCreateLaptop && (
                                     <button
                                         onClick={openCreate}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] rounded-xl text-sm font-medium text-white hover:bg-[#16213e] transition-all shadow-sm"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] rounded-xl text-sm font-medium text-gray-700 hover:shadow-md transition-all shadow-sm"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -739,9 +802,8 @@ export default function Page() {
                             </div>
                         </div>
 
-                        {/* ── Filter Bar ── */}
+                        {/* Filter Bar (tetap sama) */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-                            {/* Row 1: Search + Status + Brand + Reset */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div className="relative lg:col-span-1">
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -791,9 +853,7 @@ export default function Page() {
                                 </button>
                             </div>
 
-                            {/* Row 2: Processor + RAM + Price Range + Sort */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                {/* Filter Processor */}
                                 <select
                                     className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={filterProcessor}
@@ -804,7 +864,6 @@ export default function Page() {
                                     ))}
                                 </select>
 
-                                {/* Filter RAM */}
                                 <select
                                     className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={filterRam}
@@ -815,7 +874,6 @@ export default function Page() {
                                     ))}
                                 </select>
 
-                                {/* Filter Price Range */}
                                 <select
                                     className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={filterPriceRange}
@@ -828,7 +886,6 @@ export default function Page() {
                                     <option value="4+">Rp 4 jt ke atas</option>
                                 </select>
 
-                                {/* Sort By */}
                                 <select
                                     className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
                                     value={sortBy}
@@ -843,7 +900,6 @@ export default function Page() {
                                 </select>
                             </div>
 
-                            {/* Active filter chips — muncul kalau ada filter aktif */}
                             {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
                                 <div className="flex flex-wrap gap-2 pt-1">
                                     {filterProcessor !== "ALL" && (
@@ -874,7 +930,7 @@ export default function Page() {
                             )}
                         </div>
 
-                        {/* ── Table dengan desain modern ── */}
+                        {/* Table (tetap sama) */}
                         {isLoading ? (
                             <SkeletonTable />
                         ) : filteredLaptops.length === 0 ? (
@@ -910,51 +966,42 @@ export default function Page() {
                                                         className="group hover:bg-gray-50/80 transition-colors cursor-pointer"
                                                         onClick={() => openDetail(item)}
                                                     >
-                                                        {/* Nama */}
                                                         <td className="px-4 py-3.5 max-w-[200px]">
                                                             <span className="block font-semibold text-gray-800 truncate group-hover:text-[#1a1a2e] transition-colors" title={item.laptop_name}>
                                                                 {item.laptop_name}
                                                             </span>
                                                         </td>
-                                                        {/* Brand */}
                                                         <td className="px-4 py-3.5 text-gray-500 whitespace-nowrap">
                                                             {item.brand || <span className="text-gray-300">—</span>}
                                                         </td>
-                                                        {/* CPU */}
                                                         <td className="px-4 py-3.5 max-w-[160px]">
                                                             <span className="block text-xs text-gray-700 font-medium truncate" title={item.cpu}>
                                                                 {item.cpu || <span className="text-gray-300">—</span>}
                                                             </span>
                                                         </td>
-                                                        {/* RAM */}
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             <span className="text-xs font-medium text-gray-700">
                                                                 {item.ram || <span className="text-gray-300">—</span>}
                                                             </span>
                                                         </td>
-                                                        {/* GPU */}
                                                         <td className="px-4 py-3.5 max-w-[140px]">
                                                             <span className="block text-xs text-gray-600 truncate" title={item.gpu}>
                                                                 {item.gpu || <span className="text-gray-300">—</span>}
                                                             </span>
                                                         </td>
-                                                        {/* Storage */}
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             <span className="text-xs font-medium text-gray-700">
                                                                 {item.storage || <span className="text-gray-300">—</span>}
                                                             </span>
                                                         </td>
-                                                        {/* Harga Jual */}
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                                                             {fmt(item.selling_price)}
                                                         </td>
-                                                        {/* Stok */}
                                                         <td className="px-4 py-3.5 text-right">
                                                             <span className={`font-medium ${(item.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>
                                                                 {item.qty ?? 0}
                                                             </span>
                                                         </td>
-                                                        {/* Status */}
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             {s ? (
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -965,14 +1012,12 @@ export default function Page() {
                                                                 <span className="text-gray-400 text-xs">{item.status}</span>
                                                             )}
                                                         </td>
-                                                        {/* Aksi di tabel */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5">
-
                                                                 {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
                                                                     <button
                                                                         onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                        className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg active:bg-gray-50 transition"
+                                                                        className="p-1.5 text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                                                                         title="Lihat Barcode"
                                                                     >
                                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -981,28 +1026,26 @@ export default function Page() {
                                                                         </svg>
                                                                     </button>
                                                                 )}
-
                                                                 {canViewUnits && (
                                                                     <Link
                                                                         href={`/dashboard/laptops/${item.id}/units`}
                                                                         onClick={e => e.stopPropagation()}
-                                                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg active:bg-blue-100 transition"
+                                                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                                                                     >
                                                                         Units
                                                                     </Link>
                                                                 )}
-
                                                                 {canEditLaptop && (
                                                                     <>
                                                                         <button
                                                                             onClick={() => openEdit(item)}
-                                                                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg active:bg-gray-100 transition"
+                                                                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
                                                                         >
                                                                             Edit
                                                                         </button>
                                                                         <button
                                                                             onClick={() => handleDelete(item.id)}
-                                                                            className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg active:bg-red-100 transition"
+                                                                            className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
                                                                         >
                                                                             Hapus
                                                                         </button>
@@ -1018,7 +1061,6 @@ export default function Page() {
                                 </div>
                                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                                        {/* Info count */}
                                         <p className="text-xs text-gray-500">
                                             Menampilkan{" "}
                                             <span className="font-semibold text-gray-700">
@@ -1035,11 +1077,8 @@ export default function Page() {
                                                 <span className="text-gray-400"> (difilter dari {laptops.length})</span>
                                             )}
                                         </p>
-
-                                        {/* Pagination controls */}
                                         {totalPages > 1 && (
                                             <div className="flex items-center gap-1">
-                                                {/* Prev */}
                                                 <button
                                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                                     disabled={currentPage === 1}
@@ -1049,8 +1088,6 @@ export default function Page() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                                     </svg>
                                                 </button>
-
-                                                {/* Page numbers */}
                                                 {(() => {
                                                     const pages: (number | "...")[] = [];
                                                     if (totalPages <= 7) {
@@ -1083,8 +1120,6 @@ export default function Page() {
                                                         )
                                                     );
                                                 })()}
-
-                                                {/* Next */}
                                                 <button
                                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                                     disabled={currentPage === totalPages}
@@ -1103,7 +1138,296 @@ export default function Page() {
                     </div>
                 </main>
 
-                {/* ── Modal Detail ── */}
+                {/* ── PERBAIKAN: Modal Create & Edit dengan desain lebih premium ── */}
+
+                {/* Modal Create - dengan desain lebih bagus */}
+                <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="lg">
+                    <form onSubmit={handleCreate} className="space-y-6">
+                        {/* Info banner dengan desain lebih menarik */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-blue-800">Informasi Penting</p>
+                                    <p className="text-xs text-blue-600 mt-0.5">
+                                        Setiap unit laptop memiliki SN, grade, dan harga modal sendiri.
+                                        Data unit akan ditambahkan setelah laptop berhasil dibuat.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Form Grid dengan 2 kolom untuk desktop */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="Nama Laptop" required>
+                                <input
+                                    name="laptop_name"
+                                    placeholder="Contoh: MacBook Air M2 2023"
+                                    value={formData.laptop_name}
+                                    onChange={handleFormChange}
+                                    required
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Brand">
+                                <input
+                                    name="brand"
+                                    placeholder="Apple, Lenovo, Dell, ASUS..."
+                                    value={formData.brand}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="CPU / Processor">
+                                <input
+                                    name="cpu"
+                                    placeholder="Intel Core i7-13700H, Apple M2..."
+                                    value={formData.cpu}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="RAM">
+                                <input
+                                    name="ram"
+                                    placeholder="8GB, 16GB, 32GB"
+                                    value={formData.ram}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Storage">
+                                <input
+                                    name="storage"
+                                    placeholder="256GB SSD, 512GB NVMe"
+                                    value={formData.storage}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="GPU / VGA">
+                                <input
+                                    name="gpu"
+                                    placeholder="NVIDIA RTX 4060, Intel Iris Xe"
+                                    value={formData.gpu}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Display / Layar">
+                                <input
+                                    name="display"
+                                    placeholder='14" FHD IPS, 120Hz'
+                                    value={formData.display}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Harga Jual (Default)" required>
+                                <input
+                                    name="selling_price"
+                                    type="number"
+                                    placeholder="0"
+                                    value={formData.selling_price}
+                                    onChange={handleFormChange}
+                                    required
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+                        </div>
+
+                        {/* Kondisi & Catatan - full width */}
+                        <FormField label="Kondisi Umum">
+                            <input
+                                name="condition_note"
+                                placeholder="Mulus, bekas pemakaian normal, ada goresan tipis..."
+                                value={formData.condition_note}
+                                onChange={handleFormChange}
+                                className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                            />
+                        </FormField>
+
+                        <FormField label="Catatan Tambahan">
+                            <textarea
+                                name="notes"
+                                placeholder="Informasi tambahan tentang laptop ini..."
+                                value={formData.notes}
+                                onChange={handleFormChange}
+                                rows={3}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none"
+                            />
+                        </FormField>
+
+                        {/* Tombol Aksi */}
+                        <div className="flex gap-3 pt-4 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                className="flex-1 h-11 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={formLoading}
+                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-gray-700 rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
+                            >
+                                {formLoading ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Menyimpan...
+                                    </span>
+                                ) : (
+                                    "Buat Laptop"
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* Modal Edit - dengan desain serupa */}
+                <Modal open={modalMode === "edit"} onClose={closeModal} title="Edit Laptop" size="lg">
+                    <form onSubmit={handleEdit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="Nama Laptop" required>
+                                <input
+                                    name="laptop_name"
+                                    value={formData.laptop_name}
+                                    onChange={handleFormChange}
+                                    required
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Brand">
+                                <input
+                                    name="brand"
+                                    value={formData.brand}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="CPU / Processor">
+                                <input
+                                    name="cpu"
+                                    value={formData.cpu}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="RAM">
+                                <input
+                                    name="ram"
+                                    value={formData.ram}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Storage">
+                                <input
+                                    name="storage"
+                                    value={formData.storage}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="GPU / VGA">
+                                <input
+                                    name="gpu"
+                                    value={formData.gpu}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Display / Layar">
+                                <input
+                                    name="display"
+                                    value={formData.display}
+                                    onChange={handleFormChange}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+
+                            <FormField label="Harga Jual (Default)" required>
+                                <input
+                                    name="selling_price"
+                                    type="number"
+                                    value={formData.selling_price}
+                                    onChange={handleFormChange}
+                                    required
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                />
+                            </FormField>
+                        </div>
+
+                        <FormField label="Kondisi Umum">
+                            <input
+                                name="condition_note"
+                                value={formData.condition_note}
+                                onChange={handleFormChange}
+                                className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                            />
+                        </FormField>
+
+                        <FormField label="Catatan Tambahan">
+                            <textarea
+                                name="notes"
+                                value={formData.notes}
+                                onChange={handleFormChange}
+                                rows={3}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none"
+                            />
+                        </FormField>
+
+                        <div className="flex gap-3 pt-4 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                className="flex-1 h-11 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={formLoading}
+                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
+                            >
+                                {formLoading ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Menyimpan...
+                                    </span>
+                                ) : (
+                                    "Simpan Perubahan"
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* Modal Detail (tetap sama seperti sebelumnya) */}
                 <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
                     {detailLoading ? (
                         <ModalDetailSkeleton />
@@ -1198,7 +1522,6 @@ export default function Page() {
                                 </div>
                             )}
 
-                            {/* Detail modal footer */}
                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <p className="text-xs text-gray-400">
                                     Ditambahkan {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", {
@@ -1236,112 +1559,6 @@ export default function Page() {
                     ) : null}
                 </Modal>
 
-                {/* ── Modal Create ── */}
-                <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="md">
-                    <form onSubmit={handleCreate} className="space-y-5">
-                        <div className="flex items-start gap-3 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
-                            <svg className="w-4 h-4 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <p className="text-xs text-blue-700">
-                                SN, grade, harga modal, dan stok dikelola per-unit setelah laptop dibuat.
-                            </p>
-                        </div>
-
-                        <FormGrid>
-                            <FormField label="Nama Laptop" required>
-                                <Input name="laptop_name" placeholder="Contoh: MacBook Air M2" value={formData.laptop_name} onChange={handleFormChange} required />
-                            </FormField>
-                            <FormField label="Brand">
-                                <Input name="brand" placeholder="Apple, Lenovo, Dell..." value={formData.brand} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="CPU">
-                                <Input name="cpu" placeholder="Intel Core i7, Apple M2..." value={formData.cpu} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="RAM">
-                                <Input name="ram" placeholder="8GB, 16GB..." value={formData.ram} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Storage">
-                                <Input name="storage" placeholder="256GB SSD, 512GB..." value={formData.storage} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="GPU">
-                                <Input name="gpu" placeholder="NVIDIA RTX 4060..." value={formData.gpu} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Display">
-                                <Input name="display" placeholder='14" FHD IPS 144Hz' value={formData.display} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Jual (default)" required>
-                                <Input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required />
-                            </FormField>
-                        </FormGrid>
-                        <FormField label="Kondisi Umum">
-                            <Input name="condition_note" placeholder="Mulus, normal pemakaian..." value={formData.condition_note} onChange={handleFormChange} />
-                        </FormField>
-                        <FormField label="Catatan">
-                            <textarea name="notes" placeholder="Catatan tambahan..." value={formData.notes} onChange={handleFormChange} rows={2}
-                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none" />
-                        </FormField>
-                        <div className="flex gap-3 pt-2">
-                            <button type="button" onClick={closeModal}
-                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
-                                Batal
-                            </button>
-                            <button type="submit" disabled={formLoading}
-                                className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition disabled:opacity-50">
-                                {formLoading ? "Menyimpan..." : "Buat Laptop"}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
-
-                {/* ── Modal Edit ── */}
-                <Modal open={modalMode === "edit"} onClose={closeModal} title={`Edit Laptop`} size="md">
-                    <form onSubmit={handleEdit} className="space-y-5">
-                        <FormGrid>
-                            <FormField label="Nama Laptop" required>
-                                <Input name="laptop_name" value={formData.laptop_name} onChange={handleFormChange} required />
-                            </FormField>
-                            <FormField label="Brand">
-                                <Input name="brand" value={formData.brand} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="CPU">
-                                <Input name="cpu" value={formData.cpu} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="RAM">
-                                <Input name="ram" value={formData.ram} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Storage">
-                                <Input name="storage" value={formData.storage} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="GPU">
-                                <Input name="gpu" value={formData.gpu} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Display">
-                                <Input name="display" value={formData.display} onChange={handleFormChange} />
-                            </FormField>
-                            <FormField label="Harga Jual (default)" required>
-                                <Input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required />
-                            </FormField>
-                        </FormGrid>
-                        <FormField label="Kondisi Umum">
-                            <Input name="condition_note" value={formData.condition_note} onChange={handleFormChange} />
-                        </FormField>
-                        <FormField label="Catatan">
-                            <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={2}
-                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none" />
-                        </FormField>
-                        <div className="flex gap-3 pt-2">
-                            <button type="button" onClick={closeModal}
-                                className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
-                                Batal
-                            </button>
-                            <button type="submit" disabled={formLoading}
-                                className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition disabled:opacity-50">
-                                {formLoading ? "Menyimpan..." : "Simpan Perubahan"}
-                            </button>
-                        </div>
-                    </form>
-                </Modal>
                 {barcodeTarget && (
                     <BarcodeModal
                         laptopId={barcodeTarget.id}
@@ -1349,12 +1566,11 @@ export default function Page() {
                         onClose={() => setBarcodeTarget(null)}
                     />
                 )}
-                {/* Alert Modal */}
+
                 {alertModal && (
                     <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />
                 )}
 
-                {/* Confirm Modal */}
                 {confirmModal && (
                     <ConfirmModal
                         message={confirmModal.message}
@@ -1362,7 +1578,7 @@ export default function Page() {
                         onCancel={() => setConfirmModal(null)}
                     />
                 )}
-                {/* Delete Confirm Modal — 2-step verification */}
+
                 {deleteConfirmModal && (
                     <DeleteConfirmModal
                         laptop={deleteConfirmModal.laptop}
@@ -1392,9 +1608,7 @@ export default function Page() {
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton & UI Helpers (tidak berubah logika, hanya perbaikan visual)
-// ─────────────────────────────────────────────────────────────────────────────
+// Helper Components (tetap sama)
 function SkeletonTable() {
     const rowVariants = [130, 155, 120, 140, 165, 125];
     return (
@@ -1418,7 +1632,8 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={13} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={40} h={13} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={80} h={13} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end gap-2"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
@@ -1463,16 +1678,16 @@ function Modal({ open, onClose, title, children, size = "md" }: {
         <div ref={overlayRef} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={e => { if (e.target === overlayRef.current) onClose(); }}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-all" />
-            <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh] overflow-hidden`}>
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0 bg-white/95 backdrop-blur-sm">
-                    <h2 className="font-semibold text-gray-800 text-base truncate">{title}</h2>
+            <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl ${size === "lg" ? "sm:max-w-3xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh] overflow-hidden`}>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 bg-white/95 backdrop-blur-sm">
+                    <h2 className="font-semibold text-gray-800 text-base">{title}</h2>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <div className="overflow-y-auto flex-1 px-5 py-6">{children}</div>
+                <div className="overflow-y-auto flex-1 px-6 py-6">{children}</div>
             </div>
         </div>
     );
@@ -1486,16 +1701,8 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
     );
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
-    return <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md font-mono">{children}</span>;
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">{children}</p>;
-}
-
-function FormGrid({ children }: { children: React.ReactNode }) {
-    return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
 function FormField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
@@ -1504,13 +1711,5 @@ function FormField({ label, children, required }: { label: string; children: Rea
             <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}{required && <span className="text-red-400 ml-0.5">*</span>}</label>
             {children}
         </div>
-    );
-}
-
-function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-    return (
-        <input {...props}
-            className={`w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition ${className}`}
-        />
     );
 }
