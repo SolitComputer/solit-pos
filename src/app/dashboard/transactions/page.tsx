@@ -546,17 +546,17 @@ function TransactionCard({
 
         {/* Modal konfirmasi restore */}
         {showRestoreModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"
               onClick={() => setShowRestoreModal(false)}
             />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden sm:mx-4">
 
               {/* Header */}
               <div className="bg-red-600 px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                   </svg>
                 </div>
@@ -566,9 +566,8 @@ function TransactionCard({
                 </div>
               </div>
 
-              {/* Body */}
-              <div className="px-5 py-4 space-y-3">
-
+              {/* Body — scrollable kalau konten panjang */}
+              <div className="px-5 py-4 space-y-3 max-h-[60dvh] overflow-y-auto overscroll-contain">
                 {/* Info transaksi */}
                 <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
                   <div className="flex justify-between text-xs">
@@ -596,20 +595,18 @@ function TransactionCard({
                 </div>
 
                 {/* Efek restore */}
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Yang akan terjadi:</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">1</span>
-                    Status transaksi berubah dari <span className="font-semibold text-emerald-600 mx-1">PAID</span> → <span className="font-semibold text-red-500 ml-1">CANCELLED</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">2</span>
-                    Stok unit SN <span className="font-mono font-semibold mx-1">{item.serial_number}</span> dikembalikan ke <span className="font-semibold text-emerald-600 ml-1">SIAP_JUAL</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold">3</span>
-                    Qty laptop otomatis diperbarui
-                  </div>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Yang akan terjadi:</p>
+                  {[
+                    <>Status: <span className="font-semibold text-emerald-600">PAID</span> → <span className="font-semibold text-red-500">CANCELLED</span></>,
+                    <>Stok SN <span className="font-mono font-semibold">{item.serial_number}</span> kembali ke <span className="font-semibold text-emerald-600">SIAP_JUAL</span></>,
+                    <>Qty laptop otomatis diperbarui</>,
+                  ].map((text, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                      <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px]">{i + 1}</span>
+                      <span>{text}</span>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Warning */}
@@ -618,25 +615,24 @@ function TransactionCard({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                   </svg>
                   <p className="text-xs text-amber-700">
-                    Aksi ini <span className="font-semibold">tidak dapat diurungkan</span>. Pastikan sudah berkoordinasi dengan tim terkait.
+                    Aksi ini <span className="font-semibold">tidak dapat diurungkan</span>.
                   </p>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-5 pb-6 flex gap-3">
+              <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
                 <button
                   onClick={() => setShowRestoreModal(false)}
                   disabled={restoring}
-                  className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                  className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition disabled:opacity-50"
                 >
                   Batal
                 </button>
-
                 <button
                   onClick={handleRestore}
                   disabled={restoring}
-                  className="flex-1 h-11 bg-emerald-600 text-black rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                  className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold active:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {restoring ? (
                     <>
@@ -645,20 +641,10 @@ function TransactionCard({
                     </>
                   ) : (
                     <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                       </svg>
-                      Ya, Restore Transaksi
+                      Ya, Restore
                     </>
                   )}
                 </button>

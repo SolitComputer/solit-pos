@@ -509,15 +509,18 @@ export default function UnitsPage() {
 
             {/* ────────────────────────────────────────────── FORM MODAL ── */}
             {showForm && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeForm} />
-                    <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88vh]">
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeForm} />
+                    <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85vh] sm:mx-4 overflow-hidden">
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                             <h2 className="font-semibold text-gray-800 text-base">
-                                {editingUnit ? `Edit Unit — ${editingUnit.serial_number}` : "Tambah Unit Baru"}
+                                {editingUnit ? `Edit Unit` : "Tambah Unit Baru"}
                             </h2>
-                            <button onClick={closeForm} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+                            <button
+                                onClick={closeForm}
+                                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 transition"
+                            >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -525,7 +528,7 @@ export default function UnitsPage() {
                         </div>
 
                         {/* Body */}
-                        <div className="overflow-y-auto flex-1 px-5 py-5">
+                        <div className="overflow-y-auto flex-1 px-5 py-5 overscroll-contain">
                             <form onSubmit={handleSubmit} className="space-y-4">
 
                                 {/* Grade — visual card selector */}
@@ -641,19 +644,18 @@ export default function UnitsPage() {
                                     />
                                 </FormField>
 
-                                {/* Actions */}
                                 <div className="flex gap-2 pt-1">
                                     <button
                                         type="button"
                                         onClick={closeForm}
-                                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+                                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium active:bg-gray-200 transition"
                                     >
                                         Batal
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={formLoading}
-                                        className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
+                                        className="flex-1 h-11 bg-gray-900 text-white rounded-lg text-sm font-medium active:bg-gray-800 transition disabled:opacity-50"
                                     >
                                         {formLoading ? "Menyimpan..." : editingUnit ? "Simpan Perubahan" : "Tambah Unit"}
                                     </button>

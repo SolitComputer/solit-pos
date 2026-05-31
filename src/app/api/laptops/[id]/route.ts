@@ -67,11 +67,28 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-// DELETE — hanya ADMIN
 async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
+    const { error: unitsError } = await supabase
+      .from("laptop_units")
+      .delete()
+      .eq("laptop_id", id);
+
+    if (unitsError) {
+      return NextResponse.json(
+        { success: false, message: "Gagal menghapus units: " + unitsError.message },
+        { status: 400 }
+      );
+    }
+
+    await supabase
+      .from("warranties")
+      .delete()
+      .eq("laptop_id", id);
+
+    // Baru hapus laptop-nya
     const { error } = await supabase
       .from("laptops")
       .delete()
@@ -86,10 +103,13 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Terjadi kesalahan server" },
+      { status: 500 }
+    );
   }
 }
 
 export const GET    = withAuth(getHandler);
 export const PUT    = withAuth(putHandler,    PERMISSIONS.EDIT_LAPTOP);
-export const DELETE = withAuth(deleteHandler, ["ADMIN"]);
+export const DELETE = withAuth(deleteHandler, ["ADMIN", "PENGELOLA_BARANG"]);

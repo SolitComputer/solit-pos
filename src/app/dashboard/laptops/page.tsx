@@ -411,11 +411,20 @@ export default function Page() {
             async () => {
                 setConfirmModal(null);
                 try {
-                    await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                    const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                    const result = await res.json();
+
+                    if (!result.success) {
+                        showAlert(`Gagal menghapus laptop: ${result.message || "Terjadi kesalahan"}`);
+                        return;
+                    }
+
+                    // Sukses
                     if (modalMode === "detail") closeModal();
                     fetchLaptops();
+                    showAlert("Laptop berhasil dihapus ✅");
                 } catch {
-                    showAlert("Gagal menghapus laptop");
+                    showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
                 }
             }
         );
