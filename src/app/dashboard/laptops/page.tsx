@@ -164,6 +164,104 @@ function ConfirmModal({
     );
 }
 
+function DeleteConfirmModal({
+    laptop,
+    unitCount,
+    onConfirm,
+    onCancel,
+}: {
+    laptop: Laptop;
+    unitCount: number;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
+    const [inputName, setInputName] = useState("");
+    const isMatch = inputName.trim() === laptop.laptop_name.trim();
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-gray-800 font-semibold text-center text-sm mb-1">Hapus Laptop Permanen</h3>
+
+                {/* Warning banner — tampilkan jumlah units */}
+                {unitCount > 0 && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3 mt-2">
+                        <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        <p className="text-xs text-amber-700">
+                            Laptop ini memiliki <span className="font-bold">{unitCount} unit</span> terdaftar.
+                            Semua unit dan garansi terkait akan <span className="font-bold">ikut terhapus permanen</span>.
+                        </p>
+                    </div>
+                )}
+
+                {/* Konfirmasi ketik nama */}
+                <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-1.5">
+                        Ketik nama laptop untuk konfirmasi:
+                    </p>
+                    <p className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded mb-2 truncate">
+                        {laptop.laptop_name}
+                    </p>
+                    <input
+                        type="text"
+                        value={inputName}
+                        onChange={e => setInputName(e.target.value)}
+                        placeholder="Ketik nama laptop di atas..."
+                        className={`w-full h-10 border rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 transition ${inputName.length > 0
+                            ? isMatch
+                                ? "border-emerald-400 focus:ring-emerald-200"
+                                : "border-red-300 focus:ring-red-200"
+                            : "border-gray-200 focus:ring-gray-200"
+                            }`}
+                        autoFocus
+                        onPaste={e => e.preventDefault()} // cegah paste
+                    />
+                    {inputName.length > 0 && !isMatch && (
+                        <p className="text-xs text-red-500 mt-1">Nama tidak cocok</p>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={!isMatch}
+                        className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-semibold active:bg-red-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Hapus Permanen
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Page() {
     const [laptops, setLaptops] = useState<Laptop[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -195,6 +293,10 @@ export default function Page() {
     const [confirmModal, setConfirmModal] = useState<{
         message: string;
         onConfirm: () => void;
+    } | null>(null);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+        laptop: Laptop;
+        unitCount: number;
     } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
@@ -405,31 +507,20 @@ export default function Page() {
         }
     };
 
-    const handleDelete = (id: string) => {
-        showConfirm(
-            "Yakin ingin menghapus laptop ini? Semua unit terkait juga akan terhapus.",
-            async () => {
-                setConfirmModal(null);
-                try {
-                    const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
-                    const result = await res.json();
+    const handleDelete = async (id: string) => {
+        const laptop = laptops.find(l => l.id === id);
+        if (!laptop) return;
 
-                    if (!result.success) {
-                        showAlert(`Gagal menghapus laptop: ${result.message || "Terjadi kesalahan"}`);
-                        return;
-                    }
+        try {
+            const res = await fetch(`/api/laptops/${id}/units`);
+            const result = await res.json();
+            const unitCount = result.data?.length ?? 0;
 
-                    // Sukses
-                    if (modalMode === "detail") closeModal();
-                    fetchLaptops();
-                    showAlert("Laptop berhasil dihapus ✅");
-                } catch {
-                    showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
-                }
-            }
-        );
+            setDeleteConfirmModal({ laptop, unitCount });
+        } catch {
+            setDeleteConfirmModal({ laptop, unitCount: laptop.qty ?? 0 });
+        }
     };
-
     const exportToExcel = async () => {
         const wb = new ExcelJS.Workbook();
         wb.creator = "Solit Inventory";
@@ -876,12 +967,12 @@ export default function Page() {
                                                         </td>
                                                         {/* Aksi di tabel */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="flex items-center justify-end gap-1.5">
 
-                                                                {hasPermission(userRole!, PERMISSIONS.VIEW_BARCODE) && (
+                                                                {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
                                                                     <button
                                                                         onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                        className="px-2 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                                                        className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg active:bg-gray-50 transition"
                                                                         title="Lihat Barcode"
                                                                     >
                                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -895,7 +986,7 @@ export default function Page() {
                                                                     <Link
                                                                         href={`/dashboard/laptops/${item.id}/units`}
                                                                         onClick={e => e.stopPropagation()}
-                                                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
+                                                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg active:bg-blue-100 transition"
                                                                     >
                                                                         Units
                                                                     </Link>
@@ -905,13 +996,13 @@ export default function Page() {
                                                                     <>
                                                                         <button
                                                                             onClick={() => openEdit(item)}
-                                                                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                                                                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg active:bg-gray-100 transition"
                                                                         >
                                                                             Edit
                                                                         </button>
                                                                         <button
                                                                             onClick={() => handleDelete(item.id)}
-                                                                            className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                                                                            className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg active:bg-red-100 transition"
                                                                         >
                                                                             Hapus
                                                                         </button>
@@ -1269,6 +1360,31 @@ export default function Page() {
                         message={confirmModal.message}
                         onConfirm={confirmModal.onConfirm}
                         onCancel={() => setConfirmModal(null)}
+                    />
+                )}
+                {/* Delete Confirm Modal — 2-step verification */}
+                {deleteConfirmModal && (
+                    <DeleteConfirmModal
+                        laptop={deleteConfirmModal.laptop}
+                        unitCount={deleteConfirmModal.unitCount}
+                        onCancel={() => setDeleteConfirmModal(null)}
+                        onConfirm={async () => {
+                            const id = deleteConfirmModal.laptop.id;
+                            setDeleteConfirmModal(null);
+                            try {
+                                const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                                const result = await res.json();
+                                if (!result.success) {
+                                    showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`);
+                                    return;
+                                }
+                                if (modalMode === "detail") closeModal();
+                                fetchLaptops();
+                                showAlert("Laptop berhasil dihapus ✅");
+                            } catch {
+                                showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
+                            }
+                        }}
                     />
                 )}
             </DashboardLayout>
