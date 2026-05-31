@@ -29,9 +29,8 @@ interface Laptop {
     selling_price: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
+
+
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string; ring: string }> = {
@@ -57,6 +56,92 @@ const EMPTY_FORM = {
     notes: "",
 };
 
+function AlertModal({
+    message,
+    onClose,
+}: {
+    message: string;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
+                <button
+                    onClick={onClose}
+                    className="w-full h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
+                >
+                    OK
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ConfirmModal({
+    message,
+    onConfirm,
+    onCancel,
+    confirmLabel = "Hapus",
+    danger = true,
+}: {
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${danger ? "bg-red-50" : "bg-amber-50"}`}>
+                    <svg className={`w-6 h-6 ${danger ? "text-red-500" : "text-amber-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <p className="text-gray-700 text-sm font-medium text-center mb-6">{message}</p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className={`flex-1 h-10 rounded-xl text-sm font-medium text-white transition ${danger ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"
+                            }`}
+                    >
+                        {confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,8 +159,12 @@ export default function UnitsPage() {
     const [formLoading, setFormLoading] = useState(false);
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [userRole, setUserRole] = useState<UserRole | null>(null);
-    const canManageUnits = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
-    const canSeePriceInfo = userRole ? hasPermission(userRole, ["ADMIN", "PENGELOLA_BARANG", "ACCOUNTING"]) : false;
+    const canManageUnits = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_UNITS) : false;
+    const canSeePriceInfo = userRole ? hasPermission(userRole, ["ADMIN", "PENGELOLA_BARANG", "ACCOUNTING"] as UserRole[]) : false;
+    const [alertModal, setAlertModal] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{
+        message: string; onConfirm: () => void;
+    } | null>(null);
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -84,7 +173,6 @@ export default function UnitsPage() {
             .catch(() => setUserRole(null));
     }, []);
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -103,8 +191,6 @@ export default function UnitsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // ── Sync qty + status ke tabel laptops setelah mutasi ────────────────────
-    // Ini auto-update parent laptop berdasarkan state units terkini.
     const syncLaptopStats = useCallback(async (latestUnits: LaptopUnit[]) => {
         const siapCount = latestUnits.filter(u => u.status === "SIAP_JUAL").length;
         const newStatus = siapCount > 0 ? "SIAP_JUAL" : latestUnits.length === 0 ? "BELUM_SIAP" : "SOLD";
@@ -183,7 +269,7 @@ export default function UnitsPage() {
                 body: JSON.stringify(payload),
             });
             const result = await res.json();
-            if (!result.success) { alert(result.message); return; }
+            if (!result.success) { setAlertModal(result.message); return; }
 
             // Ambil units terbaru lalu sync ke parent
             const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
@@ -194,25 +280,31 @@ export default function UnitsPage() {
 
             closeForm();
         } catch {
-            alert("Terjadi kesalahan");
+            setAlertModal("Terjadi kesalahan");
         } finally {
             setFormLoading(false);
         }
     };
 
-    const handleDelete = async (unit: LaptopUnit) => {
-        if (!confirm(`Hapus unit SN: ${unit.serial_number}?`)) return;
-        try {
-            await fetch(`/api/units/${unit.id}`, { method: "DELETE" });
-            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
-            const freshData = await freshRes.json();
-            const freshUnits: LaptopUnit[] = freshData.data || [];
-            setUnits(freshUnits);
-            await syncLaptopStats(freshUnits);
-        } catch {
-            alert("Gagal menghapus");
-        }
+    const handleDelete = (unit: LaptopUnit) => {
+        setConfirmModal({
+            message: `Hapus unit SN: ${unit.serial_number}?`,
+            onConfirm: async () => {
+                setConfirmModal(null);
+                try {
+                    await fetch(`/api/units/${unit.id}`, { method: "DELETE" });
+                    const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+                    const freshData = await freshRes.json();
+                    const freshUnits: LaptopUnit[] = freshData.data || [];
+                    setUnits(freshUnits);
+                    await syncLaptopStats(freshUnits);
+                } catch {
+                    setAlertModal("Gagal menghapus");
+                }
+            },
+        });
     };
+
 
     return (
         <DashboardLayout>
@@ -377,20 +469,25 @@ export default function UnitsPage() {
                                                     </td>
                                                     {/* Aksi */}
                                                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={() => openEdit(unit)}
-                                                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(unit)}
-                                                                className="px-3 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
-                                                            >
-                                                                Hapus
-                                                            </button>
-                                                        </div>
+                                                        {canManageUnits ? (
+                                                            <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => openEdit(unit)}
+                                                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDelete(unit)}
+                                                                    className="px-3 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
+                                                                >
+                                                                    Hapus
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            // Role view-only: tidak tampilkan aksi apapun
+                                                            <span className="text-[10px] text-gray-300">—</span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
@@ -566,13 +663,18 @@ export default function UnitsPage() {
                     </div>
                 </div>
             )}
+            {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+            {confirmModal && (
+                <ConfirmModal
+                    message={confirmModal.message}
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={() => setConfirmModal(null)}
+                />
+            )}
         </DashboardLayout>
     );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Skeleton
-// ─────────────────────────────────────────────────────────────────────────────
 function SkeletonUnits() {
     return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">

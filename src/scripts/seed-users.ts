@@ -30,7 +30,6 @@ const users = [
 async function seed() {
   console.log("🌱 Mulai seeding users...\n");
 
-  // Hapus user lama dengan role yang sudah tidak dipakai
   const { error: deleteError } = await supabase
     .from("users")
     .delete()

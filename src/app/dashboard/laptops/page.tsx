@@ -78,6 +78,92 @@ const Shimmer = ({
     />
 );
 
+// ─── Reusable Modal Popup (ganti alert & confirm) ─────────────────────────────
+function AlertModal({
+    message,
+    onClose,
+}: {
+    message: string;
+    onClose: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
+                <button
+                    onClick={onClose}
+                    className="w-full h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
+                >
+                    OK
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ConfirmModal({
+    message,
+    onConfirm,
+    onCancel,
+    confirmLabel = "Hapus",
+    danger = true,
+}: {
+    message: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${danger ? "bg-red-50" : "bg-amber-50"}`}>
+                    <svg className={`w-6 h-6 ${danger ? "text-red-500" : "text-amber-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <p className="text-gray-700 text-sm font-medium text-center mb-6">{message}</p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className={`flex-1 h-10 rounded-xl text-sm font-medium text-white transition ${danger ? "bg-red-500 hover:bg-red-600" : "bg-amber-500 hover:bg-amber-600"
+                            }`}
+                    >
+                        {confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Page() {
     const [laptops, setLaptops] = useState<Laptop[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -101,8 +187,19 @@ export default function Page() {
 
     const canEditLaptop = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
     const canCreateLaptop = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
-    const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"]) : false;
+    const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"] as UserRole[]) : false;
+    const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
+    const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
 
+    const [alertModal, setAlertModal] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{
+        message: string;
+        onConfirm: () => void;
+    } | null>(null);
+
+    const showAlert = (msg: string) => setAlertModal(msg);
+    const showConfirm = (msg: string, onConfirm: () => void) =>
+        setConfirmModal({ message: msg, onConfirm });
 
     useEffect(() => { fetchLaptops(); }, []);
 
@@ -266,23 +363,24 @@ export default function Page() {
             const res = await fetch("/api/laptops/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    selling_price: Number(formData.selling_price),
-                }),
+                body: JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
             });
             const result = await res.json();
-            if (!result.success) { alert(result.message || "Gagal menambahkan laptop"); return; }
+            if (!result.success) {
+                showAlert(result.message || "Gagal menambahkan laptop");
+                return;
+            }
             closeModal();
             fetchLaptops();
-            alert("Laptop berhasil ditambahkan ✅");
+            showAlert("Laptop berhasil ditambahkan ✅");
         } catch {
-            alert("Terjadi kesalahan saat menyimpan");
+            showAlert("Terjadi kesalahan saat menyimpan");
         } finally {
             setFormLoading(false);
         }
     };
 
+    // handleEdit — ganti alert
     const handleEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedLaptop) return;
@@ -291,27 +389,36 @@ export default function Page() {
             const res = await fetch(`/api/laptops/${selectedLaptop.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    selling_price: Number(formData.selling_price),
-                }),
+                body: JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
             });
             const result = await res.json();
-            if (!result.success) { alert(result.message); return; }
+            if (!result.success) {
+                showAlert(result.message);
+                return;
+            }
             closeModal();
             fetchLaptops();
-        } catch { alert("Terjadi kesalahan"); } finally {
+        } catch {
+            showAlert("Terjadi kesalahan");
+        } finally {
             setFormLoading(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Yakin ingin menghapus laptop ini? Semua unit terkait juga akan terhapus.")) return;
-        try {
-            await fetch(`/api/laptops/${id}`, { method: "DELETE" });
-            if (modalMode === "detail") closeModal();
-            fetchLaptops();
-        } catch { console.error("Delete failed"); }
+    const handleDelete = (id: string) => {
+        showConfirm(
+            "Yakin ingin menghapus laptop ini? Semua unit terkait juga akan terhapus.",
+            async () => {
+                setConfirmModal(null);
+                try {
+                    await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                    if (modalMode === "detail") closeModal();
+                    fetchLaptops();
+                } catch {
+                    showAlert("Gagal menghapus laptop");
+                }
+            }
+        );
     };
 
     const exportToExcel = async () => {
@@ -758,45 +865,48 @@ export default function Page() {
                                                                 <span className="text-gray-400 text-xs">{item.status}</span>
                                                             )}
                                                         </td>
-                                                        {/* Aksi */}
+                                                        {/* Aksi di tabel */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                {/* Barcode — semua role */}
-                                                                <button
-                                                                    onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                    className="px-2 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-                                                                    title="Lihat Barcode"
-                                                                >
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                                                            d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
-                                                                    </svg>
-                                                                </button>
-                                                                {/* Units — semua role */}
-                                                                <Link
-                                                                    href={`/dashboard/laptops/${item.id}/units`}
-                                                                    onClick={e => e.stopPropagation()}
-                                                                    className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
-                                                                >
-                                                                    Units
-                                                                </Link>
-                                                                {/* Edit — hanya ADMIN & PENGELOLA_BARANG */}
-                                                                {canEditLaptop && (
+
+                                                                {hasPermission(userRole!, PERMISSIONS.VIEW_BARCODE) && (
                                                                     <button
-                                                                        onClick={() => openEdit(item)}
-                                                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                                                                        onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
+                                                                        className="px-2 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+                                                                        title="Lihat Barcode"
                                                                     >
-                                                                        Edit
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                                                                d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                                        </svg>
                                                                     </button>
                                                                 )}
-                                                                {/* Hapus — hanya ADMIN & PENGELOLA_BARANG */}
-                                                                {canEditLaptop && (
-                                                                    <button
-                                                                        onClick={() => handleDelete(item.id)}
-                                                                        className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+
+                                                                {canViewUnits && (
+                                                                    <Link
+                                                                        href={`/dashboard/laptops/${item.id}/units`}
+                                                                        onClick={e => e.stopPropagation()}
+                                                                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                                                                     >
-                                                                        Hapus
-                                                                    </button>
+                                                                        Units
+                                                                    </Link>
+                                                                )}
+
+                                                                {canEditLaptop && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => openEdit(item)}
+                                                                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                                                                        >
+                                                                            Edit
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDelete(item.id)}
+                                                                            className="px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                                                                        >
+                                                                            Hapus
+                                                                        </button>
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         </td>
@@ -988,7 +1098,7 @@ export default function Page() {
                                 </div>
                             )}
 
-                            {/* ── Detail modal footer — GANTI BAGIAN INI ── */}
+                            {/* Detail modal footer */}
                             <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <p className="text-xs text-gray-400">
                                     Ditambahkan {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", {
@@ -996,12 +1106,14 @@ export default function Page() {
                                     })}
                                 </p>
                                 <div className="flex gap-2">
-                                    <Link
-                                        href={`/dashboard/laptops/${selectedLaptop.id}/units`}
-                                        className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition"
-                                    >
-                                        Lihat Units
-                                    </Link>
+                                    {canViewUnits && (
+                                        <Link
+                                            href={`/dashboard/laptops/${selectedLaptop.id}/units`}
+                                            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition"
+                                        >
+                                            Lihat Units
+                                        </Link>
+                                    )}
                                     {canEditLaptop && (
                                         <button
                                             onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
@@ -1135,6 +1247,19 @@ export default function Page() {
                         laptopId={barcodeTarget.id}
                         laptopName={barcodeTarget.name}
                         onClose={() => setBarcodeTarget(null)}
+                    />
+                )}
+                {/* Alert Modal */}
+                {alertModal && (
+                    <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />
+                )}
+
+                {/* Confirm Modal */}
+                {confirmModal && (
+                    <ConfirmModal
+                        message={confirmModal.message}
+                        onConfirm={confirmModal.onConfirm}
+                        onCancel={() => setConfirmModal(null)}
                     />
                 )}
             </DashboardLayout>

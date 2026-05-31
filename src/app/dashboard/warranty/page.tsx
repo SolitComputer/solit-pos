@@ -28,29 +28,64 @@ interface Warranty {
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string; bg: string }> = {
   ACTIVE: {
     badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    dot:   "bg-emerald-500",
+    dot: "bg-emerald-500",
     label: "Aktif",
-    bg:    "border-l-emerald-500",
+    bg: "border-l-emerald-500",
   },
   EXPIRING_SOON: {
     badge: "bg-amber-50 text-amber-700 border-amber-200",
-    dot:   "bg-amber-400",
+    dot: "bg-amber-400",
     label: "Segera Berakhir",
-    bg:    "border-l-amber-400",
+    bg: "border-l-amber-400",
   },
   EXPIRED: {
     badge: "bg-red-50 text-red-600 border-red-200",
-    dot:   "bg-red-500",
+    dot: "bg-red-500",
     label: "Kadaluarsa",
-    bg:    "border-l-red-400",
+    bg: "border-l-red-400",
   },
   VOID: {
     badge: "bg-gray-100 text-gray-500 border-gray-200",
-    dot:   "bg-gray-400",
+    dot: "bg-gray-400",
     label: "Dibatalkan",
-    bg:    "border-l-gray-300",
+    bg: "border-l-gray-300",
   },
 };
+
+function AlertModal({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const fmt = (d: string) =>
   new Date(d).toLocaleDateString("id-ID", {
@@ -58,18 +93,18 @@ const fmt = (d: string) =>
   });
 
 export default function WarrantyPage() {
-  const [warranties, setWarranties]     = useState<Warranty[]>([]);
-  const [isLoading, setIsLoading]       = useState(true);
-  const [userRole, setUserRole]         = useState<UserRole | null>(null);
-  const [search, setSearch]             = useState("");
+  const [warranties, setWarranties] = useState<Warranty[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [showArchived, setShowArchived] = useState(false);
-  const [editTarget, setEditTarget]     = useState<Warranty | null>(null);
-  const [editLoading, setEditLoading]   = useState(false);
+  const [editTarget, setEditTarget] = useState<Warranty | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
   const [editForm, setEditForm] = useState({
     warranty_end: "", notes: "", technician_notes: "", status: "",
   });
-
+  const [alertModal, setAlertModal] = useState<string | null>(null);
   const canEdit = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_WARRANTY) : false;
 
   useEffect(() => {
@@ -114,19 +149,19 @@ export default function WarrantyPage() {
 
   // Stats
   const stats = useMemo(() => ({
-    active:       warranties.filter(w => w.computed_status === "ACTIVE").length,
+    active: warranties.filter(w => w.computed_status === "ACTIVE").length,
     expiringSoon: warranties.filter(w => w.computed_status === "EXPIRING_SOON").length,
-    expired:      warranties.filter(w => w.computed_status === "EXPIRED").length,
-    void:         warranties.filter(w => w.computed_status === "VOID").length,
+    expired: warranties.filter(w => w.computed_status === "EXPIRED").length,
+    void: warranties.filter(w => w.computed_status === "VOID").length,
   }), [warranties]);
 
   const openEdit = (w: Warranty) => {
     setEditTarget(w);
     setEditForm({
-      warranty_end:      w.warranty_end,
-      notes:             w.notes || "",
-      technician_notes:  w.technician_notes || "",
-      status:            w.computed_status,
+      warranty_end: w.warranty_end,
+      notes: w.notes || "",
+      technician_notes: w.technician_notes || "",
+      status: w.computed_status,
     });
   };
 
@@ -141,11 +176,17 @@ export default function WarrantyPage() {
         body: JSON.stringify(editForm),
       });
       const result = await res.json();
-      if (!result.success) { alert(result.message); return; }
+      if (!result.success) {
+        setAlertModal(result.message);
+        return;
+      }
       setEditTarget(null);
       fetchWarranties();
-    } catch { alert("Terjadi kesalahan"); }
-    finally { setEditLoading(false); }
+    } catch {
+      setAlertModal("Terjadi kesalahan");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   // Perpanjang garansi
@@ -177,11 +218,10 @@ export default function WarrantyPage() {
           </div>
           <button
             onClick={() => setShowArchived(!showArchived)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition ${
-              showArchived
-                ? "bg-gray-800 text-white border-gray-800"
-                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-            }`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition ${showArchived
+              ? "bg-gray-800 text-white border-gray-800"
+              : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              }`}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="21 8 21 21 3 21 3 8" />
@@ -195,10 +235,10 @@ export default function WarrantyPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Aktif",          value: stats.active,       color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-            { label: "Segera Berakhir", value: stats.expiringSoon, color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-100" },
-            { label: "Kadaluarsa",     value: stats.expired,      color: "text-red-600",     bg: "bg-red-50",    border: "border-red-100" },
-            { label: "Dibatalkan",     value: stats.void,         color: "text-gray-500",    bg: "bg-gray-50",   border: "border-gray-100" },
+            { label: "Aktif", value: stats.active, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+            { label: "Segera Berakhir", value: stats.expiringSoon, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
+            { label: "Kadaluarsa", value: stats.expired, color: "text-red-600", bg: "bg-red-50", border: "border-red-100" },
+            { label: "Dibatalkan", value: stats.void, color: "text-gray-500", bg: "bg-gray-50", border: "border-gray-100" },
           ].map(s => (
             <div key={s.label} className={`bg-white rounded-2xl border ${s.border} shadow-sm p-4`}>
               <p className="text-xs text-gray-400">{s.label}</p>
@@ -226,20 +266,19 @@ export default function WarrantyPage() {
           {/* Filter tabs */}
           <div className="flex flex-wrap gap-2">
             {[
-              { value: "ALL",           label: "Semua",           count: warranties.length },
-              { value: "ACTIVE",        label: "Aktif",           count: stats.active },
+              { value: "ALL", label: "Semua", count: warranties.length },
+              { value: "ACTIVE", label: "Aktif", count: stats.active },
               { value: "EXPIRING_SOON", label: "Segera Berakhir", count: stats.expiringSoon },
-              { value: "EXPIRED",       label: "Kadaluarsa",      count: stats.expired },
-              { value: "VOID",          label: "Dibatalkan",      count: stats.void },
+              { value: "EXPIRED", label: "Kadaluarsa", count: stats.expired },
+              { value: "VOID", label: "Dibatalkan", count: stats.void },
             ].map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setFilterStatus(opt.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                  filterStatus === opt.value
-                    ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
-                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterStatus === opt.value
+                  ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                  : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                  }`}
               >
                 {opt.label}
                 <span className={`ml-1.5 tabular-nums ${filterStatus === opt.value ? "text-gray-400" : "text-gray-300"}`}>
@@ -408,6 +447,8 @@ export default function WarrantyPage() {
           </div>
         </div>
       )}
+      {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+
     </DashboardLayout>
   );
 }

@@ -11,39 +11,138 @@ async function handler(req: NextRequest) {
       today.getDate()
     ).toISOString();
 
-    const { data: todayTransactions } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("status", "PAID")
-      .gte("paid_at", startToday);
+    // ── 7 hari terakhir untuk weekly trend ────────────────────────────────
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const { data: laptops } = await supabase
-      .from("laptops")
-      .select("*")
-      .eq("status", "SIAP_JUAL")
-      .gt("qty", 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startYesterday = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate()
+    ).toISOString();
+    const endYesterday = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate() + 1
+    ).toISOString();
 
+    const [
+      { data: todayTransactions },
+      { data: laptops },
+      { data: weeklyTransactions },
+      { data: yesterdayTransactions },
+    ] = await Promise.all([
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("status", "PAID")
+        .gte("paid_at", startToday),
+      supabase
+        .from("laptops")
+        .select("*")
+        .eq("status", "SIAP_JUAL")
+        .gt("qty", 0),
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("status", "PAID")
+        .gte("paid_at", sevenDaysAgo.toISOString()),
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("status", "PAID")
+        .gte("paid_at", startYesterday)
+        .lt("paid_at", endYesterday),
+    ]);
+
+    // ── Helper profit calc ────────────────────────────────────────────────
+    const calcProfit = (item: any): number => {
+      const dealPrice = Number(item.deal_price || item.amount || 0);
+      const inventoryPrice = Number(item.inventory_price || 0);
+      return inventoryPrice > 0
+        ? dealPrice - inventoryPrice
+        : Number(item.other || 0);
+    };
+
+    // ── Today stats ───────────────────────────────────────────────────────
     const todayRevenue =
-      todayTransactions?.reduce((acc, item) => acc + (item.deal_price || item.amount || 0), 0) || 0;
+      todayTransactions?.reduce(
+        (acc, item) => acc + Number(item.deal_price || item.amount || 0),
+        0
+      ) || 0;
 
-    // ✅ FIX: Hitung profit = deal_price - inventory_price per transaksi
-    // Kalau inventory_price = 0 (data lama), fallback ke field "other" yang tersimpan
     const todayProfit =
-      todayTransactions?.reduce((acc, item) => {
-        const dealPrice = Number(item.deal_price || item.amount || 0);
-        const inventoryPrice = Number(item.inventory_price || 0);
+      todayTransactions?.reduce((acc, item) => acc + calcProfit(item), 0) || 0;
 
-        // Kalau inventory_price ada dan > 0, hitung dari sumber data
-        // Kalau tidak ada (data lama), pakai field "other" yang sudah tersimpan
-        const profit = inventoryPrice > 0
-          ? dealPrice - inventoryPrice
-          : Number(item.other || 0);
+    // ── Yesterday stats (untuk % change) ─────────────────────────────────
+    const yesterdayRevenue =
+      yesterdayTransactions?.reduce(
+        (acc, item) => acc + Number(item.deal_price || item.amount || 0),
+        0
+      ) || 0;
 
-        return acc + profit;
-      }, 0) || 0;
+    const yesterdayProfit =
+      yesterdayTransactions?.reduce(
+        (acc, item) => acc + calcProfit(item),
+        0
+      ) || 0;
+
+    const yesterdayTrxCount = yesterdayTransactions?.length || 0;
+
+    // % change (hindari divide by zero)
+    const revenueChange =
+      yesterdayRevenue > 0
+        ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
+        : null;
+    const profitChange =
+      yesterdayProfit > 0
+        ? Math.round(((todayProfit - yesterdayProfit) / yesterdayProfit) * 100)
+        : null;
+    const trxChange =
+      yesterdayTrxCount > 0
+        ? Math.round(
+          (((todayTransactions?.length || 0) - yesterdayTrxCount) /
+            yesterdayTrxCount) *
+          100
+        )
+        : null;
 
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
+
+    const trendMap: Record<
+      string,
+      { revenue: number; profit: number; trxCount: number }
+    > = {};
+
+    // Inisialisasi 7 hari dengan nilai 0
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      trendMap[key] = { revenue: 0, profit: 0, trxCount: 0 };
+    }
+
+    weeklyTransactions?.forEach((item) => {
+      const dateKey = (item.paid_at || item.created_at || "").split("T")[0];
+      if (trendMap[dateKey]) {
+        trendMap[dateKey].revenue += Number(item.deal_price || item.amount || 0);
+        trendMap[dateKey].profit += calcProfit(item);
+        trendMap[dateKey].trxCount += 1;
+      }
+    });
+
+    const weeklyTrend = Object.entries(trendMap).map(([date, data]) => {
+      const d = new Date(date);
+      const label = d.toLocaleDateString("id-ID", {
+        weekday: "short",
+        day: "numeric",
+      }); // "Sen 26"
+      return { date, label, ...data };
+    });
 
     // ── Top Sales ─────────────────────────────────────────────────────────
     const salesMap: Record<string, { total: number; profit: number }> = {};
@@ -51,14 +150,7 @@ async function handler(req: NextRequest) {
       const sales = item.sales_name || "Unknown";
       if (!salesMap[sales]) salesMap[sales] = { total: 0, profit: 0 };
       salesMap[sales].total += 1;
-
-      const dealPrice = Number(item.deal_price || item.amount || 0);
-      const inventoryPrice = Number(item.inventory_price || 0);
-      const profit = inventoryPrice > 0
-        ? dealPrice - inventoryPrice
-        : Number(item.other || 0);
-
-      salesMap[sales].profit += profit;
+      salesMap[sales].profit += calcProfit(item);
     });
 
     const topSales = Object.entries(salesMap)
@@ -68,7 +160,8 @@ async function handler(req: NextRequest) {
 
     // ── Top Sources ───────────────────────────────────────────────────────
     const sourceMap: Record<string, number> = {};
-    todayTransactions?.forEach((item) => {
+    // Untuk source, ambil dari weekly agar lebih representatif
+    weeklyTransactions?.forEach((item) => {
       const source = item.source_platform || "Unknown";
       sourceMap[source] = (sourceMap[source] || 0) + 1;
     });
@@ -76,7 +169,7 @@ async function handler(req: NextRequest) {
     const topSources = Object.entries(sourceMap)
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
+      .slice(0, 6);
 
     // ── Top Laptop ────────────────────────────────────────────────────────
     const laptopMap: Record<string, number> = {};
@@ -90,15 +183,6 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // ── Debug log (hapus di production kalau tidak perlu) ─────────────────
-    console.log("[STATS] Today transactions:", todayTransactions?.length);
-    console.log("[STATS] Revenue:", todayRevenue, "| Profit:", todayProfit);
-    todayTransactions?.forEach(t => {
-      console.log(
-        `  - ${t.invoice_number}: deal=${t.deal_price || t.amount}, modal=${t.inventory_price}, profit=${(t.deal_price || t.amount) - (t.inventory_price || 0)}`
-      );
-    });
-
     return NextResponse.json({
       success: true,
       data: {
@@ -107,6 +191,12 @@ async function handler(req: NextRequest) {
         todayTransactions: todayTransactions?.length || 0,
         laptopReady: laptops?.length || 0,
         stockTotal,
+        // Perubahan vs kemarin
+        revenueChange,
+        profitChange,
+        trxChange,
+        // Tren 7 hari
+        weeklyTrend,
         topSales,
         topSources,
         topLaptop,

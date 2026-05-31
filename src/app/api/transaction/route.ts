@@ -44,4 +44,4 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 }
 
 // ADMIN, KEPALA_SALES, ACCOUNTING boleh lihat list transaksi
-export const GET = withAuth(handler, PERMISSIONS.EDIT_TRANSACTION.concat(["ACCOUNTING"]));
+export const GET = withAuth(handler, PERMISSIONS.VIEW_TRANSACTIONS);

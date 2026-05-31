@@ -73,7 +73,7 @@ export default function Page() {
     : false;
 
   const canSeeFinancials = userRole
-    ? hasPermission(userRole, ["ADMIN", "ACCOUNTING"])
+    ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)
     : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -140,6 +140,10 @@ export default function Page() {
     setSearch(""); setStatus("ALL"); setDateFrom(""); setDateTo("");
     setPaymentMethod("ALL"); setSourcePlatform("ALL");
   };
+
+  const canRestoreTransaction = userRole
+    ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION)
+    : false;
 
   const inputCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
   const selectCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
@@ -288,6 +292,7 @@ export default function Page() {
                 onPhotoClick={setPhotoModal}
                 canEditTransaction={canEditTransaction}
                 canSeeFinancials={canSeeFinancials}
+                canRestoreTransaction={canRestoreTransaction}
                 onRestored={() => fetchTransactions()}
               />
             ))
@@ -327,22 +332,61 @@ export default function Page() {
   );
 }
 
+// Tambah AlertModal component di atas Page() — sama persis dengan yang di laptops/page.tsx
+function AlertModal({
+  message,
+  onClose,
+}: {
+  message: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
+        <button
+          onClick={onClose}
+          className="w-full h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TransactionCard({
   item,
   onPhotoClick,
   canEditTransaction,
+  canRestoreTransaction, // ← prop baru, pisah dari canEdit
   canSeeFinancials,
-  onRestored, // ← tambah prop baru
+  onRestored,
 }: {
   item: any;
   onPhotoClick: (url: string) => void;
   canEditTransaction: boolean;
+  canRestoreTransaction: boolean; // ← baru
   canSeeFinancials: boolean;
-  onRestored: (invoice: string) => void; // ← callback setelah restore
+  onRestored: (invoice: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [alertModal, setAlertModal] = useState<string | null>(null);
 
   const handleRestore = async () => {
     setRestoring(true);
@@ -352,13 +396,13 @@ function TransactionCard({
       });
       const result = await res.json();
       if (!result.success) {
-        alert("Gagal restore: " + result.message);
+        setAlertModal("Gagal restore: " + result.message);
         return;
       }
       setShowRestoreModal(false);
-      onRestored(item.invoice_number); // refresh list
+      onRestored(item.invoice_number);
     } catch {
-      alert("Terjadi kesalahan saat restore");
+      setAlertModal("Terjadi kesalahan saat restore");
     } finally {
       setRestoring(false);
     }
@@ -477,8 +521,7 @@ function TransactionCard({
             </a>
           )}
 
-          {/* Restore — hanya untuk PAID dan role yang bisa edit */}
-          {canEditTransaction && item.status === "PAID" && (
+          {canRestoreTransaction && item.status === "PAID" && (
             <button
               onClick={() => setShowRestoreModal(true)}
               className="text-xs font-semibold text-red-500 hover:text-red-700 transition flex items-center gap-1"
@@ -489,6 +532,7 @@ function TransactionCard({
               Restore
             </button>
           )}
+
           <a
             href={`/receipt/${item.invoice_number}`}
             className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
