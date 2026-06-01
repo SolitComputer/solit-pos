@@ -118,8 +118,8 @@ function TrendBadge({ change }: { change: number | null }) {
   return (
     <span
       className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${up
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-red-50 text-red-600"
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-red-50 text-red-600"
         }`}
     >
       {up ? "▲" : "▼"} {Math.abs(change)}% vs kemarin
@@ -774,46 +774,71 @@ export default function Page() {
           </span>
         </div>
 
-        {/* ── Trend Chart + Top Lists ── */}
         <div
           className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-up"
           style={{ animationDelay: "0.1s" }}
         >
-          {/* Revenue/Profit trend chart */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 lg:col-span-1">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="font-bold text-gray-800 text-sm">
-                Tren Omzet & Profit
-              </h2>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                7 hari
-              </span>
+          {/* Revenue/Profit trend chart — GANTI bagian ini */}
+          {canSeeFinancials ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 lg:col-span-1">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="font-bold text-gray-800 text-sm">
+                  Tren Omzet & Profit
+                </h2>
+                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  7 hari
+                </span>
+              </div>
+              <div className="flex gap-3 mb-4">
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                  <span className="w-5 h-0.5 bg-[#1a1a2e] inline-block rounded" />
+                  Omzet
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                  <span
+                    className="w-5 h-0.5 bg-emerald-500 inline-block rounded"
+                    style={{ borderTop: "2px dashed #10b981", background: "none" }}
+                  />
+                  Profit
+                </div>
+              </div>
+              {isLoading ? (
+                <Shimmer className="w-full h-32" />
+              ) : weeklyRevenue.length > 0 ? (
+                <div style={{ height: 140 }}>
+                  <Line data={trendChartData} options={trendOptions} />
+                </div>
+              ) : (
+                <p className="text-center text-gray-300 text-sm py-10">
+                  Belum ada data
+                </p>
+              )}
             </div>
-            <div className="flex gap-3 mb-4">
-              <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                <span className="w-5 h-0.5 bg-[#1a1a2e] inline-block rounded" />
-                Omzet
+          ) : (
+            // ── Transaksi per Hari sebagai pengganti untuk non-finansial ──
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-800 text-sm">
+                  📊 Transaksi per Hari
+                </h2>
+                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  7 hari
+                </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                <span
-                  className="w-5 h-0.5 bg-emerald-500 inline-block rounded"
-                  style={{ borderTop: "2px dashed #10b981", background: "none" }}
-                />
-                Profit
-              </div>
+              {isLoading ? (
+                <Shimmer className="w-full h-32" />
+              ) : weeklyTrxCount.length > 0 ? (
+                <div style={{ height: 140 }}>
+                  <Bar data={trxBarData} options={barOptions} />
+                </div>
+              ) : (
+                <p className="text-center text-gray-300 text-sm py-10">
+                  Belum ada data
+                </p>
+              )}
             </div>
-            {isLoading ? (
-              <Shimmer className="w-full h-32" />
-            ) : weeklyRevenue.length > 0 ? (
-              <div style={{ height: 140 }}>
-                <Line data={trendChartData} options={trendOptions} />
-              </div>
-            ) : (
-              <p className="text-center text-gray-300 text-sm py-10">
-                Belum ada data
-              </p>
-            )}
-          </div>
+          )}
+
 
           {/* Top Sales */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -901,42 +926,8 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Analytics Row 2 ── */}
-        <div
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 fade-up"
-          style={{ animationDelay: "0.13s" }}
-        >
-          {/* Donut sumber */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-800 text-sm">
-                🌐 Sumber Pembeli
-              </h2>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                7 hari
-              </span>
-            </div>
-            {isLoading ? (
-              <div className="flex items-center gap-4">
-                <Shimmer className="w-24 h-24 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Shimmer key={i} className="h-3" />
-                  ))}
-                </div>
-              </div>
-            ) : sourceDonutData.labels!.length > 0 ? (
-              <div style={{ height: 160 }}>
-                <Doughnut data={sourceDonutData} options={donutOptions} />
-              </div>
-            ) : (
-              <p className="text-center text-gray-300 text-sm py-10">
-                Belum ada data
-              </p>
-            )}
-          </div>
-
-          {/* Bar transactions per day */}
+        {/* Bar Transaksi per Hari — tampilkan hanya jika canSeeFinancials */}
+        {canSeeFinancials && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-gray-800 text-sm">
@@ -958,64 +949,87 @@ export default function Page() {
               </p>
             )}
           </div>
-        </div>
+        )}
 
-        {/* ── Recent Transactions ── */}
-        <div
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-up"
-          style={{ animationDelay: "0.16s" }}
-        >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-              Transaksi Terbaru <LiveDot />
+        {/* Bar transactions per day */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-800 text-sm">
+              📊 Transaksi per Hari
             </h2>
-            <a
-              href="/dashboard/transactions"
-              className="text-xs font-semibold text-gray-400 hover:text-gray-700 transition"
-            >
-              Lihat Semua →
-            </a>
+            <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              7 hari
+            </span>
           </div>
-
-          <div className="divide-y divide-gray-50">
-            {isLoading ? (
-              [1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="px-5 py-4 flex items-center gap-3"
-                >
-                  <Shimmer className="w-9 h-9 rounded-xl flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Shimmer className="w-36 h-3.5" />
-                    <Shimmer className="w-52 h-3" />
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <Shimmer className="w-24 h-4" />
-                    <Shimmer className="w-16 h-3" />
-                  </div>
-                </div>
-              ))
-            ) : transactions.length === 0 ? (
-              <div className="py-14 text-center">
-                <p className="text-2xl mb-2">📭</p>
-                <p className="text-gray-400 text-sm">
-                  Belum ada transaksi hari ini
-                </p>
-              </div>
-            ) : (
-              transactions.map((item) => (
-                <TransactionRow
-                  key={item.id}
-                  item={item}
-                  onPhotoClick={setPhotoModal}
-                  canSeeFinancials={canSeeFinancials}
-                />
-              ))
-            )}
-          </div>
+          {isLoading ? (
+            <Shimmer className="w-full h-32" />
+          ) : weeklyTrxCount.length > 0 ? (
+            <div style={{ height: 140 }}>
+              <Bar data={trxBarData} options={barOptions} />
+            </div>
+          ) : (
+            <p className="text-center text-gray-300 text-sm py-10">
+              Belum ada data
+            </p>
+          )}
         </div>
       </div>
-    </DashboardLayout>
+
+      {/* ── Recent Transactions ── */}
+      <div
+        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden fade-up"
+        style={{ animationDelay: "0.16s" }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+          <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+            Transaksi Terbaru <LiveDot />
+          </h2>
+          <a
+            href="/dashboard/transactions"
+            className="text-xs font-semibold text-gray-400 hover:text-gray-700 transition"
+          >
+            Lihat Semua →
+          </a>
+        </div>
+
+        <div className="divide-y divide-gray-50">
+          {isLoading ? (
+            [1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="px-5 py-4 flex items-center gap-3"
+              >
+                <Shimmer className="w-9 h-9 rounded-xl flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Shimmer className="w-36 h-3.5" />
+                  <Shimmer className="w-52 h-3" />
+                </div>
+                <div className="space-y-1 text-right">
+                  <Shimmer className="w-24 h-4" />
+                  <Shimmer className="w-16 h-3" />
+                </div>
+              </div>
+            ))
+          ) : transactions.length === 0 ? (
+            <div className="py-14 text-center">
+              <p className="text-2xl mb-2">📭</p>
+              <p className="text-gray-400 text-sm">
+                Belum ada transaksi hari ini
+              </p>
+            </div>
+          ) : (
+            transactions.map((item) => (
+              <TransactionRow
+                key={item.id}
+                item={item}
+                onPhotoClick={setPhotoModal}
+                canSeeFinancials={canSeeFinancials}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </DashboardLayout >
   );
 }
 
