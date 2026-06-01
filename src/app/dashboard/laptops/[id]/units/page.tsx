@@ -611,7 +611,7 @@ function BulkAddModal({
                     <button
                         onClick={handleSubmit}
                         disabled={!canSubmit}
-                        className="flex-1 h-11 bg-emerald-600 text-gray-800 rounded-xl text-sm font-semibold active:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold active:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {loading ? (
                             <>
