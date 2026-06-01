@@ -31,12 +31,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    const { data: unit } = await supabase
-      .from("laptop_units")
-      .select("id, laptop_id, status")
-      .eq("serial_number", transaction.serial_number)
-      .single();
-
+    // ── 1. Update status transaksi → CANCELLED ────────────────────────────
     const { error: updateTxError } = await supabase
       .from("transactions")
       .update({
@@ -55,6 +50,12 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         { status: 400 }
       );
     }
+
+    const { data: unit } = await supabase
+      .from("laptop_units")
+      .select("id, laptop_id, status")
+      .eq("serial_number", transaction.serial_number)
+      .single();
 
     if (unit) {
       await supabase
@@ -75,6 +76,25 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         .eq("id", unit.laptop_id);
     }
 
+    const { data: warranty } = await supabase
+      .from("warranties")
+      .select("id")
+      .eq("invoice_number", invoice)
+      .single();
+
+    if (warranty) {
+      await supabase
+        .from("warranties")
+        .update({
+          status:         "VOID",
+          last_edited_by: user.name,
+          last_edited_at: new Date().toISOString(),
+          notes:          `[VOID - transaksi di-restore oleh ${user.name}]`,
+        })
+        .eq("id", warranty.id);
+    }
+
+    // ── 4. Log aktivitas ──────────────────────────────────────────────────
     await logActivity({
       userId:      user.id,
       userName:    user.name,
@@ -87,9 +107,10 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     });
 
     return NextResponse.json({
-      success:      true,
-      message:      "Transaksi berhasil di-restore. Stok unit dikembalikan.",
-      unitRestored: !!unit,
+      success:         true,
+      message:         "Transaksi berhasil di-restore. Stok unit dikembalikan & garansi dibatalkan.",
+      unitRestored:    !!unit,
+      warrantyVoided:  !!warranty,
     });
   } catch (error) {
     console.error("[RESTORE] Error:", error);
