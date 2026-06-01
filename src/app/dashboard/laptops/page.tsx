@@ -754,8 +754,8 @@ export default function Page() {
                         <div className="flex flex-wrap items-end justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-xl flex items-center justify-center shadow-sm">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <div className="w-8 h-8 bg-linear-to-br from-[#1a1a2e] to-[#16213e] rounded-xl flex items-center justify-center shadow-sm">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2">
                                             <rect x="2" y="3" width="20" height="14" rx="2" />
                                             <line x1="8" y1="21" x2="16" y2="21" />
                                             <line x1="12" y1="17" x2="12" y2="21" />

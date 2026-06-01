@@ -5,20 +5,19 @@ import { supabase } from "@/services/supabase";
 import { ROLE_DEFAULT_REDIRECT, UserRole } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
-// Admin client untuk insert login_logs (bypass RLS)
+// Admin client untuk bypass RLS saat insert login_logs
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ── Helper: parse device dari User-Agent ──────────────────────────────────────
+// ── Parse browser + OS dari User-Agent ───────────────────────────────────────
 function parseDevice(ua: string): string {
     if (!ua) return "Unknown Device";
 
     let os = "Unknown OS";
     let browser = "Unknown Browser";
 
-    // OS
     if      (/Windows NT 10|Windows NT 11/i.test(ua)) os = "Windows 10/11";
     else if (/Windows NT 6\.3/i.test(ua))             os = "Windows 8.1";
     else if (/Windows NT 6\.1/i.test(ua))             os = "Windows 7";
@@ -28,25 +27,17 @@ function parseDevice(ua: string): string {
     else if (/iPad/i.test(ua))                        os = "iPad";
     else if (/Linux/i.test(ua))                       os = "Linux";
 
-    // Browser (urutan penting — Edge & Opera pakai Chrome engine)
-    if      (/Edg\//i.test(ua))    browser = "Edge";
-    else if (/OPR\//i.test(ua))    browser = "Opera";
-    else if (/Chrome\//i.test(ua)) browser = "Chrome";
-    else if (/Firefox\//i.test(ua))browser = "Firefox";
-    else if (/Safari\//i.test(ua)) browser = "Safari";
+    // Urutan penting: Edge & Opera pakai Chrome engine
+    if      (/Edg\//i.test(ua))     browser = "Edge";
+    else if (/OPR\//i.test(ua))     browser = "Opera";
+    else if (/Chrome\//i.test(ua))  browser = "Chrome";
+    else if (/Firefox\//i.test(ua)) browser = "Firefox";
+    else if (/Safari\//i.test(ua))  browser = "Safari";
 
     return `${browser} — ${os}`;
 }
 
-// ── Helper: ambil IP dari header ──────────────────────────────────────────────
-function getIp(request: Request): string {
-    // Next.js headers() tidak tersedia di Route Handler biasa, pakai request.headers
-    const forwarded = (request.headers as any).get?.("x-forwarded-for")
-                   ?? (request.headers as Headers).get("x-forwarded-for");
-    const realIp    = (request.headers as Headers).get("x-real-ip");
-    return forwarded?.split(",")[0]?.trim() ?? realIp ?? "Unknown";
-}
-
+// ── Catat login log (fire and forget, tidak memblokir response) ───────────────
 function recordLoginLog(payload: {
     user_id:    string | null;
     user_name:  string;
@@ -56,10 +47,13 @@ function recordLoginLog(payload: {
     ip_address: string;
     status:     "SUCCESS" | "FAILED";
 }) {
-    // Wrap Promise.resolve agar TypeScript mengenali sebagai Promise penuh
-    void Promise.resolve(
-        supabaseAdmin.from("login_logs").insert(payload)
-    ).catch(() => {});
+    (async () => {
+        try {
+            await supabaseAdmin.from("login_logs").insert(payload);
+        } catch {
+            // Non-critical, ignore error
+        }
+    })();
 }
 
 export async function POST(request: Request) {
@@ -67,10 +61,12 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { email, password } = body;
 
-        // Info device & IP diambil sekali di awal
-        const ua     = (request.headers as Headers).get("user-agent") ?? "";
+        // Ambil device & IP dari request headers
+        const ua     = request.headers.get("user-agent") ?? "";
         const device = parseDevice(ua);
-        const ip     = getIp(request);
+        const ip     = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+                    ?? request.headers.get("x-real-ip")
+                    ?? "Unknown";
 
         // ── Cari user ─────────────────────────────────────────────────────────
         const { data: user, error } = await supabase
@@ -80,7 +76,7 @@ export async function POST(request: Request) {
             .single();
 
         if (error || !user) {
-            // Catat login gagal — email tidak ditemukan
+            // Catat: email tidak ditemukan
             recordLoginLog({
                 user_id:    null,
                 user_name:  email ?? "Unknown",
@@ -101,7 +97,7 @@ export async function POST(request: Request) {
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
-            // Catat login gagal — password salah
+            // Catat: password salah — user ditemukan tapi salah password
             recordLoginLog({
                 user_id:    user.id,
                 user_name:  user.name,
@@ -127,7 +123,7 @@ export async function POST(request: Request) {
 
         console.log("LOGIN SUCCESS:", user.role);
 
-        // ── Catat login berhasil ──────────────────────────────────────────────
+        // ── Catat: login berhasil ─────────────────────────────────────────────
         recordLoginLog({
             user_id:    user.id,
             user_name:  user.name,
@@ -138,7 +134,7 @@ export async function POST(request: Request) {
             status:     "SUCCESS",
         });
 
-        // ── Response & cookie ─────────────────────────────────────────────────
+        // ── Set cookie & response ─────────────────────────────────────────────
         const redirect = ROLE_DEFAULT_REDIRECT[user.role as UserRole] ?? "/payment/create";
 
         const response = NextResponse.json(
