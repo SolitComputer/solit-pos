@@ -783,7 +783,7 @@ export default function Page() {
                                 {canCreateLaptop && (
                                     <button
                                         onClick={openCreate}
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] rounded-xl text-sm font-medium text-gray-700 hover:shadow-md transition-all shadow-sm"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] rounded-xl text-sm font-medium text-white hover:shadow-md transition-all shadow-sm"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1401,7 +1401,7 @@ export default function Page() {
                             <button
                                 type="submit"
                                 disabled={formLoading}
-                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-black rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
+                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
                             >
                                 {formLoading ? (
                                     <span className="flex items-center justify-center gap-2">
