@@ -10,20 +10,20 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { data: laptop, error } = await supabase
       .from("laptops")
       .insert({
-        laptop_name:    body.laptop_name,
-        brand:          body.brand,
-        cpu:            body.cpu,
-        ram:            body.ram,
-        storage:        body.storage,
-        gpu:            body.gpu,
-        display:        body.display,
-        serial_number:  body.serial_number,
-        purchase_price: Number(body.purchase_price),
-        selling_price:  Number(body.selling_price),
-        qty:            Number(body.qty),
-        status:         body.status,
+        laptop_name: body.laptop_name,
+        brand: body.brand,
+        cpu: body.cpu,
+        ram: body.ram,
+        storage: body.storage,
+        gpu: body.gpu,
+        display: body.display,
+        serial_number: body.serial_number,
+        purchase_price: Math.round(Number(body.purchase_price) || 0),
+        selling_price: Math.round(Number(body.selling_price) || 0),
+        qty: Number(body.qty),
+        status: body.status,
         condition_note: body.condition_note,
-        notes:          body.notes,
+        notes: body.notes,
       })
       .select()
       .single();
@@ -36,14 +36,14 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "CREATE",
-      entity:      "laptop",
-      entityId:    laptop.id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "CREATE",
+      entity: "laptop",
+      entityId: laptop.id,
       entityLabel: laptop.laptop_name,
-      afterData:   laptop,
+      afterData: laptop,
     });
 
     return NextResponse.json({ success: true, data: laptop });

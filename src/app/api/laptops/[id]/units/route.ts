@@ -47,11 +47,10 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         serial_number,
         grade,
         condition_note,
-        purchase_price,
-        selling_price,
+        purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
+        selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
         status,
         notes,
-        // Kalau ada received_at dari form, pakai itu. Kalau tidak, biarkan DB pakai default now()
         ...(received_at ? { created_at: received_at } : {}),
       })
       .select()
@@ -66,14 +65,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "CREATE",
-      entity:      "unit",
-      entityId:    data.id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "CREATE",
+      entity: "unit",
+      entityId: data.id,
       entityLabel: `SN: ${data.serial_number}${laptop ? ` (${laptop.laptop_name})` : ""}`,
-      afterData:   data,
+      afterData: data,
     });
 
     return NextResponse.json({ success: true, data });

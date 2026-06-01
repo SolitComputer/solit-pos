@@ -7,7 +7,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const { data, error } = await supabase
       .from("laptops")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("laptop_name", { ascending: true });
 
     if (error) {
       return NextResponse.json(

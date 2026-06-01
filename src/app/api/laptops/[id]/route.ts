@@ -45,16 +45,16 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { data, error } = await supabase
       .from("laptops")
       .update({
-        laptop_name:    body.laptop_name,
-        brand:          body.brand,
-        cpu:            body.cpu,
-        ram:            body.ram,
-        storage:        body.storage,
-        gpu:            body.gpu,
-        display:        body.display,
+        laptop_name: body.laptop_name,
+        brand: body.brand,
+        cpu: body.cpu,
+        ram: body.ram,
+        storage: body.storage,
+        gpu: body.gpu,
+        display: body.display,
         condition_note: body.condition_note,
-        selling_price:  Number(body.selling_price),
-        notes:          body.notes,
+        selling_price: Math.round(Number(body.selling_price)),
+        notes: body.notes,
       })
       .eq("id", id)
       .select()
@@ -68,15 +68,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "EDIT",
-      entity:      "laptop",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "laptop",
+      entityId: id,
       entityLabel: before?.laptop_name ?? data.laptop_name,
-      beforeData:  before,
-      afterData:   data,
+      beforeData: before,
+      afterData: data,
     });
 
     return NextResponse.json({ success: true, data });
@@ -119,14 +119,14 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "DELETE",
-      entity:      "laptop",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "DELETE",
+      entity: "laptop",
+      entityId: id,
       entityLabel: laptop?.laptop_name,
-      beforeData:  laptop,
+      beforeData: laptop,
     });
 
     return NextResponse.json({ success: true });
@@ -138,6 +138,6 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET    = withAuth(getHandler);
-export const PUT    = withAuth(putHandler,    PERMISSIONS.EDIT_LAPTOP);
+export const GET = withAuth(getHandler);
+export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
 export const DELETE = withAuth(deleteHandler, ["ADMIN", "PENGELOLA_BARANG"]);

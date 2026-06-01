@@ -21,7 +21,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         selling_price: number;
         status: string;
         notes: string;
-        received_at?: string; 
+        received_at?: string;
       }[];
     };
 
@@ -59,8 +59,8 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       serial_number: u.serial_number.trim(),
       grade: u.grade || "B",
       condition_note: u.condition_note || "",
-      purchase_price: Number(u.purchase_price) || 0,
-      selling_price: Number(u.selling_price) || 0,
+      purchase_price: Math.round(Number(u.purchase_price) || 0),
+      selling_price: Math.round(Number(u.selling_price) || 0),
       status: u.status || "SIAP_JUAL",
       notes: u.notes || "",
       ...(u.received_at ? { created_at: u.received_at } : {}),

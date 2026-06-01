@@ -44,14 +44,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { data, error } = await supabase
       .from("laptop_units")
       .update({
-        ...(serial_number  !== undefined && { serial_number }),
-        ...(grade          !== undefined && { grade }),
+        ...(serial_number !== undefined && { serial_number }),
+        ...(grade !== undefined && { grade }),
         ...(condition_note !== undefined && { condition_note }),
-        ...(purchase_price !== undefined && { purchase_price: Number(purchase_price) }),
-        ...(selling_price  !== undefined && { selling_price:  Number(selling_price) }),
-        ...(status         !== undefined && { status }),
-        ...(notes          !== undefined && { notes }),
-        // Update tanggal masuk jika dikirim
+        ...(purchase_price !== undefined && { purchase_price: Math.round(Number(purchase_price)) }),
+        ...(selling_price !== undefined && { selling_price: Math.round(Number(selling_price)) }),
+        ...(status !== undefined && { status }),
+        ...(notes !== undefined && { notes }),
         ...(body.received_at !== undefined && body.received_at !== "" && {
           created_at: body.received_at
         }),
@@ -63,15 +62,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (error) throw error;
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "EDIT",
-      entity:      "unit",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "unit",
+      entityId: id,
       entityLabel: `SN: ${before?.serial_number ?? serial_number ?? id}`,
-      beforeData:  before,
-      afterData:   data,
+      beforeData: before,
+      afterData: data,
     });
 
     return NextResponse.json({ success: true, data });
@@ -102,14 +101,14 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (error) throw error;
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "DELETE",
-      entity:      "unit",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "DELETE",
+      entity: "unit",
+      entityId: id,
       entityLabel: `SN: ${unit?.serial_number ?? id}`,
-      beforeData:  unit,
+      beforeData: unit,
     });
 
     return NextResponse.json({ success: true });
@@ -122,5 +121,5 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const PUT    = withAuth(putHandler,    PERMISSIONS.EDIT_LAPTOP);
+export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
 export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_LAPTOP);
