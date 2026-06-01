@@ -52,8 +52,9 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             );
         }
 
-        const inventory_price = Number(unit.selling_price) || Number(laptop.selling_price) || 0;
+        const inventory_price = Number(unit.purchase_price) || 0;
         const deal_price = Number(body.amount) || 0;
+        const other = deal_price - inventory_price;
 
         const { data, error } = await supabase
             .from("transactions")

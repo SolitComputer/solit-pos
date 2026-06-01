@@ -302,10 +302,7 @@ function TransactionRow({
   onPhotoClick: (url: string) => void;
   canSeeFinancials: boolean;
 }) {
-  const profit =
-    item.inventory_price && item.inventory_price > 0
-      ? (item.deal_price || item.amount) - item.inventory_price
-      : item.other || 0;
+  const profit = item.other || 0;
 
   const displayAmount = item.deal_price || item.amount;
   const timeStr = new Date(item.paid_at || item.created_at).toLocaleTimeString(
