@@ -12,7 +12,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const body = await req.json();
 
-    const { serial_number, grade, condition_note, purchase_price, selling_price, status, notes } = body;
+    const {
+      serial_number, grade, condition_note,
+      purchase_price, selling_price, status, notes,
+    } = body;
 
     // Cek duplicate SN
     if (serial_number) {
@@ -45,9 +48,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         ...(grade          !== undefined && { grade }),
         ...(condition_note !== undefined && { condition_note }),
         ...(purchase_price !== undefined && { purchase_price: Number(purchase_price) }),
-        ...(selling_price  !== undefined && { selling_price: Number(selling_price) }),
+        ...(selling_price  !== undefined && { selling_price:  Number(selling_price) }),
         ...(status         !== undefined && { status }),
         ...(notes          !== undefined && { notes }),
+        // Update tanggal masuk jika dikirim
+        ...(body.received_at !== undefined && body.received_at !== "" && {
+          created_at: body.received_at
+        }),
       })
       .eq("id", id)
       .select()
@@ -81,7 +88,6 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
-    // Ambil data sebelum dihapus
     const { data: unit } = await supabase
       .from("laptop_units")
       .select("*")

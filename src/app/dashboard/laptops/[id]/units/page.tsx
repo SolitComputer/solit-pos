@@ -18,6 +18,7 @@ interface LaptopUnit {
     selling_price: number;
     status: string;
     notes: string;
+    received_at?: string;
     created_at: string;
 }
 
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
     selling_price: "",
     status: "SIAP_JUAL",
     notes: "",
+    received_at: "",
 };
 
 function sortUnits(units: LaptopUnit[]): LaptopUnit[] {
@@ -162,6 +164,7 @@ function BulkAddModal({
 
     const [excelRows, setExcelRows] = useState<any[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [receivedAt, setReceivedAt] = useState("");
 
     function generateRange(from: string, to: string): string[] {
         const fromTrimmed = from.trim();
@@ -259,6 +262,9 @@ function BulkAddModal({
             selling_price: Number(sellingPrice) || 0,
             condition_note: conditionNote,
             notes: "",
+            received_at: receivedAt
+                ? new Date(receivedAt).toISOString()
+                : undefined,
         };
 
         if (tab === "range") {
@@ -586,6 +592,19 @@ function BulkAddModal({
                                     className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Tanggal Masuk
+                                    <span className="text-gray-300 ml-1 font-normal">(semua unit)</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={receivedAt}
+                                    onChange={e => setReceivedAt(e.target.value)}
+                                    max={new Date().toISOString().split("T")[0]}
+                                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                />
+                            </div>
                         </div>
                     )}
 
@@ -672,6 +691,15 @@ export default function UnitsPage() {
             .then(r => setUserRole(r.user?.role ?? null))
             .catch(() => setUserRole(null));
     }, []);
+
+    const fmtDate = (iso: string) => {
+        if (!iso) return "—";
+        return new Intl.DateTimeFormat("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        }).format(new Date(iso));
+    };
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -798,6 +826,9 @@ export default function UnitsPage() {
             selling_price: String(unit.selling_price || ""),
             status: unit.status,
             notes: unit.notes || "",
+            received_at: unit.created_at
+                ? new Date(unit.created_at).toISOString().split("T")[0]
+                : "",
         });
         setShowForm(true);
     };
@@ -816,11 +847,14 @@ export default function UnitsPage() {
                 ...formData,
                 purchase_price: Number(formData.purchase_price),
                 selling_price: Number(formData.selling_price),
+                // Konversi ke ISO string jika ada, hapus kalau kosong
+                ...(formData.received_at
+                    ? { received_at: new Date(formData.received_at).toISOString() }
+                    : { received_at: undefined }
+                ),
             };
 
-            const url = editingUnit
-                ? `/api/units/${editingUnit.id}`
-                : `/api/laptops/${laptopId}/units`;
+            const url = editingUnit ? `/api/units/${editingUnit.id}` : `/api/laptops/${laptopId}/units`;
             const method = editingUnit ? "PUT" : "POST";
 
             const res = await fetch(url, {
@@ -1195,6 +1229,7 @@ export default function UnitsPage() {
                                             <Th>Serial Number</Th>
                                             <Th>Grade</Th>
                                             <Th>Kondisi</Th>
+                                            <Th>Tgl Masuk</Th>
                                             {canSeePriceInfo && <Th right>Harga Modal</Th>}
                                             <Th right>Harga Jual</Th>
                                             {canSeePriceInfo && <Th right>Margin</Th>}
@@ -1248,6 +1283,11 @@ export default function UnitsPage() {
                                                     <td className="px-4 py-3 max-w-[180px]">
                                                         <span className="text-xs text-gray-600 line-clamp-2" title={unit.condition_note}>
                                                             {unit.condition_note || <span className="text-gray-300">—</span>}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <span className="text-xs text-gray-500">
+                                                            {fmtDate(unit.created_at)}
                                                         </span>
                                                     </td>
                                                     {canSeePriceInfo && (
@@ -1472,6 +1512,27 @@ export default function UnitsPage() {
                                         onChange={handleChange}
                                         className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
                                     />
+                                </div>
+
+                                {/* Tanggal Masuk */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                        Tanggal Masuk
+                                        <span className="text-gray-300 ml-1 font-normal">(opsional, default hari ini)</span>
+                                    </label>
+                                    <input
+                                        name="received_at"
+                                        type="date"
+                                        value={formData.received_at}
+                                        onChange={handleChange}
+                                        max={new Date().toISOString().split("T")[0]} // tidak bisa pilih masa depan
+                                        className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                    />
+                                    {formData.received_at && (
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            Barang masuk: {fmtDate(formData.received_at)}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>

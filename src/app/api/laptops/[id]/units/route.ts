@@ -34,7 +34,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const body = await req.json();
 
-    const { serial_number, grade, condition_note, purchase_price, selling_price, status, notes } = body;
+    const {
+      serial_number, grade, condition_note,
+      purchase_price, selling_price, status, notes,
+      received_at, // ← tambah ini
+    } = body;
 
     const { data, error } = await supabase
       .from("laptop_units")
@@ -47,13 +51,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         selling_price,
         status,
         notes,
+        // Kalau ada received_at dari form, pakai itu. Kalau tidak, biarkan DB pakai default now()
+        ...(received_at ? { created_at: received_at } : {}),
       })
       .select()
       .single();
 
     if (error) throw error;
 
-    // Ambil nama laptop untuk label
     const { data: laptop } = await supabase
       .from("laptops")
       .select("laptop_name")
@@ -61,14 +66,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     await logActivity({
-      userId: user.id,
-      userName: user.name,
-      userRole: user.role,
-      action: "CREATE",
-      entity: "unit",
-      entityId: data.id,
+      userId:      user.id,
+      userName:    user.name,
+      userRole:    user.role,
+      action:      "CREATE",
+      entity:      "unit",
+      entityId:    data.id,
       entityLabel: `SN: ${data.serial_number}${laptop ? ` (${laptop.laptop_name})` : ""}`,
-      afterData: data,
+      afterData:   data,
     });
 
     return NextResponse.json({ success: true, data });

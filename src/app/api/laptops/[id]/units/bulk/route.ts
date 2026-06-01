@@ -14,13 +14,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { units } = body as {
       units: {
-        serial_number:  string;
-        grade:          string;
+        serial_number: string;
+        grade: string;
         condition_note: string;
         purchase_price: number;
-        selling_price:  number;
-        status:         string;
-        notes:          string;
+        selling_price: number;
+        status: string;
+        notes: string;
+        received_at?: string; 
       }[];
     };
 
@@ -54,14 +55,15 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const payload = units.map(u => ({
-      laptop_id:      laptopId,
-      serial_number:  u.serial_number.trim(),
-      grade:          u.grade || "B",
+      laptop_id: laptopId,
+      serial_number: u.serial_number.trim(),
+      grade: u.grade || "B",
       condition_note: u.condition_note || "",
       purchase_price: Number(u.purchase_price) || 0,
-      selling_price:  Number(u.selling_price) || 0,
-      status:         u.status || "SIAP_JUAL",
-      notes:          u.notes || "",
+      selling_price: Number(u.selling_price) || 0,
+      status: u.status || "SIAP_JUAL",
+      notes: u.notes || "",
+      ...(u.received_at ? { created_at: u.received_at } : {}),
     }));
 
     const { data, error } = await supabase
@@ -80,14 +82,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     // Log aktivitas
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "CREATE",
-      entity:      "unit",
-      entityId:    laptopId,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "CREATE",
+      entity: "unit",
+      entityId: laptopId,
       entityLabel: `Bulk ${units.length} unit${laptop ? ` (${laptop.laptop_name})` : ""}`,
-      afterData:   { count: units.length, serial_numbers: snList },
+      afterData: { count: units.length, serial_numbers: snList },
     });
 
     return NextResponse.json({
