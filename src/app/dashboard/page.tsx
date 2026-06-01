@@ -926,31 +926,6 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Bar Transaksi per Hari — tampilkan hanya jika canSeeFinancials */}
-        {canSeeFinancials && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-800 text-sm">
-                📊 Transaksi per Hari
-              </h2>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                7 hari
-              </span>
-            </div>
-            {isLoading ? (
-              <Shimmer className="w-full h-32" />
-            ) : weeklyTrxCount.length > 0 ? (
-              <div style={{ height: 140 }}>
-                <Bar data={trxBarData} options={barOptions} />
-              </div>
-            ) : (
-              <p className="text-center text-gray-300 text-sm py-10">
-                Belum ada data
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Bar transactions per day */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
