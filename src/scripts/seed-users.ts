@@ -29,6 +29,9 @@ const users = [
   { name: "Rayhan", email: "rayhan.acc@solit-pos.com", password: "Rayhan@Acc25", role: "ACCOUNTING" },
 
   { name: "David", email: "david.tek@solit-pos.com", password: "David@Tek25", role: "TEKNISI" },
+
+  { name: "Tengku", email: "tengku.ant@solit-pos.com", password: "Tengku@Ant25", role: "PENGANTARAN" },
+  { name: "Herry", email: "herry.ant@solit-pos.com", password: "Herry@Ant25", role: "PENGANTARAN" },
 ];
 
 async function seed() {

@@ -230,6 +230,29 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
+  PENGANTARAN: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+      ],
+    },
+  ],
 };
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -239,6 +262,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
   PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
+  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
 };
 
 function getInitials(name: string): string {
