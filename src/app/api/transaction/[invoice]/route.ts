@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { logActivity } from "@/lib/activityLogger";
 
 interface Props {
   params: Promise<{ invoice: string }>;
 }
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
@@ -34,15 +34,19 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-// ── PUT — Edit transaksi (hanya ADMIN & KEPALA_SALES) ────────────────────────
 async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
     const body = await req.json();
 
-    // Field yang boleh diedit
-    const allowedFields: Record<string, any> = {};
+    // Ambil data sebelum diubah
+    const { data: before } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("invoice_number", invoice)
+      .single();
 
+    const allowedFields: Record<string, any> = {};
     if (body.amount !== undefined) allowedFields.amount = Number(body.amount);
     if (body.deal_price !== undefined) allowedFields.deal_price = Number(body.deal_price);
     if (body.payment_method !== undefined) allowedFields.payment_method = body.payment_method;
@@ -60,21 +64,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
 
-    // Hitung ulang "other" kalau amount atau inventory_price berubah
     if (body.deal_price !== undefined || body.amount !== undefined) {
-      // Ambil inventory_price existing dulu
-      const { data: existing } = await supabase
-        .from("transactions")
-        .select("inventory_price")
-        .eq("invoice_number", invoice)
-        .single();
-
-      const inventoryPrice = existing?.inventory_price ?? 0;
+      const inventoryPrice = before?.inventory_price ?? 0;
       const dealPrice = body.deal_price ?? body.amount ?? 0;
       allowedFields.other = Number(dealPrice) - Number(inventoryPrice);
     }
 
-    // Log siapa yang edit
     allowedFields.last_edited_by = user.name;
     allowedFields.last_edited_at = new Date().toISOString();
 
@@ -92,6 +87,18 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "transaction",
+      entityId: before?.id,
+      entityLabel: `${invoice} — ${before?.customer_name ?? "—"}`,
+      beforeData: before,
+      afterData: data,
+    });
+
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("PUT transaction error:", error);
@@ -106,6 +113,4 @@ export const GET = withAuth(
   getHandler,
   PERMISSIONS.EDIT_TRANSACTION.concat(["ACCOUNTING"])
 );
-
-// Hanya ADMIN & KEPALA_SALES yang bisa edit transaksi
 export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_TRANSACTION);

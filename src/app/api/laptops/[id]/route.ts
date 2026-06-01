@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { logActivity } from "@/lib/activityLogger";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-// GET — semua role yang login boleh lihat detail laptop
 async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
@@ -30,11 +30,17 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-// PUT — hanya ADMIN & PENGELOLA_BARANG
 async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
     const body = await req.json();
+
+    // Ambil data sebelum diubah untuk before_data
+    const { data: before } = await supabase
+      .from("laptops")
+      .select("*")
+      .eq("id", id)
+      .single();
 
     const { data, error } = await supabase
       .from("laptops")
@@ -61,6 +67,18 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    await logActivity({
+      userId:      user.id,
+      userName:    user.name,
+      userRole:    user.role,
+      action:      "EDIT",
+      entity:      "laptop",
+      entityId:    id,
+      entityLabel: before?.laptop_name ?? data.laptop_name,
+      beforeData:  before,
+      afterData:   data,
+    });
+
     return NextResponse.json({ success: true, data });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
@@ -70,6 +88,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
+
+    const { data: laptop } = await supabase
+      .from("laptops")
+      .select("*")
+      .eq("id", id)
+      .single();
 
     const { error: unitsError } = await supabase
       .from("laptop_units")
@@ -83,16 +107,9 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    await supabase
-      .from("warranties")
-      .delete()
-      .eq("laptop_id", id);
+    await supabase.from("warranties").delete().eq("laptop_id", id);
 
-    // Baru hapus laptop-nya
-    const { error } = await supabase
-      .from("laptops")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("laptops").delete().eq("id", id);
 
     if (error) {
       return NextResponse.json(
@@ -100,6 +117,17 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
         { status: 400 }
       );
     }
+
+    await logActivity({
+      userId:      user.id,
+      userName:    user.name,
+      userRole:    user.role,
+      action:      "DELETE",
+      entity:      "laptop",
+      entityId:    id,
+      entityLabel: laptop?.laptop_name,
+      beforeData:  laptop,
+    });
 
     return NextResponse.json({ success: true });
   } catch {

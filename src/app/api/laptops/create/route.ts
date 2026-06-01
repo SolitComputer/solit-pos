@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { logActivity } from "@/lib/activityLogger";
 
-async function handler(req: NextRequest, ctx: any, user: AuthUser) {
+async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
 
-    const { data, error } = await supabase
+    const { data: laptop, error } = await supabase
       .from("laptops")
       .insert({
         laptop_name:    body.laptop_name,
@@ -34,9 +35,20 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error(error);
+    await logActivity({
+      userId:      user.id,
+      userName:    user.name,
+      userRole:    user.role,
+      action:      "CREATE",
+      entity:      "laptop",
+      entityId:    laptop.id,
+      entityLabel: laptop.laptop_name,
+      afterData:   laptop,
+    });
+
+    return NextResponse.json({ success: true, data: laptop });
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { success: false, message: "Internal server error" },
       { status: 500 }

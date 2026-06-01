@@ -550,38 +550,30 @@ export default function Page() {
         });
 
         const COLOR = {
-            headerBg: "FF1E293B", headerFg: "FFFFFFFF",
+            headerBg: "FF4472C4", headerFg: "FFFFFFFF",
             siapBg: "FFD1FAE5", siapFg: "FF065F46",
             belumBg: "FFFEF3C7", belumFg: "FF78350F",
             serviceBg: "FFDBEAFE", serviceFg: "FF1E3A5F",
             rowEven: "FFF8FAFC", rowOdd: "FFFFFFFF",
             totalBg: "FFEFF6FF", totalFg: "FF1E40AF",
-            borderColor: "FFE2E8F0", profitFg: "FF065F46",
-            lossFg: "FF991B1B", subTextFg: "FF64748B",
+            borderColor: "FFE2E8F0", subTextFg: "FF64748B",
         };
-
         ws.columns = [
-            { header: "No", key: "no" },
-            { header: "Nama Laptop", key: "nama" },
-            { header: "Brand", key: "brand" },
-            { header: "CPU", key: "cpu" },
-            { header: "RAM", key: "ram" },
-            { header: "Storage", key: "storage" },
-            { header: "GPU", key: "gpu" },
-            { header: "Display", key: "display" },
-            { header: "Kondisi", key: "kondisi" },
-            { header: "Harga Jual", key: "harga_jual" },
-            { header: "Stok", key: "stok" },
-            { header: "Status", key: "status" },
-            { header: "Notes", key: "notes" },
-            { header: "Tgl Masuk", key: "created" },
+            { header: "No", key: "no", width: 6 },
+            { header: "Product", key: "product", width: 35 },
+            { header: "CPU", key: "cpu", width: 28 },
+            { header: "RAM", key: "ram", width: 20 }, // ← lebih lebar
+            { header: "HDD/SSD", key: "storage", width: 16 },
+            { header: "Stock", key: "stock", width: 8 },
+            { header: "Price Store", key: "price_store", width: 18 },
         ];
 
+        // ── Style header ──────────────────────────────────────────────────────────
         const headerRow = ws.getRow(1);
-        headerRow.height = 30;
+        headerRow.height = 32;
         headerRow.eachCell(cell => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-            cell.font = { bold: true, size: 10, color: { argb: COLOR.headerFg }, name: "Arial" };
+            cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
             cell.border = {
                 top: { style: "thin", color: { argb: COLOR.borderColor } },
                 left: { style: "thin", color: { argb: COLOR.borderColor } },
@@ -591,34 +583,26 @@ export default function Page() {
             cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
+        // ── Data rows ─────────────────────────────────────────────────────────────
         filteredLaptops.forEach((item, idx) => {
             const isEven = idx % 2 === 0;
             const rowBg = isEven ? COLOR.rowEven : COLOR.rowOdd;
-            const statusMap: Record<string, string> = {
-                SIAP_JUAL: "Siap Jual", BELUM_SIAP: "Belum Siap", SERVICE: "Service", SOLD: "Sold",
-            };
+
             const row = ws.addRow({
                 no: idx + 1,
-                nama: item.laptop_name || "",
-                brand: item.brand || "",
+                product: item.laptop_name || "",
                 cpu: item.cpu || "",
                 ram: item.ram || "",
                 storage: item.storage || "",
-                gpu: item.gpu || "",
-                display: item.display || "",
-                kondisi: item.condition_note || "",
-                harga_jual: item.selling_price || 0,
-                stok: item.qty ?? 0,
-                status: statusMap[item.status] || item.status,
-                notes: item.notes || "",
-                created: new Date(item.created_at).toLocaleDateString("id-ID", {
-                    day: "2-digit", month: "short", year: "numeric",
-                }),
+                stock: item.qty ?? 0,
+                price_store: item.selling_price || 0,
             });
 
             row.height = 22;
             row.eachCell((cell, colNum) => {
                 const key = ws.getColumn(colNum).key as string;
+
+                // Base style semua cell
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
                 cell.border = {
                     top: { style: "hair", color: { argb: COLOR.borderColor } },
@@ -627,32 +611,45 @@ export default function Page() {
                     right: { style: "hair", color: { argb: COLOR.borderColor } },
                 };
                 cell.font = { size: 10, name: "Arial" };
+                cell.alignment = { vertical: "middle" };
 
-                if (key === "no") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } }; }
-                else if (key === "harga_jual") { cell.numFmt = '"Rp "#,##0'; cell.alignment = { horizontal: "right", vertical: "middle" }; }
-                else if (key === "stok") { cell.alignment = { horizontal: "center", vertical: "middle" }; if ((item.qty ?? 0) === 0) cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF991B1B" } }; }
-                else if (key === "status") {
+                if (key === "no") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    const s = item.status;
-                    if (s === "SIAP_JUAL") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } }; }
-                    else if (s === "BELUM_SIAP") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.belumBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.belumFg } }; }
-                    else if (s === "SERVICE") { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.serviceBg } }; cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.serviceFg } }; }
+                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+                } else if (key === "product") {
+                    cell.font = { size: 10, name: "Arial", bold: true };
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                } else if (key === "cpu" || key === "ram" || key === "storage") {
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                } else if (key === "stock") {
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                    if ((item.qty ?? 0) === 0) {
+                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF991B1B" } };
+                    }
+                } else if (key === "price_store") {
+                    cell.numFmt = '"Rp "#,##0';
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
                 }
-                else if (key === "nama") { cell.alignment = { horizontal: "left", vertical: "middle" }; cell.font = { size: 10, name: "Arial", bold: true }; }
-                else if (key === "created") { cell.alignment = { horizontal: "center", vertical: "middle" }; cell.font = { size: 9, name: "Arial", color: { argb: COLOR.subTextFg } }; }
-                else { cell.alignment = { horizontal: "left", vertical: "middle" }; }
             });
         });
 
+        // ── Total row ─────────────────────────────────────────────────────────────
         const dataStart = 2;
         const dataEnd = filteredLaptops.length + 1;
         const totalRow = ws.addRow({
-            no: "", nama: `TOTAL  (${filteredLaptops.length} unit)`,
-            harga_jual: { formula: `SUM(J${dataStart}:J${dataEnd})` },
-            stok: { formula: `SUM(K${dataStart}:K${dataEnd})` },
+            no: "",
+            product: `TOTAL  (${filteredLaptops.length} laptop)`,
+            cpu: "",
+            ram: "",
+            storage: "",
+            stock: { formula: `SUM(F${dataStart}:F${dataEnd})` },
+            price_store: { formula: `SUM(G${dataStart}:G${dataEnd})` },
         });
+
         totalRow.height = 26;
-        totalRow.eachCell(cell => {
+        totalRow.eachCell((cell, colNum) => {
+            const key = ws.getColumn(colNum).key as string;
+
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.totalBg } };
             cell.font = { bold: true, size: 10, name: "Arial", color: { argb: COLOR.totalFg } };
             cell.border = {
@@ -661,25 +658,20 @@ export default function Page() {
                 bottom: { style: "medium", color: { argb: "FF93C5FD" } },
                 right: { style: "hair", color: { argb: COLOR.borderColor } },
             };
+
+            if (key === "price_store") {
+                cell.numFmt = '"Rp "#,##0';
+                cell.alignment = { horizontal: "center", vertical: "middle" };
+            } else {
+                cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
         });
 
-        ws.columns.forEach((col, colIndex) => {
-            let maxLen = col.header ? String(col.header).length : 0;
-            filteredLaptops.forEach((item) => {
-                const rowNum = filteredLaptops.indexOf(item) + 2;
-                const cell = ws.getCell(rowNum, colIndex + 1);
-                if (cell.value !== null && cell.value !== undefined) {
-                    const cellText = typeof cell.value === "object" && "formula" in (cell.value as object)
-                        ? String(col.header ?? "")
-                        : String(cell.value);
-                    if (cellText.length > maxLen) maxLen = cellText.length;
-                }
-            });
-            col.width = Math.min(45, Math.max(8, maxLen + 2));
-        });
-
+        // ── Download ──────────────────────────────────────────────────────────────
         const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = `data_laptop_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -1409,7 +1401,7 @@ export default function Page() {
                             <button
                                 type="submit"
                                 disabled={formLoading}
-                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
+                                className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-black rounded-xl text-sm font-medium hover:shadow-md transition disabled:opacity-50"
                             >
                                 {formLoading ? (
                                     <span className="flex items-center justify-center gap-2">
