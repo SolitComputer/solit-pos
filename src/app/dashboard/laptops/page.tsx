@@ -346,7 +346,12 @@ export default function Page() {
         try {
             const res = await fetch("/api/laptops");
             const result = await res.json();
-            setLaptops(result.data || []);
+            const normalized = (result.data || []).map((l: Laptop) => ({
+                ...l,
+                selling_price: Math.round(Number(l.selling_price) || 0),
+                qty: Number(l.qty) || 0,
+            }));
+            setLaptops(normalized);
         } catch {
             setLaptops([]);
         } finally {

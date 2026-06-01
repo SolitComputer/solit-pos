@@ -710,8 +710,21 @@ export default function UnitsPage() {
             ]);
             const laptopData = await laptopRes.json();
             const unitsData = await unitsRes.json();
-            if (laptopData.data) setLaptop(laptopData.data);
-            if (unitsData.data) setUnits(unitsData.data);
+
+            if (laptopData.data) {
+                setLaptop({
+                    ...laptopData.data,
+                    selling_price: Math.round(Number(laptopData.data.selling_price) || 0),
+                });
+            }
+            if (unitsData.data) {
+                const normalized: LaptopUnit[] = (unitsData.data).map((u: LaptopUnit) => ({
+                    ...u,
+                    purchase_price: Math.round(Number(u.purchase_price) || 0),
+                    selling_price: Math.round(Number(u.selling_price) || 0),
+                }));
+                setUnits(normalized);
+            }
         } catch { /* ignore */ } finally {
             setIsLoading(false);
         }
