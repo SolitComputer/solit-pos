@@ -16,7 +16,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             );
         }
 
-        const invoice_number = generateInvoice();
+        const invoice_number = await generateInvoice();
 
         const { data: unit, error: unitError } = await supabase
             .from("laptop_units")
