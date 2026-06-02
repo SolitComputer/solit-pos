@@ -10,7 +10,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here — tetap kosong seperti semula */
+  turbopack: {}, // ← tambah ini untuk silence Turbopack warning
 };
 
 export default withPWA(nextConfig);
