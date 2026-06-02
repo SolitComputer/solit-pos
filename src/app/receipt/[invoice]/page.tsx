@@ -44,29 +44,29 @@ export default async function Page(props: Props) {
 
   const pickupDate = data.pickup_date
     ? new Date(data.pickup_date).toLocaleDateString("id-ID", {
-        weekday: "long", day: "numeric", month: "long", year: "numeric",
-      })
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    })
     : null;
 
   // ── Format garansi ────────────────────────────────────────────────────────
   const warrantyEndDate = warranty?.warranty_end
     ? new Date(warranty.warranty_end).toLocaleDateString("id-ID", {
-        day: "numeric", month: "long", year: "numeric",
-      })
+      day: "numeric", month: "long", year: "numeric",
+    })
     : null;
 
   const warrantyStartDate = warranty?.warranty_start
     ? new Date(warranty.warranty_start).toLocaleDateString("id-ID", {
-        day: "numeric", month: "long", year: "numeric",
-      })
+      day: "numeric", month: "long", year: "numeric",
+    })
     : null;
 
   // Hitung sisa hari garansi
   const warrantyDaysLeft = warranty?.warranty_end
     ? Math.ceil(
-        (new Date(warranty.warranty_end).setHours(0,0,0,0) - new Date().setHours(0,0,0,0))
-        / (1000 * 60 * 60 * 24)
-      )
+      (new Date(warranty.warranty_end).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0))
+      / (1000 * 60 * 60 * 24)
+    )
     : null;
 
   return (
@@ -107,7 +107,7 @@ export default async function Page(props: Props) {
                 <p className="text-slate-400 text-xs mb-1">Nomor Nota</p>
                 <p className="font-mono font-bold text-lg tracking-widest">{data.invoice_number}</p>
                 <p className="text-slate-400 text-xs mt-2">
-                  {new Date(data.created_at).toLocaleDateString("id-ID", {
+                  {new Date(data.paid_at || data.created_at).toLocaleDateString("id-ID", {
                     day: "2-digit", month: "long", year: "numeric",
                     hour: "2-digit", minute: "2-digit",
                   })}
@@ -165,16 +165,15 @@ export default async function Page(props: Props) {
               <>
                 <Separator />
                 <Section title="Informasi Garansi" icon="🛡️">
-                  <div className={`rounded-xl p-4 border ${
-                    warrantyDaysLeft !== null && warrantyDaysLeft > 7
+                  <div className={`rounded-xl p-4 border ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
                       ? "bg-emerald-50 border-emerald-200"
                       : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                      ? "bg-amber-50 border-amber-200"
-                      : "bg-red-50 border-red-200"
-                  }`}>
+                        ? "bg-amber-50 border-amber-200"
+                        : "bg-red-50 border-red-200"
+                    }`}>
                     {/* Status badge */}
                     <div className="flex items-center justify-between mb-3">
-                      
+
                       <span className="text-xs text-gray-500">
                         {warranty.warranty_duration} hari
                       </span>
@@ -187,13 +186,12 @@ export default async function Page(props: Props) {
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-500">Berakhir</span>
-                        <span className={`font-bold ${
-                          warrantyDaysLeft !== null && warrantyDaysLeft > 7
+                        <span className={`font-bold ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
                             ? "text-emerald-700"
                             : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                            ? "text-amber-700"
-                            : "text-red-700"
-                        }`}>
+                              ? "text-amber-700"
+                              : "text-red-700"
+                          }`}>
                           {warrantyEndDate}
                         </span>
                       </div>
