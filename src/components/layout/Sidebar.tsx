@@ -105,6 +105,30 @@ const Icons = {
       <line x1="15" y1="12" x2="3" y2="12" />
     </svg>
   ),
+  reports: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+      <line x1="2" y1="20" x2="22" y2="20" />
+    </svg>
+  ),
+  laptopReady: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M9 12l2 2 4-4" />
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+  laptopMinus: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M12 9v4m0 4h.01" />
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
 };
 
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
@@ -116,6 +140,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
     {
@@ -123,6 +148,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     {
@@ -139,6 +166,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     {
@@ -159,6 +187,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
@@ -182,6 +211,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
@@ -198,6 +228,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
     {
@@ -221,6 +252,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     {
@@ -243,6 +275,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
@@ -397,10 +430,23 @@ function SidebarContent({
               </p>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
-                  const isActive =
-                    pathname === item.href ||
-                    (item.href !== "/dashboard" &&
-                      pathname.startsWith(item.href));
+                  const isActive = (() => {
+                    if (pathname === item.href) return true;
+
+                    if (item.href === "/dashboard") return false;
+
+                    if (item.href === "/dashboard/laptops") {
+                      return (
+                        pathname === "/dashboard/laptops" ||
+                        (pathname.startsWith("/dashboard/laptops/") &&
+                          !pathname.startsWith("/dashboard/laptops/ready") &&
+                          !pathname.startsWith("/dashboard/laptops/minus"))
+                      );
+                    }
+
+                    // Semua route lain: startsWith biasa
+                    return pathname.startsWith(item.href);
+                  })();
                   return (
                     <NavItem
                       key={item.href}

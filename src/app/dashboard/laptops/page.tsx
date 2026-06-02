@@ -312,6 +312,7 @@ export default function Page() {
     const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"] as UserRole[]) : false;
     const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
     const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
+    const restoredPageRef = useRef<number | null>(null);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{
@@ -328,6 +329,14 @@ export default function Page() {
         setConfirmModal({ message: msg, onConfirm });
 
     useEffect(() => { fetchLaptops(); }, []);
+
+    useEffect(() => {
+        const savedPage = sessionStorage.getItem("laptops_page");
+        if (savedPage) {
+            restoredPageRef.current = Number(savedPage);
+            sessionStorage.removeItem("laptops_page");
+        }
+    }, []);
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -352,6 +361,11 @@ export default function Page() {
                 qty: Number(l.qty) || 0,
             }));
             setLaptops(normalized);
+
+            if (restoredPageRef.current !== null) {
+                setCurrentPage(restoredPageRef.current);
+                restoredPageRef.current = null;
+            }
         } catch {
             setLaptops([]);
         } finally {
@@ -1026,7 +1040,11 @@ export default function Page() {
                                                                 {canViewUnits && (
                                                                     <Link
                                                                         href={`/dashboard/laptops/${item.id}/units`}
-                                                                        onClick={e => e.stopPropagation()}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            // Simpan halaman sebelum navigasi
+                                                                            sessionStorage.setItem("laptops_page", String(currentPage));
+                                                                        }}
                                                                         className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                                                                     >
                                                                         Units

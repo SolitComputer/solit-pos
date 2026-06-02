@@ -31,12 +31,22 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/transaction/create":   ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGANTARAN"],
   "/api/transaction":          ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "PENGELOLA_BARANG", "PENGANTARAN"],
   "/api/warranty":             ["ADMIN", "TEKNISI", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN"],
+  "/dashboard/reports":        ["ADMIN", "ACCOUNTING"],
+  "/api/reports":              ["ADMIN", "ACCOUNTING"],
+  
+  "/dashboard/laptops/ready":    ["ADMIN", "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN"],
+  "/dashboard/laptops/minus":    ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"],
+  "/api/units/reserve":          ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGANTARAN"],
+  "/api/units/hold":             ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGANTARAN"],
+  "/api/units/confirm-payment":  ["ADMIN", "KEPALA_SALES"],
+  "/api/laptops/minus":          ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"],
 };
 
 export const PERMISSIONS = {
   VIEW_DASHBOARD:      ["ADMIN", "ACCOUNTING", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "PENGANTARAN"] as UserRole[],
 
   VIEW_FINANCIALS:     ["ADMIN", "ACCOUNTING"] as UserRole[],
+  VIEW_REPORTS:        ["ADMIN", "ACCOUNTING"] as UserRole[], 
 
   VIEW_TRANSACTIONS:   ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "PENGELOLA_BARANG", "PENGANTARAN"] as UserRole[],
   CREATE_TRANSACTION:  ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGANTARAN"]                                   as UserRole[],
@@ -54,6 +64,10 @@ export const PERMISSIONS = {
 
   VIEW_WARRANTY:       ["ADMIN", "TEKNISI", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN"] as UserRole[],
   EDIT_WARRANTY:       ["ADMIN", "TEKNISI"]                                                             as UserRole[],
+
+  VIEW_READY_LAPTOPS: ["ADMIN", "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN"] as UserRole[],
+  VIEW_MINUS_LAPTOPS: ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"] as UserRole[],
+  EDIT_MINUS_LAPTOPS: ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"] as UserRole[],
 } as const;
 
 export function hasPermission(

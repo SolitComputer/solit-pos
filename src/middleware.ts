@@ -90,6 +90,7 @@ export const config = {
     "/api/transaction/:path*",
     "/api/units/:path*",
     "/api/warranty/:path*",
+    "/api/reports/:path*",    
     "/dashboard/warranty/:path*",
   ],
 };
