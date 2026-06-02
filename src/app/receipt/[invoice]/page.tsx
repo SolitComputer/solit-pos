@@ -107,9 +107,11 @@ export default async function Page(props: Props) {
                 <p className="text-slate-400 text-xs mb-1">Nomor Nota</p>
                 <p className="font-mono font-bold text-lg tracking-widest">{data.invoice_number}</p>
                 <p className="text-slate-400 text-xs mt-2">
-                  {new Date(data.paid_at || data.created_at).toLocaleDateString("id-ID", {
+                  {new Date(data.paid_at || data.created_at).toLocaleString("id-ID", {
                     day: "2-digit", month: "long", year: "numeric",
                     hour: "2-digit", minute: "2-digit",
+                    hour12: false,
+                    timeZone: "Asia/Jakarta",
                   })}
                 </p>
               </div>
@@ -166,10 +168,10 @@ export default async function Page(props: Props) {
                 <Separator />
                 <Section title="Informasi Garansi" icon="🛡️">
                   <div className={`rounded-xl p-4 border ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
-                      ? "bg-emerald-50 border-emerald-200"
-                      : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                        ? "bg-amber-50 border-amber-200"
-                        : "bg-red-50 border-red-200"
+                    ? "bg-emerald-50 border-emerald-200"
+                    : warrantyDaysLeft !== null && warrantyDaysLeft > 0
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-red-50 border-red-200"
                     }`}>
                     {/* Status badge */}
                     <div className="flex items-center justify-between mb-3">
@@ -187,10 +189,10 @@ export default async function Page(props: Props) {
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-500">Berakhir</span>
                         <span className={`font-bold ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
-                            ? "text-emerald-700"
-                            : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                              ? "text-amber-700"
-                              : "text-red-700"
+                          ? "text-emerald-700"
+                          : warrantyDaysLeft !== null && warrantyDaysLeft > 0
+                            ? "text-amber-700"
+                            : "text-red-700"
                           }`}>
                           {warrantyEndDate}
                         </span>
