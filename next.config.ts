@@ -10,7 +10,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here — tetap kosong seperti semula */
+  turbopack: {}, // ← ini yang menghilangkan error
 };
 
 export default withPWA(nextConfig);
