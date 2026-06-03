@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
+console.log("PWA Loaded");
+
 const withPWA = withPWAInit({
   dest: "public",
   cacheOnFrontEndNav: true,
