@@ -11,6 +11,7 @@ const supabase = createClient(
 
 const users = [
   { name: "Rei", email: "Admin@gmail.com", password: "Rei@Solit25", role: "ADMIN" },
+  { name: "Ikmal", email: "ikmal@gmail.com", password: "ikmal@Solit25", role: "ADMIN" },
 
   { name: "Salam", email: "salam.kds@solit-pos.com", password: "Salam@Sales25", role: "KEPALA_SALES" },
 
@@ -22,6 +23,7 @@ const users = [
   { name: "Yuna", email: "yuna.crew@solit-pos.com", password: "Yuna@Crew25", role: "CREW_SALES" },
   { name: "Dicky", email: "dicky.crew@solit-pos.com", password: "Dicky@Crew25", role: "CREW_SALES" },
   { name: "Fadli", email: "fadli.crew@solit-pos.com", password: "Fadli@Crew25", role: "CREW_SALES" },
+  { name: "Fikri", email: "fikri.crew@solit-pos.com", password: "Fikri@Crew25", role: "CREW_SALES" },
 
   { name: "Yoga", email: "yoga.pgb@solit-pos.com", password: "Yoga@Barang25", role: "PENGELOLA_BARANG" },
   { name: "Rafi", email: "rafi.pgb@solit-pos.com", password: "Rafi@Barang25", role: "PENGELOLA_BARANG" },
@@ -30,13 +32,14 @@ const users = [
 
   { name: "David", email: "david.tek@solit-pos.com", password: "David@Tek25", role: "TEKNISI" },
 
-  // ← password Tengku diganti Tengku21
   { name: "Tengku", email: "tengku.ant@solit-pos.com", password: "Tengku21", role: "PENGANTARAN" },
   { name: "Herry", email: "herry.ant@solit-pos.com", password: "Herry@Ant25", role: "PENGANTARAN" },
 
-  // ← 2 akun Marketing baru
-  { name: "Alim", email: "alim.mkt@solit-pos.com", password: "Alim@Mkt25", role: "MARKETING" },
+  { name: "Alim", email: "alim.mkt@solit-pos.com", password: "Alim@Mkt25", role: "KEPALA_MARKETING" },
   { name: "Adit", email: "adit.mkt@solit-pos.com", password: "Adit@Mkt25", role: "MARKETING" },
+
+  { name: "Achmad Jaelani", email: "jaelani.kbr@solit-pos.com", password: "Jaelani@Kbr25", role: "KEBERSIHAN" },
+
 ];
 
 async function seed() {

@@ -665,14 +665,12 @@ export default function UnitsPage() {
     const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
     const [formLoading, setFormLoading] = useState(false);
 
-    // ─── Filters ──────────────────────────────────────────────────────────
     const [filterStatus, setFilterStatus] = useState("ALL");
-    const [filterGradeTab, setFilterGradeTab] = useState("ALL"); // "ALL" | "A" | "B" | "C"
+    const [filterGradeTab, setFilterGradeTab] = useState("ALL");
     const [searchSN, setSearchSN] = useState("");
     const [filterPriceMin, setFilterPriceMin] = useState("");
     const [filterPriceMax, setFilterPriceMax] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
-    // ──────────────────────────────────────────────────────────────────────
 
     const [userRole, setUserRole] = useState<UserRole | null>(null);
     const canManageUnits = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_UNITS) : false;
@@ -1327,23 +1325,27 @@ export default function UnitsPage() {
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <button
-                                                                onClick={() => openEdit(unit)}
-                                                                className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            {canManageUnits && (
-                                                                <button
-                                                                    onClick={() => handleDelete(unit)}
-                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center"
-                                                                    title="Hapus Unit"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                {canManageUnits && (
+                                                                    <button
+                                                                        onClick={() => openEdit(unit)}
+                                                                        className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                )}
+                                                                {canManageUnits && (
+                                                                    <button
+                                                                        onClick={() => handleDelete(unit)}
+                                                                        className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center"
+                                                                        title="Hapus Unit"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                     </td>
                                                 </tr>
                                             );

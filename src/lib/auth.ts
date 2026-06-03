@@ -17,15 +17,11 @@ export interface AuthUser {
   role: import("@/lib/permissions").UserRole;
 }
 
-// ======================
-// JWT SECRET
-// ======================
+
 const getSecret = () =>
   new TextEncoder().encode(process.env.JWT_SECRET || "secret");
 
-// ======================
-// GET CURRENT USER (Server Component only)
-// ======================
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const cookieStore = await cookies();
@@ -39,9 +35,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
-// ======================
-// VERIFY TOKEN (Middleware only)
-// ======================
+
 export async function verifyToken(token: string): Promise<AuthUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
@@ -51,9 +45,7 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
   }
 }
 
-// ======================
-// withAuth — API Route Wrapper
-// ======================
+
 type RouteHandler = (
   req: NextRequest,
   props: any,
@@ -91,4 +83,26 @@ export function withAuth(handler: RouteHandler, allowedRoles?: import("@/lib/per
 
     return handler(req, ctx, user);
   };
+}
+
+export function getFaceVerifiedExpiry(): Date {
+  const now = new Date();
+  // Waktu WIB = UTC+7
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const nowWIB = new Date(now.getTime() + wibOffset);
+  
+  // Set ke 00:00:00 WIB besok
+  const tomorrowWIB = new Date(nowWIB);
+  tomorrowWIB.setUTCHours(0, 0, 0, 0);
+  tomorrowWIB.setUTCDate(tomorrowWIB.getUTCDate() + 1);
+  
+  return new Date(tomorrowWIB.getTime() - wibOffset);
+}
+
+
+export function isManualAllowedDay(): boolean {
+  const reference = new Date("2025-01-01T00:00:00+07:00").getTime();
+  const now = Date.now();
+  const daysSinceRef = Math.floor((now - reference) / (1000 * 60 * 60 * 24));
+  return daysSinceRef % 3 === 0;
 }

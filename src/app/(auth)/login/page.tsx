@@ -24,14 +24,17 @@ export default function Page() {
         body: JSON.stringify({ email, password }),
       });
       const result = await response.json();
+
       if (!result.success) {
         setError(result.message || "Login gagal");
         return;
       }
-      // GANTI blok setTimeout:
+
       setTimeout(() => {
-        window.location.href = result.redirect ?? "/payment/create";
+        const destination = result.redirect ?? "/dashboard";
+        window.location.href = `/face-verify?from=${encodeURIComponent(destination)}`;
       }, 300);
+
     } catch {
       setError("Terjadi kesalahan koneksi");
     } finally {

@@ -382,7 +382,7 @@ function TransactionCard({
   item: any;
   onPhotoClick: (url: string) => void;
   canEditTransaction: boolean;
-  canRestoreTransaction: boolean; // ← baru
+  canRestoreTransaction: boolean;
   canSeeFinancials: boolean;
   onRestored: (invoice: string) => void;
 }) {
@@ -390,7 +390,6 @@ function TransactionCard({
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
-
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmSN, setConfirmSN] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -400,7 +399,8 @@ function TransactionCard({
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) {
-      setConfirmError("Serial number wajib diisi"); return;
+      setConfirmError("Serial number wajib diisi");
+      return;
     }
     setConfirming(true);
     setConfirmError("");
@@ -416,7 +416,7 @@ function TransactionCard({
       const result = await res.json();
       if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
       setShowConfirmModal(false);
-      onRestored(item.invoice_number); // re-fetch transaksi
+      onRestored(item.invoice_number);
     } catch {
       setConfirmError("Terjadi kesalahan koneksi");
     } finally {
@@ -447,10 +447,10 @@ function TransactionCard({
   const STATUS_LABEL: Record<string, string> = {
     PAID: "PAID",
     PENDING: "PENDING",
-    CANCELLED: "CANCELLED",
-    FAILED: "FAILED",
-    RESERVED: "🔒 DIPESAN",
-    HELD: "📦 DIAMBIL",
+    CANCELLED: "DIBATALKAN",
+    FAILED: "GAGAL",
+    RESERVED: "DIPESAN (DP)",
+    HELD: "DIAMBIL DULU",
   };
 
   const statusMap: Record<string, string> = {
@@ -462,31 +462,95 @@ function TransactionCard({
     HELD: "bg-orange-50 text-orange-700 border-orange-200",
   };
 
+  // ── Payment method — badge visual ─────────────────────────────────────────
+  type PaymentStyle = { bg: string; text: string; border: string; icon: React.ReactNode };
+
+  function getPaymentStyle(method: string): PaymentStyle {
+    const m = (method ?? "").toUpperCase();
+    if (m.includes("TUNAI") || m.includes("CASH")) return {
+      bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+          <line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" />
+        </svg>
+      ),
+    };
+    if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI") || m.includes("BNI") || m.includes("MANDIRI")) return {
+      bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" />
+          <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" />
+        </svg>
+      ),
+    };
+    if (m.includes("QRIS") || m.includes("QR")) return {
+      bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <path d="M14 14h.01M14 17h.01M17 14h.01M17 17h3M20 14h.01M17 20h3" />
+        </svg>
+      ),
+    };
+    if (m.includes("KREDIT") || m.includes("CREDIT") || m.includes("KARTU")) return {
+      bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" />
+        </svg>
+      ),
+    };
+    if (m.includes("COD") || m.includes("BAYAR DI TEMPAT")) return {
+      bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+    };
+    // default
+    return {
+      bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200",
+      icon: (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" />
+        </svg>
+      ),
+    };
+  }
+
+  const payStyle = getPaymentStyle(item.payment_method ?? "");
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      {/* Main row */}
+      {/* ── Main content ── */}
       <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
+
+        {/* Row 1: nama + status badge */}
+        <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-bold text-gray-800 text-sm">{item.customer_name}</h2>
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold flex-shrink-0 ${statusMap[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+              <h2 className="font-bold text-gray-800 text-sm leading-tight">{item.customer_name}</h2>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                 {STATUS_LABEL[item.status] ?? item.status}
               </span>
               {item.sales_name && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium flex-shrink-0">
-                  👤 {item.sales_name}
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium flex-shrink-0">
+                  {item.sales_name}
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{item.invoice_number}</p>
-            <p className="text-xs text-gray-500 mt-0.5 truncate">{item.laptop_name}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5 font-mono tracking-tight">{item.invoice_number}</p>
           </div>
+
+          {/* Harga */}
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-bold text-gray-800">
-              Rp{(item.deal_price || item.amount).toLocaleString("id-ID")}
+              Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
             </p>
-            {/* Profit hanya untuk ADMIN & ACCOUNTING */}
             {canSeeFinancials && (
               <p className="text-xs text-emerald-600 font-medium">
                 +Rp{(item.other || 0).toLocaleString("id-ID")}
@@ -495,29 +559,129 @@ function TransactionCard({
           </div>
         </div>
 
-        {/* Compact info */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs text-gray-500">
-          <span>{item.customer_phone}</span>
-          <span className="text-gray-200">·</span>
-          <span>{item.payment_method}</span>
-          <span className="text-gray-200">·</span>
-          <span>{item.source_platform}</span>
-          <span className="text-gray-200">·</span>
-          <span>{new Date(item.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
+        {/* Row 2: Laptop + SN (di luar detail) */}
+        <div className="mb-2.5">
+          {/* Nama laptop */}
+          <p className="text-xs font-medium text-gray-800 leading-snug truncate">
+            {item.laptop_name || "—"}
+          </p>
+
+          {/* Spek laptop — dari field cpu, ram, storage, display */}
+          {(item.cpu || item.ram || item.storage || item.display) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {item.cpu && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md font-medium">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <rect x="9" y="9" width="6" height="6" />
+                    <line x1="9" y1="1" x2="9" y2="4" />
+                    <line x1="15" y1="1" x2="15" y2="4" />
+                    <line x1="9" y1="20" x2="9" y2="23" />
+                    <line x1="15" y1="20" x2="15" y2="23" />
+                    <line x1="20" y1="9" x2="23" y2="9" />
+                    <line x1="20" y1="14" x2="23" y2="14" />
+                    <line x1="1" y1="9" x2="4" y2="9" />
+                    <line x1="1" y1="14" x2="4" y2="14" />
+                  </svg>
+                  {item.cpu}
+                </span>
+              )}
+              {item.ram && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md font-medium">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="7" width="20" height="10" rx="1" />
+                    <line x1="6" y1="7" x2="6" y2="3" />
+                    <line x1="10" y1="7" x2="10" y2="3" />
+                    <line x1="14" y1="7" x2="14" y2="3" />
+                    <line x1="18" y1="7" x2="18" y2="3" />
+                    <line x1="6" y1="21" x2="6" y2="17" />
+                    <line x1="10" y1="21" x2="10" y2="17" />
+                    <line x1="14" y1="21" x2="14" y2="17" />
+                    <line x1="18" y1="21" x2="18" y2="17" />
+                  </svg>
+                  {item.ram}
+                </span>
+              )}
+              {item.storage && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-md font-medium">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                  </svg>
+                  {item.storage}
+                </span>
+              )}
+              {item.display && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-gray-500 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded-md font-medium">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <line x1="8" y1="21" x2="16" y2="21" />
+                    <line x1="12" y1="17" x2="12" y2="21" />
+                  </svg>
+                  {item.display}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* SN — selalu di luar detail */}
+          {item.serial_number ? (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">SN</span>
+              <code className="text-[11px] font-mono text-gray-600 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded-md">
+                {item.serial_number}
+              </code>
+            </div>
+          ) : item.status === "RESERVED" ? (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">SN</span>
+              <span className="text-[11px] text-amber-500 font-medium">Belum ada (DP)</span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Row 3: Meta info — phone · payment · source · tanggal */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          {/* Phone */}
+          {item.customer_phone && (
+            <span className="text-[11px] text-gray-500">{item.customer_phone}</span>
+          )}
+
+          {/* Payment method badge — visual jelas */}
+          {item.payment_method && (
+            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${payStyle.bg} ${payStyle.text} ${payStyle.border}`}>
+              {payStyle.icon}
+              {item.payment_method}
+            </span>
+          )}
+
+          {/* Source platform */}
+          {item.source_platform && item.source_platform !== "-" && (
+            <span className="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full">
+              {item.source_platform}
+            </span>
+          )}
+
+          {/* Tanggal */}
+          <span className="text-[11px] text-gray-400 ml-auto flex-shrink-0">
+            {new Date(item.created_at).toLocaleDateString("id-ID", {
+              day: "numeric", month: "short", year: "numeric",
+            })}
+          </span>
         </div>
       </div>
 
-      {/* Footer actions */}
-      {/* Footer actions */}
+      {/* ── Footer actions ── */}
       <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-        {/* Kiri: Bukti, Maps, Detail */}
-        <div className="flex items-center gap-2">
+        {/* Kiri */}
+        <div className="flex items-center gap-3">
           {item.payment_photo && (
             <button
               onClick={() => onPhotoClick(item.payment_photo)}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition font-medium"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition font-medium"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
@@ -528,12 +692,12 @@ function TransactionCard({
           {item.latitude && item.longitude && (
             <a
               href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 transition font-medium"
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition font-medium"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <circle cx="12" cy="11" r="3" />
               </svg>
               Maps
             </a>
@@ -542,10 +706,10 @@ function TransactionCard({
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition"
           >
-            {expanded ? "Sembunyikan" : "Detail"}
+            {expanded ? "Tutup" : "Detail"}
             <svg
-              width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2"
+              width="11" height="11" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5"
               className={`transition-transform ${expanded ? "rotate-180" : ""}`}
             >
               <polyline points="6 9 12 15 18 9" />
@@ -553,8 +717,8 @@ function TransactionCard({
           </button>
         </div>
 
-        {/* Kanan: Edit + Restore + Receipt */}
-        <div className="flex items-center gap-2">
+        {/* Kanan */}
+        <div className="flex items-center gap-2.5">
           {canEditTransaction && (
             <a
               href={`/payment/${item.invoice_number}`}
@@ -567,7 +731,6 @@ function TransactionCard({
               Edit
             </a>
           )}
-
           {canRestoreTransaction && item.status === "PAID" && (
             <button
               onClick={() => setShowRestoreModal(true)}
@@ -579,8 +742,6 @@ function TransactionCard({
               Restore
             </button>
           )}
-
-          {/* ← TAMBAH tombol ini */}
           {canEditTransaction && isPending && (
             <button
               onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }}
@@ -592,7 +753,6 @@ function TransactionCard({
               Lunas
             </button>
           )}
-
           <a
             href={`/receipt/${item.invoice_number}`}
             className="text-xs font-semibold text-gray-600 hover:text-gray-900 transition flex items-center gap-1"
@@ -603,279 +763,238 @@ function TransactionCard({
             </svg>
           </a>
         </div>
+      </div>
 
-        {/* Modal konfirmasi restore */}
-        {showRestoreModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowRestoreModal(false)}
-            />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden sm:mx-4">
-
-              {/* Header */}
-              <div className="bg-red-600 px-5 py-4 flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-bold text-white text-sm">Restore Transaksi</p>
-                  <p className="text-xs text-red-100 mt-0.5">Batalkan & kembalikan stok unit</p>
-                </div>
-              </div>
-
-              {/* Body — scrollable kalau konten panjang */}
-              <div className="px-5 py-4 space-y-3 max-h-[60dvh] overflow-y-auto overscroll-contain">
-                {/* Info transaksi */}
-                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Nota</span>
-                    <span className="font-mono font-semibold text-gray-700">{item.invoice_number}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Customer</span>
-                    <span className="font-semibold text-gray-700">{item.customer_name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Laptop</span>
-                    <span className="text-gray-700 text-right max-w-[55%] truncate">{item.laptop_name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">SN</span>
-                    <span className="font-mono text-gray-700">{item.serial_number || "-"}</span>
-                  </div>
-                  <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
-                    <span className="text-gray-400">Harga</span>
-                    <span className="font-bold text-gray-800">
-                      Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Efek restore */}
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Yang akan terjadi:</p>
-                  {[
-                    <>Status: <span className="font-semibold text-emerald-600">PAID</span> → <span className="font-semibold text-red-500">CANCELLED</span></>,
-                    <>Stok SN <span className="font-mono font-semibold">{item.serial_number}</span> kembali ke <span className="font-semibold text-emerald-600">SIAP_JUAL</span></>,
-                    <>Qty laptop otomatis diperbarui</>,
-                  ].map((text, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px]">{i + 1}</span>
-                      <span>{text}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Warning */}
-                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                  </svg>
-                  <p className="text-xs text-amber-700">
-                    Aksi ini <span className="font-semibold">tidak dapat diurungkan</span>.
-                  </p>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
-                <button
-                  onClick={() => setShowRestoreModal(false)}
-                  disabled={restoring}
-                  className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition disabled:opacity-50"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleRestore}
-                  disabled={restoring}
-                  className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold active:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {restoring ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Memproses...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                      Ya, Restore
-                    </>
-                  )}
-                </button>
-              </div>
+      {/* ── Expanded detail — hanya info yang belum tampil di atas ── */}
+      {expanded && (
+        <div className="px-4 py-3 border-t border-gray-100 bg-white">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div>
+              <span className="text-gray-400">Software</span>
+              <p className="text-gray-700 font-medium mt-0.5">{item.software_request || "—"}</p>
             </div>
-          </div>
-        )}
-
-        {/* Modal Konfirmasi Lunas */}
-        {showConfirmModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowConfirmModal(false)}
-            />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden sm:mx-4">
-
-              {/* Header */}
-              <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-bold text-white text-sm">Konfirmasi Pelunasan</p>
-                  <p className="text-xs text-emerald-100 mt-0.5">
-                    {item.status === "RESERVED" ? "DP → PAID" : "Diambil → PAID"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Body */}
-              <div className="px-5 py-4 space-y-3">
-                {/* Info transaksi */}
-                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Nota</span>
-                    <span className="font-mono font-semibold text-gray-700">{item.invoice_number}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Customer</span>
-                    <span className="font-semibold text-gray-700">{item.customer_name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Laptop</span>
-                    <span className="text-gray-700 text-right max-w-[55%] truncate">{item.laptop_name}</span>
-                  </div>
-                  <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
-                    <span className="text-gray-400">Harga Deal</span>
-                    <span className="font-bold text-gray-800">
-                      Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Input SN khusus RESERVED */}
-                {item.status === "RESERVED" ? (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                      Serial Number Unit <span className="text-red-400">*</span>
-                    </label>
-                    <p className="text-[10px] text-gray-400 mb-2">
-                      Transaksi DP belum ada SN. Masukkan SN unit yang diserahkan ke customer.
-                    </p>
-                    <input
-                      type="text"
-                      value={confirmSN}
-                      onChange={e => { setConfirmSN(e.target.value); setConfirmError(""); }}
-                      placeholder="Masukkan serial number..."
-                      className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition"
-                      autoFocus
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">
-                    <p className="text-xs text-orange-700">
-                      Barang sudah diambil oleh <span className="font-semibold">{item.customer_name}</span>.
-                      Konfirmasi ini akan menandai transaksi sebagai <span className="font-semibold">LUNAS</span>.
-                    </p>
-                    {item.serial_number && (
-                      <p className="text-xs text-orange-600 mt-1">
-                        SN: <code className="font-mono bg-orange-100 px-1 rounded">{item.serial_number}</code>
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Info efek */}
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Yang akan terjadi:</p>
-                  {[
-                    <>Status transaksi → <span className="font-semibold text-emerald-600">PAID</span></>,
-                    <>Unit SN akan di-set <span className="font-semibold text-gray-700">SOLD</span></>,
-                    <>Garansi otomatis dibuat (30 hari)</>,
-                  ].map((text, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px]">{i + 1}</span>
-                      <span>{text}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {confirmError && (
-                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                    <p className="text-xs text-red-700">{confirmError}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
-                <button
-                  onClick={() => { setShowConfirmModal(false); setConfirmError(""); }}
-                  disabled={confirming}
-                  className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleConfirmPayment}
-                  disabled={confirming || (item.status === "RESERVED" && !confirmSN.trim())}
-                  className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {confirming ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Memproses...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Konfirmasi Lunas
-                    </>
-                  )}
-                </button>
-              </div>
+            <div>
+              <span className="text-gray-400">Pickup</span>
+              <p className="text-gray-700 font-medium mt-0.5">{item.pickup_method || "—"}</p>
             </div>
-          </div>
-        )}
-      </div >
-
-
-      {
-        expanded && (
-          <div className="px-4 py-3 border-t border-gray-100 bg-white space-y-2">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-              <div><span className="text-gray-400">SN:</span> <span className="text-gray-700 font-medium">{item.serial_number || "-"}</span></div>
-              <div><span className="text-gray-400">Software:</span> <span className="text-gray-700">{item.software_request || "-"}</span></div>
-              <div><span className="text-gray-400">Pickup:</span> <span className="text-gray-700">{item.pickup_method}</span></div>
-              <div><span className="text-gray-400">Jadwal:</span> <span className="text-gray-700">{item.pickup_date || "-"} {item.pickup_time || ""}</span></div>
-              {canSeeFinancials && item.inventory_price > 0 && (
-                <div>
-                  <span className="text-gray-400">Modal:</span>{" "}
-                  <span className="text-gray-700">Rp{item.inventory_price.toLocaleString("id-ID")}</span>
-                </div>
-              )}
-              {item.pickup_location && (
-                <div className="col-span-2"><span className="text-gray-400">Alamat:</span> <span className="text-gray-700">{item.pickup_location}</span></div>
-              )}
+            <div>
+              <span className="text-gray-400">Jadwal</span>
+              <p className="text-gray-700 font-medium mt-0.5">
+                {item.pickup_date || "—"} {item.pickup_time || ""}
+              </p>
             </div>
-            {item.notes && (
-              <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
-                <span className="font-semibold text-gray-500">Catatan: </span>{item.notes}
+            {canSeeFinancials && item.inventory_price > 0 && (
+              <div>
+                <span className="text-gray-400">Modal</span>
+                <p className="text-gray-700 font-medium mt-0.5">
+                  Rp{item.inventory_price.toLocaleString("id-ID")}
+                </p>
+              </div>
+            )}
+            {item.pickup_location && (
+              <div className="col-span-2">
+                <span className="text-gray-400">Alamat</span>
+                <p className="text-gray-700 font-medium mt-0.5">{item.pickup_location}</p>
               </div>
             )}
           </div>
-        )
-      }
-    </div >
+          {item.notes && (
+            <div className="mt-3 bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600 border border-gray-100">
+              <span className="font-semibold text-gray-500">Catatan: </span>
+              {item.notes}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Modals (tidak berubah dari sebelumnya) ── */}
+      {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+
+      {showRestoreModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden sm:mx-4">
+            <div className="bg-red-600 px-5 py-4 flex items-center gap-3">
+              <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Restore Transaksi</p>
+                <p className="text-xs text-red-100 mt-0.5">Batalkan & kembalikan stok unit</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3 max-h-[60dvh] overflow-y-auto overscroll-contain">
+              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
+                {[
+                  ["Nota", item.invoice_number],
+                  ["Customer", item.customer_name],
+                  ["Laptop", item.laptop_name],
+                  ["SN", item.serial_number || "—"],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex justify-between text-xs">
+                    <span className="text-gray-400">{label}</span>
+                    <span className="font-mono font-semibold text-gray-700 text-right max-w-[60%] truncate">{val}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                  <span className="text-gray-400">Harga</span>
+                  <span className="font-bold text-gray-800">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Yang akan terjadi:</p>
+                {[
+                  <><span className="font-semibold text-emerald-600">PAID</span> → <span className="font-semibold text-red-500">CANCELLED</span></>,
+                  <>Stok SN <code className="font-mono">{item.serial_number}</code> kembali ke <span className="font-semibold text-emerald-600">SIAP_JUAL</span></>,
+                  <>Qty laptop otomatis diperbarui</>,
+                ].map((text, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="w-5 h-5 bg-red-100 text-red-500 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px]">{i + 1}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <p className="text-xs text-amber-700">Aksi ini <span className="font-semibold">tidak dapat diurungkan</span>.</p>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button onClick={() => setShowRestoreModal(false)} disabled={restoring}
+                className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium transition disabled:opacity-50">
+                Batal
+              </button>
+              <button onClick={handleRestore} disabled={restoring}
+                className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2">
+                {restoring ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                    Ya, Restore
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden sm:mx-4">
+            <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+              <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-bold text-white text-sm">Konfirmasi Pelunasan</p>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  {item.status === "RESERVED" ? "DP → PAID" : "Diambil → PAID"}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 space-y-2">
+                {[
+                  ["Nota", item.invoice_number],
+                  ["Customer", item.customer_name],
+                  ["Laptop", item.laptop_name],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex justify-between text-xs">
+                    <span className="text-gray-400">{label}</span>
+                    <span className="font-semibold text-gray-700 text-right max-w-[60%] truncate">{val}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                  <span className="text-gray-400">Harga Deal</span>
+                  <span className="font-bold text-gray-800">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
+                </div>
+              </div>
+              {item.status === "RESERVED" ? (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                    Serial Number Unit <span className="text-red-400">*</span>
+                  </label>
+                  <p className="text-[10px] text-gray-400 mb-2">Masukkan SN unit yang diserahkan ke customer.</p>
+                  <input
+                    type="text"
+                    value={confirmSN}
+                    onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
+                    placeholder="Masukkan serial number..."
+                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-orange-700">
+                    Barang sudah diambil oleh <span className="font-semibold">{item.customer_name}</span>.
+                    Konfirmasi ini akan menandai transaksi sebagai <span className="font-semibold">LUNAS</span>.
+                  </p>
+                  {item.serial_number && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      SN: <code className="font-mono bg-orange-100 px-1 rounded">{item.serial_number}</code>
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Yang akan terjadi:</p>
+                {[
+                  <>Status transaksi → <span className="font-semibold text-emerald-600">PAID</span></>,
+                  <>Unit SN akan di-set <span className="font-semibold text-gray-700">SOLD</span></>,
+                  <>Garansi otomatis dibuat (30 hari)</>,
+                ].map((text, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[10px]">{i + 1}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+              {confirmError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  <p className="text-xs text-red-700">{confirmError}</p>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => { setShowConfirmModal(false); setConfirmError(""); }}
+                disabled={confirming}
+                className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmPayment}
+                disabled={confirming || (item.status === "RESERVED" && !confirmSN.trim())}
+                className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {confirming ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Konfirmasi Lunas
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

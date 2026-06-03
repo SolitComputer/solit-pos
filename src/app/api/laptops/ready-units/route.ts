@@ -4,8 +4,6 @@ import { withAuth, AuthUser } from "@/lib/auth";
 
 async function handler(req: Request, ctx: any, user: AuthUser) {
   try {
-    // Ambil semua units yang statusnya SIAP_JUAL, RESERVED, atau HELD
-    // beserta data laptop-nya via join
     const { data, error } = await supabase
       .from("laptop_units")
       .select(`
@@ -44,4 +42,5 @@ export const GET = withAuth(handler, [
   "CREW_SALES",
   "ACCOUNTING",
   "PENGANTARAN",
+  "MARKETING", 
 ]);

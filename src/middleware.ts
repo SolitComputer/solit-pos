@@ -11,15 +11,31 @@ const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = ["/api/warranty/check"];
 
+const FACE_API_WHITELIST = [
+  "/api/auth/face-verify",
+  "/api/auth/face-enroll",
+  "/api/auth/face-status",
+  "/api/auth/me",
+  "/api/auth/logout",
+  "/api/auth/login",
+];
+
+const FACE_PROTECTED_PREFIXES = ["/dashboard", "/payment"];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
+  const faceVerified = request.cookies.get("face_verified")?.value;
 
   // ── Public routes ──
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
+        // Kalau sudah login tapi belum face verify → ke /face-verify
+        if (!faceVerified) {
+          return NextResponse.redirect(new URL("/face-verify", request.url));
+        }
         return NextResponse.redirect(
           new URL(ROLE_DEFAULT_REDIRECT[user.role], request.url)
         );
@@ -37,8 +53,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Public API routes (no auth required) ──
+  if (pathname.startsWith("/face-verify")) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // ── Public API routes ──
   if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // ── Face API — hanya butuh token, tidak butuh face_verified ──
+  if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
+    if (!token) {
+      return NextResponse.json({ success: false }, { status: 401 });
+    }
     return NextResponse.next();
   }
 
@@ -56,7 +87,39 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ── Route permission check (longest match wins) ──
+  if (pathname.startsWith("/face-verify")) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    const user = await verifyToken(token);
+    if (!user) {
+      const res = NextResponse.redirect(new URL("/login", request.url));
+      res.cookies.delete("token");
+      return res;
+    }
+    return NextResponse.next();
+  }
+
+  // ── Face verification guard untuk dashboard & payment ──
+  if (FACE_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (faceVerified !== user.id) {
+      return NextResponse.redirect(
+        new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
+      );
+    }
+  }
+
+  // ── Face verification guard ──
+  if (FACE_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (faceVerified !== user.id) {
+      // Belum verifikasi wajah hari ini → redirect ke halaman verifikasi
+      return NextResponse.redirect(
+        new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
+      );
+    }
+  }
+
+  // ── Route permission check ──
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
@@ -85,12 +148,14 @@ export const config = {
     "/receipt/:path*",
     "/scan/:path*",
     "/login",
+    "/face-verify",
+    "/api/auth/:path*",
     "/api/laptops/:path*",
     "/api/dashboard/:path*",
     "/api/transaction/:path*",
     "/api/units/:path*",
     "/api/warranty/:path*",
-    "/api/reports/:path*",    
+    "/api/reports/:path*",
     "/dashboard/warranty/:path*",
   ],
 };

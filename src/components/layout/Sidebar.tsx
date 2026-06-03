@@ -140,6 +140,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.loginLog },
       ],
     },
     {
@@ -155,7 +156,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi",
       items: [
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        // ✅ Dipindah ke sini
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
       ],
@@ -299,6 +299,39 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
+  KEBERSIHAN: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+  ],
+  KEPALA_MARKETING: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+  ],
 };
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -310,6 +343,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
   MARKETING: { label: "Marketing", className: "bg-pink-50 text-pink-700" },
+  KEBERSIHAN: { label: "Kebersihan", className: "bg-cyan-50 text-cyan-700" },
+  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700" },
 };
 
 function getInitials(name: string): string {
@@ -475,8 +510,10 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+
+    await fetch("/api/auth/logout", { method: "DELETE" });
+
+    window.location.href = "/face-verify";
   };
 
   const groups: MenuGroup[] = user?.role ? (ROLE_MENUS[user.role as UserRole] ?? []) : [];
