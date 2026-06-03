@@ -30,8 +30,13 @@ const users = [
 
   { name: "David", email: "david.tek@solit-pos.com", password: "David@Tek25", role: "TEKNISI" },
 
-  { name: "Tengku", email: "tengku.ant@solit-pos.com", password: "Tengku@Ant25", role: "PENGANTARAN" },
+  // ← password Tengku diganti Tengku21
+  { name: "Tengku", email: "tengku.ant@solit-pos.com", password: "Tengku21", role: "PENGANTARAN" },
   { name: "Herry", email: "herry.ant@solit-pos.com", password: "Herry@Ant25", role: "PENGANTARAN" },
+
+  // ← 2 akun Marketing baru
+  { name: "Alim", email: "alim.mkt@solit-pos.com", password: "Alim@Mkt25", role: "MARKETING" },
+  { name: "Adit", email: "adit.mkt@solit-pos.com", password: "Adit@Mkt25", role: "MARKETING" },
 ];
 
 async function seed() {
@@ -48,7 +53,6 @@ async function seed() {
     console.log("🗑️  User lama (OPERATOR/SALES) dihapus\n");
   }
 
-  // ── Upsert setiap user ──
   for (const user of users) {
     const hashedPassword = await bcrypt.hash(user.password, 10);
 
@@ -94,13 +98,13 @@ async function seed() {
     }
   }
 
-  console.log("\n─────────────────────────────────────────────────────────");
+  console.log("\n─────────────────────────────────────────────────────────────────");
   console.log("📋 RINGKASAN AKUN:");
-  console.log("─────────────────────────────────────────────────────────");
+  console.log("─────────────────────────────────────────────────────────────────");
   users.forEach((u) => {
-    console.log(`  ${u.role.padEnd(17)} | ${u.name.padEnd(8)} | ${u.email.padEnd(28)} | ${u.password}`);
+    console.log(`  ${u.role.padEnd(17)} | ${u.name.padEnd(8)} | ${u.email.padEnd(30)} | ${u.password}`);
   });
-  console.log("─────────────────────────────────────────────────────────");
+  console.log("─────────────────────────────────────────────────────────────────");
   console.log("\n✨ Seeding selesai!");
   process.exit(0);
 }
