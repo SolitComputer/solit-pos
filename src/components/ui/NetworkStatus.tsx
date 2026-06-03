@@ -1,30 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 export default function NetworkStatus() {
-  const [online, setOnline] = useState(true);
-
   useEffect(() => {
-    setOnline(navigator.onLine);
+    const offline = () => {
+      toast.error("Tidak ada koneksi internet");
+    };
 
-    const onOnline = () => setOnline(true);
-    const onOffline = () => setOnline(false);
+    const online = () => {
+      toast.success("Koneksi kembali normal");
+    };
 
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
 
     return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
     };
   }, []);
 
-  if (online) return null;
-
-  return (
-    <div className="bg-red-600 text-white text-center py-2">
-      Tidak ada koneksi internet
-    </div>
-  );
+  return null;
 }

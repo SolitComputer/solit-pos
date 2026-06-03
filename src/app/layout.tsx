@@ -1,18 +1,41 @@
 import type { Metadata, Viewport } from "next";
+import { Toaster } from "sonner";
 import "./globals.css";
+
+import NetworkStatus from "@/components/ui/NetworkStatus";
 
 export const metadata: Metadata = {
   title: "Solit POS",
   description: "Realtime Payment & Inventory System",
+
   manifest: "/manifest.json",
+
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Solit POS",
   },
+
   icons: {
-    icon: "/icons/icon-192x192.png",
-    apple: "/icons/icon-192x192.png",
+    icon: [
+      {
+        url: "/icons/manifest-icon-192.maskable.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/icons/manifest-icon-512.maskable.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-icon-180.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
 };
 
@@ -31,14 +54,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <head>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Solit POS" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-      </head>
       <body>
+        <NetworkStatus />
+
         {children}
+
+        <Toaster richColors />
       </body>
     </html>
   );

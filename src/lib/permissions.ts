@@ -59,8 +59,8 @@ export const PERMISSIONS = {
   CREATE_LAPTOP:       ["ADMIN", "PENGELOLA_BARANG"]                                                                       as UserRole[],
   EDIT_LAPTOP:         ["ADMIN", "PENGELOLA_BARANG"]                                                                       as UserRole[],
 
-  VIEW_BARCODE:        ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "TEKNISI", "ACCOUNTING", "PENGANTARAN"] as UserRole[],
-  VIEW_UNITS:          ["ADMIN", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN"] as UserRole[],
+  VIEW_BARCODE:        ["ADMIN", "KEPALA_SALES", "CREW_SALES", "PENGELOLA_BARANG", "TEKNISI", "ACCOUNTING", "PENGANTARAN", "MARKETING"] as UserRole[],
+  VIEW_UNITS:          ["ADMIN", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGANTARAN", "MARKETING"] as UserRole[],
   CREATE_UNITS:        ["ADMIN", "PENGELOLA_BARANG"]                                                                       as UserRole[],
   EDIT_UNITS:          ["ADMIN", "PENGELOLA_BARANG"]                                                                       as UserRole[],
 

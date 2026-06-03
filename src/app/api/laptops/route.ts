@@ -22,5 +22,12 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-// Semua role yang sudah login boleh GET laptops
-export const GET = withAuth(handler);
+export const GET = withAuth(handler, [
+  "ADMIN",
+  "PENGELOLA_BARANG",
+  "KEPALA_SALES",
+  "CREW_SALES",
+  "ACCOUNTING",
+  "PENGANTARAN",
+  "MARKETING", 
+]);
