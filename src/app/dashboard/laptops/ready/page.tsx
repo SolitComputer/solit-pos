@@ -68,7 +68,6 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     );
 }
 
-// ─── Modal Reserve (DP) ───────────────────────────────────────────────────────
 function ReserveModal({
     unit,
     type,
@@ -85,11 +84,17 @@ function ReserveModal({
     const [form, setForm] = useState({
         customer_name: "",
         customer_phone: "",
-        company_name: "",
-        amount: String(unit.selling_price || ""),
+        company_name: "Solit",   // ← auto-isi Solit
+        dp_amount: "",        // ← kosong, tidak auto-fill
+        deal_price: "",        // ← kosong, tidak auto-fill
         payment_method: "TRANSFER",
         source_platform: "",
         notes: "",
+        software_request: "",
+        pickup_method: "COD",
+        pickup_date: "",
+        pickup_time: "",
+        pickup_location: "",
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -100,12 +105,16 @@ function ReserveModal({
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-        setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+    const handleChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    ) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.customer_name.trim()) { setError("Nama pelanggan wajib diisi"); return; }
+        if (isDP && !form.dp_amount) { setError("Jumlah DP wajib diisi"); return; }
+        if (!form.deal_price) { setError("Harga deal wajib diisi"); return; }
+
         setLoading(true);
         setError("");
         try {
@@ -118,11 +127,17 @@ function ReserveModal({
                     customer_name: form.customer_name.trim(),
                     customer_phone: form.customer_phone.trim() || null,
                     company_name: form.company_name.trim() || null,
-                    amount: Number(form.amount) || 0,
+                    dp_amount: isDP ? Number(form.dp_amount) : undefined,
+                    deal_price: Number(form.deal_price),
                     payment_method: form.payment_method,
                     source_platform: form.source_platform || null,
                     notes: form.notes || null,
                     sales_name: salesName,
+                    software_request: form.software_request || null,
+                    pickup_method: form.pickup_method || null,
+                    pickup_date: form.pickup_date || null,
+                    pickup_time: form.pickup_time || null,
+                    pickup_location: form.pickup_location || null,
                 }),
             });
             const result = await res.json();
@@ -137,22 +152,33 @@ function ReserveModal({
     };
 
     const isDP = type === "RESERVED";
-    const accent = isDP ? "violet" : "orange";
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
-                {/* Header */}
-                <div className={`px-5 py-4 border-b ${isDP ? "border-violet-100 bg-violet-50/50" : "border-orange-100 bg-orange-50/50"}`}>
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[94dvh] overflow-hidden">
+
+                {/* ── Header ── */}
+                <div className={`px-5 py-4 border-b flex-shrink-0 ${isDP
+                    ? "border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50"
+                    : "border-orange-100 bg-gradient-to-r from-orange-50 to-amber-50"
+                    }`}>
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="font-bold text-gray-800 text-base">
-                                {isDP ? "🔒 Pesanan DP" : "📦 Ambil Dulu"}
-                            </h2>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {isDP ? "Unit akan dikunci, belum diserahkan" : "Barang diambil, pembayaran menyusul"}
-                            </p>
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${isDP ? "bg-violet-100" : "bg-orange-100"
+                                }`}>
+                                {isDP ? "🔒" : "📦"}
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-gray-800 text-base">
+                                    {isDP ? "Pesanan DP" : "Ambil Dulu"}
+                                </h2>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    {isDP
+                                        ? "Unit dikunci, pembayaran sebagian"
+                                        : "Barang dibawa, pembayaran menyusul"}
+                                </p>
+                            </div>
                         </div>
                         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,104 +188,275 @@ function ReserveModal({
                     </div>
                 </div>
 
-                {/* Unit Info */}
-                <div className="px-5 pt-4 pb-0">
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-start gap-3">
-                        <div className="text-2xl">💻</div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-800 truncate">
-                                {unit.laptop?.laptop_name || "—"}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                SN: <code className="font-mono bg-gray-100 px-1 rounded">{unit.serial_number}</code>
-                                {" · "}{unit.grade} · {fmt(unit.selling_price)}
-                            </p>
+                {/* ── Unit Info (read-only) ── */}
+                <div className="px-5 pt-4 pb-0 flex-shrink-0">
+                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-[#1a1a2e] rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-gray-800 truncate">
+                                    {unit.laptop?.laptop_name || "—"}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    <span className="text-xs text-gray-500">
+                                        SN: <code className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-gray-700 text-[10px]">
+                                            {unit.serial_number}
+                                        </code>
+                                    </span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${unit.grade === "A" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                        unit.grade === "B" ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                            "bg-red-50 text-red-700 border-red-200"
+                                        }`}>
+                                        Grade {unit.grade}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                Nama Pelanggan / Reseller <span className="text-red-400">*</span>
-                            </label>
-                            <input
-                                name="customer_name"
-                                value={form.customer_name}
-                                onChange={handleChange}
-                                placeholder="Nama lengkap..."
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
-                                required
-                            />
+                {/* ── Form Body ── */}
+                <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
+
+                    {/* ── SECTION: Data Pelanggan ── */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Data Pelanggan
+                        </p>
+                        <div className="space-y-2.5">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Nama Pelanggan / Reseller <span className="text-red-400">*</span>
+                                </label>
+                                <input
+                                    name="customer_name"
+                                    value={form.customer_name}
+                                    onChange={handleChange}
+                                    placeholder="Nama lengkap..."
+                                    autoFocus
+                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">No. HP / WhatsApp</label>
+                                    <input
+                                        name="customer_phone"
+                                        value={form.customer_phone}
+                                        onChange={handleChange}
+                                        placeholder="08xxx..."
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                        Perusahaan
+                                    </label>
+                                    <input
+                                        name="company_name"
+                                        value={form.company_name}
+                                        onChange={handleChange}
+                                        placeholder="Nama toko / perusahaan..."
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">No. HP</label>
-                            <input
-                                name="customer_phone"
-                                value={form.customer_phone}
-                                onChange={handleChange}
-                                placeholder="08xxx..."
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
-                            />
+                    </div>
+
+                    {/* ── SECTION: Harga & Pembayaran ── */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Harga & Pembayaran
+                        </p>
+                        <div className="space-y-2.5">
+                            <div className={`grid gap-2.5 ${isDP ? "grid-cols-2" : "grid-cols-1"}`}>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                        Harga Deal <span className="text-red-400">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                        <input
+                                            name="deal_price"
+                                            type="number"
+                                            min="0"
+                                            value={form.deal_price}
+                                            onChange={handleChange}
+                                            placeholder="0"
+                                            className="w-full h-10 border border-gray-200 rounded-xl pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                {isDP && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                            Jumlah DP <span className="text-red-400">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                            <input
+                                                name="dp_amount"
+                                                type="number"
+                                                min="0"
+                                                value={form.dp_amount}
+                                                onChange={handleChange}
+                                                placeholder="0"
+                                                className="w-full h-10 border border-gray-200 rounded-xl pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                                required={isDP}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Preview sisa tagihan untuk DP */}
+                            {isDP && form.deal_price && form.dp_amount && (
+                                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-violet-600">Harga Deal</span>
+                                        <span className="font-semibold text-gray-700">
+                                            Rp {Number(form.deal_price).toLocaleString("id-ID")}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs mt-1">
+                                        <span className="text-violet-600">DP dibayar</span>
+                                        <span className="font-semibold text-violet-700">
+                                            − Rp {Number(form.dp_amount).toLocaleString("id-ID")}
+                                        </span>
+                                    </div>
+                                    <div className="h-px bg-violet-200 my-1.5" />
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold text-violet-700">Sisa Tagihan</span>
+                                        <span className="font-bold text-violet-700">
+                                            Rp {Math.max(0, Number(form.deal_price) - Number(form.dp_amount)).toLocaleString("id-ID")}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Metode Bayar</label>
+                                    <select
+                                        name="payment_method"
+                                        value={form.payment_method}
+                                        onChange={handleChange}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    >
+                                        <option value="TRANSFER">Transfer</option>
+                                        <option value="CASH">Cash</option>
+                                        <option value="QRIS">QRIS</option>
+                                        <option value="COD">COD</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Sumber / Platform</label>
+                                    <input
+                                        name="source_platform"
+                                        value={form.source_platform}
+                                        onChange={handleChange}
+                                        placeholder="WA, FB, IG, Shopee..."
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Perusahaan</label>
-                            <input
-                                name="company_name"
-                                value={form.company_name}
-                                onChange={handleChange}
-                                placeholder="Opsional..."
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
-                            />
+                    </div>
+
+                    {/* ── SECTION: Pengiriman / Pengambilan ── */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Pengiriman
+                        </p>
+                        <div className="space-y-2.5">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Metode Pengambilan</label>
+                                <select
+                                    name="pickup_method"
+                                    value={form.pickup_method}
+                                    onChange={handleChange}
+                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                >
+                                    <option value="COD">COD / Ambil Langsung</option>
+                                    <option value="DELIVERY">Antar ke Alamat</option>
+                                    <option value="EKSPEDISI">Via Ekspedisi</option>
+                                    <option value="OJOL">Ojek Online</option>
+                                </select>
+                            </div>
+                            {(form.pickup_method === "DELIVERY" || form.pickup_method === "OJOL") && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Alamat Pengiriman</label>
+                                    <textarea
+                                        name="pickup_location"
+                                        value={form.pickup_location}
+                                        onChange={handleChange}
+                                        placeholder="Jl. ..."
+                                        rows={2}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition resize-none"
+                                    />
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Tanggal Pengambilan</label>
+                                    <input
+                                        name="pickup_date"
+                                        type="date"
+                                        value={form.pickup_date}
+                                        onChange={handleChange}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Jam</label>
+                                    <input
+                                        name="pickup_time"
+                                        type="time"
+                                        value={form.pickup_time}
+                                        onChange={handleChange}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                {isDP ? "Jumlah DP" : "Harga Deal"}
-                            </label>
-                            <input
-                                name="amount"
-                                type="number"
-                                value={form.amount}
-                                onChange={handleChange}
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Metode Bayar</label>
-                            <select
-                                name="payment_method"
-                                value={form.payment_method}
-                                onChange={handleChange}
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
-                            >
-                                <option value="TRANSFER">Transfer</option>
-                                <option value="CASH">Cash</option>
-                                <option value="QRIS">QRIS</option>
-                                <option value="COD">COD</option>
-                            </select>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Sumber</label>
-                            <input
-                                name="source_platform"
-                                value={form.source_platform}
-                                onChange={handleChange}
-                                placeholder="WhatsApp, Facebook, Instagram..."
-                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
-                            />
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Catatan</label>
-                            <textarea
-                                name="notes"
-                                value={form.notes}
-                                onChange={handleChange}
-                                rows={2}
-                                placeholder="Keterangan tambahan..."
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition resize-none"
-                            />
+                    </div>
+
+                    {/* ── SECTION: Info Tambahan ── */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            Info Tambahan
+                        </p>
+                        <div className="space-y-2.5">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Permintaan Software</label>
+                                <input
+                                    name="software_request"
+                                    value={form.software_request}
+                                    onChange={handleChange}
+                                    placeholder="Contoh: Windows 11, Office 2021..."
+                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Catatan Tambahan</label>
+                                <textarea
+                                    name="notes"
+                                    value={form.notes}
+                                    onChange={handleChange}
+                                    rows={2}
+                                    placeholder="Keterangan khusus..."
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition resize-none"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -273,8 +470,8 @@ function ReserveModal({
                         </svg>
                         <span>
                             {isDP
-                                ? "Unit akan berstatus DIPESAN. SN tidak akan muncul di transaksi sampai pelunasan dikonfirmasi."
-                                : "Unit berstatus DIAMBIL. Konfirmasi pelunasan di halaman Riwayat Transaksi."}
+                                ? `Unit SN ${unit.serial_number} akan dikunci (RESERVED). Konfirmasi pelunasan di halaman DP & Ambil Dulu.`
+                                : `Unit SN ${unit.serial_number} akan berstatus HELD. Konfirmasi pelunasan di halaman DP & Ambil Dulu.`}
                         </span>
                     </div>
 
@@ -286,27 +483,47 @@ function ReserveModal({
                             <p className="text-xs text-red-700">{error}</p>
                         </div>
                     )}
-
-                    <div className="flex gap-3 pt-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
-                        >
-                            Batal
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className={`flex-1 h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 ${isDP
-                                ? "bg-violet-600 hover:bg-violet-700"
-                                : "bg-orange-500 hover:bg-orange-600"
-                                }`}
-                        >
-                            {loading ? "Menyimpan..." : isDP ? "Kunci Unit (DP)" : "Konfirmasi Ambil"}
-                        </button>
-                    </div>
                 </form>
+
+                {/* ── Footer ── */}
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-white">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className={`flex-1 h-11 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isDP
+                            ? "bg-violet-600 hover:bg-violet-700 active:bg-violet-800"
+                            : "bg-orange-500 hover:bg-orange-600 active:bg-orange-700"
+                            }`}
+                    >
+                        {loading ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Menyimpan...
+                            </>
+                        ) : isDP ? (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Kunci Unit (DP)
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Konfirmasi Ambil
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -321,44 +538,11 @@ function ConfirmPaymentModal({
     onClose: () => void;
     onSuccess: () => void;
 }) {
-    const [serialNumber, setSerialNumber] = useState(
-        unit.status === "HELD" ? unit.serial_number : ""
-    );
     const [paymentProof, setPaymentProof] = useState<string | null>(null);
     const [uploadingProof, setUploadingProof] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // ← TAMBAH: state untuk daftar SN rekomendasi
-    const [suggestedSNs, setSuggestedSNs] = useState<{ serial_number: string; grade: string; selling_price: number }[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-
-    // ← TAMBAH: fetch SN yang tersedia saat modal dibuka
-    useEffect(() => {
-        const fetchSuggestedSNs = async () => {
-            if (!unit.laptop_id) return;
-            try {
-                const res = await fetch(`/api/laptops/${unit.laptop_id}/units`);
-                const result = await res.json();
-                if (result.data) {
-                    // Untuk RESERVED: tampilkan unit SIAP_JUAL (unit yang belum dipesan)
-                    // Untuk HELD: tampilkan unit HELD saja (unit yang sudah diambil ini)
-                    const filtered = (result.data as any[]).filter(u =>
-                        unit.status === "RESERVED"
-                            ? u.status === "SIAP_JUAL"
-                            : u.status === "HELD"
-                    );
-                    setSuggestedSNs(filtered.map(u => ({
-                        serial_number: u.serial_number,
-                        grade: u.grade,
-                        selling_price: Math.round(Number(u.selling_price) || 0),
-                    })));
-                }
-            } catch { /* ignore */ }
-        };
-        fetchSuggestedSNs();
-    }, [unit.laptop_id, unit.status]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -366,11 +550,7 @@ function ConfirmPaymentModal({
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
-    // ← TAMBAH: filter suggestions berdasarkan input
-    const filteredSuggestions = suggestedSNs.filter(s =>
-        s.serial_number.toLowerCase().includes(serialNumber.toLowerCase())
-    );
-
+    // ── Upload file ke server ──────────────────────────────────────────────
     const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -382,17 +562,18 @@ function ConfirmPaymentModal({
             const res = await fetch("/api/receipt/upload-image", { method: "POST", body: formData });
             const result = await res.json();
             if (result.url) setPaymentProof(result.url);
-        } catch { /* non-blocking */ } finally {
+            else throw new Error("URL tidak ditemukan di respons");
+        } catch {
+            setError("Gagal mengupload foto bukti");
+        } finally {
             setUploadingProof(false);
         }
     };
 
     const handleConfirm = async () => {
         if (!unit.reserved_invoice) { setError("Invoice tidak ditemukan"); return; }
-        if (unit.status === "RESERVED" && !serialNumber.trim()) {
-            setError("Serial number wajib diisi untuk transaksi DP");
-            return;
-        }
+        if (!unit.serial_number) { setError("Serial number tidak ditemukan pada unit ini"); return; }
+
         setLoading(true);
         setError("");
         try {
@@ -401,7 +582,7 @@ function ConfirmPaymentModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     invoice_number: unit.reserved_invoice,
-                    serial_number: serialNumber.trim() || unit.serial_number,
+                    serial_number: unit.serial_number,
                     payment_photo: paymentProof || null,
                 }),
             });
@@ -416,210 +597,207 @@ function ConfirmPaymentModal({
         }
     };
 
-    const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+    const statusLabel = unit.status === "RESERVED" ? "DP" : "Ambil Dulu";
+    const statusColor = unit.status === "RESERVED"
+        ? "bg-violet-50 text-violet-700 border-violet-200"
+        : "bg-orange-50 text-orange-700 border-orange-200";
+    const statusDot = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 px-5 py-4 border-b border-emerald-100">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden">
+
+                {/* Header */}
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 px-5 py-4 border-b border-emerald-100 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-800">Konfirmasi Lunas</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Transaksi akan menjadi PAID</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-gray-800">Konfirmasi Lunas</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">Transaksi akan menjadi PAID</p>
-                        </div>
+                        </button>
                     </div>
                 </div>
 
-                <div className="p-5 space-y-4">
-                    {/* Info transaksi */}
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                        <p className="text-xs text-gray-400 mb-1">Unit</p>
-                        <p className="text-sm font-bold text-gray-800">{unit.laptop?.laptop_name || "—"}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            Invoice: <span className="font-mono font-medium">{unit.reserved_invoice || "—"}</span>
-                        </p>
-                        <p className="text-xs text-gray-500">
-                            Dipesan oleh: <span className="font-medium">{unit.reserved_by || "—"}</span>
-                        </p>
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+                    {/* Info rows */}
+                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                        {[
+                            {
+                                label: "Status", value: (
+                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} /> {statusLabel}
+                                    </span>
+                                )
+                            },
+                            { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
+                            { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
+                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 text-right max-w-[55%]">{unit.laptop?.laptop_name || "—"}</span> },
+                            { label: "Serial Number", value: <span className="text-xs font-mono bg-gray-200 px-2 py-0.5 rounded text-gray-800 font-semibold">{unit.serial_number || "—"}</span> },
+                            { label: "Harga Jual", value: <span className="text-sm font-bold text-emerald-600">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
+                        ].map(row => (
+                            <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
+                                <span className="text-xs text-gray-400">{row.label}</span>
+                                {row.value}
+                            </div>
+                        ))}
                     </div>
 
-                    {/* Input SN untuk RESERVED — dengan autocomplete */}
-                    {unit.status === "RESERVED" && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                Serial Number Unit <span className="text-red-400">*</span>
-                            </label>
-                            <p className="text-[10px] text-gray-400 mb-1.5">
-                                Transaksi DP belum ada SN. Masukkan SN unit yang akan diserahkan.
-                            </p>
-
-                            {/* Input + dropdown wrapper */}
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={serialNumber}
-                                    onChange={e => {
-                                        setSerialNumber(e.target.value);
-                                        setShowSuggestions(true);
-                                        setError("");
-                                    }}
-                                    onFocus={() => setShowSuggestions(true)}
-                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                                    placeholder="Ketik atau pilih SN..."
-                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition"
-                                    autoFocus
-                                />
-
-                                {/* Dropdown rekomendasi */}
-                                {showSuggestions && filteredSuggestions.length > 0 && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden max-h-44 overflow-y-auto">
-                                        <div className="px-3 py-1.5 border-b border-gray-100 bg-gray-50">
-                                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                                                Unit Siap Jual ({filteredSuggestions.length})
-                                            </p>
-                                        </div>
-                                        {filteredSuggestions.map(s => (
-                                            <button
-                                                key={s.serial_number}
-                                                type="button"
-                                                onMouseDown={() => {
-                                                    setSerialNumber(s.serial_number);
-                                                    setShowSuggestions(false);
-                                                }}
-                                                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-emerald-50 transition text-left border-b border-gray-50 last:border-0"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-xs text-gray-800 font-medium">
-                                                        {s.serial_number}
-                                                    </span>
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${s.grade === "A" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                                        s.grade === "B" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                                            "bg-red-50 text-red-700 border-red-200"
-                                                        }`}>
-                                                        {s.grade}
-                                                    </span>
-                                                </div>
-                                                <span className="text-xs text-gray-500 tabular-nums">
-                                                    {fmt(s.selling_price)}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Empty state jika tidak ada SN tersedia */}
-                                {showSuggestions && suggestedSNs.length === 0 && serialNumber === "" && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 px-3 py-2.5">
-                                        <p className="text-xs text-gray-400 text-center">Tidak ada unit siap jual untuk laptop ini</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Indikator SN sudah dipilih */}
-                            {serialNumber && suggestedSNs.find(s => s.serial_number === serialNumber) && (
-                                <div className="flex items-center gap-1.5 mt-1.5">
-                                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    <p className="text-[10px] text-emerald-600 font-medium">SN ditemukan di stok</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Info HELD — tampilkan SN yang sudah tercatat */}
+                    {/* Konteks status */}
                     {unit.status === "HELD" && (
-                        <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 flex gap-2">
+                            <span className="text-lg flex-shrink-0">📦</span>
                             <p className="text-xs text-orange-700">
-                                Unit sudah diambil oleh pelanggan. Konfirmasi ini akan menandai transaksi sebagai LUNAS.
+                                Unit sudah diambil oleh <strong>{unit.reserved_by}</strong>.
+                                Konfirmasi ini akan menandai transaksi sebagai <strong>LUNAS</strong>.
                             </p>
-                            {unit.serial_number && (
-                                <div className="flex items-center gap-2 mt-2">
-                                    <p className="text-[10px] text-orange-500 font-medium">SN Unit:</p>
-                                    <code className="text-xs font-mono bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                                        {unit.serial_number}
-                                    </code>
-                                </div>
-                            )}
+                        </div>
+                    )}
+                    {unit.status === "RESERVED" && (
+                        <div className="bg-violet-50 border border-violet-200 rounded-xl px-3 py-2.5 flex gap-2">
+                            <span className="text-lg flex-shrink-0">🔒</span>
+                            <p className="text-xs text-violet-700">
+                                Unit terkunci untuk <strong>{unit.reserved_by}</strong>.
+                                Konfirmasi akan melunasi sisa tagihan dan menyerahkan unit.
+                            </p>
                         </div>
                     )}
 
-                    {/* Upload bukti bayar */}
+                    {/* ── Upload bukti bayar (file/kamera) ── */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">
                             Bukti Transfer
                             <span className="text-gray-400 font-normal ml-1">(opsional)</span>
                         </label>
+
                         {paymentProof ? (
-                            <div className="relative flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
-                                <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
-                                    <img src={paymentProof} alt="Bukti bayar" className="w-full h-full object-cover" />
+                            /* Preview foto yang sudah diupload */
+                            <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                                <img
+                                    src={paymentProof}
+                                    alt="Bukti bayar"
+                                    className="w-full max-h-48 object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/10 flex items-start justify-end p-2">
+                                    <button
+                                        onClick={() => {
+                                            setPaymentProof(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = "";
+                                        }}
+                                        className="w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition shadow"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-emerald-700">✓ Foto terupload</p>
-                                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">Bukti transfer tersimpan</p>
-                                </div>
-                                <button
-                                    onClick={() => { setPaymentProof(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                                    className="w-7 h-7 bg-red-50 text-red-500 border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-100 transition flex-shrink-0"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                <div className="bg-emerald-50 border-t border-emerald-100 px-3 py-1.5 flex items-center gap-1.5">
+                                    <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                     </svg>
-                                </button>
+                                    <p className="text-xs font-medium text-emerald-700">Foto berhasil diupload</p>
+                                </div>
                             </div>
                         ) : (
+                            /* Tombol upload — buka gallery/kamera */
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadingProof}
-                                className="w-full h-16 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:border-gray-300 hover:bg-gray-50 transition"
+                                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-600 transition group"
                             >
                                 {uploadingProof ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                                        <span className="text-xs">Mengupload...</span>
+                                        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                                        <span className="text-xs font-medium">Mengupload...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
-                                        <span className="text-xs">Upload foto bukti</span>
+                                        <div className="text-center">
+                                            <p className="text-xs font-semibold">Foto Bukti Transfer</p>
+                                            <p className="text-[10px] mt-0.5">Tap untuk buka galeri atau kamera</p>
+                                        </div>
                                     </>
                                 )}
                             </button>
                         )}
-                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProofUpload} className="hidden" />
+
+                        {/* Input file tersembunyi — accept image, bisa pakai kamera di mobile */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleProofUpload}
+                            className="hidden"
+                        />
+                    </div>
+
+                    {/* Warning */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex gap-2">
+                        <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        <p className="text-xs text-amber-700">
+                            Konfirmasi akan mengubah status menjadi <strong>PAID</strong> dan unit menjadi <strong>SOLD</strong>. Tidak dapat dibatalkan.
+                        </p>
                     </div>
 
                     {error && (
                         <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
                             <p className="text-xs text-red-700">{error}</p>
                         </div>
                     )}
+                </div>
 
-                    <div className="flex gap-3">
-                        <button
-                            onClick={onClose}
-                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
-                        >
-                            Batal
-                        </button>
-                        <button
-                            onClick={handleConfirm}
-                            disabled={loading || uploadingProof}
-                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50"
-                        >
-                            {loading ? "Memproses..." : "Konfirmasi Lunas"}
-                        </button>
-                    </div>
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose}
+                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        disabled={loading || uploadingProof}
+                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {loading ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Memproses...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Konfirmasi Lunas
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
@@ -731,7 +909,11 @@ export default function ReadyPage() {
         }
         // Sort: SIAP_JUAL dulu, lalu HELD, lalu RESERVED
         const order: Record<string, number> = { SIAP_JUAL: 0, HELD: 1, RESERVED: 2, SOLD: 3 };
-        list.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+        list.sort((a, b) => {
+            const statusDiff = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+            if (statusDiff !== 0) return statusDiff;
+            return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
+        });
         return list;
     }, [units, filterStatus, filterGrade, search]);
 

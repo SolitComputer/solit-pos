@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { UserRole } from "@/lib/auth";
 
-
 const CACHE_KEY = "solit_sidebar_user";
 
 function getCachedUser() {
@@ -85,13 +84,6 @@ const Icons = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
-  activity: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
-    </svg>
-  ),
-  // Tambah di Icons object:
   log: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M9 11l3 3L22 4" />
@@ -129,6 +121,13 @@ const Icons = {
       <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
+  pendingOrders: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" ry="1" />
+      <path d="M9 12h6M9 16h4" />
+    </svg>
+  ),
 };
 
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
@@ -136,27 +135,29 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Dashboard",         href: "/dashboard",             icon: Icons.dashboard },
+        { name: "Riwayat",           href: "/dashboard/transactions",icon: Icons.riwayat   },
+        { name: "Log Aktivitas",     href: "/dashboard/activity-log",icon: Icons.log       },
+        { name: "Log Login",         href: "/dashboard/login-logs",  icon: Icons.loginLog  },
+        { name: "Laporan Keuangan",  href: "/dashboard/reports",     icon: Icons.reports   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        { name: "Data Laptop",       href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Garansi",           href: "/dashboard/warranty",      icon: Icons.garansi     },
+        { name: "Laptop Siap Jual",  href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Laptop Minus",      href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        { name: "Buat Payment",      href: "/payment/create",                  icon: Icons.payment       },
+        // ✅ Dipindah ke sini
+        { name: "DP & Ambil Dulu",   href: "/dashboard/pending-orders",        icon: Icons.pendingOrders },
+        { name: "Scanner",           href: "/scan",                            icon: Icons.scanner       },
       ],
     },
   ],
@@ -164,8 +165,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",  href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Garansi",      href: "/dashboard/warranty",      icon: Icons.garansi     },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
@@ -178,23 +179,24 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        { name: "Buat Payment",    href: "/payment/create",           icon: Icons.payment       },
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Scanner",         href: "/scan",                     icon: Icons.scanner       },
       ],
     },
   ],
@@ -202,23 +204,24 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        { name: "Buat Payment",    href: "/payment/create",           icon: Icons.payment       },
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Scanner",         href: "/scan",                     icon: Icons.scanner       },
       ],
     },
   ],
@@ -226,32 +229,32 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Dashboard",        href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",          href: "/dashboard/transactions", icon: Icons.riwayat   },
+        { name: "DP & Ambil Dulu",  href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Laporan Keuangan", href: "/dashboard/reports",      icon: Icons.reports   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop", href: "/dashboard/laptops",  icon: Icons.laptop  },
+        { name: "Garansi",     href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
   ],
-
   PENGELOLA_BARANG: [
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",  href: "/dashboard/laptops",       icon: Icons.laptop      },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
@@ -266,56 +269,44 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat   },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        { name: "Buat Payment",    href: "/payment/create",           icon: Icons.payment       },
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Scanner",         href: "/scan",                     icon: Icons.scanner       },
       ],
     },
   ],
 };
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
-  ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
-  KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
-  CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
-  ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
-  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
-  TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
-  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
+  ADMIN:            { label: "Admin / CEO",      className: "bg-violet-50 text-violet-700"  },
+  KEPALA_SALES:     { label: "Kepala Sales",     className: "bg-emerald-50 text-emerald-700"},
+  CREW_SALES:       { label: "Crew Sales",       className: "bg-sky-50 text-sky-700"        },
+  ACCOUNTING:       { label: "Accounting",       className: "bg-amber-50 text-amber-700"    },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700"      },
+  TEKNISI:          { label: "Teknisi",          className: "bg-orange-50 text-orange-700"  },
+  PENGANTARAN:      { label: "Pengantaran",      className: "bg-teal-50 text-teal-700"      },
 };
 
 function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
+  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
-function NavItem({
-  item,
-  isActive,
-  onClick,
-}: {
-  item: MenuItem;
-  isActive: boolean;
-  onClick?: () => void;
-}) {
+function NavItem({ item, isActive, onClick }: { item: MenuItem; isActive: boolean; onClick?: () => void }) {
   return (
     <Link
       href={item.href}
@@ -337,27 +328,15 @@ function NavItem({
   );
 }
 
-function SidebarContent({
-  user,
-  loading,
-  groups,
-  pathname,
-  onClose,
-  onLogout,
-}: {
-  user: any;
-  loading: boolean;
-  groups: MenuGroup[];
-  pathname: string;
-  onClose?: () => void;
-  onLogout: () => void;
+function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: {
+  user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
+  onClose?: () => void; onLogout: () => void;
 }) {
   const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-      {/* ── Logo & User ── */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
@@ -365,9 +344,7 @@ function SidebarContent({
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">
-              Solit POS
-            </span>
+            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
           </div>
           {onClose && (
             <button onClick={onClose}
@@ -380,7 +357,6 @@ function SidebarContent({
           )}
         </div>
 
-        {/* User card */}
         {loading ? (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
@@ -408,14 +384,9 @@ function SidebarContent({
 
       <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
-      {/* ── Nav Groups ── */}
-      <nav
-        className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-3"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
-      >
-
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-3"
+        style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {loading ? (
-          /* Skeleton nav — tetap tampilkan placeholder agar tidak loncat */
           <div className="space-y-1 pt-1">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
@@ -432,9 +403,7 @@ function SidebarContent({
                 {group.items.map((item) => {
                   const isActive = (() => {
                     if (pathname === item.href) return true;
-
                     if (item.href === "/dashboard") return false;
-
                     if (item.href === "/dashboard/laptops") {
                       return (
                         pathname === "/dashboard/laptops" ||
@@ -443,17 +412,10 @@ function SidebarContent({
                           !pathname.startsWith("/dashboard/laptops/minus"))
                       );
                     }
-
-                    // Semua route lain: startsWith biasa
                     return pathname.startsWith(item.href);
                   })();
                   return (
-                    <NavItem
-                      key={item.href}
-                      item={item}
-                      isActive={isActive}
-                      onClick={onClose}
-                    />
+                    <NavItem key={item.href} item={item} isActive={isActive} onClick={onClose} />
                   );
                 })}
               </div>
@@ -463,13 +425,9 @@ function SidebarContent({
       </nav>
 
       <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
-        <button
-          onClick={onLogout}
-          className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
-        >
-          <span className="flex-shrink-0 group-hover:text-red-500">
-            {Icons.logout}
-          </span>
+        <button onClick={onLogout}
+          className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all">
+          <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           <span>Keluar</span>
         </button>
       </div>
@@ -487,14 +445,10 @@ export default function Sidebar() {
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;
-
     const fetchUser = async () => {
       try {
         const res = await fetch("/api/auth/me");
-        if (!res.ok) {
-          window.location.href = "/login";
-          return;
-        }
+        if (!res.ok) { window.location.href = "/login"; return; }
         const result = await res.json();
         const fresh = result.user ?? null;
         setUser(fresh);
@@ -504,13 +458,10 @@ export default function Sidebar() {
         setLoading(false);
       }
     };
-
     fetchUser();
   }, []);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
@@ -518,25 +469,15 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const groups: MenuGroup[] =
-    user?.role ? (ROLE_MENUS[user.role as UserRole] ?? []) : [];
-
-  const contentProps = {
-    user,
-    loading,
-    groups,
-    pathname,
-    onLogout: handleLogout,
-  };
+  const groups: MenuGroup[] = user?.role ? (ROLE_MENUS[user.role as UserRole] ?? []) : [];
+  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout };
 
   return (
     <>
-      {/* ── Mobile hamburger ── */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
-        aria-label="Buka menu"
-      >
+        aria-label="Buka menu">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
@@ -544,23 +485,16 @@ export default function Sidebar() {
         </svg>
       </button>
 
-      {/* ── Overlay mobile ── */}
       <div
-        className={`
-          lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm
-          transition-opacity duration-200
-          ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
-        `}
-        onClick={() => setOpen(false)}
-        aria-hidden="true"
-      />
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200
+          ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        onClick={() => setOpen(false)} aria-hidden="true" />
 
-      {/* ── Mobile drawer ── */}
-      <aside className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform
+        ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      {/* ── Desktop sidebar ── */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden">
         <SidebarContent {...contentProps} />
       </aside>

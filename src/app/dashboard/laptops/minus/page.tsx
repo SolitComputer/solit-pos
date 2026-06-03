@@ -30,19 +30,19 @@ interface MinusUnit {
 
 // ─── Repair Status Config ─────────────────────────────────────────────────────
 const REPAIR_STATUS: Record<string, { label: string; badge: string; dot: string; emoji: string }> = {
-  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-blue-50 text-blue-700 border-blue-200",     dot: "bg-blue-500",   emoji: "🔄" },
-  NOT_STARTED:   { label: "Belum Terpegang",    badge: "bg-gray-100 text-gray-600 border-gray-200",    dot: "bg-gray-400",   emoji: "⏸️" },
-  GIVE_UP:       { label: "Nyerah",             badge: "bg-red-50 text-red-700 border-red-200",        dot: "bg-red-500",    emoji: "🚫" },
-  DEAD:          { label: "Mati Total",         badge: "bg-rose-100 text-rose-800 border-rose-200",    dot: "bg-rose-700",   emoji: "💀" },
-  HARD_PARTS:    { label: "Sparepart Susah",    badge: "bg-amber-50 text-amber-700 border-amber-200",  dot: "bg-amber-500",  emoji: "🔍" },
-  DONE:          { label: "Selesai",            badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", emoji: "✅" },
-  OTHER:         { label: "Lain-lain",          badge: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500", emoji: "📝" },
+  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", emoji: "🔄" },
+  NOT_STARTED: { label: "Belum Terpegang", badge: "bg-gray-100 text-gray-600 border-gray-200", dot: "bg-gray-400", emoji: "⏸️" },
+  GIVE_UP: { label: "Nyerah", badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", emoji: "🚫" },
+  DEAD: { label: "Mati Total", badge: "bg-rose-100 text-rose-800 border-rose-200", dot: "bg-rose-700", emoji: "💀" },
+  HARD_PARTS: { label: "Sparepart Susah", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", emoji: "🔍" },
+  DONE: { label: "Selesai", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", emoji: "✅" },
+  OTHER: { label: "Lain-lain", badge: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500", emoji: "📝" },
 };
 
 const UNIT_STATUS: Record<string, { label: string; badge: string }> = {
-  SERVICE:    { label: "Service",     badge: "bg-blue-50 text-blue-700 border-blue-200"   },
-  BELUM_SIAP: { label: "Belum Siap",  badge: "bg-amber-50 text-amber-700 border-amber-200" },
-  SIAP_JUAL:  { label: "Siap Jual",   badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  SERVICE: { label: "Service", badge: "bg-blue-50 text-blue-700 border-blue-200" },
+  BELUM_SIAP: { label: "Belum Siap", badge: "bg-amber-50 text-amber-700 border-amber-200" },
+  SIAP_JUAL: { label: "Siap Jual", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
@@ -58,10 +58,10 @@ function EditRepairModal({
   onSuccess: (updated: MinusUnit) => void;
 }) {
   const [repairStatus, setRepairStatus] = useState(unit.repair_status || "NOT_STARTED");
-  const [repairNotes,  setRepairNotes]  = useState(unit.repair_notes  || "");
-  const [unitStatus,   setUnitStatus]   = useState(unit.status);
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState("");
+  const [repairNotes, setRepairNotes] = useState(unit.repair_notes || "");
+  const [unitStatus, setUnitStatus] = useState(unit.status);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -83,10 +83,10 @@ function EditRepairModal({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          unit_id:      unit.id,
+          unit_id: unit.id,
           repair_status: repairStatus,
-          repair_notes:  repairNotes.trim() || null,
-          status:        unitStatus,
+          repair_notes: repairNotes.trim() || null,
+          status: unitStatus,
         }),
       });
       const result = await res.json();
@@ -135,11 +135,10 @@ function EditRepairModal({
                   key={key}
                   type="button"
                   onClick={() => setRepairStatus(key)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                    repairStatus === key
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${repairStatus === key
                       ? `${val.badge} shadow-sm scale-[1.01]`
                       : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <span className="text-base flex-shrink-0">{val.emoji}</span>
                   <div>
@@ -169,8 +168,8 @@ function EditRepairModal({
                 repairStatus === "OTHER"
                   ? "Jelaskan kondisi laptop ini..."
                   : repairStatus === "WAITING_PARTS"
-                  ? "Sparepart apa yang ditunggu? Est. kapan?"
-                  : "Catatan tambahan (opsional)..."
+                    ? "Sparepart apa yang ditunggu? Est. kapan?"
+                    : "Catatan tambahan (opsional)..."
               }
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition resize-none"
             />
@@ -183,19 +182,18 @@ function EditRepairModal({
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: "SERVICE",    label: "Service",    icon: "🔧" },
+                { value: "SERVICE", label: "Service", icon: "🔧" },
                 { value: "BELUM_SIAP", label: "Belum Siap", icon: "⏳" },
-                { value: "SIAP_JUAL",  label: "Siap Jual",  icon: "✅" },
+                { value: "SIAP_JUAL", label: "Siap Jual", icon: "✅" },
               ].map(opt => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => setUnitStatus(opt.value)}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition ${
-                    unitStatus === opt.value
+                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition ${unitStatus === opt.value
                       ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                       : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <span className="text-sm">{opt.icon}</span>
                   {opt.label}
@@ -242,18 +240,18 @@ function EditRepairModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function MinusPage() {
-  const [units,     setUnits]     = useState<MinusUnit[]>([]);
+  const [units, setUnits] = useState<MinusUnit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [userRole,  setUserRole]  = useState<UserRole | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
   // Filters
-  const [search,        setSearch]        = useState("");
-  const [filterRepair,  setFilterRepair]  = useState("ALL");
-  const [filterStatus,  setFilterStatus]  = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [filterRepair, setFilterRepair] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
 
   // Modals
   const [editTarget, setEditTarget] = useState<MinusUnit | null>(null);
-  const [alertMsg,   setAlertMsg]   = useState<string | null>(null);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   const canEdit = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_MINUS_LAPTOPS ?? ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"] as UserRole[]) : false;
 
@@ -267,13 +265,13 @@ export default function MinusPage() {
   const fetchUnits = async () => {
     setIsLoading(true);
     try {
-      const res    = await fetch("/api/laptops/minus");
+      const res = await fetch("/api/laptops/minus");
       const result = await res.json();
       if (result.success) {
         setUnits((result.data || []).map((u: MinusUnit) => ({
           ...u,
           purchase_price: Math.round(Number(u.purchase_price) || 0),
-          selling_price:  Math.round(Number(u.selling_price)  || 0),
+          selling_price: Math.round(Number(u.selling_price) || 0),
         })));
       }
     } catch {
@@ -287,10 +285,10 @@ export default function MinusPage() {
 
   const filtered = useMemo(() => {
     let list = [...units];
-    if (filterStatus !== "ALL")    list = list.filter(u => u.status === filterStatus);
+    if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
     if (filterRepair !== "ALL") {
       if (filterRepair === "NONE") list = list.filter(u => !u.repair_status);
-      else                         list = list.filter(u => u.repair_status === filterRepair);
+      else list = list.filter(u => u.repair_status === filterRepair);
     }
     if (search.trim()) {
       const t = search.toLowerCase();
@@ -301,11 +299,17 @@ export default function MinusPage() {
         u.repair_notes?.toLowerCase().includes(t)
       );
     }
-    // Sort: NOT_STARTED dulu, lalu WAITING, HARD, lain, DONE terakhir
     const ORDER: Record<string, number> = {
-      NOT_STARTED: 0, WAITING_PARTS: 1, HARD_PARTS: 2, OTHER: 3, GIVE_UP: 4, DEAD: 5, DONE: 6,
-    };
-    list.sort((a, b) => (ORDER[a.repair_status || "NOT_STARTED"] ?? 9) - (ORDER[b.repair_status || "NOT_STARTED"] ?? 9));
+    NOT_STARTED: 0, WAITING_PARTS: 1, HARD_PARTS: 2, OTHER: 3, GIVE_UP: 4, DEAD: 5, DONE: 6,
+  };
+  list.sort((a, b) => {
+    const repairDiff =
+      (ORDER[a.repair_status || "NOT_STARTED"] ?? 9) -
+      (ORDER[b.repair_status || "NOT_STARTED"] ?? 9);
+    if (repairDiff !== 0) return repairDiff;
+    // Dalam repair status yang sama, sort A-Z nama laptop
+    return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
+  });
     return list;
   }, [units, filterStatus, filterRepair, search]);
 
@@ -320,8 +324,8 @@ export default function MinusPage() {
   }, [units]);
 
   const statusCounts = {
-    ALL:        units.length,
-    SERVICE:    units.filter(u => u.status === "SERVICE").length,
+    ALL: units.length,
+    SERVICE: units.filter(u => u.status === "SERVICE").length,
     BELUM_SIAP: units.filter(u => u.status === "BELUM_SIAP").length,
   };
 
@@ -367,10 +371,10 @@ export default function MinusPage() {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Unit",     value: units.length,                           color: "text-gray-800",   bar: "bg-gray-400"    },
-              { label: "Belum Terpegang",value: repairCounts["NOT_STARTED"] || 0,       color: "text-gray-600",   bar: "bg-gray-300"    },
-              { label: "Proses",         value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-blue-600", bar: "bg-blue-500" },
-              { label: "Selesai",        value: repairCounts["DONE"] || 0,              color: "text-emerald-600",bar: "bg-emerald-500" },
+              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-400" },
+              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-300" },
+              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-blue-600", bar: "bg-blue-500" },
+              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-emerald-600", bar: "bg-emerald-500" },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden">
                 <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${s.bar} opacity-60`} />
@@ -386,21 +390,19 @@ export default function MinusPage() {
             <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               <button
                 onClick={() => setFilterRepair("ALL")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                  filterRepair === "ALL"
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === "ALL"
                     ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                     : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 Semua ({repairCounts["ALL"] || 0})
               </button>
               <button
                 onClick={() => setFilterRepair("NONE")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                  filterRepair === "NONE"
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === "NONE"
                     ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                     : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 Belum diset ({repairCounts["NONE"] || 0})
               </button>
@@ -408,17 +410,15 @@ export default function MinusPage() {
                 <button
                   key={key}
                   onClick={() => setFilterRepair(key)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                    filterRepair === key
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === key
                       ? `${val.badge} shadow-sm`
                       : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   {val.emoji} {val.label}
                   {repairCounts[key] > 0 && (
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                      filterRepair === key ? "bg-white/30" : "bg-gray-100 text-gray-500"
-                    }`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${filterRepair === key ? "bg-white/30" : "bg-gray-100 text-gray-500"
+                      }`}>
                       {repairCounts[key]}
                     </span>
                   )}
@@ -429,23 +429,21 @@ export default function MinusPage() {
             {/* Unit Status + Search */}
             <div className="flex gap-2 flex-wrap">
               {[
-                { value: "ALL",        label: "Semua Status",  count: statusCounts.ALL        },
-                { value: "SERVICE",    label: "🔧 Service",    count: statusCounts.SERVICE    },
+                { value: "ALL", label: "Semua Status", count: statusCounts.ALL },
+                { value: "SERVICE", label: "🔧 Service", count: statusCounts.SERVICE },
                 { value: "BELUM_SIAP", label: "⏳ Belum Siap", count: statusCounts.BELUM_SIAP },
               ].map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => setFilterStatus(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                    filterStatus === opt.value
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterStatus === opt.value
                       ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
                       : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   {opt.label}
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${
-                    filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                  }`}>
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                    }`}>
                     {opt.count}
                   </span>
                 </button>
@@ -502,7 +500,7 @@ export default function MinusPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filtered.map(unit => {
-                      const rs  = unit.repair_status ? REPAIR_STATUS[unit.repair_status] : null;
+                      const rs = unit.repair_status ? REPAIR_STATUS[unit.repair_status] : null;
                       const ust = UNIT_STATUS[unit.status];
                       const isDone = unit.repair_status === "DONE";
                       const isDead = unit.repair_status === "DEAD" || unit.repair_status === "GIVE_UP";
@@ -510,11 +508,10 @@ export default function MinusPage() {
                       return (
                         <tr
                           key={unit.id}
-                          className={`transition-colors ${
-                            isDone ? "bg-emerald-50/20 hover:bg-emerald-50/40" :
-                            isDead ? "bg-red-50/20 hover:bg-red-50/40" :
-                            "hover:bg-gray-50/70"
-                          }`}
+                          className={`transition-colors ${isDone ? "bg-emerald-50/20 hover:bg-emerald-50/40" :
+                              isDead ? "bg-red-50/20 hover:bg-red-50/40" :
+                                "hover:bg-gray-50/70"
+                            }`}
                         >
                           <td className="px-4 py-3.5 max-w-[200px]">
                             <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>

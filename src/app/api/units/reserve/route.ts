@@ -4,21 +4,26 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { generateInvoice } from "@/lib/invoice";
 import { logActivity } from "@/lib/activityLogger";
 
-// POST — buat reservasi (DP atau Ambil Dulu)
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
     const {
       unit_id,
-      type, // "RESERVED" = DP, "HELD" = ambil dulu
+      type,             
       customer_name,
       customer_phone,
       company_name,
-      amount,        // jumlah DP atau harga deal
+      dp_amount,        
+      deal_price,       
       payment_method,
       source_platform,
       notes,
       sales_name,
+      software_request,
+      pickup_method,
+      pickup_date,
+      pickup_time,
+      pickup_location,
     } = body;
 
     if (!unit_id || !type || !customer_name) {
@@ -31,7 +36,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     // Cek unit tersedia
     const { data: unit } = await supabase
       .from("laptop_units")
-      .select("*, laptop:laptops(id, laptop_name, selling_price)")
+      .select("*, laptop:laptops(id, laptop_name, selling_price, brand, cpu, ram, storage)")
       .eq("id", unit_id)
       .single();
 
@@ -45,7 +50,16 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     const invoice_number = await generateInvoice();
     const txStatus = type === "RESERVED" ? "RESERVED" : "HELD";
 
-    // Buat transaksi
+    // Untuk RESERVED: amount = dp_amount (uang DP)
+    // Untuk HELD: amount = deal_price (harga deal yang disepakati)
+    const txAmount = type === "RESERVED"
+      ? (Number(dp_amount) || 0)
+      : (Number(deal_price) || 0);
+
+    const txDealPrice = Number(deal_price) || 0;
+    const inventoryPrice = Number(unit.purchase_price) || 0;
+
+    // Buat transaksi — SN & unit_id SELALU disimpan untuk kedua tipe
     const { data: transaction, error: txError } = await supabase
       .from("transactions")
       .insert({
@@ -53,21 +67,26 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         sales_id:        user.id,
         sales_name:      sales_name || user.name,
         laptop_id:       unit.laptop?.id,
-        unit_id:         type === "HELD" ? unit_id : null, // SN kosong untuk DP
-        serial_number:   type === "HELD" ? unit.serial_number : null,
+        unit_id:         unit_id,          // ← SELALU simpan unit_id
+        serial_number:   unit.serial_number, // ← SELALU simpan SN
         laptop_name:     unit.laptop?.laptop_name,
         customer_name,
         customer_phone:  customer_phone || null,
         company_name:    company_name || null,
-        inventory_price: unit.purchase_price || 0,
-        deal_price:      amount || 0,
-        amount:          amount || 0,
-        other:           (amount || 0) - (unit.purchase_price || 0),
+        inventory_price: inventoryPrice,
+        deal_price:      txDealPrice,
+        amount:          txAmount,
+        other:           txDealPrice - inventoryPrice,
         payment_method:  payment_method || "CASH",
         source_platform: source_platform || null,
         notes:           notes || null,
+        software_request: software_request || null,
+        pickup_method:   pickup_method || null,
+        pickup_date:     pickup_date || null,
+        pickup_time:     pickup_time || null,
+        pickup_location: pickup_location || null,
         status:          txStatus,
-        paid_at:         null, // belum lunas
+        paid_at:         null,
       })
       .select()
       .single();
@@ -79,11 +98,11 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    // Update status unit
+    // Update status unit — SELALU simpan info reservasi
     await supabase
       .from("laptop_units")
       .update({
-        status:           type === "RESERVED" ? "RESERVED" : "HELD",
+        status:           txStatus,
         reserved_by:      customer_name,
         reserved_invoice: invoice_number,
       })
@@ -96,13 +115,13 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       action:      "CREATE",
       entity:      "transaction",
       entityId:    transaction.id,
-      entityLabel: `${invoice_number} — ${customer_name} [${txStatus}]`,
+      entityLabel: `${invoice_number} — ${customer_name} [${txStatus}] SN:${unit.serial_number}`,
       afterData:   transaction,
     });
 
     return NextResponse.json({
-      success: true,
-      data: transaction,
+      success:        true,
+      data:           transaction,
       invoice_number,
     });
   } catch (err) {
