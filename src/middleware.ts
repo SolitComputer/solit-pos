@@ -26,15 +26,17 @@ const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
-  const faceAttended = request.cookies.get("face_attended")?.value; // ← Cookie baru
 
   // ── Public routes ──
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
-        // Cek apakah harus absen dulu
-        if (isAttendanceTime() && !faceAttended) {
+        const faceAttended = request.cookies.get("face_attended")?.value;
+        const faceVerified = request.cookies.get("face_verified")?.value;
+        const hasAttended = faceAttended === user.id || faceVerified === user.id;
+        
+        if (isAttendanceTime() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -75,7 +77,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Require Token ──
   if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
@@ -87,15 +88,6 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.redirect(new URL("/login", request.url));
     response.cookies.delete("token");
     return response;
-  }
-
-  // ── ATTENDANCE GUARD (Wajib Absen Wajah) ──
-  if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
-    if (isAttendanceTime() && faceAttended !== user.id) {
-      return NextResponse.redirect(
-        new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
-      );
-    }
   }
 
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
@@ -110,7 +102,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Route Permission Check ──
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
@@ -124,7 +115,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Forward user info ──
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);

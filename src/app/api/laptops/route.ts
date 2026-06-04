@@ -30,4 +30,5 @@ export const GET = withAuth(handler, [
   "ACCOUNTING",
   "PENGANTARAN",
   "MARKETING", 
+  "KEPALA_MARKETING"
 ]);
