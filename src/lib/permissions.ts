@@ -47,6 +47,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/laptops/minus":        ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"],
   "/dashboard/users":          ["ADMIN"],
   "/api/users":                ["ADMIN"],
+  "/dashboard/attendance": ["ADMIN", "KEPALA_SALES", "CREW_SALES", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING"],
 };
 
 export const PERMISSIONS = {

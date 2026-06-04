@@ -42,6 +42,11 @@ const Icons = {
       <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
+  attendance: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" />
+    </svg>
+  ),
   riwayat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -136,6 +141,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
@@ -166,6 +172,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
@@ -180,6 +187,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -205,6 +213,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -230,6 +239,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -248,6 +258,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -270,6 +281,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -295,6 +307,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -303,6 +316,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
@@ -320,6 +334,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -490,10 +505,14 @@ export default function Sidebar() {
   useEffect(() => {
     if (hasFetched.current) return;
     hasFetched.current = true;
+
     const fetchUser = async () => {
       try {
         const res = await fetch("/api/auth/me");
-        if (!res.ok) { window.location.href = "/login"; return; }
+        if (!res.ok) {
+          window.location.href = "/login";
+          return;
+        }
         const result = await res.json();
         const fresh = result.user ?? null;
         setUser(fresh);
@@ -510,10 +529,8 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
-
-    await fetch("/api/auth/logout", { method: "DELETE" });
-
-    window.location.href = "/face-verify";
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
   };
 
   const groups: MenuGroup[] = user?.role ? (ROLE_MENUS[user.role as UserRole] ?? []) : [];
@@ -543,7 +560,13 @@ export default function Sidebar() {
       </aside>
 
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden">
-        <SidebarContent {...contentProps} />
+        <SidebarContent
+          user={user}
+          loading={loading}
+          groups={groups}
+          pathname={pathname}
+          onLogout={handleLogout}
+        />
       </aside>
     </>
   );

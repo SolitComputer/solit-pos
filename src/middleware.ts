@@ -5,6 +5,7 @@ import {
   ROUTE_PERMISSIONS,
   ROLE_DEFAULT_REDIRECT,
   UserRole,
+  isAttendanceTime,
 } from "@/lib/auth";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
@@ -20,24 +21,24 @@ const FACE_API_WHITELIST = [
   "/api/auth/login",
 ];
 
-const FACE_PROTECTED_PREFIXES = ["/dashboard", "/payment"];
+const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
-  const faceVerified = request.cookies.get("face_verified")?.value;
+  const faceAttended = request.cookies.get("face_attended")?.value; // ← Cookie baru
 
   // ── Public routes ──
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
-        // Kalau sudah login tapi belum face verify → ke /face-verify
-        if (!faceVerified) {
+        // Cek apakah harus absen dulu
+        if (isAttendanceTime() && !faceAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
-          new URL(ROLE_DEFAULT_REDIRECT[user.role], request.url)
+          new URL(ROLE_DEFAULT_REDIRECT[user.role as UserRole], request.url)
         );
       }
     }
@@ -53,6 +54,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── Face Verify Page ──
   if (pathname.startsWith("/face-verify")) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -65,7 +67,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Face API — hanya butuh token, tidak butuh face_verified ──
+  // ── Face API Whitelist ──
   if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
     if (!token) {
       return NextResponse.json({ success: false }, { status: 401 });
@@ -73,7 +75,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Require auth ──
+  // ── Require Token ──
   if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
@@ -87,39 +89,28 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (pathname.startsWith("/face-verify")) {
-    if (!token) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    const user = await verifyToken(token);
-    if (!user) {
-      const res = NextResponse.redirect(new URL("/login", request.url));
-      res.cookies.delete("token");
-      return res;
-    }
-    return NextResponse.next();
-  }
-
-  // ── Face verification guard untuk dashboard & payment ──
-  if (FACE_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
-    if (faceVerified !== user.id) {
+  // ── ATTENDANCE GUARD (Wajib Absen Wajah) ──
+  if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (isAttendanceTime() && faceAttended !== user.id) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
   }
 
-  // ── Face verification guard ──
-  if (FACE_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
-    if (faceVerified !== user.id) {
-      // Belum verifikasi wajah hari ini → redirect ke halaman verifikasi
+  if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    const faceAttended = request.cookies.get("face_attended")?.value;
+    const faceVerified = request.cookies.get("face_verified")?.value;
+    const hasAttended = faceAttended === user.id || faceVerified === user.id;
+
+    if (isAttendanceTime() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
   }
 
-  // ── Route permission check ──
+  // ── Route Permission Check ──
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
@@ -133,7 +124,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Forward user info ke headers ──
+  // ── Forward user info ──
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);

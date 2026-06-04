@@ -32,7 +32,7 @@ export default function Page() {
 
       setTimeout(() => {
         const destination = result.redirect ?? "/dashboard";
-        window.location.href = `/face-verify?from=${encodeURIComponent(destination)}`;
+        window.location.href = destination;  
       }, 300);
 
     } catch {
