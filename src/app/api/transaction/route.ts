@@ -3,7 +3,6 @@ import { supabase } from "@/services/supabase";
 import { createClient } from "@supabase/supabase-js";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 
-// Admin client untuk bypass RLS saat baca laptops
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -15,7 +14,6 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "ALL";
 
-    // ── Step 1: Fetch transaksi ───────────────────────────────────────────
     let query = supabase
       .from("transactions")
       .select("*")
@@ -37,14 +35,12 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 
     const transactions = data ?? [];
 
-    // ── Step 2: Kumpulkan laptop_id unik ──────────────────────────────────
     const laptopIds = [...new Set(
       transactions
         .map((t: any) => t.laptop_id)
         .filter(Boolean)
     )] as string[];
 
-    // ── Step 3: Fetch specs pakai admin client (bypass RLS) ───────────────
     let laptopMap: Record<string, any> = {};
 
     if (laptopIds.length > 0) {
@@ -55,7 +51,6 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 
       if (laptopError) {
         console.error("Laptop specs error:", laptopError.message);
-        // Non-fatal — lanjut tanpa specs
       } else if (laptops) {
         laptopMap = Object.fromEntries(
           laptops.map((l: any) => [l.id, l])
@@ -63,7 +58,6 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       }
     }
 
-    // ── Step 4: Merge specs ke transaksi ──────────────────────────────────
     const mapped = transactions.map((item: any) => {
       const specs = item.laptop_id ? laptopMap[item.laptop_id] : null;
       return {

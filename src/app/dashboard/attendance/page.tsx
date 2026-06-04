@@ -58,7 +58,6 @@ function toWIBDate(iso: string): string {
     });
 }
 
-// ✅ FUNGSI BARU: Cek apakah absen terlambat (lewat jam 12:00 WIB)
 function isLateAttendance(checkInTime: string): boolean {
     const date = new Date(checkInTime);
     // Konversi ke WIB (UTC+7)
@@ -95,7 +94,6 @@ const STATUS_STYLES: Record<string, string> = {
     LATE: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-// ─── Location Badge ────────────────────────────────────────────────────────────
 function LocationBadge({ lat, lng, accuracy }: {
     lat: number | null; lng: number | null; accuracy: number | null;
 }) {
@@ -133,12 +131,10 @@ function LocationBadge({ lat, lng, accuracy }: {
     );
 }
 
-// ─── Shimmer ──────────────────────────────────────────────────────────────────
 const Shimmer = ({ className = "" }: { className?: string }) => (
     <div className={`rounded-lg animate-pulse bg-gray-100 ${className}`} />
 );
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AttendanceDashboardPage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [loading, setLoading] = useState(true);

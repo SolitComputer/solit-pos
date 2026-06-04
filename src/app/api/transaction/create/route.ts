@@ -64,6 +64,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 sales_name: user.name,
                 laptop_id: laptop.id,
                 customer_name: body.customer_name,
+                 customer_type: body.customer_type || "UMUM",
                 company_name: body.company_name,
                 customer_phone: body.customer_phone,
                 laptop_name: laptop.laptop_name,
