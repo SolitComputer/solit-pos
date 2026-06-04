@@ -10,8 +10,9 @@ const supabase = createClient(
 );
 
 const users = [
-  { name: "Rei", email: "Admin@gmail.com", password: "Rei@Solit25", role: "ADMIN" },
-  { name: "Ikmal", email: "ikmal@gmail.com", password: "ikmal@Solit25", role: "ADMIN" },
+  { name: "Rei",    email: "Admin@gmail.com", password: "Rei@Solit25", role: "ADMIN" },
+  { name: "Ikmal",  email: "ikmal@gmail.com", password: "ikmal@Solit25", role: "ADMIN" },
+  { name: "Fauzan", email: "fauzan@gmail.com", password: "ojan@Solit25", role: "ADMIN" },
 
   { name: "Salam", email: "salam.kds@solit-pos.com", password: "Salam@Sales25", role: "KEPALA_SALES" },
 
@@ -20,12 +21,12 @@ const users = [
   { name: "Resti", email: "resti.crew@solit-pos.com", password: "Resti@Crew25", role: "CREW_SALES" },
   { name: "Fitri", email: "fitri.crew@solit-pos.com", password: "Fitri@Crew25", role: "CREW_SALES" },
   { name: "Fatir", email: "fatir.crew@solit-pos.com", password: "Fatir@Crew25", role: "CREW_SALES" },
-  { name: "Yuna", email: "yuna.crew@solit-pos.com", password: "Yuna@Crew25", role: "CREW_SALES" },
+  { name: "Yuna",  email: "yuna.crew@solit-pos.com",  password: "Yuna@Crew25",  role: "CREW_SALES" },
   { name: "Dicky", email: "dicky.crew@solit-pos.com", password: "Dicky@Crew25", role: "CREW_SALES" },
   { name: "Fadli", email: "fadli.crew@solit-pos.com", password: "Fadli@Crew25", role: "CREW_SALES" },
   { name: "Fikri", email: "fikri.crew@solit-pos.com", password: "Fikri@Crew25", role: "CREW_SALES" },
 
-  { name: "Yoga", email: "yoga.pgb@solit-pos.com", password: "Yoga@Barang25", role: "PENGELOLA_BARANG" },
+  { name: "Yoga", email: "yoga.pgb@solit-pos.com", password: "Yoga@Barang25", role: "ADMIN" },
   { name: "Rafi", email: "rafi.pgb@solit-pos.com", password: "Rafi@Barang25", role: "PENGELOLA_BARANG" },
 
   { name: "Rayhan", email: "rayhan.acc@solit-pos.com", password: "Rayhan@Acc25", role: "ACCOUNTING" },
