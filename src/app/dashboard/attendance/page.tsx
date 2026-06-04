@@ -1,3 +1,5 @@
+// src/app/dashboard/attendance/page.tsx
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -26,6 +28,12 @@ type Attendance = {
 const OFFICE_LAT = -6.402593;
 const OFFICE_LNG = 106.787233;
 
+// ✅ Konstanta jam absen
+const ATTENDANCE_START_HOUR = 7;
+const ATTENDANCE_START_MIN = 30;
+const ATTENDANCE_END_HOUR = 12;
+const ATTENDANCE_END_MIN = 0;
+
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371000;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -43,23 +51,51 @@ function toWIBTime(iso: string): string {
         hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta",
     });
 }
+
 function toWIBDate(iso: string): string {
     return new Date(iso).toLocaleDateString("id-ID", {
         weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Jakarta",
     });
 }
 
+// ✅ FUNGSI BARU: Cek apakah absen terlambat (lewat jam 12:00 WIB)
+function isLateAttendance(checkInTime: string): boolean {
+    const date = new Date(checkInTime);
+    // Konversi ke WIB (UTC+7)
+    const wibMs = date.getTime() + 7 * 60 * 60 * 1000;
+    const wibDate = new Date(wibMs);
+    const totalMinutes = wibDate.getUTCHours() * 60 + wibDate.getUTCMinutes();
+    const endTimeMinutes = ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
+    
+    // Jika absen setelah jam 12:00 WIB → TERLAMBAT
+    return totalMinutes > endTimeMinutes;
+}
+
+// ✅ FUNGSI BARU: Mendapatkan status yang benar untuk ditampilkan
+function getDisplayStatus(attendance: Attendance): "PRESENT" | "LATE" {
+    // Jika status asli sudah LATE, tetap LATE
+    if (attendance.status === "LATE") return "LATE";
+    
+    // Jika status asli PRESENT, cek apakah absen setelah jam 12:00
+    const checkTime = attendance.check_in_time || attendance.created_at;
+    if (isLateAttendance(checkTime)) {
+        return "LATE"; // Tampilkan sebagai TERLAMBAT
+    }
+    
+    return "PRESENT"; // Tepat waktu
+}
+
 const METHOD_STYLES: Record<string, string> = {
     FACE: "bg-blue-50 text-blue-700 border-blue-200",
     FORCE: "bg-orange-50 text-orange-700 border-orange-200",
 };
+
 const STATUS_STYLES: Record<string, string> = {
     PRESENT: "bg-emerald-50 text-emerald-700 border-emerald-200",
     LATE: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 // ─── Location Badge ────────────────────────────────────────────────────────────
-// ✅ Fitur baru: tampilkan jarak + link maps + koordinat
 function LocationBadge({ lat, lng, accuracy }: {
     lat: number | null; lng: number | null; accuracy: number | null;
 }) {
@@ -73,7 +109,6 @@ function LocationBadge({ lat, lng, accuracy }: {
 
     return (
         <div className="flex flex-col gap-1">
-            {/* Jarak dari kantor */}
             <div className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border w-fit
         ${isNear ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -82,8 +117,6 @@ function LocationBadge({ lat, lng, accuracy }: {
                 </svg>
                 {distanceM}m dari kantor
             </div>
-
-            {/* Koordinat + buka maps */}
             <a
                 href={mapsUrl}
                 target="_blank"
@@ -152,9 +185,17 @@ export default function AttendanceDashboardPage() {
         }
     };
 
+    // ✅ Data dengan status yang sudah dikoreksi (untuk ditampilkan)
+    const attendancesWithCorrectedStatus = useMemo(() => {
+        return attendances.map(att => ({
+            ...att,
+            displayStatus: getDisplayStatus(att)
+        }));
+    }, [attendances]);
+
     // ── Filter ────────────────────────────────────────────────────────────────
     const filteredData = useMemo(() => {
-        let data = [...attendances];
+        let data = [...attendancesWithCorrectedStatus];
 
         if (activeTab !== "Semua") {
             data = data.filter(item => item.user_name === activeTab);
@@ -191,21 +232,21 @@ export default function AttendanceDashboardPage() {
             new Date(b.check_in_time || b.created_at).getTime() -
             new Date(a.check_in_time || a.created_at).getTime()
         );
-    }, [attendances, activeTab, searchTerm, dateFilter]);
+    }, [attendancesWithCorrectedStatus, activeTab, searchTerm, dateFilter]);
 
     const uniqueUsers = useMemo(() => {
-        const users = [...new Set(attendances.map(a => a.user_name))];
+        const users = [...new Set(attendancesWithCorrectedStatus.map(a => a.user_name))];
         return ["Semua", ...users];
-    }, [attendances]);
+    }, [attendancesWithCorrectedStatus]);
 
-    // ── Stats hitung dari tabel attendances ───────────────────────────────────
-    const todayCount = attendances.filter(a => {
+    // ✅ Statistik menggunakan status yang sudah dikoreksi
+    const todayCount = attendancesWithCorrectedStatus.filter(a => {
         const d = new Date(a.check_in_time || a.created_at);
         return d.toDateString() === new Date().toDateString();
     }).length;
 
-    const presentCount = attendances.filter(a => a.status === "PRESENT").length;
-    const lateCount = attendances.filter(a => a.status === "LATE").length;
+    const presentCount = attendancesWithCorrectedStatus.filter(a => a.displayStatus === "PRESENT").length;
+    const lateCount = attendancesWithCorrectedStatus.filter(a => a.displayStatus === "LATE").length;
 
     return (
         <DashboardLayout>
@@ -218,7 +259,7 @@ export default function AttendanceDashboardPage() {
                             {currentUser?.role === "ADMIN" ? "Laporan Absensi Karyawan" : "Riwayat Absensi Saya"}
                         </h1>
                         <p className="text-xs text-gray-400 mt-0.5">
-                            Total tercatat: <span className="font-semibold text-gray-600">{attendances.length}</span> absensi
+                            Total tercatat: <span className="font-semibold text-gray-600">{attendancesWithCorrectedStatus.length}</span> absensi
                         </p>
                     </div>
                     <button
@@ -248,7 +289,6 @@ export default function AttendanceDashboardPage() {
 
                 {/* ── Filters ── */}
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3.5 sm:p-4 space-y-3">
-                    {/* Tabs user */}
                     <div className="flex flex-wrap gap-1.5">
                         {uniqueUsers.map(name => (
                             <button
@@ -264,7 +304,6 @@ export default function AttendanceDashboardPage() {
                         ))}
                     </div>
 
-                    {/* Date + Search */}
                     <div className="flex flex-wrap gap-2">
                         <select
                             value={dateFilter}
@@ -287,9 +326,7 @@ export default function AttendanceDashboardPage() {
                     </div>
                 </div>
 
-                {/* ── Table desktop / Card mobile ── */}
-
-                {/* Desktop table */}
+                {/* ── Table desktop ── */}
                 <div className="hidden sm:block bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[700px]">
@@ -335,8 +372,9 @@ export default function AttendanceDashboardPage() {
                                                 <span className="text-gray-300 text-[10px] ml-1">WIB</span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                                                    {a.status === "PRESENT" ? "Tepat Waktu" : a.status === "LATE" ? "Terlambat" : a.status}
+                                                {/* ✅ Menggunakan displayStatus yang sudah dikoreksi */}
+                                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_STYLES[a.displayStatus] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                                                    {a.displayStatus === "PRESENT" ? "Tepat Waktu" : "Terlambat"}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
@@ -344,7 +382,6 @@ export default function AttendanceDashboardPage() {
                                                     {a.method === "FACE" ? "Wajah" : a.method === "FORCE" ? "Manual" : a.method}
                                                 </span>
                                             </td>
-                                            {/* ✅ Kolom lokasi baru */}
                                             <td className="px-4 py-3">
                                                 <LocationBadge lat={a.latitude} lng={a.longitude} accuracy={a.accuracy} />
                                             </td>
@@ -376,13 +413,8 @@ export default function AttendanceDashboardPage() {
                         </div>
                     ) : (
                         filteredData.map(a => {
-                            const distM = (a.latitude && a.longitude)
-                                ? Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))
-                                : null;
-
                             return (
                                 <div key={a.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                                    {/* Baris 1: Nama + jam */}
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             <div className="font-semibold text-gray-800 text-sm">{a.user_name}</div>
@@ -399,22 +431,19 @@ export default function AttendanceDashboardPage() {
                                         </div>
                                     </div>
 
-                                    {/* Baris 2: badge status + metode */}
                                     <div className="flex flex-wrap gap-1.5 mt-2.5">
-                                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                                            {a.status === "PRESENT" ? "Tepat Waktu" : a.status === "LATE" ? "Terlambat" : a.status}
+                                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_STYLES[a.displayStatus] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                                            {a.displayStatus === "PRESENT" ? "Tepat Waktu" : "Terlambat"}
                                         </span>
                                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${METHOD_STYLES[a.method] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                                             {a.method === "FACE" ? "Wajah" : a.method === "FORCE" ? "Manual" : a.method}
                                         </span>
                                     </div>
 
-                                    {/* ✅ Baris 3: Lokasi */}
                                     <div className="mt-2.5 pt-2.5 border-t border-gray-50">
                                         <LocationBadge lat={a.latitude} lng={a.longitude} accuracy={a.accuracy} />
                                     </div>
 
-                                    {/* Device */}
                                     <div className="mt-1.5 text-[10px] text-gray-300 truncate">{a.device}</div>
                                 </div>
                             );
@@ -422,10 +451,9 @@ export default function AttendanceDashboardPage() {
                     )}
                 </div>
 
-                {/* Count info */}
                 {!loading && filteredData.length > 0 && (
                     <p className="text-xs text-gray-400 text-center pb-2">
-                        Menampilkan {filteredData.length} dari {attendances.length} data
+                        Menampilkan {filteredData.length} dari {attendancesWithCorrectedStatus.length} data
                     </p>
                 )}
 
