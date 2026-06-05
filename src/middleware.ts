@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -24,6 +23,20 @@ const FACE_API_WHITELIST = [
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 
+function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
+  const faceAttended = request.cookies.get("face_attended")?.value;
+  const faceVerified = request.cookies.get("face_verified")?.value;
+  const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
+  const dayOffToday = request.cookies.get("day_off_today")?.value;
+
+  return (
+    faceAttended === userId ||
+    faceVerified === userId ||
+    attendanceSkipped === userId ||
+    dayOffToday === userId
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
@@ -32,14 +45,8 @@ export async function middleware(request: NextRequest) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
-        const faceAttended = request.cookies.get("face_attended")?.value;
-        const faceVerified = request.cookies.get("face_verified")?.value;
-        // ✅ Cek juga attendance_skipped
-        const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-        const hasAttended = faceAttended === user.id || faceVerified === user.id;
-        const hasSkipped = attendanceSkipped === user.id;
-
-        if (isAttendanceTime() && !hasAttended && !hasSkipped) {
+        const hasAttended = hasAttendanceBypass(request, user.id);
+        if (isAttendanceTime() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -90,14 +97,8 @@ export async function middleware(request: NextRequest) {
   }
 
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const faceAttended = request.cookies.get("face_attended")?.value;
-    const faceVerified = request.cookies.get("face_verified")?.value;
-    // ✅ Cek attendance_skipped — user yang skip tidak di-redirect lagi
-    const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-    const hasAttended = faceAttended === user.id || faceVerified === user.id;
-    const hasSkipped = attendanceSkipped === user.id;
-
-    if (isAttendanceTime() && !hasAttended && !hasSkipped) {
+    const hasAttended = hasAttendanceBypass(request, user.id);
+    if (isAttendanceTime() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
