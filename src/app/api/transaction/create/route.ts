@@ -21,12 +21,12 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const { data: unit, error: unitError } = await supabase
             .from("laptop_units")
             .select(`
-        *,
-        laptop:laptops (
-          id, laptop_name, brand, cpu, ram,
-          storage, gpu, display, qty, selling_price
-        )
-      `)
+                *,
+                laptop:laptops (
+                    id, laptop_name, brand, cpu, ram,
+                    storage, gpu, display, qty, selling_price
+                )
+            `)
             .eq("id", body.unit_id)
             .single();
 
@@ -54,7 +54,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
         const inventory_price = Number(unit.purchase_price) || 0;
         const deal_price = Number(body.amount) || 0;
-        const other = deal_price - inventory_price;
+
+        // ✅ Tentukan status transaksi & unit berdasarkan e-commerce atau tidak
+        const isEcommerce = Boolean(body.is_ecommerce);
+        const txStatus = isEcommerce ? "PACKING" : "PAID";
+        const unitStatus = isEcommerce ? "PACKING" : "SOLD";
 
         const { data, error } = await supabase
             .from("transactions")
@@ -63,8 +67,9 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 sales_id: user.id,
                 sales_name: user.name,
                 laptop_id: laptop.id,
+                unit_id: unit.id,
                 customer_name: body.customer_name,
-                 customer_type: body.customer_type || "UMUM",
+                customer_type: body.customer_type || "UMUM",
                 company_name: body.company_name,
                 customer_phone: body.customer_phone,
                 laptop_name: laptop.laptop_name,
@@ -77,15 +82,20 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 source_platform: body.source_platform,
                 inventory_price,
                 deal_price,
-                other: Number(deal_price) - Number(inventory_price),
+                other: deal_price - inventory_price,
                 amount: deal_price,
                 payment_method: body.payment_method,
                 payment_photo: body.payment_photo,
                 latitude: body.latitude,
                 longitude: body.longitude,
                 notes: body.notes,
-                status: "PAID",
-                paid_at: new Date().toISOString(),
+                // ✅ Field e-commerce
+                is_ecommerce: isEcommerce,
+                ecommerce_platform: body.ecommerce_platform || null,
+                ecommerce_order_id: body.ecommerce_order_id || null,
+                status: txStatus,
+                // ✅ PACKING belum paid_at, PAID langsung set
+                paid_at: isEcommerce ? null : new Date().toISOString(),
             })
             .select()
             .single();
@@ -98,9 +108,16 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             );
         }
 
+        // ✅ Update status unit — PACKING = RESERVED, PAID = SOLD
         await supabase
             .from("laptop_units")
-            .update({ status: "SOLD" })
+            .update({
+                status: unitStatus,
+                ...(isEcommerce && {
+                    reserved_by: body.customer_name,
+                    reserved_invoice: invoice_number,
+                }),
+            })
             .eq("id", unit.id);
 
         const { data: remainingUnits } = await supabase
@@ -112,28 +129,33 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const newQty = remainingUnits?.length ?? 0;
         await supabase
             .from("laptops")
-            .update({ qty: newQty, status: newQty <= 0 ? "SOLD" : "SIAP_JUAL" })
+            .update({
+                qty: newQty,
+                status: newQty <= 0 ? (isEcommerce ? "BELUM_SIAP" : "SOLD") : "SIAP_JUAL",
+            })
             .eq("id", laptop.id);
 
-        const warrantyDuration = Number(body.warranty_duration) || 30;
-        const warrantyStart = new Date();
-        const warrantyEnd = new Date();
-        warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
+        if (!isEcommerce) {
+            const warrantyDuration = Number(body.warranty_duration) || 30;
+            const warrantyStart = new Date();
+            const warrantyEnd = new Date();
+            warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
 
-        await supabase.from("warranties").insert({
-            invoice_number,
-            serial_number: unit.serial_number.toUpperCase(),
-            customer_name: body.customer_name,
-            customer_phone: body.customer_phone || null,
-            laptop_name: laptop.laptop_name,
-            laptop_id: laptop.id,
-            unit_id: unit.id,
-            warranty_start: warrantyStart.toISOString().split("T")[0],
-            warranty_end: warrantyEnd.toISOString().split("T")[0],
-            warranty_duration: warrantyDuration,
-            status: "ACTIVE",
-            created_by: user.name,
-        });
+            await supabase.from("warranties").insert({
+                invoice_number,
+                serial_number: unit.serial_number.toUpperCase(),
+                customer_name: body.customer_name,
+                customer_phone: body.customer_phone || null,
+                laptop_name: laptop.laptop_name,
+                laptop_id: laptop.id,
+                unit_id: unit.id,
+                warranty_start: warrantyStart.toISOString().split("T")[0],
+                warranty_end: warrantyEnd.toISOString().split("T")[0],
+                warranty_duration: warrantyDuration,
+                status: "ACTIVE",
+                created_by: user.name,
+            });
+        }
 
         await logActivity({
             userId: user.id,
@@ -142,7 +164,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             action: "CREATE",
             entity: "transaction",
             entityId: data.id,
-            entityLabel: `${invoice_number} — ${body.customer_name}`,
+            entityLabel: `${invoice_number} — ${body.customer_name} [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""}`,
             afterData: data,
         });
 

@@ -65,7 +65,7 @@ function isLateAttendance(checkInTime: string): boolean {
     const wibDate = new Date(wibMs);
     const totalMinutes = wibDate.getUTCHours() * 60 + wibDate.getUTCMinutes();
     const endTimeMinutes = ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
-    
+
     // Jika absen setelah jam 12:00 WIB → TERLAMBAT
     return totalMinutes > endTimeMinutes;
 }
@@ -74,13 +74,13 @@ function isLateAttendance(checkInTime: string): boolean {
 function getDisplayStatus(attendance: Attendance): "PRESENT" | "LATE" {
     // Jika status asli sudah LATE, tetap LATE
     if (attendance.status === "LATE") return "LATE";
-    
+
     // Jika status asli PRESENT, cek apakah absen setelah jam 12:00
     const checkTime = attendance.check_in_time || attendance.created_at;
     if (isLateAttendance(checkTime)) {
         return "LATE"; // Tampilkan sebagai TERLAMBAT
     }
-    
+
     return "PRESENT"; // Tepat waktu
 }
 
@@ -147,21 +147,6 @@ export default function AttendanceDashboardPage() {
         const init = async () => {
             const user = await getCurrentUserClient();
             setCurrentUser(user);
-
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const isAttendanceHour = (hours === 7 && minutes >= 30) || (hours >= 8 && hours < 12);
-
-            if (isAttendanceHour) {
-                const hasAttended = document.cookie.includes("face_attended") ||
-                    document.cookie.includes("face_verified");
-                if (!hasAttended) {
-                    window.location.href = "/face-verify?from=/dashboard/attendance";
-                    return;
-                }
-            }
-
             fetchAttendance();
         };
         init();
@@ -291,8 +276,8 @@ export default function AttendanceDashboardPage() {
                                 key={name}
                                 onClick={() => setActiveTab(name)}
                                 className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${activeTab === name
-                                        ? "bg-gray-800 text-white shadow-sm"
-                                        : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                    ? "bg-gray-800 text-white shadow-sm"
+                                    : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
                                     }`}
                             >
                                 {name}

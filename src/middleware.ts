@@ -1,3 +1,4 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -27,16 +28,18 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
-  // ── Public routes ──
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
         const faceAttended = request.cookies.get("face_attended")?.value;
         const faceVerified = request.cookies.get("face_verified")?.value;
+        // ✅ Cek juga attendance_skipped
+        const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
         const hasAttended = faceAttended === user.id || faceVerified === user.id;
-        
-        if (isAttendanceTime() && !hasAttended) {
+        const hasSkipped = attendanceSkipped === user.id;
+
+        if (isAttendanceTime() && !hasAttended && !hasSkipped) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -51,12 +54,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // ── Public prefixes ──
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // ── Face Verify Page ──
   if (pathname.startsWith("/face-verify")) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -64,12 +65,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Public API routes ──
   if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // ── Face API Whitelist ──
   if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
     if (!token) {
       return NextResponse.json({ success: false }, { status: 401 });
@@ -93,9 +92,12 @@ export async function middleware(request: NextRequest) {
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     const faceAttended = request.cookies.get("face_attended")?.value;
     const faceVerified = request.cookies.get("face_verified")?.value;
+    // ✅ Cek attendance_skipped — user yang skip tidak di-redirect lagi
+    const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
     const hasAttended = faceAttended === user.id || faceVerified === user.id;
+    const hasSkipped = attendanceSkipped === user.id;
 
-    if (isAttendanceTime() && !hasAttended) {
+    if (isAttendanceTime() && !hasAttended && !hasSkipped) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );

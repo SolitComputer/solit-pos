@@ -68,7 +68,6 @@ export default function CreatePaymentPage() {
     const [laptops, setLaptops] = useState<LaptopOption[]>([]);
     const [isLoadingLaptops, setIsLoadingLaptops] = useState(true);
 
-    // Units untuk laptop yang dipilih
     const [units, setUnits] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
@@ -84,8 +83,12 @@ export default function CreatePaymentPage() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingSubmitData, setPendingSubmitData] = useState<CreatePaymentType | null>(null);
 
-    // ✅ State untuk customer type
     const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
+
+    const [isEcommerce, setIsEcommerce] = useState(false);
+    const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
+    const [ecommerceOrderId, setEcommerceOrderId] = useState("");
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const {
         register,
@@ -203,7 +206,7 @@ export default function CreatePaymentPage() {
 
     const watchedFields = watch();
     useEffect(() => {
-        if (fromScan) return;
+        if (fromScan || isSubmitted) return;
 
         const draft = {
             ...watchedFields,
@@ -215,7 +218,7 @@ export default function CreatePaymentPage() {
             _savedAt: new Date().toISOString(),
         };
         saveDraft(draft);
-    }, [watchedFields, step, customerType, selectedLaptop, selectedUnit, rawDealPrice]);
+    }, [watchedFields, step, customerType, selectedLaptop, selectedUnit, rawDealPrice, isSubmitted]);
 
     // ── Jika dari scan: pre-load unit langsung ────────────────────────────────
     useEffect(() => {
@@ -404,7 +407,7 @@ export default function CreatePaymentPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...pendingSubmitData,
-                    customer_type: customerType, // ✅ kirim customer_type
+                    customer_type: customerType,
                     unit_id: selectedUnit.id,
                     laptop_id: selectedLaptop?.id,
                     serial_number: selectedUnit.serial_number,
@@ -414,11 +417,17 @@ export default function CreatePaymentPage() {
                     longitude,
                     amount: rawDealPrice,
                     warranty_duration: warrantyDuration,
+                    is_ecommerce: isEcommerce,
+                    ecommerce_platform: isEcommerce ? ecommercePlatform : null,
+                    ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
                 }),
             });
             const result = await res.json();
             if (!result.success) { alert(result.message); return; }
+
+            setIsSubmitted(true);
             clearDraft();
+
             window.location.href = `/receipt/${result.invoice_number}`;
         } catch {
             alert("Terjadi kesalahan");
@@ -799,6 +808,84 @@ export default function CreatePaymentPage() {
                     {step === 4 && (
                         <>
                             <div>
+                                <label className="text-xs text-gray-400 mb-1.5 block">Jenis Penjualan</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce
+                                            ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        🏪 Offline / Langsung
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEcommerce(true)}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce
+                                            ? "bg-sky-600 text-white border-sky-600"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        📦 E-Commerce
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ── Platform E-Commerce (muncul jika toggle aktif) ── */}
+                            {isEcommerce && (
+                                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
+                                    <p className="text-xs font-semibold text-sky-700 flex items-center gap-1.5">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 3H8l-2 4h12l-2-4z" />
+                                        </svg>
+                                        Transaksi E-Commerce — status PACKING sampai dana cair
+                                    </p>
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1.5 block">Platform *</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(["SHOPEE", "TOKOPEDIA", "TIKTOK", "LAZADA"] as const).map(p => (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => setEcommercePlatform(p)}
+                                                    className={`h-10 rounded-xl border text-xs font-semibold transition ${ecommercePlatform === p
+                                                        ? "bg-sky-600 text-white border-sky-600"
+                                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                        }`}
+                                                >
+                                                    {p === "SHOPEE" ? "🛍 Shopee"
+                                                        : p === "TOKOPEDIA" ? "🟢 Tokopedia"
+                                                            : p === "TIKTOK" ? "🎵 TikTok Shop"
+                                                                : "🟠 Lazada"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1.5 block">No. Order (opsional)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Contoh: 240605ABCDEF"
+                                            className={inputClass}
+                                            value={ecommerceOrderId}
+                                            onChange={e => setEcommerceOrderId(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-start gap-2 bg-white/60 rounded-lg px-3 py-2 border border-sky-100">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" className="flex-shrink-0 mt-0.5">
+                                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                                        </svg>
+                                        <p className="text-[10px] text-sky-700 leading-relaxed">
+                                            Dana dari {ecommercePlatform || "marketplace"} akan cair 1-3 hari kerja.
+                                            Konfirmasi PAID setelah dana masuk via tombol <strong>Cair</strong> di halaman transaksi.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Metode Pembayaran</label>
                                 <select className={selectClass} {...register("payment_method")}>
                                     <option value="QRIS">QRIS</option>
@@ -899,7 +986,7 @@ export default function CreatePaymentPage() {
                             onClick={() => setShowConfirmModal(false)}
                         />
 
-                        <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[85vh]">
 
                             <div className="bg-[#1a1a2e] px-5 py-4">
                                 <div className="flex items-center gap-3">
@@ -915,7 +1002,7 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
-                            <div className="px-5 py-4 space-y-3">
+                            <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex justify-between items-center">
                                     <div>
                                         <p className="text-xs text-emerald-600 font-medium">Total Pembayaran</p>
@@ -960,6 +1047,26 @@ export default function CreatePaymentPage() {
                                     )}
                                     <div className="h-px bg-gray-200" />
                                     <ConfirmRow icon="🛡️" label="Garansi" value={`${warrantyDuration} hari`} />
+                                    {isEcommerce && (
+                                        <>
+                                            <div className="h-px bg-gray-200" />
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-sm">📦</span>
+                                                    <span className="text-xs text-gray-400">E-Commerce</span>
+                                                </div>
+                                                <span className="text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                                    {ecommercePlatform}
+                                                </span>
+                                            </div>
+                                            {ecommerceOrderId && (
+                                                <ConfirmRow icon="🔢" label="No. Order" value={ecommerceOrderId} mono />
+                                            )}
+                                            <div className="text-[10px] text-sky-600 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                                                Status: <strong>PACKING</strong> — konfirmasi PAID setelah dana cair dari {ecommercePlatform}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
@@ -972,7 +1079,7 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
-                            <div className="px-5 pb-6 flex gap-3">
+                            <div className="px-5 pb-6 pt-3 flex gap-3 border-t border-gray-100 bg-white flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirmModal(false)}

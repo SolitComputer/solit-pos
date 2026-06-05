@@ -63,7 +63,7 @@ function CustomerTypeBadge({ type }: { type?: string }) {
   if (!type || type === "UMUM") return null;
   const styles: Record<string, string> = {
     RESELLER: "bg-blue-50 text-blue-700 border-blue-200",
-    MITRA:    "bg-green-50 text-green-700 border-green-200",
+    MITRA: "bg-green-50 text-green-700 border-green-200",
   };
   const icons: Record<string, string> = { RESELLER: "🔄", MITRA: "🤝" };
   return (
@@ -100,8 +100,8 @@ export default function Page() {
       .catch(() => setUserRole(null));
   }, []);
 
-  const canEditTransaction   = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
-  const canSeeFinancials     = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
+  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+  const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -175,7 +175,7 @@ export default function Page() {
     setPaymentMethod("ALL"); setSourcePlatform("ALL");
   };
 
-  const inputCls  = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
+  const inputCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
   const selectCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
 
   return (
@@ -216,8 +216,8 @@ export default function Page() {
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {sortOrder === "newest"
-                  ? <><line x1="12" y1="20" x2="12" y2="4"/><polyline points="6 10 12 4 18 10"/><line x1="4" y1="20" x2="20" y2="20"/></>
-                  : <><line x1="12" y1="4" x2="12" y2="20"/><polyline points="18 14 12 20 6 14"/><line x1="4" y1="4" x2="20" y2="4"/></>
+                  ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /><line x1="4" y1="20" x2="20" y2="20" /></>
+                  : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /><line x1="4" y1="4" x2="20" y2="4" /></>
                 }
               </svg>
               <span className="hidden sm:inline text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
@@ -244,10 +244,15 @@ export default function Page() {
               <div>
                 <label className="text-xs text-gray-400 mb-1.5 block">Status</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                  {["ALL", "PAID", "RESERVED", "HELD", "PENDING", "CANCELLED", "FAILED"].map((s) => (
+                  {["ALL", "PAID", "PACKING", "RESERVED", "HELD", "PENDING", "CANCELLED", "FAILED"].map((s) => (
                     <button key={s} onClick={() => setStatus(s)}
                       className={`h-9 rounded-xl text-xs font-semibold border transition ${status === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                      {s === "ALL" ? "Semua" : s === "RESERVED" ? "DP" : s === "HELD" ? "Ambil Dulu" : s === "CANCELLED" ? "Batal" : s}
+                      {s === "ALL" ? "Semua"
+                        : s === "RESERVED" ? "DP"
+                          : s === "HELD" ? "Ambil Dulu"
+                            : s === "CANCELLED" ? "Batal"
+                              : s === "PACKING" ? "📦 Packing"
+                                : s}
                     </button>
                   ))}
                 </div>
@@ -258,10 +263,10 @@ export default function Page() {
                 <label className="text-xs text-gray-400 mb-1.5 block">Tipe Customer</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[
-                    { val: "ALL",      label: "Semua",    icon: "" },
-                    { val: "UMUM",     label: "Umum",     icon: "👤" },
+                    { val: "ALL", label: "Semua", icon: "" },
+                    { val: "UMUM", label: "Umum", icon: "👤" },
                     { val: "RESELLER", label: "Reseller", icon: "🔄" },
-                    { val: "MITRA",    label: "Mitra",    icon: "🤝" },
+                    { val: "MITRA", label: "Mitra", icon: "🤝" },
                   ].map((ct) => (
                     <button key={ct.val} onClick={() => setCustomerType(ct.val)}
                       className={`h-9 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1 ${customerType === ct.val ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
@@ -364,7 +369,6 @@ export default function Page() {
   );
 }
 
-// ─── TransactionCard ──────────────────────────────────────────────────────────
 function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored }: {
   item: any; onPhotoClick: (url: string) => void;
   canEditTransaction: boolean; canRestoreTransaction: boolean;
@@ -379,7 +383,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
-  const isPending = item.status === "RESERVED" || item.status === "HELD";
+  const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
@@ -411,8 +415,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   };
 
   const STATUS_LABEL: Record<string, string> = {
-    PAID: "PAID", PENDING: "PENDING", CANCELLED: "DIBATALKAN",
-    FAILED: "GAGAL", RESERVED: "DIPESAN (DP)", HELD: "DIAMBIL DULU",
+    PAID: "PAID",
+    PENDING: "PENDING",
+    CANCELLED: "DIBATALKAN",
+    FAILED: "GAGAL",
+    RESERVED: "DIPESAN (DP)",
+    HELD: "DIAMBIL DULU",
+    PACKING: "PACKING",
   };
   const statusMap: Record<string, string> = {
     PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -421,6 +430,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     CANCELLED: "bg-gray-100 text-gray-500 border-gray-200",
     RESERVED: "bg-violet-50 text-violet-700 border-violet-200",
     HELD: "bg-orange-50 text-orange-700 border-orange-200",
+    PACKING: "bg-sky-50 text-sky-700 border-sky-200",
   };
 
   type PaymentStyle = { bg: string; text: string; border: string; icon: React.ReactNode };
@@ -434,7 +444,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
   const payStyle = getPaymentStyle(item.payment_method ?? "");
   const customerTypeLabel: Record<string, string> = { UMUM: "Umum", RESELLER: "Reseller", MITRA: "Mitra" };
-  const customerTypeIcon: Record<string, string>  = { UMUM: "👤", RESELLER: "🔄", MITRA: "🤝" };
+  const customerTypeIcon: Record<string, string> = { UMUM: "👤", RESELLER: "🔄", MITRA: "🤝" };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
@@ -564,6 +574,19 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         </div>
       </div>
 
+      {item.status === "PACKING" && item.ecommerce_platform && (
+        <div className="flex justify-between text-xs bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+          <span className="text-sky-600 font-medium">
+            📦 Pesanan {item.ecommerce_platform}
+          </span>
+          {item.ecommerce_order_id && (
+            <span className="font-mono text-sky-700 text-[10px]">
+              #{item.ecommerce_order_id}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Expanded detail */}
       {expanded && (
         <div className="px-4 py-3 border-t border-gray-100 bg-white">
@@ -678,7 +701,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               </div>
               <div>
                 <p className="font-bold text-white text-sm">Konfirmasi Pelunasan</p>
-                <p className="text-xs text-emerald-100 mt-0.5">{item.status === "RESERVED" ? "DP → PAID" : "Diambil → PAID"}</p>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  {item.status === "RESERVED"
+                    ? "DP → PAID"
+                    : item.status === "PACKING"
+                      ? "📦 Dana Cair → PAID"
+                      : "Diambil → PAID"}
+                </p>
               </div>
             </div>
             <div className="px-5 py-4 space-y-3">

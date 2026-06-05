@@ -18,7 +18,7 @@ async function handler(req: Request, ctx: any, user: AuthUser) {
           selling_price
         )
       `)
-      .in("status", ["SIAP_JUAL", "RESERVED", "HELD"])
+      .in("status", ["SIAP_JUAL", "RESERVED", "HELD", "PACKING"])
       .order("created_at", { ascending: false });
 
     if (error) {
