@@ -39,7 +39,6 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { invoice } = await props.params;
     const body = await req.json();
 
-    // Ambil data sebelum diubah
     const { data: before } = await supabase
       .from("transactions")
       .select("*")
@@ -63,6 +62,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.source_platform !== undefined) allowedFields.source_platform = body.source_platform;
     if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
+    if (body.customer_type !== undefined) allowedFields.customer_type = body.customer_type;
 
     if (body.deal_price !== undefined || body.amount !== undefined) {
       const inventoryPrice = before?.inventory_price ?? 0;

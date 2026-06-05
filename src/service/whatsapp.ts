@@ -37,7 +37,7 @@ export async function sendWhatsapp(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          target:  normalized,
+          target: normalized,
           message: message,
           // Opsional: delay antar pesan jika bulk (dalam detik)
           delay: "2",
@@ -67,8 +67,8 @@ export async function sendWhatsapp(
 
     } catch (err: unknown) {
       lastError = err;
-      const errName  = err instanceof Error ? err.name    : "Unknown";
-      const errMsg   = err instanceof Error ? err.message : String(err);
+      const errName = err instanceof Error ? err.name : "Unknown";
+      const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`[Fonnte] Error attempt ${attempt}: ${errName} — ${errMsg}`);
 
       if (attempt < MAX_RETRIES) {
@@ -87,17 +87,18 @@ export async function sendWhatsapp(
  * Dikirim otomatis setelah transaksi PAID
  */
 export function buildPaymentMessage(data: {
-  customer_name:    string;
-  invoice_number:   string;
-  laptop_name:      string;
-  serial_number?:   string;
-  amount:           number;
-  payment_method:   string;
-  pickup_method:    string;
-  pickup_date?:     string;
-  pickup_time?:     string;
+  customer_name: string;
+  invoice_number: string;
+  laptop_name: string;
+  serial_number?: string;
+  amount: number;
+  payment_method: string;
+  pickup_method: string;
+  pickup_date?: string;
+  pickup_time?: string;
   pickup_location?: string;
   software_request?: string;
+  customer_type?: string;
 }): string {
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("id-ID", {
@@ -111,11 +112,11 @@ export function buildPaymentMessage(data: {
 
   const scheduleLines = data.pickup_date
     ? [
-        `📅 Tanggal    : ${fmtDate(data.pickup_date)}`,
-        data.pickup_time ? `⏰ Jam         : ${data.pickup_time}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n")
+      `📅 Tanggal    : ${fmtDate(data.pickup_date)}`,
+      data.pickup_time ? `⏰ Jam         : ${data.pickup_time}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n")
     : "";
 
   return [
@@ -128,10 +129,12 @@ export function buildPaymentMessage(data: {
     `━━━━━━━━━━━━━━━━━━`,
     `📄 Nota           : ${data.invoice_number}`,
     `💻 Laptop        : ${data.laptop_name}`,
-    data.serial_number   ? `🔢 Serial No    : ${data.serial_number}` : null,
+    data.serial_number ? `🔢 Serial No    : ${data.serial_number}` : null,
     data.software_request ? `💿 Software    : ${data.software_request}` : null,
     `💰 Total           : Rp${data.amount.toLocaleString("id-ID")}`,
     `💳 Pembayaran  : ${data.payment_method}`,
+    data.customer_type === "RESELLER" ? `🔄 Tipe             : Reseller` : null,
+    data.customer_type === "MITRA" ? `🤝 Tipe             : Mitra Bisnis` : null,
     `🏷️ Status         : LUNAS ✓`,
     ``,
     `━━━━━━━━━━━━━━━━━━`,

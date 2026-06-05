@@ -10,6 +10,7 @@ interface Transaction {
   customer_name: string;
   customer_phone: string;
   company_name: string;
+  customer_type?: string;
   laptop_name: string;
   serial_number: string;
   amount: number;
@@ -116,36 +117,36 @@ export default function EditTransactionPage() {
 
   if (isLoading) {
     return (
-        <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
-          <div className="h-8 bg-gray-100 rounded-xl w-48" />
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
-            {Array(6).fill(0).map((_, i) => (
-              <div key={i} className="h-11 bg-gray-100 rounded-xl" />
-            ))}
-          </div>
+      <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
+        <div className="h-8 bg-gray-100 rounded-xl w-48" />
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          {Array(6).fill(0).map((_, i) => (
+            <div key={i} className="h-11 bg-gray-100 rounded-xl" />
+          ))}
         </div>
+      </div>
     );
   }
 
   if (!canEdit) {
     return (
-        <div className="max-w-md mx-auto mt-20 text-center bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
-          <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-          </div>
-          <h2 className="font-bold text-gray-800 text-lg">Akses Ditolak</h2>
-          <p className="text-gray-500 text-sm mt-2">
-            Hanya <span className="font-semibold">Admin</span> dan <span className="font-semibold">Kepala Sales</span> yang bisa mengedit transaksi.
-          </p>
-          <button
-            onClick={() => router.back()}
-            className="mt-5 px-5 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
-          >
-            Kembali
-          </button>
+      <div className="max-w-md mx-auto mt-20 text-center bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
+        <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
         </div>
+        <h2 className="font-bold text-gray-800 text-lg">Akses Ditolak</h2>
+        <p className="text-gray-500 text-sm mt-2">
+          Hanya <span className="font-semibold">Admin</span> dan <span className="font-semibold">Kepala Sales</span> yang bisa mengedit transaksi.
+        </p>
+        <button
+          onClick={() => router.back()}
+          className="mt-5 px-5 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition"
+        >
+          Kembali
+        </button>
+      </div>
     );
   }
 
@@ -224,6 +225,31 @@ export default function EditTransactionPage() {
 
           {/* Section: Pembeli */}
           <SectionHeader icon="👤" title="Data Pembeli" />
+          <Field label="Tipe Customer">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "UMUM", label: "Umum", icon: "👤" },
+                { value: "RESELLER", label: "Reseller", icon: "🔄" },
+                { value: "MITRA", label: "Mitra", icon: "🤝" },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, customer_type: opt.value }));
+                    setHasChanges(true);
+                  }}
+                  className={`flex items-center justify-center gap-1.5 h-11 rounded-xl border text-sm font-medium transition ${(formData.customer_type ?? "UMUM") === opt.value
+                      ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    }`}
+                >
+                  <span>{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nama Pembeli" required>
               <input name="customer_name" value={formData.customer_name || ""} onChange={handleChange} className={inputCls} />

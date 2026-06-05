@@ -181,6 +181,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 pickup_time: body.pickup_time,
                 pickup_location: body.pickup_location,
                 software_request: body.software_request,
+                customer_type: body.customer_type,
             });
 
             sendWhatsapp(body.customer_phone, message)

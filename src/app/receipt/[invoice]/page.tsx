@@ -141,15 +141,19 @@ export default async function Page(props: Props) {
 
             <Separator />
 
-            {/* Laptop */}
-            <Section title="Detail Laptop" icon="💻">
-              <InfoRow label="Laptop" value={data.laptop_name} bold />
-              {data.serial_number && (
-                <InfoRow label="Serial Number" value={data.serial_number} mono />
-              )}
-              {data.software_request && (
-                <InfoRow label="Software" value={data.software_request} />
-              )}
+            {/* Customer */}
+            <Section title="Data Pembeli" icon="👤">
+              <InfoRow label="Nama" value={data.customer_name} bold />
+              <InfoRow label="WhatsApp" value={data.customer_phone} />
+              {data.company_name && <InfoRow label="Perusahaan" value={data.company_name} />}
+              <InfoRow
+                label="Tipe"
+                value={
+                  data.customer_type === "RESELLER" ? "🔄 Reseller"
+                    : data.customer_type === "MITRA" ? "🤝 Mitra Bisnis"
+                      : "👤 Umum"
+                }
+              />
             </Section>
 
             <Separator />
@@ -255,6 +259,7 @@ export default async function Page(props: Props) {
               softwareRequest={data.software_request || undefined}
               warrantyEnd={warranty?.warranty_end || undefined}
               warrantyDaysLeft={warrantyDaysLeft ?? undefined}
+              customerType={data.customer_type || "UMUM"} 
             />
           </div>
         </div>

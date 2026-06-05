@@ -17,6 +17,7 @@ interface Props {
     softwareRequest?: string;
     warrantyEnd?: string;
     warrantyDaysLeft?: number;
+    customerType?: string;
 }
 export default function ReceiptActions({
     customerPhone,
@@ -32,6 +33,7 @@ export default function ReceiptActions({
     softwareRequest,
     warrantyEnd,
     warrantyDaysLeft,
+    customerType,
 }: Props) {
     const [downloading, setDownloading] = useState(false);
     const [waSent, setWaSent] = useState(false);
@@ -71,6 +73,8 @@ export default function ReceiptActions({
             serialNumber ? `🔢 Serial No    : ${serialNumber}` : null,
             `💰 Total           : Rp${amount?.toLocaleString("id-ID")}`,
             `🏷️ Pembayaran  : ${paymentMethod}`,
+            customerType === "RESELLER" ? `🔄 Tipe             : Reseller` : null,
+            customerType === "MITRA" ? `🤝 Tipe             : Mitra Bisnis` : null,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
             `📦 *Info Pengambilan*`,
@@ -94,7 +98,7 @@ export default function ReceiptActions({
         ]
             .filter((l) => l !== null)
             .join("\n");
-            
+
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines)}`;
         window.open(url, "_blank");
         setWaSent(true);
