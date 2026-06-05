@@ -16,7 +16,6 @@ export async function GET(request: Request) {
     const year  = searchParams.get("year");
     const month = searchParams.get("month");
 
-    // ── Step 1: ambil date_off records ─────────────────────────────────────
     let q = supabase
       .from("user_date_off")
       .select("id, user_id, off_date, notes, created_at")

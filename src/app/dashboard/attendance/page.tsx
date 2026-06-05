@@ -425,7 +425,6 @@ function DateOffModal({ users, calYear, calMonth, dateOffs, onClose, onSaved }: 
     );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AttendanceDashboardPage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
@@ -445,24 +444,32 @@ export default function AttendanceDashboardPage() {
     const [calMonth, setCalMonth] = useState(today.getMonth());
     const [selectedDate, setSelectedDate] = useState<string | null>(todayKey);
     const [usersLoading, setUsersLoading] = useState(false);
+    const [allDateOffs, setAllDateOffs] = useState<DateOff[]>([]);
 
     useEffect(() => {
         const init = async () => {
             const user = await getCurrentUserClient();
             setCurrentUser(user);
-            await Promise.all([
+
+            const baseTasks = [
                 fetchAttendance(),
                 fetchDayOffs(),
                 fetchDateOffs(today.getFullYear(), today.getMonth()),
-                fetchAllUsers(),
-            ]);
+                fetchAllDateOffs(),
+            ];
+
+            if (user?.role === "ADMIN") {
+                baseTasks.push(fetchAllUsers());
+            }
+
+            await Promise.all(baseTasks);
         };
         init();
     }, []);
 
+
     useEffect(() => { fetchDateOffs(calYear, calMonth); }, [calYear, calMonth]);
 
-    // ── Fetchers ──────────────────────────────────────────────────────────────
     const fetchAttendance = async () => {
         setLoading(true);
         try {
@@ -486,20 +493,28 @@ export default function AttendanceDashboardPage() {
         finally { setUsersLoading(false); }
     };
 
-    // ── Maps ──────────────────────────────────────────────────────────────────
-    // Mingguan: user_name → Set<day_of_week>
     const dayOffByUser = useMemo(() => {
         const m: Record<string, Set<number>> = {};
         dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); });
         return m;
     }, [dayOffs]);
 
-    // Spesifik: user_name → Set<"YYYY-MM-DD">
     const dateOffByUser = useMemo(() => {
         const m: Record<string, Set<string>> = {};
-        dateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); });
+        allDateOffs.forEach(d => {
+            const n = d.users?.name;
+            if (!n) return;
+            if (!m[n]) m[n] = new Set();
+            m[n].add(d.off_date);
+        });
         return m;
-    }, [dateOffs]);
+    }, [allDateOffs]);
+
+    const specificOffDates = useMemo(() => {
+        const set = new Set<string>();
+        allDateOffs.forEach(d => set.add(d.off_date));
+        return set;
+    }, [allDateOffs]);
 
     const allUsersById = useMemo(() => {
         const m: Record<string, UserInfo> = {};
@@ -507,7 +522,6 @@ export default function AttendanceDashboardPage() {
         return m;
     }, [allUsers]);
 
-    // Helper gabungan: siapa yang libur di tanggal tertentu
     const getOffUsersForDate = (dateKey: string): string[] => {
         const dow = new Date(dateKey + "T12:00:00").getDay();
         const weekly = Object.entries(dayOffByUser).filter(([, s]) => s.has(dow)).map(([n]) => n);
@@ -515,7 +529,14 @@ export default function AttendanceDashboardPage() {
         return [...new Set([...weekly, ...specific])];
     };
 
-    // ── Derived data ──────────────────────────────────────────────────────────
+    const fetchAllDateOffs = async () => {
+        try {
+            const r = await fetch("/api/attendance/date-off");
+            const d = await r.json();
+            if (d.success) setAllDateOffs(d.data || []);
+        } catch { }
+    };
+
     const filteredByUser = useMemo(() => {
         return attendances.filter(a => {
             if (filterUser !== "Semua" && a.user_name !== filterUser) return false;
@@ -704,10 +725,16 @@ export default function AttendanceDashboardPage() {
                                         const dow = new Date(calYear, calMonth, day).getDay();
                                         const isSun = dow === 0, isSat = dow === 6, has = tot > 0;
 
-                                        // Libur hanya untuk filter spesifik
+                                        // ── Cek libur untuk filter spesifik ──────────────────────────────────
                                         const isDayOff = filterUser !== "Semua"
-                                            ? (dayOffByUser[filterUser]?.has(dow) ?? false) || (dateOffByUser[filterUser]?.has(dk) ?? false)
+                                            ? (dayOffByUser[filterUser]?.has(dow) ?? false) ||
+                                            (dateOffByUser[filterUser]?.has(dk) ?? false)
                                             : false;
+
+                                        // ── Cek apakah ada SIAPAPUN yang libur di tanggal ini (untuk "Semua") ─
+                                        // Mingguan: ada user yang hari ini = hari liburnya
+                                        const hasAnyWeeklyOff = Object.values(dayOffByUser).some(s => s.has(dow));
+                                        const hasAnySpecificOff = specificOffDates.has(dk);
 
                                         return (
                                             <button key={day} onClick={() => handleDayClick(day)}
@@ -718,13 +745,23 @@ export default function AttendanceDashboardPage() {
                                                             : has ? "bg-gray-50 hover:bg-gray-100"
                                                                 : "hover:bg-gray-50"
                                                     }`}>
+
                                                 {isDayOff && filterUser !== "Semua" && (
                                                     <span className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${isSel ? "bg-red-300" : "bg-red-400"}`} />
                                                 )}
-                                                <span className={`text-xs font-bold mb-1 ${isSel ? "text-white" : isTod ? "text-blue-600"
-                                                    : isDayOff && filterUser !== "Semua" ? "text-red-500"
-                                                        : isSun ? "text-red-300" : isSat ? "text-gray-400" : "text-gray-700"
+
+                                                {filterUser === "Semua" && (hasAnyWeeklyOff || hasAnySpecificOff) && !isSel && (
+                                                    <span className="absolute top-1 left-1 w-1 h-1 rounded-full bg-red-300" />
+                                                )}
+
+                                                <span className={`text-xs font-bold mb-1 ${isSel ? "text-white"
+                                                    : isTod ? "text-blue-600"
+                                                        : isDayOff && filterUser !== "Semua" ? "text-red-500"
+                                                            : isSun ? "text-red-300"
+                                                                : isSat ? "text-gray-400"
+                                                                    : "text-gray-700"
                                                     }`}>{day}</span>
+
                                                 {has && (
                                                     <div className="flex flex-col items-center gap-0.5 w-full px-1">
                                                         {pc > 0 && <div className={`w-full h-1 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"}`} />}
@@ -738,7 +775,6 @@ export default function AttendanceDashboardPage() {
                                 </div>
                             )}
 
-                            {/* Legenda */}
                             <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100 flex-wrap">
                                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                                     <span className="w-4 h-1 rounded-full bg-emerald-400 inline-block" />Tepat waktu
@@ -750,7 +786,11 @@ export default function AttendanceDashboardPage() {
                                     <span className="w-4 h-3.5 rounded-md bg-blue-50 border border-blue-200 inline-block" />Hari ini
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[11px] text-red-500">
-                                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Hari libur
+                                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Libur (filter aktif)
+                                </div>
+                                {/* ✅ Tambah */}
+                                <div className="flex items-center gap-1.5 text-[11px] text-red-400">
+                                    <span className="w-2 h-2 rounded-full bg-red-300 inline-block" />Ada yang libur
                                 </div>
                             </div>
                         </div>
@@ -930,7 +970,11 @@ export default function AttendanceDashboardPage() {
                 <DateOffModal users={allUsers} calYear={calYear} calMonth={calMonth}
                     dateOffs={dateOffs}
                     onClose={() => setShowDateOffModal(false)}
-                    onSaved={() => { fetchDateOffs(calYear, calMonth); setShowDateOffModal(false); }}
+                    onSaved={() => {
+                        fetchDateOffs(calYear, calMonth);
+                        fetchAllDateOffs();
+                        setShowDateOffModal(false);
+                    }}
                 />
             )}
         </DashboardLayout>
