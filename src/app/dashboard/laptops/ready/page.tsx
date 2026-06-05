@@ -332,7 +332,6 @@ export default function ReadyPage() {
                                             : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                                     }`}
                                 >
-                                    <span>{opt.icon}</span>
                                     <span>{opt.label}</span>
                                     <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
                                         filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
@@ -455,7 +454,6 @@ export default function ReadyPage() {
                                                         {st && (
                                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${st.badge}`}>
                                                                 <span className={`w-1.5 h-1.5 rounded-full ${st.dot} animate-pulse`} />
-                                                                <span>{st.icon}</span>
                                                                 {st.label}
                                                             </span>
                                                         )}

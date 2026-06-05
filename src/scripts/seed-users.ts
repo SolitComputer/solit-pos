@@ -23,7 +23,7 @@ const users = [
   { name: "Fatir", email: "fatir.crew@solit-pos.com", password: "Fatir@Crew25", role: "CREW_SALES" },
   { name: "Yuna",  email: "yuna.crew@solit-pos.com",  password: "Yuna@Crew25",  role: "CREW_SALES" },
   { name: "Dicky", email: "dicky.crew@solit-pos.com", password: "Dicky@Crew25", role: "CREW_SALES" },
-  { name: "Fadli", email: "fadli.crew@solit-pos.com", password: "Fadli@Crew25", role: "CREW_SALES" },
+  { name: "Fadri", email: "fadri.crew@solit-pos.com", password: "Fadri@Crew25", role: "CREW_SALES" },
   { name: "Fikri", email: "fikri.crew@solit-pos.com", password: "Fikri@Crew25", role: "CREW_SALES" },
 
   { name: "Yoga", email: "yoga.pgb@solit-pos.com", password: "Yoga@Barang25", role: "ADMIN" },

@@ -142,7 +142,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -163,6 +162,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
       ],
     },
@@ -188,7 +188,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
@@ -202,6 +201,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Transaksi",
       items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }, // ✅
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
@@ -214,7 +214,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
@@ -228,6 +227,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Transaksi",
       items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }, // ✅
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
@@ -240,8 +240,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
@@ -250,6 +248,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }, // ✅
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
       ],
     },
   ],
@@ -282,7 +287,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
@@ -296,6 +300,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Transaksi",
       items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }, // ✅
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
@@ -335,7 +340,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
@@ -344,6 +348,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+    {
+      label: "Transaksi", 
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
   ],
