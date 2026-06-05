@@ -55,14 +55,14 @@ function daysSince(iso: string) {
 const STATUS_CONFIG = {
     RESERVED: {
         label: "DP",
-        badge: "bg-amber-50 text-amber-700 border-amber-200",
-        dot: "bg-amber-400",
+        badge: "bg-gray-100 text-gray-700 border-gray-200",
+        dot: "bg-gray-500",
         desc: "Sudah bayar DP, belum lunas",
     },
     HELD: {
         label: "Ambil Dulu",
-        badge: "bg-blue-50 text-blue-700 border-blue-200",
-        dot: "bg-blue-500",
+        badge: "bg-gray-100 text-gray-700 border-gray-200",
+        dot: "bg-gray-500",
         desc: "Barang dibawa, belum bayar",
     },
 } as const;
@@ -81,14 +81,14 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-scaleIn">
                 <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
                 <button onClick={onClose}
-                    className="w-full h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 shadow-md">
+                    className="w-full h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-200 shadow-md">
                     OK
                 </button>
             </div>
@@ -111,7 +111,7 @@ function ConfirmModal({
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scaleIn">
-                <div className="bg-gray-800 px-5 py-4">
+                <div className="bg-gray-700 px-5 py-4">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ function ConfirmModal({
                             Batal
                         </button>
                         <button onClick={onConfirm}
-                            className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 shadow-md">
+                            className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-200 shadow-md">
                             {confirmLabel}
                         </button>
                     </div>
@@ -218,7 +218,7 @@ function ConfirmPaymentModal({
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
                 {/* Header dengan warna abu-abu */}
-                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                <div className="bg-gray-700 px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -367,7 +367,7 @@ function ConfirmPaymentModal({
                     <button
                         onClick={handleConfirm}
                         disabled={loading || uploadingPhoto}
-                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2 shadow-md"
+                        className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2 shadow-md"
                     >
                         {loading ? (
                             <>
@@ -424,7 +424,7 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
-                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                <div className="bg-gray-700 px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="font-bold text-white text-base">Detail Transaksi</h2>
@@ -480,7 +480,7 @@ function TransactionCard({
     return (
         <div className={`group bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden ${isOld ? "border-amber-200" : "border-gray-100"} animate-fadeUp`}>
             {/* Top stripe */}
-            <div className={`h-1 ${tx.status === "RESERVED" ? "bg-amber-400" : "bg-blue-500"}`} />
+            <div className={`h-1 ${tx.status === "RESERVED" ? "bg-gray-500" : "bg-gray-500"}`} />
 
             <div className="p-4 sm:p-5">
                 {/* Header row */}
@@ -576,7 +576,7 @@ function TransactionCard({
                     {tx.customer_phone && (
                         <button
                             onClick={() => onWhatsApp(tx)}
-                            className="h-9 bg-green-50 text-green-600 rounded-xl text-xs font-medium hover:bg-green-100 transition-all duration-200 flex items-center justify-center gap-1.5 border border-green-200 group/btn"
+                            className="h-9 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center gap-1.5 border border-gray-200 group/btn"
                         >
                             <svg className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -587,7 +587,7 @@ function TransactionCard({
                     {canConfirm && (
                         <button
                             onClick={() => onConfirm(tx)}
-                            className="h-9 bg-gray-800 text-white rounded-xl text-xs font-semibold hover:bg-gray-900 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md group/btn"
+                            className="h-9 bg-gray-700 text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md group/btn"
                         >
                             <svg className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -757,18 +757,18 @@ export default function PendingOrdersPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3 animate-slideIn">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <div className="w-1 h-7 bg-gray-300 rounded-full" />
-                                <div className="w-7 h-7 bg-gray-100 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2.2">
+                                <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
+                                <div className="w-7 h-7 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center shadow-md">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
                                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
                                     </svg>
                                 </div>
-                                <h1 className="text-2xl font-bold text-gray-800">
+                                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
                                     DP & Ambil Dulu
                                 </h1>
                             </div>
-                            <p className="text-sm text-gray-400 ml-10">
-                                Transaksi yang belum dilunasi — <span className="text-gray-500 font-medium">Perlu tindakan</span>
+                            <p className="text-sm text-gray-500 ml-10">
+                                Transaksi yang belum dilunasi — <span className="text-gray-600 font-medium">Perlu tindakan</span>
                             </p>
                         </div>
                         <button
@@ -787,10 +787,10 @@ export default function PendingOrdersPage() {
                     {/* ── Stats Cards ── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp" style={{ animationDelay: "0.05s" }}>
                         {[
-                            { label: "Total Pending", value: counts.all, color: "text-gray-800", bg: "bg-white", icon: "📋", bar: "bg-gray-400" },
-                            { label: "DP (Reserved)", value: counts.reserved, color: "text-amber-600", bg: "bg-amber-50", icon: "💳", bar: "bg-amber-500" },
-                            { label: "Ambil Dulu", value: counts.held, color: "text-blue-600", bg: "bg-blue-50", icon: "📦", bar: "bg-blue-500" },
-                            { label: "Total Nilai", value: fmt(totalValue), color: "text-gray-800", bg: "bg-gray-100", icon: "💰", bar: "bg-gray-500" },
+                            { label: "Total Pending", value: counts.all, color: "text-gray-800", bg: "bg-white", icon: "📋", bar: "bg-gray-500" },
+                            { label: "DP (Reserved)", value: counts.reserved, color: "text-gray-700", bg: "bg-gray-50", icon: "💳", bar: "bg-gray-500" },
+                            { label: "Ambil Dulu", value: counts.held, color: "text-gray-700", bg: "bg-gray-50", icon: "📦", bar: "bg-gray-500" },
+                            { label: "Total Nilai", value: fmt(totalValue), color: "text-gray-800", bg: "bg-gray-100", icon: "💰", bar: "bg-gray-600" },
                         ].map(stat => (
                             <div key={stat.label} className={`${stat.bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
                                 <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${stat.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
@@ -816,11 +816,7 @@ export default function PendingOrdersPage() {
                                     onClick={() => setFilterStatus(opt.value)}
                                     className={`flex flex-col items-center py-2.5 px-2 rounded-xl text-center transition-all duration-200 ${
                                         filterStatus === opt.value
-                                            ? opt.value === "RESERVED"
-                                                ? "bg-amber-500 text-white shadow-md transform scale-105"
-                                                : opt.value === "HELD"
-                                                    ? "bg-blue-500 text-white shadow-md transform scale-105"
-                                                    : "bg-gray-800 text-white shadow-md transform scale-105"
+                                            ? "bg-gray-700 text-white shadow-md transform scale-105"
                                             : "text-gray-500 hover:bg-gray-50"
                                     }`}
                                 >

@@ -165,7 +165,7 @@ export default function CreatePaymentPage() {
             "customer_name", "customer_phone", "company_name",
             "source_platform", "pickup_method", "pickup_date",
             "pickup_time", "pickup_location", "payment_method",
-            "software_request", "notes", "amount", "customer_type", // ✅ tambah customer_type
+            "software_request", "notes", "amount", "customer_type",
         ] as const;
 
         fields.forEach(field => {
@@ -453,10 +453,10 @@ export default function CreatePaymentPage() {
     };
 
     // ── Styles ────────────────────────────────────────────────────────────────
-    const inputClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] bg-white w-full transition";
-    const selectClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] w-full transition";
-    const btnSecondary = "flex-1 bg-white text-gray-600 border border-gray-200 rounded-xl h-11 font-medium hover:bg-gray-50 active:scale-[0.98] transition-all text-sm";
-    const btnPrimary = "flex-1 bg-[#1a1a2e] text-white rounded-xl h-11 font-medium hover:bg-[#16213e] active:scale-[0.98] transition-all text-sm";
+    const inputClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 bg-white w-full transition-all duration-200";
+    const selectClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 w-full transition-all duration-200";
+    const btnSecondary = "flex-1 bg-white text-gray-600 border border-gray-200 rounded-xl h-11 font-medium hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all duration-200 text-sm";
+    const btnPrimary = "flex-1 bg-gray-700 text-white rounded-xl h-11 font-medium hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-sm shadow-sm";
 
     const stepLabels = ["Data Pembeli", "Laptop & Unit", "Pengambilan", "Pembayaran"];
 
@@ -464,20 +464,23 @@ export default function CreatePaymentPage() {
     const backFromStep3 = () => fromScan ? setStep(1) : setStep(2);
 
     return (
-        <div className="max-w-lg mx-auto">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="max-w-lg mx-auto px-4 py-6">
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all duration-300">
 
                 {/* Header */}
                 <div className="mb-5">
-                    <h1 className="text-lg font-bold text-[#1a1a2e] tracking-tight">Buat Payment</h1>
-                    <p className="text-gray-400 text-xs mt-0.5">{stepLabels[step - 1]}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">Buat Payment</h1>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-3">{stepLabels[step - 1]}</p>
                 </div>
 
                 {/* Step indicator */}
                 <div className="flex gap-1.5 mb-6">
                     {[1, 2, 3, 4].map((item) => (
-                        <div key={item} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > item ? "bg-[#1a1a2e]"
-                            : step === item ? "bg-[#1a1a2e]/50"
+                        <div key={item} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > item ? "bg-gray-600"
+                            : step === item ? "bg-gray-400"
                                 : "bg-gray-200"
                             }`} />
                     ))}
@@ -485,24 +488,24 @@ export default function CreatePaymentPage() {
 
                 {/* Banner scan */}
                 {fromScan && (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-4">
-                        <svg className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
+                        <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div>
-                            <p className="text-xs font-semibold text-emerald-700">Unit dari scan barcode</p>
-                            <p className="text-xs text-emerald-600 font-mono">{urlSn}</p>
+                            <p className="text-xs font-semibold text-gray-700">Unit dari scan barcode</p>
+                            <p className="text-xs text-gray-500 font-mono">{urlSn}</p>
                         </div>
                     </div>
                 )}
 
                 {draftRestored && !fromScan && (
-                    <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 mb-4">
+                    <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
                         <div className="flex items-center gap-2">
-                            <svg className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            <p className="text-xs font-semibold text-blue-700">Draft tersimpan dipulihkan</p>
+                            <p className="text-xs font-semibold text-gray-700">Draft tersimpan dipulihkan</p>
                         </div>
                         <button
                             type="button"
@@ -510,7 +513,7 @@ export default function CreatePaymentPage() {
                                 clearDraft();
                                 window.location.reload();
                             }}
-                            className="text-xs text-blue-500 hover:text-blue-700 transition underline"
+                            className="text-xs text-gray-500 hover:text-gray-700 transition underline"
                         >
                             Mulai baru
                         </button>
@@ -530,14 +533,14 @@ export default function CreatePaymentPage() {
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
 
-                            {/* ✅ TAMBAHKAN: Pilihan Tipe Customer */}
+                            {/* ✅ Tipe Customer */}
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Tipe Customer *</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tipe Customer *</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {[
-                                        { value: "UMUM", label: "Umum", icon: "👤", color: "bg-gray-50", description: "Pembeli biasa" },
-                                        { value: "RESELLER", label: "Reseller", icon: "🔄", color: "bg-blue-50", description: "Membeli untuk dijual kembali" },
-                                        { value: "MITRA", label: "Mitra", icon: "🤝", color: "bg-green-50", description: "Mitra bisnis Solit 03" }
+                                        { value: "UMUM", label: "Umum", icon: "👤", description: "Pembeli biasa" },
+                                        { value: "RESELLER", label: "Reseller", icon: "🔄", description: "Membeli untuk dijual kembali" },
+                                        { value: "MITRA", label: "Mitra", icon: "🤝", description: "Mitra bisnis Solit 03" }
                                     ].map(option => (
                                         <button
                                             key={option.value}
@@ -546,16 +549,13 @@ export default function CreatePaymentPage() {
                                                 setCustomerType(option.value as any);
                                                 setValue("customer_type", option.value as any);
                                             }}
-                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${customerType === option.value
-                                                ? "border-[#1a1a2e] bg-[#1a1a2e]/5 ring-2 ring-[#1a1a2e]/20"
-                                                : "border-gray-200 bg-white hover:border-gray-300"
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${customerType === option.value
+                                                ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
+                                                : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                                                 }`}
                                         >
                                             <span className="text-xl">{option.icon}</span>
-                                            <span className={`text-xs font-medium ${customerType === option.value
-                                                ? "text-[#1a1a2e]"
-                                                : "text-gray-600"
-                                                }`}>
+                                            <span className={`text-xs font-medium ${customerType === option.value ? "text-gray-800" : "text-gray-600"}`}>
                                                 {option.label}
                                             </span>
                                             <span className="text-[9px] text-gray-400">{option.description}</span>
@@ -571,7 +571,7 @@ export default function CreatePaymentPage() {
                             <input type="tel" placeholder="No. WhatsApp *" className={inputClass} {...register("customer_phone")} />
 
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Tahu Solit dari mana?</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
                                 <select className={selectClass} {...register("source_platform")}>
                                     {["Instagram", "TikTok", "Facebook", "WhatsApp", "Google", "Shopee", "Tokopedia", "Teman", "Lainnya"].map(s => (
                                         <option key={s} value={s}>{s}</option>
@@ -599,7 +599,7 @@ export default function CreatePaymentPage() {
                         <>
                             {/* Search SN */}
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">
+                                <label className="text-xs text-gray-500 mb-1.5 block">
                                     Cari Serial Number (SN)
                                 </label>
                                 <div className="relative">
@@ -615,7 +615,7 @@ export default function CreatePaymentPage() {
                                     />
                                     {isLoadingUnits && (
                                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-[#1a1a2e] rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
                                         </div>
                                     )}
                                 </div>
@@ -630,7 +630,7 @@ export default function CreatePaymentPage() {
                                                 onClick={() => handleSelectSnResult(u)}
                                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0"
                                             >
-                                                <p className="font-mono text-sm font-semibold text-[#1a1a2e]">
+                                                <p className="font-mono text-sm font-semibold text-gray-800">
                                                     {u.serial_number}
                                                 </p>
                                                 <p className="text-xs text-gray-500 mt-0.5">
@@ -667,7 +667,7 @@ export default function CreatePaymentPage() {
                                             setValue("laptop_id", "");
                                             setValue("laptop_name", "");
                                         }}
-                                        className="text-xs text-red-400 hover:text-red-500 transition flex items-center gap-1"
+                                        className="text-xs text-red-400 hover:text-red-600 transition flex items-center gap-1"
                                     >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -713,22 +713,17 @@ export default function CreatePaymentPage() {
                         </>
                     )}
 
-                    {/* Step 2 dari scan: tampilkan info unit yang sudah pre-selected */}
-                    {step === 2 && fromScan && (
-                        null
-                    )}
-
                     {/* ── STEP 3: Pengambilan ── */}
-                    {step === 3 && (
+                    {(step === 3 || (step === 2 && fromScan)) && (
                         <>
                             {/* Ringkasan unit jika dari scan */}
                             {fromScan && selectedLaptop && selectedUnit && (
                                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2 mb-1">
-                                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Unit Terpilih</p>
-                                    <p className="font-semibold text-[#1a1a2e] text-sm">{selectedLaptop.laptop_name}</p>
+                                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Unit Terpilih</p>
+                                    <p className="font-semibold text-gray-800 text-sm">{selectedLaptop.laptop_name}</p>
                                     <p className="text-xs text-gray-500 font-mono">SN: {selectedUnit.serial_number} · Grade {selectedUnit.grade}</p>
                                     <div>
-                                        <label className="text-xs text-gray-400 mb-1.5 block">Harga Deal *</label>
+                                        <label className="text-xs text-gray-500 mb-1.5 block">Harga Deal *</label>
                                         <input
                                             type="text"
                                             inputMode="numeric"
@@ -752,7 +747,7 @@ export default function CreatePaymentPage() {
                                         {rawDealPrice > 0 && canSeeMargin && (
                                             <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
                                                 <span className="text-gray-500">Selisih</span>
-                                                <span className={`font-semibold ${other >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                                <span className={`font-semibold ${other >= 0 ? "text-gray-600" : "text-red-500"}`}>
                                                     {other >= 0 ? "+" : ""}Rp{other.toLocaleString("id-ID")}
                                                 </span>
                                             </div>
@@ -768,7 +763,7 @@ export default function CreatePaymentPage() {
                             )}
 
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Metode Pengambilan</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Metode Pengambilan</label>
                                 <select className={selectClass} {...register("pickup_method")}>
                                     <option value="DATANG">Datang ke toko</option>
                                     <option value="DIANTAR">Diantar</option>
@@ -776,12 +771,12 @@ export default function CreatePaymentPage() {
                                 {errors.pickup_method && <p className="text-xs text-red-500 mt-1">{errors.pickup_method.message}</p>}
                             </div>
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Tanggal</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tanggal</label>
                                 <input type="date" className={inputClass} {...register("pickup_date")} />
                                 {errors.pickup_date && <p className="text-xs text-red-500 mt-1">{errors.pickup_date.message}</p>}
                             </div>
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Jam</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Jam</label>
                                 <input type="time" className={inputClass} {...register("pickup_time")} />
                                 {errors.pickup_time && <p className="text-xs text-red-500 mt-1">{errors.pickup_time.message}</p>}
                             </div>
@@ -808,13 +803,13 @@ export default function CreatePaymentPage() {
                     {step === 4 && (
                         <>
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Jenis Penjualan</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Jenis Penjualan</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
                                         type="button"
                                         onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
                                         className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce
-                                            ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                                            ? "bg-gray-700 text-white border-gray-700 shadow-sm"
                                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                             }`}
                                     >
@@ -824,7 +819,7 @@ export default function CreatePaymentPage() {
                                         type="button"
                                         onClick={() => setIsEcommerce(true)}
                                         className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce
-                                            ? "bg-sky-600 text-white border-sky-600"
+                                            ? "bg-gray-600 text-white border-gray-600 shadow-sm"
                                             : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                             }`}
                                     >
@@ -833,10 +828,9 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
-                            {/* ── Platform E-Commerce (muncul jika toggle aktif) ── */}
                             {isEcommerce && (
-                                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
-                                    <p className="text-xs font-semibold text-sky-700 flex items-center gap-1.5">
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                                    <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M16 3H8l-2 4h12l-2-4z" />
@@ -852,7 +846,7 @@ export default function CreatePaymentPage() {
                                                     type="button"
                                                     onClick={() => setEcommercePlatform(p)}
                                                     className={`h-10 rounded-xl border text-xs font-semibold transition ${ecommercePlatform === p
-                                                        ? "bg-sky-600 text-white border-sky-600"
+                                                        ? "bg-gray-600 text-white border-gray-600 shadow-sm"
                                                         : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                                         }`}
                                                 >
@@ -874,19 +868,10 @@ export default function CreatePaymentPage() {
                                             onChange={e => setEcommerceOrderId(e.target.value)}
                                         />
                                     </div>
-                                    <div className="flex items-start gap-2 bg-white/60 rounded-lg px-3 py-2 border border-sky-100">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" className="flex-shrink-0 mt-0.5">
-                                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                                        </svg>
-                                        <p className="text-[10px] text-sky-700 leading-relaxed">
-                                            Dana dari {ecommercePlatform || "marketplace"} akan cair 1-3 hari kerja.
-                                            Konfirmasi PAID setelah dana masuk via tombol <strong>Cair</strong> di halaman transaksi.
-                                        </p>
-                                    </div>
                                 </div>
                             )}
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Metode Pembayaran</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Metode Pembayaran</label>
                                 <select className={selectClass} {...register("payment_method")}>
                                     <option value="QRIS">QRIS</option>
                                     <option value="TRANSFER">Transfer</option>
@@ -896,7 +881,7 @@ export default function CreatePaymentPage() {
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block flex items-center gap-1.5">
+                                <label className="text-xs text-gray-500 mb-1.5 block flex items-center gap-1.5">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                                     </svg>
@@ -909,7 +894,7 @@ export default function CreatePaymentPage() {
                                             type="button"
                                             onClick={() => setWarrantyDuration(d)}
                                             className={`flex-1 h-10 rounded-xl border text-xs font-semibold transition ${warrantyDuration === d
-                                                ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                                                ? "bg-gray-700 text-white border-gray-700 shadow-sm"
                                                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
@@ -923,25 +908,22 @@ export default function CreatePaymentPage() {
                                             max={365}
                                             value={warrantyDuration}
                                             onChange={e => setWarrantyDuration(Number(e.target.value))}
-                                            className="w-full h-10 border border-gray-200 rounded-xl px-3 pr-8 text-xs text-center bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition"
+                                            className="w-full h-10 border border-gray-200 rounded-xl px-3 pr-8 text-xs text-center bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition"
                                         />
                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">hr</span>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-gray-400 mt-1.5">
-                                    Garansi berlaku {warrantyDuration} hari sejak transaksi.
-                                </p>
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 mb-1.5 block">Foto Bukti Pembayaran *</label>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Foto Bukti Pembayaran *</label>
                                 <input
                                     type="file" accept="image/*" capture="environment"
                                     className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
                                     onChange={handlePhotoChange}
                                 />
                                 {paymentPhoto && (
-                                    <p className="text-xs text-emerald-600 mt-1">✓ {paymentPhoto.name}</p>
+                                    <p className="text-xs text-gray-600 mt-1">✓ {paymentPhoto.name}</p>
                                 )}
                             </div>
 
@@ -955,8 +937,8 @@ export default function CreatePaymentPage() {
                                 <button
                                     type="button" onClick={getLocation}
                                     className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude
-                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                        : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
+                                        ? "bg-gray-100 text-gray-700 border border-gray-200"
+                                        : "bg-gray-700 text-white hover:bg-gray-800"
                                         }`}
                                 >
                                     {gpsLoading ? "..." : latitude ? "✓ Diambil" : "Ambil GPS"}
@@ -988,36 +970,35 @@ export default function CreatePaymentPage() {
 
                         <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[85vh]">
 
-                            <div className="bg-[#1a1a2e] px-5 py-4">
+                            <div className="bg-gray-700 px-5 py-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-5 h-5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div className="w-9 h-9 bg-gray-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                     </div>
                                     <div>
                                         <p className="font-bold text-white text-sm">Konfirmasi Transaksi</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">Periksa detail sebelum menyimpan</p>
+                                        <p className="text-xs text-gray-300 mt-0.5">Periksa detail sebelum menyimpan</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
-                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex justify-between items-center">
+                                <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex justify-between items-center">
                                     <div>
-                                        <p className="text-xs text-emerald-600 font-medium">Total Pembayaran</p>
-                                        <p className="text-xl font-black text-emerald-700 mt-0.5">
+                                        <p className="text-xs text-gray-500 font-medium">Total Pembayaran</p>
+                                        <p className="text-xl font-black text-gray-800 mt-0.5">
                                             Rp{rawDealPrice.toLocaleString("id-ID")}
                                         </p>
                                     </div>
-                                    <span className="text-xs font-semibold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
+                                    <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200">
                                         {watch("payment_method")}
                                     </span>
                                 </div>
 
                                 <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                                     <ConfirmRow icon="👤" label="Pembeli" value={watch("customer_name") || "—"} />
-                                    {/* ✅ Tampilkan tipe customer */}
                                     <ConfirmRow
                                         icon={customerType === "RESELLER" ? "🔄" : customerType === "MITRA" ? "🤝" : "👤"}
                                         label="Tipe"
@@ -1055,16 +1036,13 @@ export default function CreatePaymentPage() {
                                                     <span className="text-sm">📦</span>
                                                     <span className="text-xs text-gray-400">E-Commerce</span>
                                                 </div>
-                                                <span className="text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                                <span className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
                                                     {ecommercePlatform}
                                                 </span>
                                             </div>
                                             {ecommerceOrderId && (
                                                 <ConfirmRow icon="🔢" label="No. Order" value={ecommerceOrderId} mono />
                                             )}
-                                            <div className="text-[10px] text-sky-600 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
-                                                Status: <strong>PACKING</strong> — konfirmasi PAID setelah dana cair dari {ecommercePlatform}
-                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -1091,7 +1069,7 @@ export default function CreatePaymentPage() {
                                     type="button"
                                     onClick={handleConfirmedSubmit}
                                     disabled={submitting}
-                                    className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
                                 >
                                     {submitting ? (
                                         <>
@@ -1157,15 +1135,15 @@ function UnitInfoCard({
     canSeeMargin: boolean;
 }) {
     const gradeColor = {
-        A: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        B: "text-amber-700 bg-amber-50 border-amber-200",
+        A: "text-gray-700 bg-gray-100 border-gray-200",
+        B: "text-gray-700 bg-gray-100 border-gray-200",
         C: "text-red-700 bg-red-50 border-red-200",
     };
 
     return (
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
             <div>
-                <p className="font-semibold text-[#1a1a2e] text-sm">{laptop.laptop_name}</p>
+                <p className="font-semibold text-gray-800 text-sm">{laptop.laptop_name}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                     {[laptop.cpu, laptop.ram, laptop.storage].filter(Boolean).join(" · ")}
                 </p>
@@ -1174,14 +1152,14 @@ function UnitInfoCard({
             <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
                 <div className="flex-1">
                     <p className="text-xs text-gray-400 mb-0.5">Serial Number</p>
-                    <p className="font-mono text-sm font-semibold text-[#1a1a2e]">{unit.serial_number}</p>
+                    <p className="font-mono text-sm font-semibold text-gray-800">{unit.serial_number}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${gradeColor[unit.grade] || gradeColor.A}`}>
                         Grade {unit.grade}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${unit.status === "SIAP_JUAL"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        ? "bg-gray-100 text-gray-700 border-gray-200"
                         : "bg-red-50 text-red-600 border-red-200"
                         }`}>
                         {unit.status === "SIAP_JUAL" ? "✓ Siap Jual" : `⚠ ${unit.status}`}
@@ -1205,7 +1183,7 @@ function UnitInfoCard({
             )}
 
             <div>
-                <label className="text-xs text-gray-400 mb-1.5 block">Harga Deal *</label>
+                <label className="text-xs text-gray-500 mb-1.5 block">Harga Deal *</label>
                 <input
                     type="text"
                     inputMode="numeric"
@@ -1231,7 +1209,7 @@ function UnitInfoCard({
             {rawDealPrice > 0 && (
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
                     <span className="text-gray-500">Selisih</span>
-                    <span className={`font-semibold ${other >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    <span className={`font-semibold ${other >= 0 ? "text-gray-600" : "text-red-500"}`}>
                         {other >= 0 ? "+" : ""}Rp{other.toLocaleString("id-ID")}
                     </span>
                 </div>

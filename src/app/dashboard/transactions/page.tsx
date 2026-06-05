@@ -47,13 +47,13 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
-        <button onClick={onClose} className="w-full h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-medium hover:bg-[#16213e] transition">OK</button>
+        <button onClick={onClose} className="w-full h-10 bg-gray-700 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition">OK</button>
       </div>
     </div>
   );
@@ -63,8 +63,8 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
 function CustomerTypeBadge({ type }: { type?: string }) {
   if (!type || type === "UMUM") return null;
   const styles: Record<string, string> = {
-    RESELLER: "bg-blue-50 text-blue-700 border-blue-200",
-    MITRA: "bg-green-50 text-green-700 border-green-200",
+    RESELLER: "bg-gray-100 text-gray-700 border-gray-200",
+    MITRA: "bg-gray-100 text-gray-700 border-gray-200",
   };
   const icons: Record<string, string> = { RESELLER: "🔄", MITRA: "🤝" };
   return (
@@ -176,35 +176,51 @@ export default function Page() {
     setPaymentMethod("ALL"); setSourcePlatform("ALL");
   };
 
-  const inputCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
-  const selectCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition";
+  const inputCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition";
+  const selectCls = "w-full border border-gray-200 rounded-xl h-10 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition";
 
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
 
-      <div className="max-w-4xl mx-auto space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Riwayat Transaksi</h1>
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
+        {/* Header dengan animasi */}
+        <div className="flex items-center justify-between animate-fadeIn">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
+              <div className="w-7 h-7 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center shadow-md">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <rect x="1" y="4" width="22" height="16" rx="2" />
+                  <line x1="1" y1="10" x2="23" y2="10" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
+                Riwayat Transaksi
+              </h1>
+            </div>
+            <p className="text-xs text-gray-400 mt-1 ml-10">Kelola dan pantau semua transaksi penjualan</p>
+          </div>
           {!isLoading && (
-            <span className="text-xs text-gray-400 font-medium bg-gray-100 px-2.5 py-1 rounded-full">
-              {filteredTransactions.length} transaksi
-            </span>
+            <div className="bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-semibold text-gray-700">
+                {filteredTransactions.length} transaksi
+              </span>
+            </div>
           )}
         </div>
 
         {/* Search + Filter */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-4 space-y-3">
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="relative flex-1 group">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-200" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input
                 type="text"
                 placeholder="Cari nota, customer, WA, laptop..."
-                className="w-full border border-gray-200 rounded-xl h-10 pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition"
+                className="w-full border border-gray-200 rounded-xl h-10 pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition-all duration-200"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -212,7 +228,7 @@ export default function Page() {
             {/* ✅ Tombol sort urutan */}
             <button
               onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
               title={sortOrder === "newest" ? "Urutkan: Terlama dulu" : "Urutkan: Terbaru dulu"}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -225,7 +241,11 @@ export default function Page() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${hasActiveFilter ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-sm font-medium transition flex-shrink-0 ${
+                hasActiveFilter 
+                  ? "bg-gray-700 text-white border-gray-700 shadow-md" 
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+              }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -243,11 +263,11 @@ export default function Page() {
             <div className="pt-3 border-t border-gray-100 space-y-3">
               {/* Status */}
               <div>
-                <label className="text-xs text-gray-400 mb-1.5 block">Status</label>
+                <label className="text-xs text-gray-500 mb-1.5 block">Status</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                   {["ALL", "PAID", "PACKING", "RESERVED", "HELD", "PENDING", "CANCELLED", "FAILED"].map((s) => (
                     <button key={s} onClick={() => setStatus(s)}
-                      className={`h-9 rounded-xl text-xs font-semibold border transition ${status === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-9 rounded-xl text-xs font-semibold border transition ${status === s ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {s === "ALL" ? "Semua"
                         : s === "RESERVED" ? "DP"
                           : s === "HELD" ? "Ambil Dulu"
@@ -261,7 +281,7 @@ export default function Page() {
 
               {/* ✅ Filter Customer Type */}
               <div>
-                <label className="text-xs text-gray-400 mb-1.5 block">Tipe Customer</label>
+                <label className="text-xs text-gray-500 mb-1.5 block">Tipe Customer</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[
                     { val: "ALL", label: "Semua", icon: "" },
@@ -270,7 +290,7 @@ export default function Page() {
                     { val: "MITRA", label: "Mitra", icon: "🤝" },
                   ].map((ct) => (
                     <button key={ct.val} onClick={() => setCustomerType(ct.val)}
-                      className={`h-9 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1 ${customerType === ct.val ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-9 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-1 ${customerType === ct.val ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {ct.icon && <span>{ct.icon}</span>}
                       {ct.label}
                     </button>
@@ -293,13 +313,13 @@ export default function Page() {
               {/* Method & Source */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Metode bayar</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Metode bayar</label>
                   <select className={selectCls} value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                     {uniquePaymentMethods.map((m) => <option key={m} value={m}>{m === "ALL" ? "Semua Metode" : m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Sumber</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Sumber</label>
                   <select className={selectCls} value={sourcePlatform} onChange={(e) => setSourcePlatform(e.target.value)}>
                     {uniqueSourcePlatforms.map((s) => <option key={s} value={s}>{s === "ALL" ? "Semua Source" : s}</option>)}
                   </select>
@@ -307,7 +327,7 @@ export default function Page() {
               </div>
 
               {hasActiveFilter && (
-                <button onClick={resetFilters} className="w-full h-9 text-sm text-gray-500 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 transition font-medium">
+                <button onClick={resetFilters} className="w-full h-9 text-sm text-gray-500 border border-dashed border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition font-medium">
                   Reset semua filter
                 </button>
               )}
@@ -318,7 +338,6 @@ export default function Page() {
         {/* List Transaksi */}
         <div className="space-y-3">
           {isLoading ? (
-            // Enhanced Loading Skeleton
             Array(4).fill(0).map((_, i) => (
               <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse space-y-3">
                 <div className="flex justify-between">
@@ -336,7 +355,6 @@ export default function Page() {
               </div>
             ))
           ) : paginatedTransactions.length === 0 ? (
-            // Enhanced Empty State
             <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
               <div className="text-7xl mb-4 animate-bounce">🔍</div>
               <p className="text-gray-500 text-base font-semibold">Tidak ada transaksi</p>
@@ -369,15 +387,19 @@ export default function Page() {
         {!isLoading && filteredTransactions.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-2">
             <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition font-medium">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-300 transition font-medium group">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:-translate-x-0.5 transition-transform"><polyline points="15 18 9 12 15 6" /></svg>
               Sebelumnya
             </button>
-            <span className="text-sm text-gray-500 font-medium">{currentPage} / {totalPages}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg">{currentPage}</span>
+              <span className="text-sm text-gray-400">/</span>
+              <span className="text-sm text-gray-500">{totalPages}</span>
+            </div>
             <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition font-medium">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-300 transition font-medium group">
               Selanjutnya
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:translate-x-0.5 transition-transform"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
         )}
@@ -463,18 +485,18 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     PENDING: "bg-gray-100 text-gray-700 border-gray-200",
     FAILED: "bg-red-50 text-red-600 border-red-200",
     CANCELLED: "bg-gray-100 text-gray-500 border-gray-200",
-    RESERVED: "bg-violet-50 text-violet-700 border-violet-200",
-    HELD: "bg-orange-50 text-orange-700 border-orange-200",
-    PACKING: "bg-sky-50 text-sky-700 border-sky-200",
+    RESERVED: "bg-gray-100 text-gray-700 border-gray-200",
+    HELD: "bg-gray-100 text-gray-700 border-gray-200",
+    PACKING: "bg-gray-100 text-gray-700 border-gray-200",
   };
 
   type PaymentStyle = { bg: string; text: string; border: string; icon: React.ReactNode };
   function getPaymentStyle(method: string): PaymentStyle {
     const m = (method ?? "").toUpperCase();
-    if (m.includes("TUNAI") || m.includes("CASH")) return { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /><line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" /></svg> };
-    if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI")) return { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg> };
-    if (m.includes("QRIS") || m.includes("QR")) return { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h.01M14 17h.01M17 14h.01M17 17h3M20 14h.01M17 20h3" /></svg> };
-    return { bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> };
+    if (m.includes("TUNAI") || m.includes("CASH")) return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /><line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" /></svg> };
+    if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI")) return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg> };
+    if (m.includes("QRIS") || m.includes("QR")) return { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h.01M14 17h.01M17 14h.01M17 17h3M20 14h.01M17 20h3" /></svg> };
+    return { bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> };
   }
 
   const payStyle = getPaymentStyle(item.payment_method ?? "");
@@ -482,7 +504,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const customerTypeIcon: Record<string, string> = { UMUM: "👤", RESELLER: "🔄", MITRA: "🤝" };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group">
       <div className="p-4">
         {/* Row 1: nama + status + harga */}
         <div className="flex items-start justify-between gap-3 mb-2">
@@ -492,7 +514,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <span className={`text-[11px] px-2.5 py-1 rounded-full border font-semibold flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                 {STATUS_LABEL[item.status] ?? item.status}
               </span>
-              {/* ✅ Customer type badge */}
               <CustomerTypeBadge type={item.customer_type} />
               {item.sales_name && (
                 <span className="text-[11px] px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 font-medium flex-shrink-0">
@@ -505,7 +526,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           <div className="text-right flex-shrink-0">
             <p className="text-sm font-bold text-gray-800">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
             {canSeeFinancials && (
-              <p className="text-xs text-emerald-600 font-medium">+Rp{(item.other || 0).toLocaleString("id-ID")}</p>
+              <p className="text-xs text-gray-600 font-medium">+Rp{(item.other || 0).toLocaleString("id-ID")}</p>
             )}
           </div>
         </div>
@@ -515,9 +536,9 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           <p className="text-xs font-medium text-gray-800 leading-snug truncate">{item.laptop_name || "—"}</p>
           {(item.cpu || item.ram || item.storage || item.display) && (
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {item.cpu && <span className="inline-flex items-center text-[10px] text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-md font-medium">{item.cpu}</span>}
-              {item.ram && <span className="inline-flex items-center text-[10px] text-violet-700 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md font-medium">{item.ram}</span>}
-              {item.storage && <span className="inline-flex items-center text-[10px] text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-md font-medium">{item.storage}</span>}
+              {item.cpu && <span className="inline-flex items-center text-[10px] text-gray-700 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-md font-medium">{item.cpu}</span>}
+              {item.ram && <span className="inline-flex items-center text-[10px] text-gray-700 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-md font-medium">{item.ram}</span>}
+              {item.storage && <span className="inline-flex items-center text-[10px] text-gray-700 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-md font-medium">{item.storage}</span>}
               {item.display && <span className="inline-flex items-center text-[10px] text-gray-500 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded-md font-medium">{item.display}</span>}
             </div>
           )}
@@ -555,14 +576,14 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {item.payment_photo && (
-            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition font-medium">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition font-medium group/btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover/btn:scale-110 transition-transform"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
               Bukti
             </button>
           )}
           {item.latitude && item.longitude && (
             <a href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition font-medium">
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition font-medium">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" />
               </svg>
@@ -578,7 +599,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         </div>
         <div className="flex items-center gap-2.5">
           {canEditTransaction && (
-            <a href={`/payment/${item.invoice_number}`} className="text-xs font-semibold text-amber-600 hover:text-amber-800 transition flex items-center gap-1">
+            <a href={`/payment/${item.invoice_number}`} className="text-xs font-semibold text-gray-600 hover:text-gray-800 transition flex items-center gap-1">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -595,7 +616,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             </button>
           )}
           {canEditTransaction && isPending && (
-            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition flex items-center gap-1">
+            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="text-xs font-semibold text-gray-600 hover:text-gray-800 transition flex items-center gap-1">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -610,12 +631,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       </div>
 
       {item.status === "PACKING" && item.ecommerce_platform && (
-        <div className="flex justify-between text-xs bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
-          <span className="text-sky-600 font-medium">
+        <div className="flex justify-between text-xs bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
+          <span className="text-gray-700 font-medium">
             📦 Pesanan {item.ecommerce_platform}
           </span>
           {item.ecommerce_order_id && (
-            <span className="font-mono text-sky-700 text-[10px]">
+            <span className="font-mono text-gray-600 text-[10px]">
               #{item.ecommerce_order_id}
             </span>
           )}
@@ -626,7 +647,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       {expanded && (
         <div className="px-4 py-3 border-t border-gray-100 bg-white">
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-            {/* ✅ Tipe customer di expanded */}
             <div>
               <span className="text-gray-400">Tipe Customer</span>
               <div className="flex items-center gap-1 mt-0.5">
@@ -693,7 +713,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                     <span className="font-mono font-semibold text-gray-700 text-right max-w-[60%] truncate">{val}</span>
                   </div>
                 ))}
-                {/* ✅ Tambah customer type di restore modal */}
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Tipe</span>
                   <span className="font-semibold text-gray-700">{customerTypeIcon[item.customer_type] ?? "👤"} {customerTypeLabel[item.customer_type] ?? "Umum"}</span>
@@ -711,8 +730,8 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               </div>
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
-              <button onClick={() => setShowRestoreModal(false)} disabled={restoring} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium transition disabled:opacity-50">Batal</button>
-              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2">
+              <button onClick={() => setShowRestoreModal(false)} disabled={restoring} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium transition disabled:opacity-50 hover:bg-gray-200">Batal</button>
+              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md hover:bg-gray-800">
                 {restoring ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</> : <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
                   Ya, Restore
@@ -736,7 +755,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               </div>
               <div>
                 <p className="font-bold text-white text-sm">Konfirmasi Pelunasan</p>
-                <p className="text-xs text-emerald-100 mt-0.5">
+                <p className="text-xs text-gray-300 mt-0.5">
                   {item.status === "RESERVED"
                     ? "DP → PAID"
                     : item.status === "PACKING"
@@ -753,7 +772,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                     <span className="font-semibold text-gray-700 text-right max-w-[60%] truncate">{val}</span>
                   </div>
                 ))}
-                {/* ✅ Customer type di confirm modal */}
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Tipe</span>
                   <span className="font-semibold text-gray-700">{customerTypeIcon[item.customer_type] ?? "👤"} {customerTypeLabel[item.customer_type] ?? "Umum"}</span>
@@ -768,7 +786,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Serial Number Unit <span className="text-red-400">*</span></label>
                   <input type="text" value={confirmSN} onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
                     placeholder="Masukkan serial number..."
-                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 transition"
+                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition"
                     autoFocus />
                 </div>
               ) : (
@@ -792,7 +810,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <button onClick={() => { setShowConfirmModal(false); setConfirmError(""); }} disabled={confirming}
                 className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
               <button onClick={handleConfirmPayment} disabled={confirming || (item.status === "RESERVED" && !confirmSN.trim())}
-                className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 flex items-center justify-center gap-2">
+                className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-md">
                 {confirming ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</> : <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   Konfirmasi Lunas
