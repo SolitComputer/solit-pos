@@ -67,7 +67,7 @@ const STATUS_CONFIG = {
     },
 } as const;
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Sub-components dengan tema putih abu-abu ─────────────────────────────────
 
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
     useEffect(() => {
@@ -77,18 +77,18 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-xs p-5 text-center">
-                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-scaleIn">
+                <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <p className="text-gray-700 text-sm font-medium mb-4">{message}</p>
+                <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
                 <button onClick={onClose}
-                    className="w-full h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-medium hover:bg-[#16213e] transition">
+                    className="w-full h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 shadow-md">
                     OK
                 </button>
             </div>
@@ -108,24 +108,34 @@ function ConfirmModal({
     }, [onCancel]);
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
-                <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scaleIn">
+                <div className="bg-gray-800 px-5 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="font-bold text-white text-sm">Konfirmasi Tindakan</p>
+                            <p className="text-xs text-gray-300 mt-0.5">Aksi ini tidak dapat dibatalkan</p>
+                        </div>
+                    </div>
                 </div>
-                <p className="text-gray-700 text-sm text-center leading-relaxed mb-4">{message}</p>
-                <div className="flex gap-2">
-                    <button onClick={onCancel}
-                        className="flex-1 h-9 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
-                        Batal
-                    </button>
-                    <button onClick={onConfirm}
-                        className="flex-1 h-9 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition">
-                        {confirmLabel}
-                    </button>
+                <div className="p-5">
+                    <p className="text-gray-700 text-sm text-center leading-relaxed mb-6">{message}</p>
+                    <div className="flex gap-3">
+                        <button onClick={onCancel}
+                            className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200">
+                            Batal
+                        </button>
+                        <button onClick={onConfirm}
+                            className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 shadow-md">
+                            {confirmLabel}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -203,32 +213,34 @@ function ConfirmPaymentModal({
     const cfg = STATUS_CONFIG[tx.status];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0 bg-emerald-50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center">
-                            <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                {/* Header dengan warna abu-abu */}
+                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-white text-base">Konfirmasi Lunas</h2>
+                                <p className="text-xs text-gray-300 mt-0.5">{tx.invoice_number}</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose}
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition-all duration-200">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </div>
-                        <div>
-                            <h2 className="font-bold text-gray-800 text-base">Konfirmasi Lunas</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">{tx.invoice_number}</p>
-                        </div>
+                        </button>
                     </div>
-                    <button onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
                 </div>
 
-                {/* Body */}
+                {/* Body - scrollable */}
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
                     {/* Info transaksi */}
@@ -236,8 +248,8 @@ function ConfirmPaymentModal({
                         {[
                             {
                                 label: "Status", value: (
-                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.badge}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} /> {cfg.label}
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.badge}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`} /> {cfg.label}
                                     </span>
                                 )
                             },
@@ -246,21 +258,21 @@ function ConfirmPaymentModal({
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 text-right max-w-[55%]">{tx.laptop_name}</span> },
                             {
                                 label: "Serial Number", value: tx.serial_number
-                                    ? <span className="text-xs font-mono bg-gray-200 px-2 py-0.5 rounded text-gray-800 font-semibold">{tx.serial_number}</span>
+                                    ? <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-md text-gray-800 font-semibold">{tx.serial_number}</code>
                                     : <span className="text-xs text-amber-500 font-medium">⚠️ Tidak ada SN</span>
                             },
-                            { label: "Harga Deal", value: <span className="text-sm font-bold text-emerald-600">Rp {(tx.deal_price || tx.amount || 0).toLocaleString("id-ID")}</span> },
+                            { label: "Harga Deal", value: <span className="text-sm font-bold text-gray-800">Rp {(tx.deal_price || tx.amount || 0).toLocaleString("id-ID")}</span> },
                         ].map((row, i) => (
-                            <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                            <div key={i} className="flex items-center justify-between px-4 py-3">
                                 <span className="text-xs text-gray-400 flex-shrink-0">{row.label}</span>
-                                <div>{row.value}</div>
+                                <div className="text-right">{row.value}</div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Upload bukti (file/kamera) */}
+                    {/* Upload bukti */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1.5">
                             Bukti Transfer
                             <span className="text-gray-400 font-normal ml-1">(opsional)</span>
                         </label>
@@ -278,11 +290,11 @@ function ConfirmPaymentModal({
                                         </svg>
                                     </button>
                                 </div>
-                                <div className="bg-emerald-50 border-t border-emerald-100 px-3 py-1.5 flex items-center gap-1.5">
-                                    <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="bg-gray-100 border-t border-gray-200 px-3 py-1.5 flex items-center gap-1.5">
+                                    <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    <p className="text-xs font-medium text-emerald-700">Foto berhasil diupload</p>
+                                    <p className="text-xs font-medium text-gray-700">Foto berhasil diupload</p>
                                 </div>
                             </div>
                         ) : (
@@ -290,7 +302,7 @@ function ConfirmPaymentModal({
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploadingPhoto}
-                                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-600 transition"
+                                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-600 transition-all duration-200 group"
                             >
                                 {uploadingPhoto ? (
                                     <>
@@ -299,7 +311,7 @@ function ConfirmPaymentModal({
                                     </>
                                 ) : (
                                     <>
-                                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-8 h-8 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                                                 d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -307,7 +319,7 @@ function ConfirmPaymentModal({
                                         </svg>
                                         <div className="text-center">
                                             <p className="text-xs font-semibold">Foto Bukti Transfer</p>
-                                            <p className="text-[10px] mt-0.5">Tap untuk buka galeri atau kamera</p>
+                                            <p className="text-[10px] mt-0.5 text-gray-400">Tap untuk buka galeri atau kamera</p>
                                         </div>
                                     </>
                                 )}
@@ -325,7 +337,7 @@ function ConfirmPaymentModal({
                     </div>
 
                     {/* Warning */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                         <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -336,7 +348,7 @@ function ConfirmPaymentModal({
                     </div>
 
                     {error && (
-                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 animate-shake">
                             <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -347,15 +359,15 @@ function ConfirmPaymentModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-white">
                     <button onClick={onClose} disabled={loading}
-                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200 disabled:opacity-50">
                         Batal
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={loading || uploadingPhoto}
-                        className="flex-1 h-11 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600 transition disabled:opacity-40 flex items-center justify-center gap-2"
+                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2 shadow-md"
                     >
                         {loading ? (
                             <>
@@ -387,11 +399,11 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
     const cfg = STATUS_CONFIG[tx.status];
 
     const rows: { label: string; value: React.ReactNode }[] = [
-        { label: "Invoice", value: <span className="font-mono text-xs">{tx.invoice_number}</span> },
+        { label: "Invoice", value: <span className="font-mono text-xs font-semibold text-gray-600">{tx.invoice_number}</span> },
         {
             label: "Status", value: (
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.badge}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} /> {cfg.label}
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`} /> {cfg.label}
                 </span>
             )
         },
@@ -399,8 +411,8 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
         { label: "No. HP", value: tx.customer_phone || "—" },
         { label: "Perusahaan", value: tx.company_name || "—" },
         { label: "Laptop", value: tx.laptop_name },
-        { label: "Serial Number", value: tx.serial_number ? <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{tx.serial_number}</span> : <span className="text-gray-400 text-xs">Belum ditentukan</span> },
-        { label: "Harga Deal", value: <span className="font-semibold text-emerald-600">{fmt(tx.deal_price || tx.amount)}</span> },
+        { label: "Serial Number", value: tx.serial_number ? <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{tx.serial_number}</code> : <span className="text-gray-400 text-xs">Belum ditentukan</span> },
+        { label: "Harga Deal", value: <span className="font-bold text-gray-800">{fmt(tx.deal_price || tx.amount)}</span> },
         { label: "Metode Bayar", value: tx.payment_method },
         { label: "Platform", value: tx.source_platform || "—" },
         { label: "Sales", value: tx.sales_name },
@@ -409,34 +421,36 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-                    <div>
-                        <h2 className="font-bold text-gray-800 text-base">Detail Transaksi</h2>
-                        <p className="text-xs text-gray-400 mt-0.5">{tx.invoice_number}</p>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="font-bold text-white text-base">Detail Transaksi</h2>
+                            <p className="text-xs text-gray-300 mt-0.5">{tx.invoice_number}</p>
+                        </div>
+                        <button onClick={onClose}
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition-all duration-200">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
-                    <button onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
-                    <div className="space-y-0 divide-y divide-gray-50">
+                    <div className="space-y-0 divide-y divide-gray-100">
                         {rows.map(row => (
-                            <div key={row.label} className="flex items-start justify-between py-2.5 gap-3">
-                                <span className="text-xs text-gray-400 flex-shrink-0 w-28">{row.label}</span>
-                                <span className="text-xs text-gray-800 text-right font-medium">{row.value}</span>
+                            <div key={row.label} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2">
+                                <span className="text-xs text-gray-400 font-medium sm:w-28">{row.label}</span>
+                                <span className="text-xs text-gray-800 text-left sm:text-right font-medium break-all">{row.value}</span>
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white">
                     <button onClick={onClose}
-                        className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
+                        className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200">
                         Tutup
                     </button>
                 </div>
@@ -445,7 +459,7 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
     );
 }
 
-// ─── Transaction Card ─────────────────────────────────────────────────────────
+// ─── Transaction Card dengan tema putih abu-abu ───────────────────────────────
 
 function TransactionCard({
     tx,
@@ -461,21 +475,23 @@ function TransactionCard({
     onWhatsApp: (tx: PendingTransaction) => void;
 }) {
     const cfg = STATUS_CONFIG[tx.status];
-    const isOld = Date.now() - new Date(tx.created_at).getTime() > 3 * 86_400_000; // > 3 hari
+    const isOld = Date.now() - new Date(tx.created_at).getTime() > 3 * 86_400_000;
 
     return (
-        <div className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-md ${isOld ? "border-amber-200" : "border-gray-100"}`}>
+        <div className={`group bg-white rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden ${isOld ? "border-amber-200" : "border-gray-100"} animate-fadeUp`}>
             {/* Top stripe */}
             <div className={`h-1 ${tx.status === "RESERVED" ? "bg-amber-400" : "bg-blue-500"}`} />
 
-            <div className="p-4">
+            <div className="p-4 sm:p-5">
                 {/* Header row */}
-                <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-gray-700">{tx.invoice_number}</span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${cfg.badge}`}>
-                                <span className={`w-1 h-1 rounded-full ${cfg.dot}`} />
+                            <code className="font-mono text-xs font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                                {tx.invoice_number}
+                            </code>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${cfg.badge}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`} />
                                 {cfg.label}
                             </span>
                             {isOld && (
@@ -484,57 +500,85 @@ function TransactionCard({
                                 </span>
                             )}
                         </div>
-                        <p className="text-sm font-bold text-gray-800 mt-1 truncate">{tx.customer_name}</p>
+                        <p className="text-base font-bold text-gray-800 mt-2 truncate">{tx.customer_name}</p>
                         {tx.customer_phone && (
-                            <p className="text-xs text-gray-400">{tx.customer_phone}</p>
+                            <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                                </svg>
+                                {tx.customer_phone}
+                            </p>
                         )}
                     </div>
                     <div className="text-right flex-shrink-0">
-                        <p className="text-base font-bold text-emerald-600 tabular-nums">
+                        <p className="text-lg font-bold text-gray-800 tabular-nums">
                             {fmt(tx.deal_price || tx.amount)}
                         </p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{tx.payment_method}</p>
+                        <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full mt-1 inline-block">
+                            {tx.payment_method}
+                        </span>
                     </div>
                 </div>
 
                 {/* Laptop info */}
-                <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
-                    <p className="text-xs font-semibold text-gray-700 truncate">{tx.laptop_name}</p>
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 mb-4">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{tx.laptop_name}</p>
                     {tx.serial_number ? (
-                        <p className="text-[10px] font-mono text-gray-400 mt-0.5">SN: {tx.serial_number}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" />
+                                <line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" />
+                                <line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
+                            <code className="text-[11px] font-mono text-gray-500">SN: {tx.serial_number}</code>
+                        </div>
                     ) : (
-                        <p className="text-[10px] text-amber-500 mt-0.5">⏳ SN belum ditentukan</p>
+                        <p className="text-[11px] text-amber-500 flex items-center gap-1 mt-1">
+                            <span>⚠️</span> SN belum ditentukan
+                        </p>
                     )}
                 </div>
 
-                {/* Meta */}
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-1.5">
-                        <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
+                {/* Meta info */}
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
                             <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                         </div>
-                        <span className="text-[10px] text-gray-500">{tx.sales_name}</span>
+                        <span className="text-[11px] font-medium text-gray-500">{tx.sales_name}</span>
                     </div>
-                    <span className="text-[10px] text-gray-400">{fmtDate(tx.created_at)}</span>
+                    <div className="flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        <span className="text-[10px] text-gray-400">{fmtDate(tx.created_at)}</span>
+                    </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                         onClick={() => onDetail(tx)}
-                        className="flex-1 h-9 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                        className="h-9 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center gap-1.5 group/btn"
                     >
+                        <svg className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
                         Detail
                     </button>
                     {tx.customer_phone && (
                         <button
                             onClick={() => onWhatsApp(tx)}
-                            className="h-9 px-3 bg-green-50 text-green-600 rounded-lg text-xs font-medium hover:bg-green-100 transition flex items-center gap-1.5 border border-green-200"
+                            className="h-9 bg-green-50 text-green-600 rounded-xl text-xs font-medium hover:bg-green-100 transition-all duration-200 flex items-center justify-center gap-1.5 border border-green-200 group/btn"
                         >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <svg className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                             </svg>
                             WA
@@ -543,9 +587,9 @@ function TransactionCard({
                     {canConfirm && (
                         <button
                             onClick={() => onConfirm(tx)}
-                            className="flex-1 h-9 bg-emerald-500 text-white rounded-lg text-xs font-semibold hover:bg-emerald-600 transition flex items-center justify-center gap-1.5"
+                            className="h-9 bg-gray-800 text-white rounded-xl text-xs font-semibold hover:bg-gray-900 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md group/btn"
                         >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Lunas
@@ -561,20 +605,24 @@ function TransactionCard({
 
 function SkeletonCard() {
     return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="h-1 bg-gray-100" />
-            <div className="p-4 space-y-3">
+            <div className="p-5 space-y-4 animate-pulse">
                 <div className="flex justify-between">
-                    <div className="space-y-1.5">
-                        <div className="h-3 bg-gray-100 rounded w-28 animate-pulse" />
-                        <div className="h-4 bg-gray-100 rounded w-36 animate-pulse" />
+                    <div className="space-y-2">
+                        <div className="h-3 bg-gray-200 rounded w-28" />
+                        <div className="h-4 bg-gray-200 rounded w-36" />
+                        <div className="h-3 bg-gray-200 rounded w-24" />
                     </div>
-                    <div className="h-5 bg-gray-100 rounded w-24 animate-pulse" />
+                    <div className="h-6 bg-gray-200 rounded w-24" />
                 </div>
-                <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-48" />
+                    <div className="h-3 bg-gray-200 rounded w-32" />
+                </div>
                 <div className="flex gap-2">
-                    <div className="flex-1 h-9 bg-gray-100 rounded-lg animate-pulse" />
-                    <div className="flex-1 h-9 bg-gray-100 rounded-lg animate-pulse" />
+                    <div className="flex-1 h-9 bg-gray-200 rounded-xl" />
+                    <div className="flex-1 h-9 bg-gray-200 rounded-xl" />
                 </div>
             </div>
         </div>
@@ -594,7 +642,6 @@ export default function PendingOrdersPage() {
     const [confirmPaymentTx, setConfirmPaymentTx] = useState<PendingTransaction | null>(null);
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
 
-    // Roles yang boleh konfirmasi lunas
     const canConfirm = userRole
         ? (["ADMIN", "KEPALA_SALES", "CREW_SALES"] as UserRole[]).includes(userRole)
         : false;
@@ -669,32 +716,67 @@ export default function PendingOrdersPage() {
 
     return (
         <DashboardLayout>
-            <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes scaleIn {
+                    from { opacity: 0; transform: scale(0.9); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes slideUp {
+                    from { transform: translateY(100%); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes fadeUp {
+                    from { opacity: 0; transform: translateY(15px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-5px); }
+                    75% { transform: translateX(5px); }
+                }
+                @keyframes bounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-10px); }
+                }
+                .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+                .animate-scaleIn { animation: scaleIn 0.25s ease-out; }
+                .animate-slideUp { animation: slideUp 0.3s ease-out; }
+                .animate-fadeUp { animation: fadeUp 0.4s ease-out; }
+                .animate-shake { animation: shake 0.3s ease-in-out; }
+                .animate-bounce { animation: bounce 1s ease-in-out infinite; }
+            `}</style>
+
+            <main className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto space-y-5">
 
                     {/* ── Header ── */}
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3 animate-slideIn">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
+                                <div className="w-1 h-7 bg-gray-300 rounded-full" />
+                                <div className="w-7 h-7 bg-gray-100 rounded-lg flex items-center justify-center shadow-sm">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2.2">
                                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
                                     </svg>
                                 </div>
-                                <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">
+                                <h1 className="text-2xl font-bold text-gray-800">
                                     DP & Ambil Dulu
                                 </h1>
                             </div>
-                            <p className="text-xs text-gray-400 ml-9">
-                                Transaksi yang belum dilunasi
+                            <p className="text-sm text-gray-400 ml-10">
+                                Transaksi yang belum dilunasi — <span className="text-gray-500 font-medium">Perlu tindakan</span>
                             </p>
                         </div>
                         <button
                             onClick={fetchData}
                             disabled={isLoading}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-sm group"
                         >
-                            <svg className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-4 h-4 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
@@ -703,68 +785,73 @@ export default function PendingOrdersPage() {
                     </div>
 
                     {/* ── Stats Cards ── */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp" style={{ animationDelay: "0.05s" }}>
                         {[
-                            { label: "Total Pending", value: counts.all, color: "text-gray-800", bg: "bg-white", icon: "📋" },
-                            { label: "DP (Reserved)", value: counts.reserved, color: "text-amber-600", bg: "bg-amber-50", icon: "💳" },
-                            { label: "Ambil Dulu", value: counts.held, color: "text-blue-600", bg: "bg-blue-50", icon: "📦" },
-                            { label: "Total Nilai", value: fmt(totalValue), color: "text-emerald-600", bg: "bg-emerald-50", icon: "💰" },
+                            { label: "Total Pending", value: counts.all, color: "text-gray-800", bg: "bg-white", icon: "📋", bar: "bg-gray-400" },
+                            { label: "DP (Reserved)", value: counts.reserved, color: "text-amber-600", bg: "bg-amber-50", icon: "💳", bar: "bg-amber-500" },
+                            { label: "Ambil Dulu", value: counts.held, color: "text-blue-600", bg: "bg-blue-50", icon: "📦", bar: "bg-blue-500" },
+                            { label: "Total Nilai", value: fmt(totalValue), color: "text-gray-800", bg: "bg-gray-100", icon: "💰", bar: "bg-gray-500" },
                         ].map(stat => (
-                            <div key={stat.label} className={`${stat.bg} rounded-xl border border-gray-100 shadow-sm p-3`}>
+                            <div key={stat.label} className={`${stat.bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
+                                <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${stat.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs text-gray-400">{stat.label}</p>
-                                    <span className="text-sm opacity-60">{stat.icon}</span>
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{stat.label}</p>
+                                    <span className="text-lg opacity-60 group-hover:opacity-100 transition-opacity">{stat.icon}</span>
                                 </div>
-                                <p className={`text-xl font-bold mt-1 ${stat.color} truncate`}>{stat.value}</p>
+                                <p className={`text-2xl font-extrabold mt-1 ${stat.color} group-hover:scale-105 transition-transform origin-left`}>{stat.value}</p>
                             </div>
                         ))}
                     </div>
 
                     {/* ── Filter Tabs ── */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
-                        <div className="flex gap-1.5">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 animate-fadeUp" style={{ animationDelay: "0.08s" }}>
+                        <div className="grid grid-cols-3 gap-1.5">
                             {([
-                                { value: "ALL", label: "Semua", count: counts.all },
-                                { value: "RESERVED", label: "DP", count: counts.reserved },
-                                { value: "HELD", label: "Ambil Dulu", count: counts.held },
+                                { value: "ALL", label: "Semua", count: counts.all, icon: "📋" },
+                                { value: "RESERVED", label: "DP", count: counts.reserved, icon: "💳" },
+                                { value: "HELD", label: "Ambil Dulu", count: counts.held, icon: "📦" },
                             ] as const).map(opt => (
                                 <button
                                     key={opt.value}
                                     onClick={() => setFilterStatus(opt.value)}
-                                    className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg text-center transition-all ${filterStatus === opt.value
-                                        ? opt.value === "RESERVED"
-                                            ? "bg-amber-400 text-white"
-                                            : opt.value === "HELD"
-                                                ? "bg-blue-500 text-white"
-                                                : "bg-[#1a1a2e] text-white"
-                                        : "text-gray-500 hover:bg-gray-50"
-                                        }`}
+                                    className={`flex flex-col items-center py-2.5 px-2 rounded-xl text-center transition-all duration-200 ${
+                                        filterStatus === opt.value
+                                            ? opt.value === "RESERVED"
+                                                ? "bg-amber-500 text-white shadow-md transform scale-105"
+                                                : opt.value === "HELD"
+                                                    ? "bg-blue-500 text-white shadow-md transform scale-105"
+                                                    : "bg-gray-800 text-white shadow-md transform scale-105"
+                                            : "text-gray-500 hover:bg-gray-50"
+                                    }`}
                                 >
-                                    <span className="text-[10px] font-medium opacity-80">{opt.label}</span>
-                                    <span className="text-sm font-bold mt-0.5">{opt.count}</span>
+                                    <span className="text-lg">{opt.icon}</span>
+                                    <span className="text-[10px] font-medium mt-0.5">{opt.label}</span>
+                                    <span className={`text-sm font-bold mt-0.5 ${filterStatus === opt.value ? "text-white" : "text-gray-700"}`}>
+                                        {opt.count}
+                                    </span>
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     {/* ── Search ── */}
-                    <div className="relative">
-                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="relative group animate-fadeUp" style={{ animationDelay: "0.1s" }}>
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         <input
                             type="text"
-                            placeholder="Cari nama customer, invoice, laptop, no HP..."
+                            placeholder="Cari nama customer, invoice, laptop, atau no HP..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition shadow-sm"
+                            className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition-all duration-200 shadow-sm"
                         />
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-200"
                             >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -774,19 +861,19 @@ export default function PendingOrdersPage() {
                     {/* ── Content ── */}
                     {isLoading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+                            {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-16 text-center">
-                            <div className="text-4xl mb-3 opacity-40">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center animate-fadeIn">
+                            <div className="text-6xl mb-4 animate-bounce">
                                 {transactions.length === 0 ? "🎉" : "🔍"}
                             </div>
-                            <p className="text-gray-500 text-sm font-medium">
+                            <p className="text-gray-500 font-semibold text-base">
                                 {transactions.length === 0
                                     ? "Tidak ada transaksi pending"
                                     : "Tidak ada hasil untuk pencarian ini"}
                             </p>
-                            <p className="text-gray-400 text-xs mt-1">
+                            <p className="text-gray-400 text-sm mt-2">
                                 {transactions.length === 0
                                     ? "Semua transaksi sudah dilunasi"
                                     : "Coba ubah kata kunci atau filter"}
@@ -794,7 +881,7 @@ export default function PendingOrdersPage() {
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery("")}
-                                    className="mt-3 px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                                    className="mt-4 px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200"
                                 >
                                     Hapus pencarian
                                 </button>
@@ -814,10 +901,14 @@ export default function PendingOrdersPage() {
                                     />
                                 ))}
                             </div>
-                            <p className="text-xs text-gray-400 text-center">
-                                Menampilkan <span className="font-medium text-gray-600">{filtered.length}</span> dari{" "}
-                                <span className="font-medium text-gray-600">{transactions.length}</span> transaksi pending
-                            </p>
+                            <div className="flex items-center justify-center gap-2 pt-2">
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+                                <p className="text-xs text-gray-400">
+                                    Menampilkan <span className="font-semibold text-gray-600">{filtered.length}</span> dari{" "}
+                                    <span className="font-semibold text-gray-600">{transactions.length}</span> transaksi
+                                </p>
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+                            </div>
                         </>
                     )}
                 </div>

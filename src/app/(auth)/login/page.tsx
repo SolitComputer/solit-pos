@@ -106,7 +106,7 @@ export default function Page() {
               </label>
               <input
                 type="email"
-                placeholder="nama@perusahaan.com"
+                placeholder="Masukan email Anda"
                 className="w-full bg-white/[0.04] border border-white/10 rounded-xl h-12 px-4 text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-purple-500/50 focus:bg-white/[0.08] focus:ring-1 focus:ring-purple-500/30 transition-all duration-300"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -120,7 +120,7 @@ export default function Page() {
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                Kata Sandi
+                Password
               </label>
               <div className="relative">
                 <input
@@ -130,6 +130,16 @@ export default function Page() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onFocus={(e) => {
+                    // Placeholder akan hilang saat input di-focus
+                    e.target.placeholder = "";
+                  }}
+                  onBlur={(e) => {
+                    // Placeholder akan kembali jika password kosong
+                    if (!password) {
+                      e.target.placeholder = "••••••••";
+                    }
+                  }}
                 />
                 <button
                   type="button"
