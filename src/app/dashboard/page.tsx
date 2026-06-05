@@ -112,12 +112,11 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
 const ACCENT = {
-  gray: { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
-  gray: { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
-  gray: { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
-  gray: { bg: "bg-gray-50", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
+  gray:    { bg: "bg-gray-50",   text: "text-gray-700",   bar: "bg-gray-600",   border: "border-gray-200"   },
+  emerald: { bg: "bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
+  amber:   { bg: "bg-amber-50",  text: "text-amber-700",  bar: "bg-amber-600",  border: "border-amber-200"  },
+  blue:    { bg: "bg-blue-50",   text: "text-blue-700",   bar: "bg-blue-600",   border: "border-blue-200"   },
 } as const;
 
 function StatCard({ label, value, sub, icon, accent = "gray", change }: {
