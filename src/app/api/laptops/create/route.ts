@@ -20,8 +20,8 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
         serial_number: body.serial_number,
         purchase_price: Math.round(Number(body.purchase_price) || 0),
         selling_price: Math.round(Number(body.selling_price) || 0),
-        qty: Number(body.qty),
-        status: body.status,
+        qty: 0,           
+        status: "BELUM_SIAP",
         condition_note: body.condition_note,
         notes: body.notes,
       })

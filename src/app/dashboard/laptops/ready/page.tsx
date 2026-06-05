@@ -38,14 +38,23 @@ const GRADE_BADGE: Record<string, string> = {
     C: "bg-red-50 text-red-700 border-red-200",
 };
 
-const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string; icon: string }> = {
-    SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual", icon: "✅" },
-    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)", icon: "🔒" },
-    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu", icon: "📦" },
-    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual", icon: "💸" },
+const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
+    SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    BELUM_SIAP: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Belum Siap" },
+    SERVICE: { badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500", label: "Service" },
+    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+    RESERVED: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "Packing / DP" },
+    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
 };
 
-// ─── Sub-components dengan tema putih abu-abu ────────────────────────────────────
+const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string }> = {
+    SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
+    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
+    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
+    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+    PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "📦 Packing" },
+};
+// ─── Sub-components ───────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -197,11 +206,13 @@ export default function ReadyPage() {
         return list;
     }, [units, filterStatus, filterGrade, search]);
 
+    // Tambah ke counts
     const counts = {
         all: units.length,
         siap: units.filter(u => u.status === "SIAP_JUAL").length,
         reserved: units.filter(u => u.status === "RESERVED").length,
         held: units.filter(u => u.status === "HELD").length,
+        packing: units.filter(u => u.status === "PACKING").length, // ✅ baru
     };
 
     return (
@@ -301,15 +312,16 @@ export default function ReadyPage() {
                         <StatCard label="Diambil" value={counts.held} icon="📦" color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                     </div>
 
-                    {/* Filter dengan desain premium */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5 space-y-4">
-                        {/* Status tabs */}
+                    {/* Filter */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
                         <div className="flex flex-wrap gap-2">
+                            {/* Status tabs */}
                             {[
-                                { value: "ALL", label: "Semua", count: counts.all, icon: "📋" },
-                                { value: "SIAP_JUAL", label: "Siap Jual", count: counts.siap, icon: "✅" },
-                                { value: "RESERVED", label: "Dipesan", count: counts.reserved, icon: "🔒" },
-                                { value: "HELD", label: "Diambil", count: counts.held, icon: "📦" },
+                                { value: "ALL", label: "Semua", count: counts.all },
+                                { value: "SIAP_JUAL", label: "✅ Siap Jual", count: counts.siap },
+                                { value: "RESERVED", label: "🔒 Dipesan", count: counts.reserved },
+                                { value: "HELD", label: "📦 Diambil", count: counts.held },
+                                { value: "PACKING", label: "📦 Packing", count: counts.packing },
                             ].map(opt => (
                                 <button
                                     key={opt.value}
@@ -399,7 +411,7 @@ export default function ReadyPage() {
                                         {filtered.map((unit, idx) => {
                                             const st = STATUS_CONFIG[unit.status];
                                             const isAvailable = unit.status === "SIAP_JUAL";
-                                            const isPending = unit.status === "RESERVED" || unit.status === "HELD";
+                                            const isPending = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
                                             return (
                                                 <tr
                                                     key={unit.id}

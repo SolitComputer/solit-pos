@@ -6,19 +6,18 @@ import * as faceapi from "face-api.js";
 
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
-  | "manual" | "enrolling" | "verifying" | "success" | "error"
-  | "out-of-range" | "out-of-time";  // ✅ Tambah stage out-of-time
+  | "enrolling" | "verifying" | "success" | "error"
+  | "out-of-range" | "out-of-time";
 
-const MAX_ATTEMPTS          = 7;
-const AUTO_CAPTURE_CONFIDENCE = 0.82;
-const HOLD_FRAMES           = 5;
-const DETECTION_INPUT_SIZE  = 160;
+const MAX_ATTEMPTS            = 5;
+const AUTO_CAPTURE_CONFIDENCE = 0.75;  
+const HOLD_FRAMES             = 3;     
+const DETECTION_INPUT_SIZE    = 224;  
 
 const COMPANY_LAT           = -6.402123;
 const COMPANY_LNG           = 106.787296;
 const MAX_DISTANCE_METERS   = 80;
 
-// ✅ Jam absen — harus sama dengan konstanta di route.ts
 const ATTENDANCE_START_HOUR = 7;
 const ATTENDANCE_START_MIN  = 30;
 const ATTENDANCE_END_HOUR   = 12;
@@ -28,12 +27,6 @@ function ts() {
   return new Date().toLocaleTimeString("id-ID", { hour12: false });
 }
 
-/**
- * Cek jam absen di sisi client (untuk UX awal, server tetap jadi authority).
- *
- * ✅ Discriminated union: saat allowed=false, TypeScript tahu reason TIDAK bisa "OPEN".
- * Ini menghilangkan kebutuhan cast di call site.
- */
 type AttendanceTimeResult =
   | { allowed: true;  reason: "OPEN";                   openAt: string; closeAt: string }
   | { allowed: false; reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string };
@@ -79,15 +72,14 @@ export default function FaceVerifyPage() {
   const [holdProgress,    setHoldProgress]    = useState(0);
   const [clockStr,        setClockStr]        = useState(ts());
   const [logs,            setLogs]            = useState<LogEntry[]>([
-    { time: ts(), msg: "solit biometric engine v2.5 started", type: "ok" },
+    { time: ts(), msg: "solit biometric engine v3.0 started", type: "ok" },
   ]);
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
-  const [manualAllowed,   setManualAllowed]   = useState(false);
   const [gpsCoords,       setGpsCoords]       = useState<GpsCoords | null>(null);
   const [gpsLoading,      setGpsLoading]      = useState(false);
-  // ✅ Info waktu untuk ditampilkan di layar out-of-time
+  const [skipping,        setSkipping]        = useState(false);
   const [timeInfo,        setTimeInfo]        = useState<{
-    reason: "TOO_EARLY"|"TOO_LATE"; openAt: string; closeAt: string;
+    reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string;
   } | null>(null);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
@@ -106,9 +98,9 @@ export default function FaceVerifyPage() {
   useEffect(() => { attemptsRef.current = attempts; }, [attempts]);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const R = 6371000, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
   const checkLocation = useCallback(async () => {
@@ -161,15 +153,12 @@ export default function FaceVerifyPage() {
       try {
         addLog("loading models...", "info");
 
-        // ✅ Cek waktu di client SEBELUM load models (cepat, tidak perlu network)
         const timeCheck = isAttendanceTime();
         if (!timeCheck.allowed) {
           addLog(`Di luar jam absen — ${timeCheck.reason}`, "warn");
-          // ✅ Saat !allowed, reason pasti "TOO_EARLY" atau "TOO_LATE" (tidak mungkin "OPEN")
-          // TypeScript tidak bisa infer ini dari kondisi .allowed, jadi kita cast eksplisit
           setTimeInfo({
-            reason:  timeCheck.reason as "TOO_EARLY" | "TOO_LATE",
-            openAt:  timeCheck.openAt,
+            reason: timeCheck.reason as "TOO_EARLY" | "TOO_LATE",
+            openAt: timeCheck.openAt,
             closeAt: timeCheck.closeAt,
           });
           setStage("out-of-time");
@@ -186,18 +175,17 @@ export default function FaceVerifyPage() {
         ]);
 
         if (cancelled) return;
-        addLog("models loaded", "ok");
+        addLog("models loaded ✓", "ok");
 
         if (!statusResult?.success) { window.location.href = "/login"; return; }
         if (statusResult.alreadyAttended) { window.location.href = redirectTo; return; }
 
-        // ✅ face-status juga bisa mengembalikan isAttendanceTime false (server-side check)
         if (statusResult.isAttendanceTime === false) {
           addLog("Server: di luar jam absen", "warn");
           const pad = (n: number) => String(n).padStart(2, "0");
           setTimeInfo({
-            reason:  "TOO_LATE",
-            openAt:  `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`,
+            reason: "TOO_LATE",
+            openAt: `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`,
             closeAt: `${pad(ATTENDANCE_END_HOUR)}:${pad(ATTENDANCE_END_MIN)} WIB`,
           });
           setStage("out-of-time");
@@ -241,7 +229,7 @@ export default function FaceVerifyPage() {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => { });
       }
-      addLog("camera active", "ok");
+      addLog("camera active ✓", "ok");
       return true;
     } catch {
       addLog("camera unavailable", "err");
@@ -263,7 +251,9 @@ export default function FaceVerifyPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         embedding, attemptCount: attempt,
-        latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null, accuracy: coords?.accuracy ?? null,
+        latitude: coords?.latitude ?? null,
+        longitude: coords?.longitude ?? null,
+        accuracy: coords?.accuracy ?? null,
       }),
     });
     return res.json();
@@ -278,7 +268,11 @@ export default function FaceVerifyPage() {
       if (!videoRef.current || !canvasRef.current || isCapturingRef.current) return;
       try {
         const detections = await faceapi
-          .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: DETECTION_INPUT_SIZE, scoreThreshold: 0.5 }))
+          .detectAllFaces(
+            videoRef.current,
+            // ✅ scoreThreshold lebih rendah = lebih mudah detect wajah
+            new faceapi.TinyFaceDetectorOptions({ inputSize: DETECTION_INPUT_SIZE, scoreThreshold: 0.4 })
+          )
           .withFaceLandmarks();
 
         const dims = { width: videoRef.current.videoWidth, height: videoRef.current.videoHeight };
@@ -289,14 +283,20 @@ export default function FaceVerifyPage() {
         if (ctx) {
           ctx.clearRect(0, 0, dims.width, dims.height);
           if (detections.length === 1) {
-            ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 0.8;
+            ctx.strokeStyle = "rgba(255,255,255,0.35)";
+            ctx.lineWidth = 0.8;
             faceapi.draw.drawFaceLandmarks(canvasRef.current, resized);
           }
         }
 
         const detected = detections.length === 1;
         setFaceDetected(detected);
-        if (!detected) { holdCountRef.current = 0; setConfidence(0); setHoldProgress(0); return; }
+        if (!detected) {
+          holdCountRef.current = 0;
+          setConfidence(0);
+          setHoldProgress(0);
+          return;
+        }
 
         const score = detections[0].detection.score;
         setConfidence(Math.round(score * 100));
@@ -316,52 +316,66 @@ export default function FaceVerifyPage() {
             if (mode === "enroll") {
               setStage("enrolling");
               setMessage("Memproses pendaftaran wajah...");
-              addLog("auto-capture — extracting embedding", "ok");
+              addLog("auto-capture — enrolling...", "ok");
 
               const enrollRes  = await fetch("/api/auth/face-enroll", {
-                method: "POST", headers: { "Content-Type": "application/json" },
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ embedding }),
               });
               const enrollData = await enrollRes.json();
 
               if (enrollData.success) {
-                addLog("enrollment berhasil", "ok");
+                addLog("enrollment berhasil ✓", "ok");
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
-                  setStage("success"); setMessage("Wajah berhasil didaftarkan dan absen tercatat ✓");
+                  setStage("success");
+                  setMessage("Wajah berhasil didaftarkan dan absen tercatat ✓");
                   setTimeout(() => (window.location.href = redirectTo), 1800);
                 } else if (vd.outOfTime) {
-                  // ✅ Handle server time gate saat enroll
                   const pad = (n: number) => String(n).padStart(2, "0");
                   setTimeInfo({ reason: "TOO_LATE", openAt: `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`, closeAt: `${pad(ATTENDANCE_END_HOUR)}:${pad(ATTENDANCE_END_MIN)} WIB` });
                   setStage("out-of-time");
                 } else {
-                  setStage("verify"); setMessage("Posisikan wajah lagi untuk absen");
+                  setStage("verify");
+                  setMessage("Posisikan wajah lagi untuk absen");
                 }
               } else {
-                addLog(`enrollment gagal: ${enrollData.message}`, "err"); setStage("enroll");
+                addLog(`enrollment gagal: ${enrollData.message}`, "err");
+                setStage("enroll");
               }
             } else {
               const currentAttempt = attemptsRef.current + 1;
               setAttempts(currentAttempt);
+              addLog(`mencoba verifikasi [${currentAttempt}/${MAX_ATTEMPTS}]...`, "info");
               const vd = await doVerify(embedding, currentAttempt, coords);
 
               if (vd.success) {
-                setStage("success"); setMessage("Absen wajah berhasil ✓ Selamat bekerja");
+                setStage("success");
+                setMessage("Absen wajah berhasil ✓ Selamat bekerja");
                 setTimeout(() => (window.location.href = redirectTo), 1500);
               } else if (vd.outOfTime) {
-                // ✅ Kalau server tolak karena waktu (edge case: jam tepat berakhir saat scanning)
-                addLog("Waktu absen berakhir saat proses verify", "warn");
+                addLog("Waktu absen berakhir", "warn");
                 const pad = (n: number) => String(n).padStart(2, "0");
                 setTimeInfo({ reason: "TOO_LATE", openAt: `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`, closeAt: `${pad(ATTENDANCE_END_HOUR)}:${pad(ATTENDANCE_END_MIN)} WIB` });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
-                addLog("wajah belum terdaftar, alihkan ke enroll", "warn");
-                setStage("enroll"); setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
+                addLog("wajah belum terdaftar → enroll", "warn");
+                setStage("enroll");
+                setMessage("Wajah belum terdaftar. Daftarkan sekarang.");
               } else {
-                addLog(`match gagal [${currentAttempt}/${MAX_ATTEMPTS}]`, "warn");
-                if (currentAttempt >= MAX_ATTEMPTS) { setStage("manual"); setMessage("Terlalu banyak percobaan gagal"); }
-                else { setStage("verify"); setMessage(`Gagal (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`); if (currentAttempt >= 3) setManualAllowed(true); }
+                addLog(`match gagal [${currentAttempt}/${MAX_ATTEMPTS}] — dist: ${vd.distance?.toFixed(3) ?? "?"}`, "warn");
+                if (currentAttempt >= MAX_ATTEMPTS) {
+                  // ✅ Tidak ada fallback manual — tampilkan pesan dan biarkan coba lagi
+                  setAttempts(0);
+                  attemptsRef.current = 0;
+                  setStage("verify");
+                  setMessage("Wajah tidak dikenali. Pastikan pencahayaan cukup dan coba lagi.");
+                  addLog("reset attempts — silakan coba lagi", "warn");
+                } else {
+                  setStage("verify");
+                  setMessage(`Gagal (${currentAttempt}/${MAX_ATTEMPTS}) — Coba lagi`);
+                }
               }
             }
             isCapturingRef.current = false;
@@ -370,60 +384,51 @@ export default function FaceVerifyPage() {
           holdCountRef.current = Math.max(0, holdCountRef.current - 1);
           setHoldProgress(p => Math.max(0, p - 5));
         }
-      } catch (err) { console.error("Detection loop error:", err); }
-    }, 200);
+      } catch (err) {
+        console.error("Detection loop error:", err);
+      }
+    }, 150); // ✅ Dari 200ms → 150ms, lebih responsif
   }, [addLog, captureEmbedding, doVerify, redirectTo]);
 
   useEffect(() => {
     if (stage === "enroll" || stage === "verify") {
-      startCamera().then(ok => { if (ok) startFaceDetectionLoop(stage as "enroll"|"verify", gpsCoords); else setStage("manual"); });
+      startCamera().then(ok => {
+        if (ok) startFaceDetectionLoop(stage as "enroll" | "verify", gpsCoords);
+        else {
+          setStage("error");
+          setMessage("Kamera tidak dapat diakses. Izinkan akses kamera di browser.");
+        }
+      });
     }
-    if (["loading","checking","success","error","manual","location","out-of-range","out-of-time"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time"].includes(stage)) {
       stopCamera();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  const handleManual = useCallback(async () => {
-    setStage("verifying");
-    addLog("manual absen requested", "warn");
+  // ✅ TOLAK ABSEN: set cookie skip lalu redirect ke dashboard
+  const handleRejectAttendance = useCallback(async () => {
+    if (!confirm("Yakin ingin melewati absen? Kehadiran Anda tidak akan tercatat hari ini.")) return;
+    setSkipping(true);
     try {
-      const res  = await fetch("/api/auth/face-verify", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: gpsCoords?.latitude ?? null, longitude: gpsCoords?.longitude ?? null, accuracy: gpsCoords?.accuracy ?? null }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        addLog("manual absen granted", "ok");
-        setStage("success"); setMessage("Absen manual berhasil");
-        setTimeout(() => (window.location.href = redirectTo), 1500);
-      } else if (data.outOfTime) {
-        // ✅ Server tolak absen manual karena waktu
-        addLog("Waktu absen sudah berakhir", "warn");
-        const pad = (n: number) => String(n).padStart(2, "0");
-        setTimeInfo({ reason: "TOO_LATE", openAt: `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`, closeAt: `${pad(ATTENDANCE_END_HOUR)}:${pad(ATTENDANCE_END_MIN)} WIB` });
-        setStage("out-of-time");
-      } else { setStage("manual"); }
-    } catch { addLog("connection error", "err"); setStage("manual"); }
-  }, [addLog, redirectTo, gpsCoords]);
+      await fetch("/api/auth/face-status", { method: "POST" });
+    } catch {
+      // tetap lanjut meskipun gagal set cookie
+    }
+    window.location.href = redirectTo;
+  }, [redirectTo]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   };
 
-  const handleRejectAttendance = () => {
-    if (confirm("Yakin ingin menolak absen? Anda akan diarahkan ke halaman login.")) {
-      window.location.href = "/login";
-    }
-  };
-
-  const showCamera   = ["enroll","verify","enrolling","verifying"].includes(stage);
-  const isProcessing = ["enrolling","verifying"].includes(stage);
+  const showCamera   = ["enroll", "verify", "enrolling", "verifying"].includes(stage);
+  const isProcessing = ["enrolling", "verifying"].includes(stage);
 
   const confColor =
-    confidence > 82 ? "rgba(255,255,255,0.75)"
-    : confidence > 60 ? "#f59e0b" : "#f87171";
+    confidence > 75 ? "rgba(255,255,255,0.75)"
+    : confidence > 50 ? "#f59e0b" : "#f87171";
 
   const logColor: Record<LogType, string> = {
     info: "rgba(255,255,255,0.3)", ok: "rgba(255,255,255,0.75)", warn: "#f59e0b", err: "#f87171",
@@ -496,9 +501,9 @@ export default function FaceVerifyPage() {
         .gps-ping { position: relative; width: 8px; height: 8px; flex-shrink: 0; }
         .gps-ping-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; position: absolute; }
         .gps-ping-ring { width: 8px; height: 8px; border-radius: 50%; background: rgba(74,222,128,0.4); position: absolute; animation: gps-ping 1.5s ease-out infinite; }
-        /* ✅ Time gate card */
         .time-gate-card { width: 100%; background: rgba(251,191,36,0.06); border: 0.5px solid rgba(251,191,36,0.25); border-radius: 14px; padding: 20px; text-align: center; animation: fadeSlide 0.25s ease; }
         .clock-colon { animation: clock-tick 1s step-end infinite; }
+        .tip-box { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
       `}</style>
 
       <div className="fv-card">
@@ -520,10 +525,7 @@ export default function FaceVerifyPage() {
         {/* Title */}
         <div style={{ textAlign: "center", marginBottom: 18 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.88)", letterSpacing: 0.2, marginBottom: 3 }}>
-            {stage === "enroll" || stage === "enrolling" ? "Daftarkan Wajah"
-              : stage === "manual" ? "Absen Manual"
-              : stage === "out-of-time" ? "Absen Tertutup"
-              : "Absensi Wajah"}
+            {stage === "enroll" || stage === "enrolling" ? "Daftarkan Wajah" : "Absensi Wajah"}
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 0.3 }}>
             Solit POS — Absensi Biometrik
@@ -540,52 +542,36 @@ export default function FaceVerifyPage() {
           </div>
         )}
 
-        {/* ✅ OUT OF TIME — tampilan khusus jam absen tutup/belum buka */}
+        {/* Out of time */}
         {stage === "out-of-time" && (
           <div style={{ padding: "8px 0 16px" }}>
             <div className="time-gate-card">
-              {/* Ikon jam */}
               <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-
-              {/* Pesan utama */}
               <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
                 {timeInfo?.reason === "TOO_EARLY" ? "Absen Belum Dibuka" : "Waktu Absen Berakhir"}
               </div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.6, marginBottom: 16 }}>
                 {timeInfo?.reason === "TOO_EARLY"
-                  ? <>Absen dibuka pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{openAtStr} WIB</span></>
-                  : <>Batas absen pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{closeAtStr} WIB</span></>
+                  ? <span>Absen dibuka pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{openAtStr} WIB</span></span>
+                  : <span>Batas absen pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{closeAtStr} WIB</span></span>
                 }
               </div>
-
-              {/* Jam aktif absen */}
               <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 16px", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(251,191,36,0.6)" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                   Jam absen: <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
                   <span className="clock-colon"> – </span>
                   <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAtStr} WIB</span>
                 </div>
               </div>
-
-              {/* Jam sekarang */}
               <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.25)" }}>
                 Waktu sekarang: <span style={{ fontFamily: "monospace" }}>{clockStr} WIB</span>
               </div>
             </div>
-
-            {/* Tombol ke dashboard (kalau sudah pernah absen / mau bypass) */}
-            <button
-              className="btn-main"
-              style={{ marginTop: 16, background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" }}
-              onClick={() => window.location.href = redirectTo}
-            >
+            <button className="btn-main" style={{ marginTop: 16 }} onClick={() => window.location.href = redirectTo}>
               Lanjut ke Dashboard →
             </button>
           </div>
@@ -615,7 +601,7 @@ export default function FaceVerifyPage() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "28px 0" }}>
             <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth={1.5}>
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
             </div>
             <div style={{ fontSize: 13, color: "#f87171", textAlign: "center" }}>{message}</div>
@@ -630,8 +616,8 @@ export default function FaceVerifyPage() {
               <div style={{ position: "absolute", width: 64, height: 64, borderRadius: "50%", background: "rgba(74,222,128,0.08)", border: "0.5px solid rgba(74,222,128,0.2)" }} />
               <div style={{ position: "absolute", width: 48, height: 48, borderRadius: "50%", background: "rgba(74,222,128,0.06)", animation: "gps-ping 2s ease-out infinite" }} />
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth={1.5} style={{ position: "relative", zIndex: 1 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>Cek Lokasi Absen</div>
@@ -641,13 +627,21 @@ export default function FaceVerifyPage() {
             <button className="btn-main" style={{ maxWidth: 220 }} onClick={checkLocation}>
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Cek Lokasi Saya
               </span>
             </button>
-            <button className="btn-ghost" style={{ marginTop: 12, color: "rgba(248,113,113,0.6)" }} onClick={handleRejectAttendance}>Tolak Absen →</button>
+            {/* ✅ Tolak absen dari location stage */}
+            <button
+              className="btn-ghost"
+              style={{ marginTop: 12, color: "rgba(248,113,113,0.5)" }}
+              onClick={handleRejectAttendance}
+              disabled={skipping}
+            >
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </button>
           </div>
         )}
 
@@ -666,7 +660,7 @@ export default function FaceVerifyPage() {
                 </div>
               </div>
               <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 2, width: `${Math.min(((currentDistance??0)/(MAX_DISTANCE_METERS*2))*100,100)}%`, background: "linear-gradient(90deg,#f87171,#ef4444)", transition: "width 0.5s ease" }} />
+                <div style={{ height: "100%", borderRadius: 2, width: `${Math.min(((currentDistance ?? 0) / (MAX_DISTANCE_METERS * 2)) * 100, 100)}%`, background: "linear-gradient(90deg,#f87171,#ef4444)", transition: "width 0.5s ease" }} />
               </div>
               <div style={{ fontSize: 10, color: "rgba(248,113,113,0.5)", marginTop: 8 }}>
                 Terlalu jauh {currentDistance != null ? `+${currentDistance - MAX_DISTANCE_METERS}m` : ""} dari batas
@@ -675,13 +669,21 @@ export default function FaceVerifyPage() {
             {gpsCoords && (
               <a href={`https://maps.google.com/?q=${gpsCoords.latitude},${gpsCoords.longitude}`} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 11, color: "rgba(96,165,250,0.7)", marginBottom: 20, display: "flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                 {gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}
                 <span style={{ color: "rgba(255,255,255,0.2)" }}>±{Math.round(gpsCoords.accuracy)}m</span>
               </a>
             )}
-            <button className="btn-main" style={{ maxWidth: 220, background: "rgba(248,113,113,0.12)", borderColor: "rgba(248,113,113,0.3)", color: "#f87171" }} onClick={handleRejectAttendance}>Kembali ke Login</button>
-            <button className="btn-ghost" style={{ marginTop: 10 }} onClick={checkLocation}>Coba cek ulang →</button>
+            <button className="btn-ghost" style={{ marginTop: 4 }} onClick={checkLocation}>Coba cek ulang →</button>
+            {/* ✅ Tolak absen dari out-of-range juga */}
+            <button
+              className="btn-ghost"
+              style={{ marginTop: 6, color: "rgba(248,113,113,0.5)" }}
+              onClick={handleRejectAttendance}
+              disabled={skipping}
+            >
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </button>
           </div>
         )}
 
@@ -700,34 +702,57 @@ export default function FaceVerifyPage() {
                 </div>
               </div>
             )}
-            {attempts > 0 && !isProcessing && (
-              <div className="fail-badge"><div className="fail-badge-dot" /><div className="fail-badge-text">Wajah tidak dikenali</div><div className="fail-badge-count">{attempts}/{MAX_ATTEMPTS}</div></div>
+
+            {/* ✅ Tips deteksi wajah */}
+            {!isProcessing && (
+              <div className="tip-box">
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.7 }}>
+                  💡 Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
+                </div>
+              </div>
             )}
+
+            {attempts > 0 && !isProcessing && (
+              <div className="fail-badge">
+                <div className="fail-badge-dot" />
+                <div className="fail-badge-text">Wajah tidak dikenali — coba lagi</div>
+                <div className="fail-badge-count">{attempts}/{MAX_ATTEMPTS}</div>
+              </div>
+            )}
+
             <div className="status-chip">
               <div className={`s-dot ${isProcessing ? "s-dot-amber" : faceDetected ? "s-dot-green" : "s-dot-gray"}`} />
               <div style={{ flex: 1, fontSize: 11, color: isProcessing ? "#f59e0b" : faceDetected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)", letterSpacing: 0.2 }}>
-                {isProcessing ? message : faceDetected ? "Wajah terdeteksi — tahan" : "Arahkan wajah ke oval"}
+                {isProcessing ? message : faceDetected ? "Wajah terdeteksi — tahan sebentar" : "Arahkan wajah ke oval"}
               </div>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{attempts}/{MAX_ATTEMPTS}</div>
             </div>
+
             <div className="cam-box">
               <video ref={videoRef} playsInline muted />
               <canvas ref={canvasRef} />
               <div className="cam-grid" /><div className="cam-scanline" />
-              <div className="face-oval"><div className={`face-oval-ring ${faceDetected?"on":"off"}`} /><div className="face-oval-spin1" /><div className="face-oval-spin2" /></div>
+              <div className="face-oval">
+                <div className={`face-oval-ring ${faceDetected ? "on" : "off"}`} />
+                <div className="face-oval-spin1" />
+                <div className="face-oval-spin2" />
+              </div>
               <div className="hud hud-tl"><div>cam·0</div><div className="blink" style={{ color: "rgba(255,255,255,0.45)" }}>● rec</div></div>
               <div className="hud hud-tr"><div>640×480</div><div style={{ color: confColor }}>{confidence}%</div></div>
-              <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE*100 ? "conf: lock" : "conf: scan"}</div>
+              <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? "conf: lock ✓" : "conf: scan"}</div>
               <div className="hud hud-br">{currentDistance != null ? `📍 ${currentDistance}m` : clockStr}</div>
-              <div className="hold-bar-wrap"><div className="hold-bar-fill" style={{ width: `${holdProgress}%`, background: holdProgress>80?"rgba(255,255,255,0.6)":"rgba(255,255,255,0.3)" }} /></div>
+              <div className="hold-bar-wrap"><div className="hold-bar-fill" style={{ width: `${holdProgress}%`, background: holdProgress > 80 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)" }} /></div>
               {isProcessing && (<div className="proc-overlay"><div className="spinner" /><div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: 0.3 }}>{message}</div></div>)}
             </div>
+
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.25)", marginBottom: 4, letterSpacing: 0.3 }}>
-                <span>confidence</span><span style={{ color: confColor }}>{confidence}%{confidence >= AUTO_CAPTURE_CONFIDENCE*100 ? " — ready" : ""}</span>
+                <span>confidence</span>
+                <span style={{ color: confColor }}>{confidence}%{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? " — ready ✓" : ""}</span>
               </div>
               <div className="pbar-wrap"><div className="pbar-fill" style={{ width: `${confidence}%`, background: confColor }} /></div>
             </div>
+
             {holdProgress > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.25)", marginBottom: 4, letterSpacing: 0.3 }}>
@@ -736,45 +761,29 @@ export default function FaceVerifyPage() {
                 <div className="pbar-wrap"><div className="pbar-fill" style={{ width: `${holdProgress}%`, background: "rgba(255,255,255,0.45)" }} /></div>
               </div>
             )}
-            {(manualAllowed || attempts >= MAX_ATTEMPTS) && !isProcessing && (
-              <button className="btn-ghost" onClick={() => setStage("manual")} style={{ width: "100%", textAlign: "center", marginTop: 2 }}>Gunakan verifikasi manual →</button>
-            )}
+
+            {/* ✅ Re-enroll jika wajah terus tidak dikenali */}
             {attempts >= 3 && !isProcessing && (
-              <button className="btn-ghost" style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.5)", fontSize: 10 }}
+              <button
+                className="btn-ghost"
+                style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.5)", fontSize: 10 }}
                 onClick={async () => {
                   addLog("re-enrollment requested", "warn");
                   await fetch("/api/auth/face-enroll", { method: "PUT" });
-                  setAttempts(0); attemptsRef.current = 0; setManualAllowed(false);
-                  setStage("enroll"); setMessage("Daftarkan wajah Anda");
-                }}>
+                  setAttempts(0);
+                  attemptsRef.current = 0;
+                  setStage("enroll");
+                  setMessage("Daftarkan wajah Anda");
+                }}
+              >
                 Wajah tidak dikenali? Daftar ulang →
               </button>
             )}
           </>
         )}
 
-        {/* Manual mode */}
-        {stage === "manual" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
-              <div style={{ width: 44, height: 44, background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.5}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", letterSpacing: 0.2 }}>{message}</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{attempts >= MAX_ATTEMPTS ? `${MAX_ATTEMPTS} percobaan gagal — akses manual` : "Mode manual tersedia hari ini"}</div>
-            </div>
-            <button className="btn-main" onClick={handleManual}>Masuk tanpa verifikasi wajah</button>
-            {attempts < MAX_ATTEMPTS && (
-              <button className="btn-ghost" style={{ textAlign: "center", width: "100%" }}
-                onClick={() => { setStage("verify"); startCamera().then(ok => { if (ok) startFaceDetectionLoop("verify", gpsCoords); }); }}>
-                ← Kembali ke scan wajah
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Terminal log */}
-        {!["loading","checking","out-of-time"].includes(stage) && (
+        {!["loading", "checking", "out-of-time"].includes(stage) && (
           <div style={{ marginTop: 14, marginBottom: 14 }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, marginBottom: 5 }}>system log</div>
             <div className="t-log">
@@ -790,10 +799,10 @@ export default function FaceVerifyPage() {
         )}
 
         {/* Footer */}
-        {!["loading","checking","success","out-of-time"].includes(stage) && (
+        {!["loading", "checking", "success", "out-of-time"].includes(stage) && (
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.05)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <button className="btn-ghost" onClick={handleLogout}>Bukan Anda? Ganti akun</button>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", letterSpacing: 0.4 }}>sys:ok · wib</div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", letterSpacing: 0.4 }}>biometric only · wib</div>
           </div>
         )}
       </div>

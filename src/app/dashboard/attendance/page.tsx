@@ -63,14 +63,21 @@ function isLateAttendance(checkInTime: string): boolean {
     const wibDate = new Date(wibMs);
     const totalMinutes = wibDate.getUTCHours() * 60 + wibDate.getUTCMinutes();
     const endTimeMinutes = ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
+
+    // Jika absen setelah jam 12:00 WIB → TERLAMBAT
     return totalMinutes > endTimeMinutes;
 }
 
 function getDisplayStatus(attendance: Attendance): "PRESENT" | "LATE" {
     if (attendance.status === "LATE") return "LATE";
+
+    // Jika status asli PRESENT, cek apakah absen setelah jam 12:00
     const checkTime = attendance.check_in_time || attendance.created_at;
-    if (isLateAttendance(checkTime)) return "LATE";
-    return "PRESENT";
+    if (isLateAttendance(checkTime)) {
+        return "LATE"; // Tampilkan sebagai TERLAMBAT
+    }
+
+    return "PRESENT"; // Tepat waktu
 }
 
 const METHOD_STYLES: Record<string, string> = {
@@ -83,107 +90,6 @@ const STATUS_STYLES: Record<string, string> = {
     LATE: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-// ─── New Components ────────────────────────────────────────────────────────────
-
-// Loading Skeleton yang lebih menarik
-const LoadingSkeleton = () => (
-    <div className="space-y-3">
-        {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm animate-pulse">
-                <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                        <div className="h-4 bg-gray-200 rounded w-32" />
-                        <div className="h-3 bg-gray-200 rounded w-24" />
-                    </div>
-                    <div className="h-8 bg-gray-200 rounded w-16" />
-                </div>
-                <div className="mt-3 flex gap-2">
-                    <div className="h-6 bg-gray-200 rounded-full w-20" />
-                    <div className="h-6 bg-gray-200 rounded-full w-20" />
-                </div>
-            </div>
-        ))}
-    </div>
-);
-
-// Empty State yang menarik
-const EmptyState = () => (
-    <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-2xl border border-gray-100">
-        <div className="text-6xl mb-4 animate-bounce">📋</div>
-        <p className="text-gray-400 text-sm font-medium">Belum ada data absensi</p>
-        <p className="text-gray-300 text-xs mt-1">Silahkan lakukan absensi terlebih dahulu</p>
-    </div>
-);
-
-// Stat Card dengan animasi
-const StatCard = ({ label, value, icon, color, bg, border, loading }: any) => (
-    <div className={`${bg} border ${border} rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-[1.02] group`}>
-        <div className="flex items-start justify-between">
-            <div>
-                <p className="text-gray-500 text-xs font-medium tracking-wide">{label}</p>
-                <p className={`text-3xl font-extrabold mt-1 ${color} transition-all duration-300 group-hover:scale-105 origin-left`}>
-                    {loading ? <span className="inline-block w-10 h-7 bg-gray-200 rounded animate-pulse" /> : value}
-                </p>
-            </div>
-            <div className={`p-2 rounded-xl ${bg} opacity-60 group-hover:opacity-100 transition-opacity`}>
-                {icon}
-            </div>
-        </div>
-    </div>
-);
-
-// Export Button Component
-const ExportButton = ({ data, onExport }: any) => {
-    const [isExporting, setIsExporting] = useState(false);
-
-    const handleExport = async () => {
-        setIsExporting(true);
-        if (onExport) await onExport();
-        setTimeout(() => setIsExporting(false), 1000);
-    };
-
-    return (
-        <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-        >
-            {isExporting ? (
-                <>
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span>Mengunduh...</span>
-                </>
-            ) : (
-                <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <span>Export Data</span>
-                </>
-            )}
-        </button>
-    );
-};
-
-// Filter Badge Component
-const FilterBadge = ({ label, active, onClick }: any) => (
-    <button
-        onClick={onClick}
-        className={`px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200 whitespace-nowrap
-            ${active
-                ? "bg-gray-800 text-white shadow-md transform scale-105"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-            }`}
-    >
-        {label}
-    </button>
-);
-
-// Location Badge yang ditingkatkan
 function LocationBadge({ lat, lng, accuracy }: {
     lat: number | null; lng: number | null; accuracy: number | null;
 }) {
@@ -231,7 +137,10 @@ function LocationBadge({ lat, lng, accuracy }: {
     );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+const Shimmer = ({ className = "" }: { className?: string }) => (
+    <div className={`rounded-lg animate-pulse bg-gray-100 ${className}`} />
+);
+
 export default function AttendanceDashboardPage() {
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [loading, setLoading] = useState(true);
@@ -245,21 +154,6 @@ export default function AttendanceDashboardPage() {
         const init = async () => {
             const user = await getCurrentUserClient();
             setCurrentUser(user);
-
-            const now = new Date();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const isAttendanceHour = (hours === 7 && minutes >= 30) || (hours >= 8 && hours < 12);
-
-            if (isAttendanceHour) {
-                const hasAttended = document.cookie.includes("face_attended") ||
-                    document.cookie.includes("face_verified");
-                if (!hasAttended) {
-                    window.location.href = "/face-verify?from=/dashboard/attendance";
-                    return;
-                }
-            }
-
             fetchAttendance();
         };
         init();
@@ -415,10 +309,14 @@ export default function AttendanceDashboardPage() {
                                 <span className="text-sm font-semibold text-gray-700">Filter Data</span>
                             </div>
                             <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                                key={name}
+                                onClick={() => setActiveTab(name)}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${activeTab === name
+                                    ? "bg-gray-800 text-white shadow-sm"
+                                    : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                                    }`}
                             >
-                                {showFilters ? "Sembunyikan ↑" : "Tampilkan ↓"}
+                                {name}
                             </button>
                         </div>
 

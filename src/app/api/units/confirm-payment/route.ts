@@ -15,7 +15,6 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    // Ambil transaksi
     const { data: transaction } = await supabase
       .from("transactions")
       .select("*")
@@ -29,23 +28,22 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    if (!["RESERVED", "HELD"].includes(transaction.status)) {
+    // ✅ Tambah PACKING ke status yang bisa dikonfirmasi
+    if (!["RESERVED", "HELD", "PACKING"].includes(transaction.status)) {
       return NextResponse.json(
         { success: false, message: `Transaksi status "${transaction.status}" tidak bisa dikonfirmasi` },
         { status: 400 }
       );
     }
 
-    // Untuk RESERVED: wajib input SN dulu
     const finalSN = transaction.serial_number || serial_number;
     if (!finalSN) {
       return NextResponse.json(
-        { success: false, message: "Serial number wajib diisi untuk transaksi RESERVED" },
+        { success: false, message: "Serial number wajib diisi" },
         { status: 400 }
       );
     }
 
-    // Cari unit by SN
     const { data: unit } = await supabase
       .from("laptop_units")
       .select("id, laptop_id, status")
@@ -59,16 +57,15 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    // Update transaksi → PAID
     const now = new Date().toISOString();
     const { data: updatedTx } = await supabase
       .from("transactions")
       .update({
-        status:         "PAID",
-        serial_number:  finalSN,
-        unit_id:        unit.id,
-        paid_at:        now,
-        payment_photo:  payment_photo || transaction.payment_photo,
+        status: "PAID",
+        serial_number: finalSN,
+        unit_id: unit.id,
+        paid_at: now,
+        payment_photo: payment_photo || transaction.payment_photo,
         last_edited_by: user.name,
         last_edited_at: now,
       })
@@ -76,17 +73,15 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       .select()
       .single();
 
-    // Update unit → SOLD
     await supabase
       .from("laptop_units")
       .update({
-        status:           "SOLD",
-        reserved_by:      null,
+        status: "SOLD",
+        reserved_by: null,
         reserved_invoice: null,
       })
       .eq("id", unit.id);
 
-    // Update qty laptop
     const { data: remainingUnits } = await supabase
       .from("laptop_units")
       .select("id")
@@ -99,41 +94,65 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       .update({ qty: newQty, status: newQty <= 0 ? "SOLD" : "SIAP_JUAL" })
       .eq("id", unit.laptop_id);
 
-    // Buat garansi
-    const warrantyDuration = 30;
-    const warrantyEnd = new Date();
-    warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
+    // ✅ Buat garansi saat PACKING → PAID (belum dibuat sebelumnya)
+    if (transaction.status === "PACKING") {
+      const warrantyDuration = 30;
+      const warrantyEnd = new Date();
+      warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
 
-    await supabase.from("warranties").insert({
-      invoice_number,
-      serial_number:      finalSN.toUpperCase(),
-      customer_name:      transaction.customer_name,
-      customer_phone:     transaction.customer_phone || null,
-      laptop_name:        transaction.laptop_name,
-      laptop_id:          unit.laptop_id,
-      unit_id:            unit.id,
-      warranty_start:     new Date().toISOString().split("T")[0],
-      warranty_end:       warrantyEnd.toISOString().split("T")[0],
-      warranty_duration:  warrantyDuration,
-      status:             "ACTIVE",
-      created_by:         user.name,
-    });
+      await supabase.from("warranties").insert({
+        invoice_number,
+        serial_number: finalSN.toUpperCase(),
+        customer_name: transaction.customer_name,
+        customer_phone: transaction.customer_phone || null,
+        laptop_name: transaction.laptop_name,
+        laptop_id: unit.laptop_id,
+        unit_id: unit.id,
+        warranty_start: new Date().toISOString().split("T")[0],
+        warranty_end: warrantyEnd.toISOString().split("T")[0],
+        warranty_duration: warrantyDuration,
+        status: "ACTIVE",
+        created_by: user.name,
+      });
+    } else {
+      // RESERVED/HELD — garansi seperti sebelumnya
+      const warrantyDuration = 30;
+      const warrantyEnd = new Date();
+      warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
+
+      await supabase.from("warranties").insert({
+        invoice_number,
+        serial_number: finalSN.toUpperCase(),
+        customer_name: transaction.customer_name,
+        customer_phone: transaction.customer_phone || null,
+        laptop_name: transaction.laptop_name,
+        laptop_id: unit.laptop_id,
+        unit_id: unit.id,
+        warranty_start: new Date().toISOString().split("T")[0],
+        warranty_end: warrantyEnd.toISOString().split("T")[0],
+        warranty_duration: warrantyDuration,
+        status: "ACTIVE",
+        created_by: user.name,
+      });
+    }
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "EDIT",
-      entity:      "transaction",
-      entityId:    transaction.id,
-      entityLabel: `${invoice_number} — KONFIRMASI LUNAS`,
-      beforeData:  transaction,
-      afterData:   updatedTx,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "transaction",
+      entityId: transaction.id,
+      entityLabel: `${invoice_number} — ${transaction.status === "PACKING" ? "PACKING → PAID (uang cair)" : "KONFIRMASI LUNAS"}`,
+      beforeData: transaction,
+      afterData: updatedTx,
     });
 
     return NextResponse.json({
-      success:        true,
-      message:        "Pembayaran dikonfirmasi, transaksi PAID",
+      success: true,
+      message: transaction.status === "PACKING"
+        ? "Dana marketplace cair, transaksi PAID"
+        : "Pembayaran dikonfirmasi, transaksi PAID",
       invoice_number,
     });
   } catch (err) {

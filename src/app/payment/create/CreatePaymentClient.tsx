@@ -68,7 +68,6 @@ export default function CreatePaymentPage() {
     const [laptops, setLaptops] = useState<LaptopOption[]>([]);
     const [isLoadingLaptops, setIsLoadingLaptops] = useState(true);
 
-    // Units untuk laptop yang dipilih
     const [units, setUnits] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
@@ -84,21 +83,53 @@ export default function CreatePaymentPage() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingSubmitData, setPendingSubmitData] = useState<CreatePaymentType | null>(null);
 
-    const { register, handleSubmit, watch, setValue, formState: { errors } } =
-        useForm<CreatePaymentType>({
-            resolver: zodResolver(createPaymentSchema),
-            defaultValues: {
-                company_name: "Solit 03",
-                payment_method: "CASH",
-                pickup_method: "DATANG",
-                source_platform: "Instagram",
-            },
-        });
+    const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
+
+    const [isEcommerce, setIsEcommerce] = useState(false);
+    const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
+    const [ecommerceOrderId, setEcommerceOrderId] = useState("");
+    const [isSubmitted, setIsSubmitted] = useState(false);
+
+    const {
+        register,
+        handleSubmit,
+        watch,
+        setValue,
+        formState: { errors }
+    } = useForm<CreatePaymentType>({
+        resolver: zodResolver(createPaymentSchema),
+        defaultValues: {
+            company_name: "Solit 03",
+            payment_method: "CASH" as const,
+            pickup_method: "DATANG",
+            source_platform: "Instagram",
+            customer_type: "UMUM" as const,
+            customer_name: "",
+            customer_phone: "",
+            laptop_id: "",
+            laptop_name: "",
+            unit_id: "",
+            serial_number: "",
+            pickup_date: "",
+            pickup_time: "",
+            amount: 0,
+        } as CreatePaymentType,
+    });
 
     const pickupMethod = watch("pickup_method");
     const other = selectedUnit
         ? rawDealPrice - (selectedUnit.selling_price || selectedLaptop?.selling_price || 0)
         : 0;
+
+    // ✅ Watch customer_type dari form
+    const watchedCustomerType = watch("customer_type");
+
+    // Update local state when form value changes
+    useEffect(() => {
+        if (watchedCustomerType && (watchedCustomerType === "UMUM" || watchedCustomerType === "RESELLER" || watchedCustomerType === "MITRA")) {
+            setCustomerType(watchedCustomerType);
+        }
+    }, [watchedCustomerType]);
 
     useEffect(() => {
         const fetchLaptops = async () => {
@@ -134,7 +165,7 @@ export default function CreatePaymentPage() {
             "customer_name", "customer_phone", "company_name",
             "source_platform", "pickup_method", "pickup_date",
             "pickup_time", "pickup_location", "payment_method",
-            "software_request", "notes", "amount",
+            "software_request", "notes", "amount", "customer_type", // ✅ tambah customer_type
         ] as const;
 
         fields.forEach(field => {
@@ -144,6 +175,7 @@ export default function CreatePaymentPage() {
         });
 
         if (draft._step) setStep(draft._step);
+        if (draft._customerType) setCustomerType(draft._customerType);
 
         if (draft._selectedLaptop) setSelectedLaptop(draft._selectedLaptop);
         if (draft._selectedUnit) {
@@ -174,18 +206,19 @@ export default function CreatePaymentPage() {
 
     const watchedFields = watch();
     useEffect(() => {
-        if (fromScan) return;
+        if (fromScan || isSubmitted) return;
 
         const draft = {
             ...watchedFields,
             _step: step,
+            _customerType: customerType,
             _selectedLaptop: selectedLaptop,
             _selectedUnit: selectedUnit,
             _rawDealPrice: rawDealPrice,
             _savedAt: new Date().toISOString(),
         };
         saveDraft(draft);
-    }, [watchedFields, step, selectedLaptop, selectedUnit, rawDealPrice]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [watchedFields, step, customerType, selectedLaptop, selectedUnit, rawDealPrice, isSubmitted]);
 
     // ── Jika dari scan: pre-load unit langsung ────────────────────────────────
     useEffect(() => {
@@ -238,7 +271,6 @@ export default function CreatePaymentPage() {
         try {
             const res = await fetch(`/api/laptops/${laptopId}/units`);
             const result = await res.json();
-            // Hanya tampilkan yang SIAP_JUAL
             const siap: UnitOption[] = (result.data || []).filter(
                 (u: UnitOption) => u.status === "SIAP_JUAL"
             );
@@ -375,6 +407,7 @@ export default function CreatePaymentPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...pendingSubmitData,
+                    customer_type: customerType,
                     unit_id: selectedUnit.id,
                     laptop_id: selectedLaptop?.id,
                     serial_number: selectedUnit.serial_number,
@@ -384,11 +417,17 @@ export default function CreatePaymentPage() {
                     longitude,
                     amount: rawDealPrice,
                     warranty_duration: warrantyDuration,
+                    is_ecommerce: isEcommerce,
+                    ecommerce_platform: isEcommerce ? ecommercePlatform : null,
+                    ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
                 }),
             });
             const result = await res.json();
             if (!result.success) { alert(result.message); return; }
+
+            setIsSubmitted(true);
             clearDraft();
+
             window.location.href = `/receipt/${result.invoice_number}`;
         } catch {
             alert("Terjadi kesalahan");
@@ -421,11 +460,9 @@ export default function CreatePaymentPage() {
 
     const stepLabels = ["Data Pembeli", "Laptop & Unit", "Pengambilan", "Pembayaran"];
 
-    // Step 2 di-skip jika dari scan (unit sudah pre-selected)
     const goToStep3 = () => setStep(3);
     const backFromStep3 = () => fromScan ? setStep(1) : setStep(2);
 
-    // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="max-w-lg mx-auto">
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -486,13 +523,53 @@ export default function CreatePaymentPage() {
                     <input type="hidden" {...register("laptop_name")} />
                     <input type="hidden" {...register("serial_number")} />
                     <input type="hidden" {...register("unit_id" as any)} />
+                    <input type="hidden" {...register("customer_type")} />
 
                     {/* ── STEP 1: Data Pembeli ── */}
                     {step === 1 && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
+
+                            {/* ✅ TAMBAHKAN: Pilihan Tipe Customer */}
+                            <div>
+                                <label className="text-xs text-gray-400 mb-1.5 block">Tipe Customer *</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { value: "UMUM", label: "Umum", icon: "👤", color: "bg-gray-50", description: "Pembeli biasa" },
+                                        { value: "RESELLER", label: "Reseller", icon: "🔄", color: "bg-blue-50", description: "Membeli untuk dijual kembali" },
+                                        { value: "MITRA", label: "Mitra", icon: "🤝", color: "bg-green-50", description: "Mitra bisnis Solit 03" }
+                                    ].map(option => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setCustomerType(option.value as any);
+                                                setValue("customer_type", option.value as any);
+                                            }}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${customerType === option.value
+                                                ? "border-[#1a1a2e] bg-[#1a1a2e]/5 ring-2 ring-[#1a1a2e]/20"
+                                                : "border-gray-200 bg-white hover:border-gray-300"
+                                                }`}
+                                        >
+                                            <span className="text-xl">{option.icon}</span>
+                                            <span className={`text-xs font-medium ${customerType === option.value
+                                                ? "text-[#1a1a2e]"
+                                                : "text-gray-600"
+                                                }`}>
+                                                {option.label}
+                                            </span>
+                                            <span className="text-[9px] text-gray-400">{option.description}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                {errors.customer_type && (
+                                    <p className="text-xs text-red-500 mt-1">{errors.customer_type.message}</p>
+                                )}
+                            </div>
+
                             <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />
                             <input type="tel" placeholder="No. WhatsApp *" className={inputClass} {...register("customer_phone")} />
+
                             <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Tahu Solit dari mana?</label>
                                 <select className={selectClass} {...register("source_platform")}>
@@ -500,13 +577,14 @@ export default function CreatePaymentPage() {
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
+                                {errors.source_platform && <p className="text-xs text-red-500 mt-1">{errors.source_platform.message}</p>}
                             </div>
+
                             <button
                                 type="button"
                                 onClick={() => {
                                     if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
                                     if (!watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
-                                    // Dari scan → langsung ke step 3 (unit sudah ada)
                                     fromScan ? setStep(3) : setStep(2);
                                 }}
                                 className={`w-full ${btnPrimary}`}
@@ -577,7 +655,6 @@ export default function CreatePaymentPage() {
                             {/* Info card unit yang dipilih */}
                             {selectedLaptop && selectedUnit && (
                                 <>
-                                    {/* Tombol clear */}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -636,11 +713,8 @@ export default function CreatePaymentPage() {
                         </>
                     )}
 
-
-
                     {/* Step 2 dari scan: tampilkan info unit yang sudah pre-selected */}
                     {step === 2 && fromScan && (
-                        // Ini tidak akan pernah muncul karena fromScan skip step 2
                         null
                     )}
 
@@ -699,14 +773,17 @@ export default function CreatePaymentPage() {
                                     <option value="DATANG">Datang ke toko</option>
                                     <option value="DIANTAR">Diantar</option>
                                 </select>
+                                {errors.pickup_method && <p className="text-xs text-red-500 mt-1">{errors.pickup_method.message}</p>}
                             </div>
                             <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Tanggal</label>
                                 <input type="date" className={inputClass} {...register("pickup_date")} />
+                                {errors.pickup_date && <p className="text-xs text-red-500 mt-1">{errors.pickup_date.message}</p>}
                             </div>
                             <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Jam</label>
                                 <input type="time" className={inputClass} {...register("pickup_time")} />
+                                {errors.pickup_time && <p className="text-xs text-red-500 mt-1">{errors.pickup_time.message}</p>}
                             </div>
                             {pickupMethod === "DIANTAR" && (
                                 <input type="text" placeholder="Alamat pengiriman" className={inputClass} {...register("pickup_location")} />
@@ -731,14 +808,91 @@ export default function CreatePaymentPage() {
                     {step === 4 && (
                         <>
                             <div>
+                                <label className="text-xs text-gray-400 mb-1.5 block">Jenis Penjualan</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce
+                                            ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        🏪 Offline / Langsung
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEcommerce(true)}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce
+                                            ? "bg-sky-600 text-white border-sky-600"
+                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        📦 E-Commerce
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ── Platform E-Commerce (muncul jika toggle aktif) ── */}
+                            {isEcommerce && (
+                                <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 space-y-3">
+                                    <p className="text-xs font-semibold text-sky-700 flex items-center gap-1.5">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 3H8l-2 4h12l-2-4z" />
+                                        </svg>
+                                        Transaksi E-Commerce — status PACKING sampai dana cair
+                                    </p>
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1.5 block">Platform *</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(["SHOPEE", "TOKOPEDIA", "TIKTOK", "LAZADA"] as const).map(p => (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => setEcommercePlatform(p)}
+                                                    className={`h-10 rounded-xl border text-xs font-semibold transition ${ecommercePlatform === p
+                                                        ? "bg-sky-600 text-white border-sky-600"
+                                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                        }`}
+                                                >
+                                                    {p === "SHOPEE" ? "🛍 Shopee"
+                                                        : p === "TOKOPEDIA" ? "🟢 Tokopedia"
+                                                            : p === "TIKTOK" ? "🎵 TikTok Shop"
+                                                                : "🟠 Lazada"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1.5 block">No. Order (opsional)</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Contoh: 240605ABCDEF"
+                                            className={inputClass}
+                                            value={ecommerceOrderId}
+                                            onChange={e => setEcommerceOrderId(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-start gap-2 bg-white/60 rounded-lg px-3 py-2 border border-sky-100">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2" className="flex-shrink-0 mt-0.5">
+                                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                                        </svg>
+                                        <p className="text-[10px] text-sky-700 leading-relaxed">
+                                            Dana dari {ecommercePlatform || "marketplace"} akan cair 1-3 hari kerja.
+                                            Konfirmasi PAID setelah dana masuk via tombol <strong>Cair</strong> di halaman transaksi.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            <div>
                                 <label className="text-xs text-gray-400 mb-1.5 block">Metode Pembayaran</label>
                                 <select className={selectClass} {...register("payment_method")}>
-                                    <option value="CASH">Cash</option>
+                                    <option value="QRIS">QRIS</option>
                                     <option value="TRANSFER">Transfer</option>
-                                    <option value="DP">DP</option>
-                                    <option value="CICILAN">Cicilan</option>
-                                    <option value="LAINNYA">Lainnya</option>
+                                    <option value="CASH">Cash</option>
                                 </select>
+                                {errors.payment_method && <p className="text-xs text-red-500 mt-1">{errors.payment_method.message}</p>}
                             </div>
 
                             <div>
@@ -749,7 +903,6 @@ export default function CreatePaymentPage() {
                                     Durasi Garansi
                                 </label>
                                 <div className="flex gap-2">
-                                    {/* Quick select */}
                                     {[7, 14, 30, 90].map(d => (
                                         <button
                                             key={d}
@@ -763,7 +916,6 @@ export default function CreatePaymentPage() {
                                             {d}h
                                         </button>
                                     ))}
-                                    {/* Custom input */}
                                     <div className="relative flex-1">
                                         <input
                                             type="number"
@@ -778,7 +930,6 @@ export default function CreatePaymentPage() {
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1.5">
                                     Garansi berlaku {warrantyDuration} hari sejak transaksi.
-                                    Teknisi akan mengelola detail garansi setelahnya.
                                 </p>
                             </div>
 
@@ -826,19 +977,17 @@ export default function CreatePaymentPage() {
                         </>
                     )}
                 </form>
+
                 {/* ── Modal Konfirmasi Transaksi ── */}
                 {showConfirmModal && selectedUnit && selectedLaptop && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        {/* Overlay */}
                         <div
                             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                             onClick={() => setShowConfirmModal(false)}
                         />
 
-                        {/* Modal */}
-                        <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[85vh]">
 
-                            {/* Header */}
                             <div className="bg-[#1a1a2e] px-5 py-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -853,10 +1002,7 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
-                            {/* Body — ringkasan transaksi */}
-                            <div className="px-5 py-4 space-y-3">
-
-                                {/* Total harga — hero */}
+                            <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
                                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex justify-between items-center">
                                     <div>
                                         <p className="text-xs text-emerald-600 font-medium">Total Pembayaran</p>
@@ -869,32 +1015,24 @@ export default function CreatePaymentPage() {
                                     </span>
                                 </div>
 
-                                {/* Detail rows */}
                                 <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                                     <ConfirmRow icon="👤" label="Pembeli" value={watch("customer_name") || "—"} />
+                                    {/* ✅ Tampilkan tipe customer */}
+                                    <ConfirmRow
+                                        icon={customerType === "RESELLER" ? "🔄" : customerType === "MITRA" ? "🤝" : "👤"}
+                                        label="Tipe"
+                                        value={customerType === "RESELLER" ? "Reseller" : customerType === "MITRA" ? "Mitra" : "Umum"}
+                                    />
                                     <ConfirmRow icon="📱" label="WhatsApp" value={watch("customer_phone") || "—"} />
                                     <div className="h-px bg-gray-200" />
                                     <ConfirmRow icon="💻" label="Laptop" value={selectedLaptop.laptop_name} bold />
-                                    <ConfirmRow
-                                        icon="🔢"
-                                        label="Serial Number"
-                                        value={selectedUnit.serial_number}
-                                        mono
-                                    />
-                                    <ConfirmRow
-                                        icon="⭐"
-                                        label="Grade"
-                                        value={`Grade ${selectedUnit.grade}`}
-                                    />
+                                    <ConfirmRow icon="🔢" label="Serial Number" value={selectedUnit.serial_number} mono />
+                                    <ConfirmRow icon="⭐" label="Grade" value={`Grade ${selectedUnit.grade}`} />
                                     {watch("software_request") && (
                                         <ConfirmRow icon="💿" label="Software" value={watch("software_request") || ""} />
                                     )}
                                     <div className="h-px bg-gray-200" />
-                                    <ConfirmRow
-                                        icon="📦"
-                                        label="Pengambilan"
-                                        value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"}
-                                    />
+                                    <ConfirmRow icon="📦" label="Pengambilan" value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"} />
                                     {watch("pickup_date") && (
                                         <ConfirmRow
                                             icon="📅"
@@ -908,26 +1046,40 @@ export default function CreatePaymentPage() {
                                         <ConfirmRow icon="⏰" label="Jam" value={watch("pickup_time") || ""} />
                                     )}
                                     <div className="h-px bg-gray-200" />
-                                    <ConfirmRow
-                                        icon="🛡️"
-                                        label="Garansi"
-                                        value={`${warrantyDuration} hari`}
-                                    />
+                                    <ConfirmRow icon="🛡️" label="Garansi" value={`${warrantyDuration} hari`} />
+                                    {isEcommerce && (
+                                        <>
+                                            <div className="h-px bg-gray-200" />
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-sm">📦</span>
+                                                    <span className="text-xs text-gray-400">E-Commerce</span>
+                                                </div>
+                                                <span className="text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                                    {ecommercePlatform}
+                                                </span>
+                                            </div>
+                                            {ecommerceOrderId && (
+                                                <ConfirmRow icon="🔢" label="No. Order" value={ecommerceOrderId} mono />
+                                            )}
+                                            <div className="text-[10px] text-sky-600 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                                                Status: <strong>PACKING</strong> — konfirmasi PAID setelah dana cair dari {ecommercePlatform}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
-                                {/* Warning */}
                                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                                     <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                     <p className="text-xs text-amber-700">
-                                        Transaksi yang sudah disimpan <span className="font-semibold">tidak dapat dibatalkan</span>. Pastikan semua data sudah benar.
+                                        Transaksi yang sudah disimpan <span className="font-semibold">tidak dapat dibatalkan</span>.
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Footer buttons */}
-                            <div className="px-5 pb-6 flex gap-3">
+                            <div className="px-5 pb-6 pt-3 flex gap-3 border-t border-gray-100 bg-white flex-shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirmModal(false)}
@@ -964,9 +1116,8 @@ export default function CreatePaymentPage() {
     );
 }
 
-function ConfirmRow({
-    icon, label, value, bold, mono
-}: {
+// ─── Helper Components ────────────────────────────────────────────────────────
+function ConfirmRow({ icon, label, value, bold, mono }: {
     icon: string;
     label: string;
     value: string;
@@ -1000,7 +1151,7 @@ function UnitInfoCard({
     unit: UnitOption;
     rawDealPrice: number;
     setRawDealPrice: (n: number) => void;
-    setValue: UseFormSetValue<CreatePaymentType>;
+    setValue: (name: any, value: any) => void;
     other: number;
     inputClass: string;
     canSeeMargin: boolean;
@@ -1013,7 +1164,6 @@ function UnitInfoCard({
 
     return (
         <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
-            {/* Laptop name + specs */}
             <div>
                 <p className="font-semibold text-[#1a1a2e] text-sm">{laptop.laptop_name}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
@@ -1030,7 +1180,6 @@ function UnitInfoCard({
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${gradeColor[unit.grade] || gradeColor.A}`}>
                         Grade {unit.grade}
                     </span>
-                    {/* Badge status */}
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${unit.status === "SIAP_JUAL"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : "bg-red-50 text-red-600 border-red-200"
@@ -1040,7 +1189,6 @@ function UnitInfoCard({
                 </div>
             </div>
 
-            {/* Kondisi */}
             {unit.condition_note && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     {unit.condition_note}
@@ -1056,7 +1204,6 @@ function UnitInfoCard({
                 </div>
             )}
 
-            {/* Harga Deal input */}
             <div>
                 <label className="text-xs text-gray-400 mb-1.5 block">Harga Deal *</label>
                 <input
@@ -1081,7 +1228,6 @@ function UnitInfoCard({
                 />
             </div>
 
-            {/* Selisih */}
             {rawDealPrice > 0 && (
                 <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
                     <span className="text-gray-500">Selisih</span>

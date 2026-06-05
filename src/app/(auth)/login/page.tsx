@@ -25,7 +25,7 @@ export default function Page() {
       });
       const result = await response.json();
 
-      if (!result.success) {
+      if (!result.success) {  
         setError(result.message || "Login gagal");
         return;
       }
