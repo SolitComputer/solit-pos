@@ -34,7 +34,7 @@ async function checkAttendanceWindowForUser(userId: string, supabaseAdmin: any):
       .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
     supabaseAdmin.from("user_date_schedule")
       .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
-      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(), // ← sekarang bisa dipakai
+      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(), 
   ]);
 
   const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";

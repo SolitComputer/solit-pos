@@ -20,7 +20,7 @@ const MAX_DISTANCE_METERS = 80;
 
 const SHIFT_CONFIG_CLIENT = {
   PAGI: { startH: 7,  startM: 30, endH: 12, endM: 0 },
-  SORE: { startH: 14, startM: 0,  endH: 23, endM: 0 },
+  SORE: { startH: 14, startM: 0,  endH: 18, endM: 0 },
 } as const;
 
 type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;

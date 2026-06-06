@@ -50,7 +50,7 @@ export const SHIFT_CONFIG = {
   SORE: {
     start: { h: 14, m: 0 },
     lateFrom: { h: 16, m: 0 },
-    end: { h: 23, m: 0 },
+    end: { h: 18, m: 0 },
   },
 } as const;
 
