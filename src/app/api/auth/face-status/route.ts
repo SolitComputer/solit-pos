@@ -4,13 +4,13 @@ import { verifyToken } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const ATTENDANCE_START_HOUR = 7;
-const ATTENDANCE_START_MIN  = 30;
-const ATTENDANCE_END_HOUR   = 12;
-const ATTENDANCE_END_MIN    = 0;
+const ATTENDANCE_START_MIN = 30;
+const ATTENDANCE_END_HOUR = 12;
+const ATTENDANCE_END_MIN = 0;
 
 function getMidnightWIB(): Date {
     const nowUTC = new Date();
-    const wibMs  = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+    const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
     const nowWIB = new Date(wibMs);
     return new Date(Date.UTC(
         nowWIB.getUTCFullYear(),
@@ -35,21 +35,21 @@ export async function GET() {
         );
 
         // ── Cookie checks ─────────────────────────────────────────────────────
-        const faceVerified    = cookieStore.get("face_verified")?.value;
-        const faceAttended    = cookieStore.get("face_attended")?.value;
-        const skipCookie      = cookieStore.get("attendance_skipped")?.value;
-        const dayOffCookie    = cookieStore.get("day_off_today")?.value;
+        const faceVerified = cookieStore.get("face_verified")?.value;
+        const faceAttended = cookieStore.get("face_attended")?.value;
+        const skipCookie = cookieStore.get("attendance_skipped")?.value;
+        const dayOffCookie = cookieStore.get("day_off_today")?.value;
 
         const alreadyFromCookie =
-            faceVerified  === user.id ||
-            faceAttended  === user.id ||
-            skipCookie    === user.id ||
-            dayOffCookie  === user.id;
+            faceVerified === user.id ||
+            faceAttended === user.id ||
+            skipCookie === user.id ||
+            dayOffCookie === user.id;
 
         // ── Waktu WIB ────────────────────────────────────────────────────────
-        const nowUTC   = new Date();
-        const wibMs    = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-        const nowWIB   = new Date(wibMs);
+        const nowUTC = new Date();
+        const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+        const nowWIB = new Date(wibMs);
         const todayDow = nowWIB.getUTCDay();
         const todayDate = nowWIB.toISOString().slice(0, 10); // YYYY-MM-DD
 
@@ -87,11 +87,11 @@ export async function GET() {
                 .single(),
         ]);
 
-        const isTodayDayOff   = Boolean(weeklyOff) || Boolean(specificOff);
-        const alreadyAttendedDB = Boolean(todaySuccess); 
+        const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
+        const alreadyAttendedDB = Boolean(todaySuccess);
         const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
         const start = ATTENDANCE_START_HOUR * 60 + ATTENDANCE_START_MIN;
-        const end   = ATTENDANCE_END_HOUR   * 60 + ATTENDANCE_END_MIN;
+        const end = ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
         const isAttendanceTime = total >= start && total <= end;
 
         const needEnroll = !userData?.face_embedding;
@@ -151,9 +151,9 @@ export async function POST() {
         const user = await verifyToken(token);
         if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-        const nowUTC  = new Date();
-        const wibMs   = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-        const nowWIB  = new Date(wibMs);
+        const nowUTC = new Date();
+        const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+        const nowWIB = new Date(wibMs);
         const midnight = new Date(Date.UTC(
             nowWIB.getUTCFullYear(),
             nowWIB.getUTCMonth(),

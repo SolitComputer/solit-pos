@@ -5,19 +5,15 @@ import { supabase } from "@/services/supabase";
 import { ROLE_DEFAULT_REDIRECT, UserRole } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
-// Admin client untuk bypass RLS saat insert login_logs
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ── Parse browser + OS dari User-Agent ───────────────────────────────────────
 function parseDevice(ua: string): string {
     if (!ua) return "Unknown Device";
-
     let os = "Unknown OS";
     let browser = "Unknown Browser";
-
     if (/Windows NT 10|Windows NT 11/i.test(ua)) os = "Windows 10/11";
     else if (/Windows NT 6\.3/i.test(ua)) os = "Windows 8.1";
     else if (/Windows NT 6\.1/i.test(ua)) os = "Windows 7";
@@ -26,18 +22,14 @@ function parseDevice(ua: string): string {
     else if (/iPhone/i.test(ua)) os = "iPhone";
     else if (/iPad/i.test(ua)) os = "iPad";
     else if (/Linux/i.test(ua)) os = "Linux";
-
-    // Urutan penting: Edge & Opera pakai Chrome engine
     if (/Edg\//i.test(ua)) browser = "Edge";
     else if (/OPR\//i.test(ua)) browser = "Opera";
     else if (/Chrome\//i.test(ua)) browser = "Chrome";
     else if (/Firefox\//i.test(ua)) browser = "Firefox";
     else if (/Safari\//i.test(ua)) browser = "Safari";
-
     return `${browser} — ${os}`;
 }
 
-// ── Catat login log (fire and forget, tidak memblokir response) ───────────────
 function recordLoginLog(payload: {
     user_id: string | null;
     user_name: string;
@@ -50,10 +42,20 @@ function recordLoginLog(payload: {
     (async () => {
         try {
             await supabaseAdmin.from("login_logs").insert(payload);
-        } catch {
-            // Non-critical, ignore error
-        }
+        } catch { }
     })();
+}
+
+function getMidnightWIB(): Date {
+    const nowUTC = new Date();
+    const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+    const nowWIB = new Date(wibMs);
+    return new Date(Date.UTC(
+        nowWIB.getUTCFullYear(),
+        nowWIB.getUTCMonth(),
+        nowWIB.getUTCDate() + 1,
+        17, 0, 0 
+    ));
 }
 
 export async function POST(request: Request) {
@@ -61,14 +63,12 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { email, password } = body;
 
-        // Ambil device & IP dari request headers
         const ua = request.headers.get("user-agent") ?? "";
         const device = parseDevice(ua);
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
             ?? request.headers.get("x-real-ip")
             ?? "Unknown";
 
-        // ── Cari user ─────────────────────────────────────────────────────────
         const { data: user, error } = await supabase
             .from("users")
             .select("*")
@@ -76,7 +76,6 @@ export async function POST(request: Request) {
             .single();
 
         if (error || !user) {
-            // Catat: email tidak ditemukan
             recordLoginLog({
                 user_id: null,
                 user_name: email ?? "Unknown",
@@ -86,18 +85,14 @@ export async function POST(request: Request) {
                 ip_address: ip,
                 status: "FAILED",
             });
-
             return NextResponse.json(
                 { success: false, message: "Email tidak ditemukan" },
                 { status: 400 }
             );
         }
 
-        // ── Check password ────────────────────────────────────────────────────
         const isMatch = await bcrypt.compare(password, user.password);
-
         if (!isMatch) {
-            // Catat: password salah — user ditemukan tapi salah password
             recordLoginLog({
                 user_id: user.id,
                 user_name: user.name,
@@ -107,23 +102,18 @@ export async function POST(request: Request) {
                 ip_address: ip,
                 status: "FAILED",
             });
-
             return NextResponse.json(
                 { success: false, message: "Password salah" },
                 { status: 400 }
             );
         }
 
-        // ── Generate JWT ──────────────────────────────────────────────────────
         const token = jwt.sign(
             { id: user.id, name: user.name, role: user.role },
             process.env.JWT_SECRET || "secret",
             { expiresIn: "7d" }
         );
 
-        console.log("LOGIN SUCCESS:", user.role);
-
-        // ── Catat: login berhasil ─────────────────────────────────────────────
         recordLoginLog({
             user_id: user.id,
             user_name: user.name,
@@ -134,18 +124,43 @@ export async function POST(request: Request) {
             status: "SUCCESS",
         });
 
-        // ── Set cookie & response ─────────────────────────────────────────────
+        const nowUTC = new Date();
+        const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+        const nowWIB = new Date(wibMs);
+        const todayDate = nowWIB.toISOString().slice(0, 10); 
+
+        const { data: todaySuccess } = await supabaseAdmin
+            .from("face_verifications")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("status", "SUCCESS")
+            .gte("created_at", `${todayDate}T00:00:00+07:00`)
+            .lte("created_at", `${todayDate}T23:59:59+07:00`)
+            .maybeSingle();
+
+        const todayDow = nowWIB.getUTCDay();
+        const [{ data: weeklyOff }, { data: specificOff }] = await Promise.all([
+            supabaseAdmin
+                .from("user_day_off")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("day_of_week", todayDow)
+                .maybeSingle(),
+            supabaseAdmin
+                .from("user_date_off")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("off_date", todayDate)
+                .maybeSingle(),
+        ]);
+
+        const alreadyAttendedToday = Boolean(todaySuccess);
+        const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
+
         const redirect = ROLE_DEFAULT_REDIRECT[user.role as UserRole] ?? "/dashboard";
 
         const response = NextResponse.json(
-            {
-                success: true,
-                redirect,
-                user: {
-                    name: user.name,
-                    role: user.role,
-                },
-            },
+            { success: true, redirect, user: { name: user.name, role: user.role } },
             { status: 200 }
         );
 
@@ -156,6 +171,24 @@ export async function POST(request: Request) {
             path: "/",
             maxAge: 60 * 60 * 24 * 7,
         });
+
+        const cookieExpiry = getMidnightWIB();
+        const cookieOptions = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax" as const,
+            path: "/",
+            expires: cookieExpiry,
+        };
+
+        if (alreadyAttendedToday) {
+            response.cookies.set("face_attended", user.id, cookieOptions);
+            response.cookies.set("face_verified", user.id, cookieOptions);
+        }
+
+        if (isTodayDayOff) {
+            response.cookies.set("day_off_today", user.id, cookieOptions);
+        }
 
         return response;
 
