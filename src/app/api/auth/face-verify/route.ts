@@ -20,29 +20,39 @@ async function checkAttendanceWindowForUser(userId: string, supabaseAdmin: any):
   openAt: string;
   closeAt: string;
   shift: ShiftType;
+  schedule: import("@/lib/auth").DaySchedule;
 }> {
-  const { data } = await supabaseAdmin
-    .from("users")
-    .select("shift")
-    .eq("id", userId)
-    .single();
+  const nowUTC   = new Date();
+  const nowWIB   = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
+  const todayDow  = nowWIB.getUTCDay();
+  const todayDate = nowWIB.toISOString().slice(0, 10); 
 
-  const shift: ShiftType = (data?.shift as ShiftType) ?? "PAGI";
-  const cfg = SHIFT_CONFIG[shift];
+  const [{ data: userData }, { data: customData }, { data: dateData }] = await Promise.all([
+    supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
+    supabaseAdmin.from("user_schedule")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
+    supabaseAdmin.from("user_date_schedule")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(), // ← sekarang bisa dipakai
+  ]);
 
-  const nowUTC = new Date();
-  const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
+  const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
+  const { resolveSchedule } = await import("@/lib/auth");
+  const schedule = resolveSchedule(shift, dateData ?? customData);
+
   const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start = cfg.start.h * 60 + cfg.start.m;
-  const end = cfg.end.h * 60 + cfg.end.m;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const openAt = `${pad(cfg.start.h)}:${pad(cfg.start.m)} WIB`;
-  const closeAt = `${pad(cfg.end.h)}:${pad(cfg.end.m)} WIB`;
+  const start = schedule.start.h * 60 + schedule.start.m;
+  const end   = schedule.end.h   * 60 + schedule.end.m;
+  const pad   = (n: number) => String(n).padStart(2, "0");
+  const openAt  = `${pad(schedule.start.h)}:${pad(schedule.start.m)} WIB`;
+  const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
 
-  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt, shift };
-  if (total > end) return { allowed: false, reason: "TOO_LATE", openAt, closeAt, shift };
-  return { allowed: true, reason: "OPEN", openAt, closeAt, shift };
+  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt, shift, schedule };
+  if (total > end)   return { allowed: false, reason: "TOO_LATE",  openAt, closeAt, shift, schedule };
+  return               { allowed: true,  reason: "OPEN",      openAt, closeAt, shift, schedule };
 }
+
 
 function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
@@ -111,10 +121,12 @@ export async function POST(request: Request) {
       .single();
 
     const userShift: ShiftType = (userFullData?.shift as ShiftType) ?? "PAGI";
-    const { weight, status: attendanceStatus } = calcAttendanceWeight(
+    const { calcAttendanceWeightFromSchedule } = await import("@/lib/auth");
+    const { weight, status: attendanceStatus } = calcAttendanceWeightFromSchedule(
       new Date().toISOString(),
-      userShift
+      timeCheck.schedule   
     );
+
 
     const nowWIB = new Date(Date.now() + 7 * 3600_000);
     const todayDate = nowWIB.toISOString().slice(0, 10);

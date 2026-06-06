@@ -8,20 +8,20 @@ export default function Page() {
   const [stage, setStage] = useState<LoginStage>("login");
 
   // Login form
-  const [phone, setPhone]       = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw]     = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Set password form
-  const [userId, setUserId]           = useState("");
-  const [newPw, setNewPw]             = useState("");
-  const [confirmPw, setConfirmPw]     = useState("");
-  const [showNewPw, setShowNewPw]     = useState(false);
-  const [pwLoading, setPwLoading]     = useState(false);
-  const [pwError, setPwError]         = useState("");
-  const [pwSuccess, setPwSuccess]     = useState("");
+  const [userId, setUserId] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
 
   const handleLogin = async () => {
     setError("");
@@ -29,13 +29,18 @@ export default function Page() {
       setError("Nomor WA dan password wajib diisi");
       return;
     }
+    if (phone.length < 8) {
+      setError("Nomor WA terlalu pendek");
+      return;
+    }
     try {
       setLoading(true);
+      const fullPhone = "0" + phone;
       const res = await fetch("/api/auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone: fullPhone, password }),
       });
       const result = await res.json();
 
@@ -63,8 +68,8 @@ export default function Page() {
   const handleSetPassword = async () => {
     setPwError(""); setPwSuccess("");
     if (!newPw || !confirmPw) { setPwError("Semua field wajib"); return; }
-    if (newPw !== confirmPw)  { setPwError("Password tidak cocok"); return; }
-    if (newPw.length < 6)     { setPwError("Minimal 6 karakter"); return; }
+    if (newPw !== confirmPw) { setPwError("Password tidak cocok"); return; }
+    if (newPw.length < 6) { setPwError("Minimal 6 karakter"); return; }
 
     try {
       setPwLoading(true);
@@ -140,18 +145,34 @@ export default function Page() {
                 <div>
                   <label className="text-white/50 text-xs font-semibold mb-2 block uppercase tracking-wider flex items-center gap-1">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.09 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+                      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.09 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                     </svg>
                     Nomor WhatsApp
                   </label>
-                  <input
-                    type="tel"
-                    placeholder="contoh: 08123456789"
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl h-12 px-4 text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-purple-500/50 focus:bg-white/[0.08] focus:ring-1 focus:ring-purple-500/30 transition-all duration-300"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                  />
+                  <div className="relative flex items-center">
+                    <div className="absolute left-4 text-white/40 text-sm font-mono select-none pointer-events-none z-10">
+                      0
+                    </div>
+                    <input
+                      type="tel"
+                      placeholder="8xxxxxxxxxx"
+                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl h-12 pl-8 pr-4 text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-purple-500/50 focus:bg-white/[0.08] focus:ring-1 focus:ring-purple-500/30 transition-all duration-300 font-mono"
+                      value={phone}
+                      onChange={e => {
+                        let digits = e.target.value.replace(/\D/g, "");
+                        // Kalau paste nomor lengkap, strip semua prefix
+                        if (digits.startsWith("628")) digits = digits.slice(2);
+                        else if (digits.startsWith("62")) digits = digits.slice(2);
+                        else if (digits.startsWith("08")) digits = digits.slice(1);
+                        else if (digits.startsWith("0")) digits = digits.slice(1);
+                        setPhone(digits.slice(0, 13));
+                      }}
+                      onKeyDown={handleKeyDown}
+                    />
+                  </div>
+                  <p className="text-white/20 text-[10px] mt-1.5 ml-1">
+                    Contoh: 8 1 2 3 4 5 6 7 8 9 0 (nomor setelah 0)
+                  </p>
                 </div>
 
                 {/* Password */}
@@ -175,13 +196,13 @@ export default function Page() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 transition-all duration-200">
                       {showPw ? (
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
-                          <line x1="1" y1="1" x2="23" y2="23"/>
+                          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
                         </svg>
                       ) : (
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
                         </svg>
                       )}
                     </button>
@@ -192,7 +213,7 @@ export default function Page() {
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl blur opacity-40 group-hover:opacity-70 transition duration-300" />
                   <div className="relative w-full bg-white rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 hover:bg-white/95 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                     {loading ? (
-                      <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Memproses...</>
+                      <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Memproses...</>
                     ) : "Masuk ke Dashboard"}
                   </div>
                 </button>
@@ -236,8 +257,8 @@ export default function Page() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 transition-all">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         {showNewPw
-                          ? <><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>
-                          : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>
+                          ? <><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>
+                          : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>
                         }
                       </svg>
                     </button>
@@ -260,7 +281,7 @@ export default function Page() {
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-green-600 to-teal-600 rounded-xl blur opacity-40 group-hover:opacity-70 transition duration-300" />
                   <div className="relative w-full bg-white rounded-xl h-12 font-semibold text-sm text-[#03030a] flex items-center justify-center gap-2 hover:bg-white/95 active:scale-[0.98] transition-all duration-200 disabled:opacity-50">
                     {pwLoading ? (
-                      <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Menyimpan...</>
+                      <><svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Menyimpan...</>
                     ) : "Simpan Password"}
                   </div>
                 </button>

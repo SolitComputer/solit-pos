@@ -14,7 +14,7 @@ export interface AuthUser {
   id: string;
   name: string;
   role: import("@/lib/permissions").UserRole;
-  shift?: "PAGI" | "SORE"; 
+  shift?: "PAGI" | "SORE";
 }
 
 const getSecret = () =>
@@ -43,37 +43,86 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
 
 export const SHIFT_CONFIG = {
   PAGI: {
-    start:    { h: 7,  m: 30 },
-    lateFrom: { h: 8,  m: 0  },   
-    end:      { h: 12, m: 0  },
+    start: { h: 7, m: 30 },
+    lateFrom: { h: 8, m: 0 },
+    end: { h: 12, m: 0 },
   },
   SORE: {
-    start:    { h: 14, m: 0  },
-    lateFrom: { h: 16, m: 0  },   
-    end:      { h: 18, m: 0  },
+    start: { h: 14, m: 0 },
+    lateFrom: { h: 16, m: 0 },
+    end: { h: 23, m: 0 },
   },
 } as const;
 
+export interface DaySchedule {
+  start: { h: number; m: number };
+  lateFrom: { h: number; m: number };
+  end: { h: number; m: number };
+  source: "custom" | "shift";
+}
+
+
 export type ShiftType = keyof typeof SHIFT_CONFIG;
+
+export function resolveSchedule(
+  shift: ShiftType,
+  customSchedule?: {
+    start_hour: number; start_minute: number;
+    late_hour: number; late_minute: number;
+    end_hour: number; end_minute: number;
+  } | null
+): DaySchedule {
+  if (customSchedule) {
+    return {
+      start: { h: customSchedule.start_hour, m: customSchedule.start_minute },
+      lateFrom: { h: customSchedule.late_hour, m: customSchedule.late_minute },
+      end: { h: customSchedule.end_hour, m: customSchedule.end_minute },
+      source: "custom",
+    };
+  }
+  const cfg = SHIFT_CONFIG[shift];
+  return {
+    start: cfg.start,
+    lateFrom: cfg.lateFrom,
+    end: cfg.end,
+    source: "shift",
+  };
+}
 
 export function isAttendanceTimeForShift(shift: ShiftType = "PAGI"): boolean {
   const cfg = SHIFT_CONFIG[shift];
   const nowUTC = new Date();
   const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
-  const total  = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start  = cfg.start.h * 60 + cfg.start.m;
-  const end    = cfg.end.h * 60 + cfg.end.m;
+  const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
+  const start = cfg.start.h * 60 + cfg.start.m;
+  const end = cfg.end.h * 60 + cfg.end.m;
   return total >= start && total <= end;
 }
 
 export function isAttendanceTime(shift: "PAGI" | "SORE" = "PAGI"): boolean {
-  const cfg    = SHIFT_CONFIG[shift];
+  const cfg = SHIFT_CONFIG[shift];
   const nowUTC = new Date();
   const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
-  const total  = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start  = cfg.start.h * 60 + cfg.start.m;
-  const end    = cfg.end.h   * 60 + cfg.end.m;
+  const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
+  const start = cfg.start.h * 60 + cfg.start.m;
+  const end = cfg.end.h * 60 + cfg.end.m;
   return total >= start && total <= end;
+}
+
+export function calcAttendanceWeightFromSchedule(
+  checkInISO: string,
+  schedule: DaySchedule
+): { weight: 1 | 0.5 | 0; status: "TEPAT" | "TERLAMBAT" | "DI_LUAR" } {
+  const checkIn = new Date(checkInISO);
+  const wib = new Date(checkIn.getTime() + 7 * 60 * 60 * 1000);
+  const total = wib.getUTCHours() * 60 + wib.getUTCMinutes();
+  const start = schedule.start.h * 60 + schedule.start.m;
+  const late = schedule.lateFrom.h * 60 + schedule.lateFrom.m;
+  const end = schedule.end.h * 60 + schedule.end.m;
+
+  if (total < start || total > end) return { weight: 0, status: "DI_LUAR" };
+  if (total >= late) return { weight: 0.5, status: "TERLAMBAT" };
+  return { weight: 1, status: "TEPAT" };
 }
 
 export function calcAttendanceWeight(
@@ -82,16 +131,16 @@ export function calcAttendanceWeight(
 ): { weight: 1 | 0.5 | 0; status: "TEPAT" | "TERLAMBAT" | "DI_LUAR" } {
   const cfg = SHIFT_CONFIG[shift];
   const checkIn = new Date(checkInISO);
-  const wibMs   = checkIn.getTime() + 7 * 60 * 60 * 1000;
-  const wib     = new Date(wibMs);
-  const total   = wib.getUTCHours() * 60 + wib.getUTCMinutes();
-  const start   = cfg.start.h * 60 + cfg.start.m;
-  const late    = cfg.lateFrom.h * 60 + cfg.lateFrom.m;
-  const end     = cfg.end.h * 60 + cfg.end.m;
+  const wibMs = checkIn.getTime() + 7 * 60 * 60 * 1000;
+  const wib = new Date(wibMs);
+  const total = wib.getUTCHours() * 60 + wib.getUTCMinutes();
+  const start = cfg.start.h * 60 + cfg.start.m;
+  const late = cfg.lateFrom.h * 60 + cfg.lateFrom.m;
+  const end = cfg.end.h * 60 + cfg.end.m;
 
-  if (total < start || total > end) return { weight: 0,   status: "DI_LUAR" };
-  if (total >= late)                 return { weight: 0.5, status: "TERLAMBAT" };
-  return                                    { weight: 1,   status: "TEPAT" };
+  if (total < start || total > end) return { weight: 0, status: "DI_LUAR" };
+  if (total >= late) return { weight: 0.5, status: "TERLAMBAT" };
+  return { weight: 1, status: "TEPAT" };
 }
 
 export function getAttendanceExpiry(): Date {
@@ -138,4 +187,4 @@ export function withAuth(
 
 // Deprecated aliases
 export function getFaceVerifiedExpiry() { return getAttendanceExpiry(); }
-export function isManualAllowedDay()    { return false; }
+export function isManualAllowedDay() { return false; }

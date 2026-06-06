@@ -1,3 +1,4 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -19,21 +20,21 @@ const FACE_API_WHITELIST = [
   "/api/auth/me",
   "/api/auth/logout",
   "/api/auth/login",
+  "/api/auth/set-password",
 ];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 
 function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
-  const faceAttended = request.cookies.get("face_attended")?.value;
-  const faceVerified = request.cookies.get("face_verified")?.value;
+  const faceAttended      = request.cookies.get("face_attended")?.value;
+  const faceVerified      = request.cookies.get("face_verified")?.value;
   const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-  const dayOffToday = request.cookies.get("day_off_today")?.value;
-
+  const dayOffToday       = request.cookies.get("day_off_today")?.value;
   return (
-    faceAttended === userId ||
-    faceVerified === userId ||
+    faceAttended      === userId ||
+    faceVerified      === userId ||
     attendanceSkipped === userId ||
-    dayOffToday === userId
+    dayOffToday       === userId
   );
 }
 
@@ -41,12 +42,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
+  // ── Public routes ──────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
         const hasAttended = hasAttendanceBypass(request, user.id);
-        if (isAttendanceTime() && !hasAttended) {
+        // ✅ FIX: baca shift dari JWT token, bukan hardcode default
+        const userShift = (user as any).shift ?? "PAGI";
+        if (isAttendanceTime(userShift) && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -66,9 +70,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/face-verify")) {
-    if (!token) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+    if (!token) return NextResponse.redirect(new URL("/login", request.url));
     return NextResponse.next();
   }
 
@@ -77,9 +79,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
-    if (!token) {
-      return NextResponse.json({ success: false }, { status: 401 });
-    }
+    if (!token) return NextResponse.json({ success: false }, { status: 401 });
     return NextResponse.next();
   }
 
@@ -96,15 +96,19 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // ── Protected routes: cek attendance ─────────────────────────────────────
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     const hasAttended = hasAttendanceBypass(request, user.id);
-    if (isAttendanceTime() && !hasAttended) {
+    // ✅ FIX: baca shift dari JWT, bukan default
+    const userShift = (user as any).shift ?? "PAGI";
+    if (isAttendanceTime(userShift) && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
   }
 
+  // ── Route permission check ─────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
@@ -119,9 +123,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  response.headers.set("x-user-id", user.id);
-  response.headers.set("x-user-role", user.role);
-  response.headers.set("x-user-name", user.name);
+  response.headers.set("x-user-id",   user.id);
+  response.headers.set("x-user-role",  user.role);
+  response.headers.set("x-user-name",  user.name);
   return response;
 }
 
@@ -141,5 +145,6 @@ export const config = {
     "/api/warranty/:path*",
     "/api/reports/:path*",
     "/dashboard/warranty/:path*",
+    "/api/attendance/:path*",
   ],
 };

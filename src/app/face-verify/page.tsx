@@ -18,10 +18,9 @@ const COMPANY_LAT         = -6.402123;
 const COMPANY_LNG         = 106.787296;
 const MAX_DISTANCE_METERS = 80;
 
-// ── Shift config (mirror dari server, tanpa import) ────────────────────────
 const SHIFT_CONFIG_CLIENT = {
   PAGI: { startH: 7,  startM: 30, endH: 12, endM: 0 },
-  SORE: { startH: 14, startM: 0,  endH: 18, endM: 0 },
+  SORE: { startH: 14, startM: 0,  endH: 23, endM: 0 },
 } as const;
 
 type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;
@@ -34,7 +33,6 @@ type AttendanceTimeResult =
   | { allowed: true;  reason: "OPEN";                   openAt: string; closeAt: string }
   | { allowed: false; reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string };
 
-// ✅ FIX: terima parameter shift, tidak hardcode
 function isAttendanceTimeClient(shift: ShiftType): AttendanceTimeResult {
   const cfg    = SHIFT_CONFIG_CLIENT[shift];
   const nowUTC = new Date();
