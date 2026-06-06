@@ -53,7 +53,7 @@ function isLate(t: string): boolean {
     return d.getUTCHours() * 60 + d.getUTCMinutes() > ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
 }
 function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" {
-    if (a.status === "LATE") return "LATE";
+    if (a.method === "FORCE") return "PRESENT";
     if (isLate(a.check_in_time || a.created_at)) return "LATE";
     return "PRESENT";
 }
@@ -473,9 +473,18 @@ export default function AttendanceDashboardPage() {
     const fetchAttendance = async () => {
         setLoading(true);
         try {
-            const r = await fetch("/api/attendance"); const d = await r.json();
-            if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a) })));
-        } catch { } finally { setLoading(false); }
+            const r = await fetch("/api/attendance");
+            const d = await r.json();
+            if (d.success) {
+                setAttendances(
+                    (d.data || []).map((a: Attendance) => ({
+                        ...a,
+                        displayStatus: getDisplayStatus(a),
+                    }))
+                );
+            }
+        } catch { }
+        finally { setLoading(false); }
     };
     const fetchDayOffs = async () => {
         try { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); } catch { }

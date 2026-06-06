@@ -17,7 +17,6 @@ export async function GET(request: Request) {
       );
     }
 
-    // ✅ Build query berdasarkan role
     let query = supabase
       .from("face_verifications")
       .select(`
@@ -28,6 +27,7 @@ export async function GET(request: Request) {
           role
         )
       `)
+      .in("status", ["SUCCESS", "SKIPPED_MANUAL"])
       .order("created_at", { ascending: false });
 
     if (user.role !== "ADMIN") {
@@ -51,12 +51,7 @@ export async function GET(request: Request) {
         user_role: item.users?.role || "STAFF",
         date: item.created_at,
         check_in_time: item.created_at,
-        status:
-          item.status === "SUCCESS"
-            ? "PRESENT"
-            : item.status === "SKIPPED_MANUAL"
-            ? "PRESENT"
-            : "LATE",
+        status: item.status === "SUCCESS" ? "PRESENT" : "PRESENT",
         method: item.status === "SUCCESS" ? "FACE" : "FORCE",
         latitude: item.latitude,
         longitude: item.longitude,

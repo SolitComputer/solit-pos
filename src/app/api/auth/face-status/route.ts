@@ -35,10 +35,10 @@ export async function GET() {
         );
 
         // ── Cookie checks ─────────────────────────────────────────────────────
-        const faceVerified = cookieStore.get("face_verified")?.value;
-        const faceAttended = cookieStore.get("face_attended")?.value;
-        const skipCookie   = cookieStore.get("attendance_skipped")?.value;
-        const dayOffCookie = cookieStore.get("day_off_today")?.value;
+        const faceVerified    = cookieStore.get("face_verified")?.value;
+        const faceAttended    = cookieStore.get("face_attended")?.value;
+        const skipCookie      = cookieStore.get("attendance_skipped")?.value;
+        const dayOffCookie    = cookieStore.get("day_off_today")?.value;
 
         const alreadyFromCookie =
             faceVerified  === user.id ||
@@ -47,14 +47,19 @@ export async function GET() {
             dayOffCookie  === user.id;
 
         // ── Waktu WIB ────────────────────────────────────────────────────────
-        const nowUTC      = new Date();
-        const wibMs       = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-        const nowWIB      = new Date(wibMs);
-        const todayDow    = nowWIB.getUTCDay();                   // 0=Min..6=Sab
-        const todayDate   = nowWIB.toISOString().slice(0, 10);   // YYYY-MM-DD
+        const nowUTC   = new Date();
+        const wibMs    = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+        const nowWIB   = new Date(wibMs);
+        const todayDow = nowWIB.getUTCDay();
+        const todayDate = nowWIB.toISOString().slice(0, 10); // YYYY-MM-DD
 
-        // ── Cek libur: mingguan + tanggal spesifik secara paralel ────────────
-        const [{ data: weeklyOff }, { data: specificOff }] = await Promise.all([
+        // ── Cek libur & DB paralel ───────────────────────────────────────────
+        const [
+            { data: weeklyOff },
+            { data: specificOff },
+            { data: todaySuccess },
+            { data: userData },
+        ] = await Promise.all([
             supabase
                 .from("user_day_off")
                 .select("id")
@@ -67,25 +72,31 @@ export async function GET() {
                 .eq("user_id", user.id)
                 .eq("off_date", todayDate)
                 .maybeSingle(),
+            supabase
+                .from("face_verifications")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("status", "SUCCESS")
+                .gte("created_at", `${todayDate}T00:00:00+07:00`)
+                .lte("created_at", `${todayDate}T23:59:59+07:00`)
+                .maybeSingle(),
+            supabase
+                .from("users")
+                .select("face_embedding")
+                .eq("id", user.id)
+                .single(),
         ]);
 
-        const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
-
-        // ── Cek jam absen ────────────────────────────────────────────────────
+        const isTodayDayOff   = Boolean(weeklyOff) || Boolean(specificOff);
+        const alreadyAttendedDB = Boolean(todaySuccess); 
         const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
         const start = ATTENDANCE_START_HOUR * 60 + ATTENDANCE_START_MIN;
         const end   = ATTENDANCE_END_HOUR   * 60 + ATTENDANCE_END_MIN;
         const isAttendanceTime = total >= start && total <= end;
 
-        // ── Cek face enrollment ──────────────────────────────────────────────
-        const { data: userData } = await supabase
-            .from("users")
-            .select("face_embedding")
-            .eq("id", user.id)
-            .single();
+        const needEnroll = !userData?.face_embedding;
 
-        const needEnroll    = !userData?.face_embedding;
-        const alreadyAttended = alreadyFromCookie || isTodayDayOff;
+        const alreadyAttended = alreadyFromCookie || isTodayDayOff || alreadyAttendedDB;
 
         const response = NextResponse.json({
             success: true,
@@ -95,10 +106,27 @@ export async function GET() {
             isTodayDayOff,
         });
 
-        // ── Set cookie day_off_today jika belum ada ──────────────────────────
         if (isTodayDayOff && dayOffCookie !== user.id) {
             const expiry = getMidnightWIB();
             response.cookies.set("day_off_today", user.id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                path: "/",
+                expires: expiry,
+            });
+        }
+
+        if (alreadyAttendedDB && faceAttended !== user.id) {
+            const expiry = getMidnightWIB();
+            response.cookies.set("face_attended", user.id, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                path: "/",
+                expires: expiry,
+            });
+            response.cookies.set("face_verified", user.id, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
