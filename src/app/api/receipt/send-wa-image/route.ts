@@ -14,18 +14,22 @@ export async function POST(req: NextRequest) {
 
         const caption = `🧾 Struk pembayaran invoice *${invoice}*\nTerima kasih sudah berbelanja di *Solit 03* 🙏`;
 
-        // ✅ Pakai FormData, bukan JSON — Fonnte wajib FormData untuk kirim media
         const formData = new FormData();
         formData.append("target", normalized);
         formData.append("message", caption);
-        formData.append("url", imageUrl);          // URL gambar dari Supabase
+        formData.append("url", imageUrl);
         formData.append("filename", `struk-${invoice}.jpg`);
+
+        const FONNTE_TOKEN = process.env.WHATSAPP_API_KEY;
+        if (!FONNTE_TOKEN) {
+            console.error("[send-wa-image] WHATSAPP_API_KEY tidak ditemukan di env");
+            return NextResponse.json({ success: false, message: "API key not configured" });
+        }
 
         const res = await fetch("https://api.fonnte.com/send", {
             method: "POST",
             headers: {
-                Authorization: process.env.WHATSAPP_API_KEY || "",
-                // ✅ Jangan set Content-Type manual — biar browser/Node set boundary otomatis
+                Authorization: FONNTE_TOKEN,
             },
             body: formData,
         });
@@ -34,15 +38,16 @@ export async function POST(req: NextRequest) {
         console.log("[send-wa-image] Fonnte response:", result);
 
         if (!res.ok || result.status === false) {
-            return NextResponse.json({ 
-                success: false, 
-                message: result.reason || "Fonnte error" 
+            return NextResponse.json({
+                success: false,
+                message: result.reason || result.message || "Fonnte error",
+                detail: result,
             });
         }
 
         return NextResponse.json({ success: true });
     } catch (err) {
         console.error("[send-wa-image] Error:", err);
-        return NextResponse.json({ success: false, message: "Internal error" });
+        return NextResponse.json({ success: false, message: String(err) });
     }
 }

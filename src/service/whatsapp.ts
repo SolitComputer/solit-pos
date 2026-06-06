@@ -1,7 +1,3 @@
-/**
- * Kirim pesan WhatsApp via Fonnte API
- * Pengirim: nomor CS Solit (089680400022) yang terdaftar di Fonnte
- */
 export async function sendWhatsapp(
   target: string,
   message: string
@@ -32,14 +28,12 @@ export async function sendWhatsapp(
       const res = await fetch("https://api.fonnte.com/send", {
         method: "POST",
         headers: {
-          // Token device 089680400022 dari .env.local
           Authorization: process.env.WHATSAPP_API_KEY ?? "",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           target: normalized,
           message: message,
-          // Opsional: delay antar pesan jika bulk (dalam detik)
           delay: "2",
         }),
         signal: controller.signal,
