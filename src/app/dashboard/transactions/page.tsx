@@ -131,7 +131,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     HELD: "DIAMBIL",
     PACKING: "PACKING",
   };
-  
+
   const statusMap: Record<string, string> = {
     PAID: "bg-green-100 text-green-800 border-green-300 shadow-sm",
     PENDING: "bg-yellow-100 text-yellow-800 border-yellow-300 shadow-sm",
@@ -155,7 +155,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     };
 
     const role = item.employee_role || getRoleFromName(name);
-    
+
     const getRoleStyle = () => {
       const roleLower = role.toLowerCase();
       if (roleLower.includes("admin")) return "bg-red-100 text-red-800 border-red-300";
@@ -189,29 +189,29 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   type PaymentStyle = { bg: string; text: string; border: string; icon: React.ReactNode };
   function getPaymentStyle(method: string): PaymentStyle {
     const m = (method ?? "").toUpperCase();
-    if (m.includes("TUNAI") || m.includes("CASH")) return { 
-      bg: "bg-emerald-100", 
-      text: "text-emerald-800", 
-      border: "border-emerald-300", 
-      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /><line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" /></svg> 
+    if (m.includes("TUNAI") || m.includes("CASH")) return {
+      bg: "bg-emerald-100",
+      text: "text-emerald-800",
+      border: "border-emerald-300",
+      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /><line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" /></svg>
     };
-    if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI") || m.includes("MANDIRI") || m.includes("BNI")) return { 
-      bg: "bg-blue-100", 
-      text: "text-blue-800", 
-      border: "border-blue-300", 
-      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg> 
+    if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI") || m.includes("MANDIRI") || m.includes("BNI")) return {
+      bg: "bg-blue-100",
+      text: "text-blue-800",
+      border: "border-blue-300",
+      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg>
     };
-    if (m.includes("QRIS") || m.includes("QR")) return { 
-      bg: "bg-purple-100", 
-      text: "text-purple-800", 
-      border: "border-purple-300", 
-      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h.01M14 17h.01M17 14h.01M17 17h3M20 14h.01M17 20h3" /></svg> 
+    if (m.includes("QRIS") || m.includes("QR")) return {
+      bg: "bg-purple-100",
+      text: "text-purple-800",
+      border: "border-purple-300",
+      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h.01M14 17h.01M17 14h.01M17 17h3M20 14h.01M17 20h3" /></svg>
     };
-    return { 
-      bg: "bg-gray-100", 
-      text: "text-gray-600", 
-      border: "border-gray-300", 
-      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> 
+    return {
+      bg: "bg-gray-100",
+      text: "text-gray-600",
+      border: "border-gray-300",
+      icon: <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
     };
   }
 
@@ -224,7 +224,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
-    
+
     if (d.toDateString() === now.toDateString()) return "Hari ini";
     if (d.toDateString() === yesterday.toDateString()) return "Kemarin";
     return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
@@ -309,7 +309,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           <div className="flex items-center gap-0.5 ml-auto">
             <span className="text-[7px] text-gray-400">📅</span>
             <span className="text-[8px] text-gray-500 flex-shrink-0">
-              {formatDate(item.created_at)}
+              {formatDate(item.paid_at || item.created_at)}
             </span>
           </div>
         </div>
@@ -486,13 +486,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               {item.status === "RESERVED" && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1">🔢 Serial Number <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    value={confirmSN} 
-                    onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }} 
-                    placeholder="Masukkan serial number unit..." 
-                    className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition" 
-                    autoFocus 
+                  <input
+                    type="text"
+                    value={confirmSN}
+                    onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
+                    placeholder="Masukkan serial number unit..."
+                    className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                    autoFocus
                   />
                 </div>
               )}
@@ -694,11 +694,10 @@ export default function Page() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition ${
-                hasActiveFilter 
-                  ? "bg-gray-800 text-white border-gray-800 shadow-sm" 
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition ${hasActiveFilter
+                  ? "bg-gray-800 text-white border-gray-800 shadow-sm"
                   : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
+                }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -743,15 +742,14 @@ export default function Page() {
                     { val: "MITRA", label: "Mitra", icon: "🤝", color: "indigo" },
                   ].map((ct) => (
                     <button key={ct.val} onClick={() => setCustomerType(ct.val)}
-                      className={`h-8 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1 ${
-                        customerType === ct.val 
-                          ? ct.color === "amber" 
-                            ? "bg-amber-500 text-white border-amber-500 shadow-sm" 
+                      className={`h-8 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1 ${customerType === ct.val
+                          ? ct.color === "amber"
+                            ? "bg-amber-500 text-white border-amber-500 shadow-sm"
                             : ct.color === "indigo"
-                            ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
-                            : "bg-gray-800 text-white border-gray-800 shadow-sm"
+                              ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
+                              : "bg-gray-800 text-white border-gray-800 shadow-sm"
                           : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                      }`}>
+                        }`}>
                       {ct.icon && <span>{ct.icon}</span>}
                       {ct.label}
                     </button>

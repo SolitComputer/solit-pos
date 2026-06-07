@@ -40,47 +40,49 @@ interface RankItem {
 }
 
 function getPreset(preset: string): { from: string; to: string } {
-  const today = new Date();
-  const pad   = (n: number) => String(n).padStart(2, "0");
-  const fmt   = (d: Date)   => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const todayStr = fmt(today);
+  const WIB = 7 * 60 * 60 * 1000;
+  const nowWIB = new Date(Date.now() + WIB);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) =>
+    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  const todayStr = fmt(nowWIB);
 
   if (preset === "today") {
     return { from: todayStr, to: todayStr };
   }
   if (preset === "yesterday") {
-    const y = new Date(today); y.setDate(y.getDate() - 1);
+    const y = new Date(nowWIB); y.setUTCDate(y.getUTCDate() - 1);
     const ys = fmt(y);
     return { from: ys, to: ys };
   }
   if (preset === "this_week") {
-    const mon = new Date(today);
-    mon.setDate(today.getDate() - (today.getDay() || 7) + 1);
+    const mon = new Date(nowWIB);
+    const day = mon.getUTCDay() || 7;
+    mon.setUTCDate(mon.getUTCDate() - day + 1);
     return { from: fmt(mon), to: todayStr };
   }
   if (preset === "this_month") {
-    return { from: `${today.getFullYear()}-${pad(today.getMonth()+1)}-01`, to: todayStr };
+    return { from: `${nowWIB.getUTCFullYear()}-${pad(nowWIB.getUTCMonth() + 1)}-01`, to: todayStr };
   }
   if (preset === "last_month") {
-    const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const last  = new Date(today.getFullYear(), today.getMonth(), 0);
+    const first = new Date(Date.UTC(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth() - 1, 1));
+    const last  = new Date(Date.UTC(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), 0));
     return { from: fmt(first), to: fmt(last) };
   }
   if (preset === "last_7") {
-    const d = new Date(today); d.setDate(d.getDate() - 6);
+    const d = new Date(nowWIB); d.setUTCDate(d.getUTCDate() - 6);
     return { from: fmt(d), to: todayStr };
   }
   if (preset === "last_30") {
-    const d = new Date(today); d.setDate(d.getDate() - 29);
+    const d = new Date(nowWIB); d.setUTCDate(d.getUTCDate() - 29);
     return { from: fmt(d), to: todayStr };
   }
   if (preset === "this_year") {
-    return { from: `${today.getFullYear()}-01-01`, to: todayStr };
+    return { from: `${nowWIB.getUTCFullYear()}-01-01`, to: todayStr };
   }
   return { from: todayStr, to: todayStr };
 }
 
-// Loading Skeleton Component
 function SummarySkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">

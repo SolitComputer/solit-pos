@@ -2,45 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth } from "@/lib/auth";
 
-function getWIBDateRange(daysOffset = 0): { start: string; end: string } {
+// pickup_date adalah string "YYYY-MM-DD" — tidak perlu ISO conversion
+function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
-  const now = new Date();
-
-  const nowWIB = new Date(now.getTime() + WIB);
-
-  const targetWIB = new Date(nowWIB);
-  targetWIB.setUTCDate(targetWIB.getUTCDate() + daysOffset);
-
-  const startWIB = new Date(targetWIB);
-  startWIB.setUTCHours(0, 0, 0, 0);
-
-  const endWIB = new Date(targetWIB);
-  endWIB.setUTCHours(23, 59, 59, 999);
-
-  return {
-    start: new Date(startWIB.getTime() - WIB).toISOString(),
-    end:   new Date(endWIB.getTime()   - WIB).toISOString(),
-  };
+  const nowWIB = new Date(Date.now() + WIB);
+  return nowWIB.toISOString().split("T")[0]; // "2026-06-07"
 }
 
-function getWIBDateKey(isoString: string): string {
-  // Konversi ISO string ke date key "YYYY-MM-DD" dalam WIB
+function getYesterdayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
-  const d = new Date(new Date(isoString).getTime() + WIB);
-  return d.toISOString().split("T")[0];
+  const nowWIB = new Date(Date.now() + WIB);
+  nowWIB.setUTCDate(nowWIB.getUTCDate() - 1);
+  return nowWIB.toISOString().split("T")[0]; // "2026-06-06"
 }
 
-function getWIBWeekStart(): string {
-  // 7 hari lalu, 00:00 WIB
-  return getWIBDateRange(-6).start;
+function getLast7DaysWIB(): string {
+  const WIB = 7 * 60 * 60 * 1000;
+  const nowWIB = new Date(Date.now() + WIB);
+  nowWIB.setUTCDate(nowWIB.getUTCDate() - 6);
+  return nowWIB.toISOString().split("T")[0]; // "2026-06-01"
 }
 
 async function handler(req: NextRequest) {
   try {
-    // ── Range tanggal pakai WIB ───────────────────────────────────────────
-    const todayRange     = getWIBDateRange(0);   // hari ini WIB
-    const yesterdayRange = getWIBDateRange(-1);  // kemarin WIB
-    const weekStart      = getWIBWeekStart();    // 7 hari lalu WIB
+    const today     = getTodayWIB();
+    const yesterday = getYesterdayWIB();
+    const weekStart = getLast7DaysWIB();
 
     const [
       { data: todayTransactions },
@@ -48,12 +35,12 @@ async function handler(req: NextRequest) {
       { data: weeklyTransactions },
       { data: yesterdayTransactions },
     ] = await Promise.all([
+      // Filter by pickup_date = hari ini
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .gte("paid_at", todayRange.start)
-        .lte("paid_at", todayRange.end),
+        .eq("pickup_date", today),
 
       supabase
         .from("laptops")
@@ -61,18 +48,20 @@ async function handler(req: NextRequest) {
         .eq("status", "SIAP_JUAL")
         .gt("qty", 0),
 
+      // Filter by pickup_date >= 7 hari lalu
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .gte("paid_at", weekStart),
+        .gte("pickup_date", weekStart)
+        .lte("pickup_date", today),
 
+      // Filter by pickup_date = kemarin
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .gte("paid_at", yesterdayRange.start)
-        .lte("paid_at", yesterdayRange.end),
+        .eq("pickup_date", yesterday),
     ]);
 
     // ── Helper profit calc ────────────────────────────────────────────────
@@ -124,19 +113,21 @@ async function handler(req: NextRequest) {
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
 
-    // ── Weekly trend — pakai getWIBDateKey ────────────────────────────────
+    // ── Weekly trend — group by pickup_date langsung ──────────────────────
     const trendMap: Record<string, { revenue: number; profit: number; trxCount: number }> = {};
 
-    // Inisialisasi 7 hari dengan key WIB
+    // Inisialisasi 7 hari
     for (let i = 6; i >= 0; i--) {
-      const { start } = getWIBDateRange(-i);
-      const key = getWIBDateKey(start); // "YYYY-MM-DD" dalam WIB
+      const WIB = 7 * 60 * 60 * 1000;
+      const d = new Date(Date.now() + WIB);
+      d.setUTCDate(d.getUTCDate() - i);
+      const key = d.toISOString().split("T")[0];
       trendMap[key] = { revenue: 0, profit: 0, trxCount: 0 };
     }
 
     weeklyTransactions?.forEach((item) => {
-      // Konversi paid_at ke date key WIB (bukan UTC!)
-      const dateKey = getWIBDateKey(item.paid_at || item.created_at || "");
+      // pickup_date sudah "YYYY-MM-DD", langsung pakai sebagai key
+      const dateKey = item.pickup_date as string;
       if (trendMap[dateKey]) {
         trendMap[dateKey].revenue  += Number(item.deal_price || item.amount || 0);
         trendMap[dateKey].profit   += calcProfit(item);
@@ -145,7 +136,6 @@ async function handler(req: NextRequest) {
     });
 
     const weeklyTrend = Object.entries(trendMap).map(([date, data]) => {
-      // Parse date key dalam WIB untuk label yang benar
       const [y, m, d] = date.split("-").map(Number);
       const label = new Date(y, m - 1, d).toLocaleDateString("id-ID", {
         weekday: "short",

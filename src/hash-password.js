@@ -6,7 +6,7 @@ const bcrypt =
 async function run() {
 
   const password =
-    "sales01@solit.com";
+    "#Fadrian5779";
 
   const hash =
     await bcrypt.hash(

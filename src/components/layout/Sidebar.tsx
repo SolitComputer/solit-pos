@@ -354,6 +354,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi", 
       items: [
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
   ],

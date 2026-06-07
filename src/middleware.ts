@@ -11,7 +11,10 @@ import {
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
-const PUBLIC_API_ROUTES = ["/api/warranty/check"];
+const PUBLIC_API_ROUTES = [
+  "/api/warranty/check",
+  "/api/auth/set-password",
+];
 
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
@@ -20,7 +23,6 @@ const FACE_API_WHITELIST = [
   "/api/auth/me",
   "/api/auth/logout",
   "/api/auth/login",
-  "/api/auth/set-password",
 ];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];

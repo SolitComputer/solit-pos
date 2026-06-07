@@ -113,10 +113,10 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
 }
 
 const ACCENT = {
-  gray:    { bg: "from-gray-50 to-gray-100", text: "text-gray-700",   bar: "bg-gray-600",   border: "border-gray-200"   },
+  gray: { bg: "from-gray-50 to-gray-100", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
   emerald: { bg: "from-emerald-50 to-green-100", text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
-  amber:   { bg: "from-amber-50 to-yellow-100",  text: "text-amber-700",  bar: "bg-amber-600",  border: "border-amber-200"  },
-  blue:    { bg: "from-blue-50 to-indigo-100",   text: "text-blue-700",   bar: "bg-blue-600",   border: "border-blue-200"   },
+  amber: { bg: "from-amber-50 to-yellow-100", text: "text-amber-700", bar: "bg-amber-600", border: "border-amber-200" },
+  blue: { bg: "from-blue-50 to-indigo-100", text: "text-blue-700", bar: "bg-blue-600", border: "border-blue-200" },
 } as const;
 
 function StatCard({ label, value, sub, icon, accent = "gray", change }: {
@@ -197,7 +197,9 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
 }) {
   const profit = item.other || 0;
   const displayAmount = item.deal_price || item.amount;
-  const timeStr = new Date(item.paid_at || item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const txDate = new Date(item.paid_at || item.created_at);
+  const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
   return (
     <div className="px-3 sm:px-5 py-3 hover:bg-gray-50/80 transition-all duration-200 group">
@@ -242,7 +244,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
         {/* Amount */}
         <div className="flex-shrink-0 text-right">
           <p className="text-xs sm:text-sm font-bold text-gray-800">Rp {fmtShort(displayAmount)}</p>
-          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{timeStr}</p>
+          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{dateStr} · {timeStr}</p>
           {canSeeFinancials && profit > 0 && (
             <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 mt-0.5">+{fmtShort(profit)}</p>
           )}
@@ -258,8 +260,8 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
         )}
 
         {item.payment_photo && (
-          <button 
-            onClick={() => onPhotoClick(item.payment_photo!)} 
+          <button
+            onClick={() => onPhotoClick(item.payment_photo!)}
             className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-700 transition-all duration-200 group/btn"
           >
             <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,10 +305,10 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
       disabled={isLoading}
       className="relative flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 group disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      <svg 
-        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-all duration-500 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} 
-        fill="none" 
-        stroke="currentColor" 
+      <svg
+        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-all duration-500 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`}
+        fill="none"
+        stroke="currentColor"
         viewBox="0 0 24 24"
       >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -339,7 +341,7 @@ export default function Page() {
     } else {
       setIsLoading(true);
     }
-    
+
     try {
       const [statsRes, transRes, meRes] = await Promise.all([
         fetch("/api/dashboard/stats"),
@@ -349,7 +351,7 @@ export default function Page() {
       const [statsResult, transResult, meResult] = await Promise.all([
         statsRes.json(), transRes.json(), meRes.json(),
       ]);
-      
+
       if (statsResult.success) setStats(statsResult.data);
       setTransactions(transResult?.data || []);
       setUserRole(meResult.user?.role ?? null);
@@ -373,19 +375,19 @@ export default function Page() {
     const d = new Date();
     setNow(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
     fetchAll(false);
-    
+
     const interval = setInterval(() => {
       fetchAll(true);
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [fetchAll]);
 
   // ── Chart data ─────────────────────────────────────────────────────────────
-  const weeklyLabels    = stats?.weeklyTrend?.map((d) => d.label) ?? [];
-  const weeklyRevenue   = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
-  const weeklyProfit    = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
-  const weeklyTrxCount  = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
+  const weeklyLabels = stats?.weeklyTrend?.map((d) => d.label) ?? [];
+  const weeklyRevenue = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
+  const weeklyProfit = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
+  const weeklyTrxCount = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
 
   const trendChartData = {
     labels: weeklyLabels,
@@ -423,7 +425,7 @@ export default function Page() {
     datasets: [{
       label: "Transaksi",
       data: weeklyTrxCount,
-      backgroundColor: weeklyTrxCount.map((_, i) => 
+      backgroundColor: weeklyTrxCount.map((_, i) =>
         i === weeklyTrxCount.length - 1 ? "#4B5563" : "rgba(75,85,99,0.2)"
       ),
       borderRadius: 8,
@@ -442,13 +444,13 @@ export default function Page() {
     interaction: { mode: "index" as const, intersect: false },
     plugins: {
       legend: { display: false },
-      tooltip: { 
+      tooltip: {
         backgroundColor: "rgba(0,0,0,0.85)",
         titleColor: "#fff",
         bodyColor: "#e5e7eb",
         padding: 8,
         cornerRadius: 8,
-        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: Rp ${fmtShort(ctx.raw as number)}` } 
+        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: Rp ${fmtShort(ctx.raw as number)}` }
       },
     },
     scales: {
@@ -461,10 +463,10 @@ export default function Page() {
     ...chartBaseOptions,
     plugins: {
       legend: { display: false },
-      tooltip: { 
+      tooltip: {
         backgroundColor: "rgba(0,0,0,0.85)",
         cornerRadius: 8,
-        callbacks: { label: (ctx: any) => `${ctx.raw} transaksi` } 
+        callbacks: { label: (ctx: any) => `${ctx.raw} transaksi` }
       },
     },
     scales: {
