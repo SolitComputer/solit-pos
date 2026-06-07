@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken, getAttendanceExpiry } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { SHIFT_CONFIG, ShiftType, calcAttendanceWeight, getAttendanceExpiry, verifyToken } from "@/lib/auth";
+
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,25 +14,45 @@ const ATTENDANCE_START_MIN = 30;
 const ATTENDANCE_END_HOUR = 12;
 const ATTENDANCE_END_MIN = 0;
 
-function checkAttendanceWindow(): {
+async function checkAttendanceWindowForUser(userId: string, supabaseAdmin: any): Promise<{
   allowed: boolean;
   reason: "TOO_EARLY" | "TOO_LATE" | "OPEN";
   openAt: string;
   closeAt: string;
-} {
-  const nowUTC = new Date();
-  const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-  const nowWIB = new Date(wibMs);
+  shift: ShiftType;
+  schedule: import("@/lib/auth").DaySchedule;
+}> {
+  const nowUTC   = new Date();
+  const nowWIB   = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
+  const todayDow  = nowWIB.getUTCDay();
+  const todayDate = nowWIB.toISOString().slice(0, 10); 
+
+  const [{ data: userData }, { data: customData }, { data: dateData }] = await Promise.all([
+    supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
+    supabaseAdmin.from("user_schedule")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
+    supabaseAdmin.from("user_date_schedule")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(), 
+  ]);
+
+  const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
+  const { resolveSchedule } = await import("@/lib/auth");
+  const schedule = resolveSchedule(shift, dateData ?? customData);
+
   const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start = ATTENDANCE_START_HOUR * 60 + ATTENDANCE_START_MIN;
-  const end = ATTENDANCE_END_HOUR * 60 + ATTENDANCE_END_MIN;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const openAt = `${pad(ATTENDANCE_START_HOUR)}:${pad(ATTENDANCE_START_MIN)} WIB`;
-  const closeAt = `${pad(ATTENDANCE_END_HOUR)}:${pad(ATTENDANCE_END_MIN)} WIB`;
-  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt };
-  if (total > end) return { allowed: false, reason: "TOO_LATE", openAt, closeAt };
-  return { allowed: true, reason: "OPEN", openAt, closeAt };
+  const start = schedule.start.h * 60 + schedule.start.m;
+  const end   = schedule.end.h   * 60 + schedule.end.m;
+  const pad   = (n: number) => String(n).padStart(2, "0");
+  const openAt  = `${pad(schedule.start.h)}:${pad(schedule.start.m)} WIB`;
+  const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
+
+  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt, shift, schedule };
+  if (total > end)   return { allowed: false, reason: "TOO_LATE",  openAt, closeAt, shift, schedule };
+  return               { allowed: true,  reason: "OPEN",      openAt, closeAt, shift, schedule };
 }
+
 
 function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
@@ -53,7 +74,6 @@ function parseDevice(ua: string): string {
   return `${browser} — ${os}`;
 }
 
-// ✅ Helper: set KEDUA cookie sekaligus agar tidak ada mismatch nama
 function setAttendanceCookies(response: NextResponse, userId: string, expiry: Date) {
   const cookieOptions = {
     httpOnly: true,
@@ -62,9 +82,7 @@ function setAttendanceCookies(response: NextResponse, userId: string, expiry: Da
     path: "/",
     expires: expiry,
   };
-  // Set face_verified (dipakai attendance/page.tsx original)
   response.cookies.set("face_verified", userId, cookieOptions);
-  // Set face_attended (dipakai versi baru)
   response.cookies.set("face_attended", userId, cookieOptions);
 }
 
@@ -77,7 +95,8 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false, message: "Token invalid" }, { status: 401 });
 
-    const timeCheck = checkAttendanceWindow();
+    const timeCheck = await checkAttendanceWindowForUser(user.id, supabaseAdmin);
+
     if (!timeCheck.allowed) {
       const msg = timeCheck.reason === "TOO_EARLY"
         ? `Absen belum dibuka. Buka pukul ${timeCheck.openAt}`
@@ -95,13 +114,45 @@ export async function POST(request: Request) {
     const device = parseDevice(ua);
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
 
-    const { data: userData } = await supabaseAdmin
+    const { data: userFullData } = await supabaseAdmin
       .from("users")
-      .select("face_embedding")
+      .select("face_embedding, shift")
       .eq("id", user.id)
       .single();
 
-    if (!userData?.face_embedding) {
+    const userShift: ShiftType = (userFullData?.shift as ShiftType) ?? "PAGI";
+    const { calcAttendanceWeightFromSchedule } = await import("@/lib/auth");
+    const { weight, status: attendanceStatus } = calcAttendanceWeightFromSchedule(
+      new Date().toISOString(),
+      timeCheck.schedule   
+    );
+
+
+    const nowWIB = new Date(Date.now() + 7 * 3600_000);
+    const todayDate = nowWIB.toISOString().slice(0, 10);
+
+    const { data: alreadyToday } = await supabaseAdmin
+      .from("face_verifications")
+      .select("id, created_at")
+      .eq("user_id", user.id)
+      .eq("status", "SUCCESS")
+      .gte("created_at", `${todayDate}T00:00:00+07:00`)
+      .lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .maybeSingle();
+
+    if (alreadyToday) {
+      const expiry = getAttendanceExpiry();
+      const response = NextResponse.json({
+        success: true,
+        message: "Sudah absen hari ini",
+        alreadyAttended: true,
+        firstCheckIn: alreadyToday.created_at,
+      });
+      setAttendanceCookies(response, user.id, expiry);
+      return response;
+    }
+
+    if (!userFullData?.face_embedding) {
       return NextResponse.json(
         { success: false, message: "Wajah belum terdaftar", needEnroll: true },
         { status: 400 }
@@ -109,7 +160,7 @@ export async function POST(request: Request) {
     }
 
     const THRESHOLD = 0.45;
-    const distance = euclideanDistance(embedding, userData.face_embedding);
+    const distance = euclideanDistance(embedding, userFullData.face_embedding);
     const matched = distance < THRESHOLD;
 
     const insertPayload: Record<string, any> = {
@@ -118,6 +169,8 @@ export async function POST(request: Request) {
       attempt_count: Number(attemptCount),
       device,
       ip_address: ip,
+      shift: userShift,
+      late_weight: matched ? weight : null,
     };
     if (latitude != null) insertPayload.latitude = latitude;
     if (longitude != null) insertPayload.longitude = longitude;
@@ -158,7 +211,7 @@ export async function PUT(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-    const timeCheck = checkAttendanceWindow();
+    const timeCheck = await checkAttendanceWindowForUser(user.id, supabaseAdmin);
     if (!timeCheck.allowed) {
       const msg = timeCheck.reason === "TOO_EARLY"
         ? `Absen belum dibuka. Buka pukul ${timeCheck.openAt}`
