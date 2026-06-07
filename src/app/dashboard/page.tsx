@@ -73,7 +73,7 @@ function TrendBadge({ change }: { change: number | null }) {
   if (change === null) return null;
   const up = change >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${up ? "bg-gray-100 text-gray-700" : "bg-red-50 text-red-600"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${up ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
       {up ? "▲" : "▼"} {Math.abs(change)}%
     </span>
   );
@@ -175,8 +175,8 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
 // ─── Transaction Row ──────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-gray-100 text-gray-700 border-gray-200",
-  PENDING: "bg-gray-100 text-gray-700 border-gray-200",
+  PAID: "bg-green-50 text-green-700 border-green-200",
+  PENDING: "bg-yellow-50 text-yellow-700 border-yellow-200",
   CANCELLED: "bg-red-50 text-red-600 border-red-200",
 };
 
@@ -238,7 +238,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           <p className="text-sm font-bold text-gray-800">Rp {fmtShort(displayAmount)}</p>
           <p className="text-[10px] text-gray-400 mt-0.5">{timeStr}</p>
           {canSeeFinancials && profit > 0 && (
-            <p className="text-[10px] font-semibold text-gray-600 mt-0.5">+{fmtShort(profit)}</p>
+            <p className="text-[10px] font-semibold text-green-600 mt-0.5">+{fmtShort(profit)}</p>
           )}
         </div>
       </div>
@@ -273,7 +273,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700 transition-all duration-200"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path d="M17.657 16.657L13.414 20.9a8 8 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <circle cx="12" cy="11" r="3" />
             </svg>
             Maps
@@ -289,11 +289,38 @@ const LiveDot = () => (
   <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
 );
 
+// ─── Refresh Button Component ────────────────────────────────────────────────
+function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoading: boolean }) {
+  return (
+    <button
+      onClick={onRefresh}
+      disabled={isLoading}
+      className="relative flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-xl transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 group disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <svg 
+        className={`w-3.5 h-3.5 transition-all duration-500 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      <span className="hidden sm:inline">
+        {isLoading ? 'Memuat...' : 'Refresh'}
+      </span>
+      {isLoading && (
+        <span className="absolute inset-0 rounded-xl bg-gray-50/50 animate-pulse" />
+      )}
+    </button>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Page() {
   const [stats, setStats] = useState<Stats>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState("");
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -301,7 +328,13 @@ export default function Page() {
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (showRefreshAnimation = false) => {
+    if (showRefreshAnimation) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       const [statsRes, transRes, meRes] = await Promise.all([
         fetch("/api/dashboard/stats"),
@@ -311,21 +344,58 @@ export default function Page() {
       const [statsResult, transResult, meResult] = await Promise.all([
         statsRes.json(), transRes.json(), meRes.json(),
       ]);
+      
       if (statsResult.success) setStats(statsResult.data);
       setTransactions(transResult?.data || []);
       setUserRole(meResult.user?.role ?? null);
       setLastUpdated(new Date());
+      
+      // Show success feedback
+      if (showRefreshAnimation) {
+        const refreshBtn = document.querySelector('.refresh-success');
+        if (refreshBtn) {
+          refreshBtn.classList.add('text-green-600');
+          setTimeout(() => {
+            refreshBtn.classList.remove('text-green-600');
+          }, 1000);
+        }
+      }
     } catch (e) {
       console.error(e);
+      // Show error feedback
+      if (showRefreshAnimation) {
+        const refreshBtn = document.querySelector('.refresh-error');
+        if (refreshBtn) {
+          refreshBtn.classList.add('text-red-600');
+          setTimeout(() => {
+            refreshBtn.classList.remove('text-red-600');
+          }, 1000);
+        }
+      }
     } finally {
-      setIsLoading(false);
+      if (showRefreshAnimation) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, []);
+
+  const handleRefresh = () => {
+    fetchAll(true);
+  };
 
   useEffect(() => {
     const d = new Date();
     setNow(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
-    fetchAll();
+    fetchAll(false);
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchAll(true);
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [fetchAll]);
 
   // ── Chart data ─────────────────────────────────────────────────────────────
@@ -345,9 +415,9 @@ export default function Page() {
       },
       {
         label: "Profit", data: weeklyProfit,
-        borderColor: "#9CA3AF", backgroundColor: "rgba(156,163,175,0.06)",
+        borderColor: "#10B981", backgroundColor: "rgba(16,185,129,0.06)",
         borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3,
-        pointHoverRadius: 5, pointBackgroundColor: "#9CA3AF", pointBorderColor: "#fff", pointBorderWidth: 1.5,
+        pointHoverRadius: 5, pointBackgroundColor: "#10B981", pointBorderColor: "#fff", pointBorderWidth: 1.5,
         borderDash: [5, 4],
       },
     ],
@@ -423,9 +493,22 @@ export default function Page() {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
         }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
         .fade-up { animation: fade-up 0.4s ease both; }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .animate-scaleIn { animation: scaleIn 0.25s ease-out; }
+        .animate-slideIn { animation: slideIn 0.3s ease-out; }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 0.6s linear infinite;
+        }
       `}</style>
 
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
@@ -450,9 +533,9 @@ export default function Page() {
                   Dashboard
                 </h1>
                 {lastUpdated && (
-                  <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1.5">
+                  <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1.5 animate-slideIn">
                     <LiveDot />
-                    Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                    Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </p>
                 )}
               </>
@@ -460,15 +543,7 @@ export default function Page() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={fetchAll}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-2 rounded-xl transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 group"
-            >
-              <svg className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+            <RefreshButton onRefresh={handleRefresh} isLoading={isRefreshing} />
             <a
               href="/payment/create"
               className="inline-flex items-center gap-1.5 bg-gray-700 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-800 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg whitespace-nowrap"
@@ -503,7 +578,7 @@ export default function Page() {
 
               {canSeeFinancials ? (
                 <StatCard label="Profit Hari Ini" value={`Rp ${fmtShort(stats?.todayProfit || 0)}`}
-                  sub="margin bersih" icon={<ProfitIcon />} accent="gray" change={stats?.profitChange} />
+                  sub="margin bersih" icon={<ProfitIcon />} accent="emerald" change={stats?.profitChange} />
               ) : (
                 <StatCard label="Laptop Ready" value={stats?.laptopReady || 0}
                   sub={`${stats?.stockTotal || 0} total unit`} icon={<LaptopIcon />} accent="gray" />
@@ -543,7 +618,7 @@ export default function Page() {
                   <span className="w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <span className="w-5 inline-block" style={{ borderTop: "2px dashed #9CA3AF" }} />Profit
+                  <span className="w-5 inline-block" style={{ borderTop: "2px dashed #10B981" }} />Profit
                 </div>
               </div>
               {isLoading ? <Shimmer className="w-full h-36" /> : weeklyRevenue.length > 0 ? (
@@ -600,7 +675,7 @@ export default function Page() {
                   <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
                     maxTotal={stats.topSales[0]?.total || 1}
                     extra={canSeeFinancials && s.profit > 0 ? (
-                      <span className="text-[10px] text-gray-600 font-semibold flex-shrink-0">+{fmtShort(s.profit)}</span>
+                      <span className="text-[10px] text-green-600 font-semibold flex-shrink-0">+{fmtShort(s.profit)}</span>
                     ) : undefined}
                   />
                 ))}
