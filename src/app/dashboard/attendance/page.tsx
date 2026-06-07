@@ -9,7 +9,7 @@ type Attendance = {
     check_in_time: string; status: string; method: string;
     latitude: number | null; longitude: number | null; accuracy: number | null;
     device: string; ip_address: string; face_distance: number | null; created_at: string;
-    displayStatus?: "PRESENT" | "LATE"; user_shift?: "PAGI" | "SORE";
+    displayStatus?: "PRESENT" | "LATE" | "SKIP"; user_shift?: "PAGI" | "SORE";
 };
 type DayOff = { id: string; user_id: string; day_of_week: number; notes?: string; users?: { id: string; name: string; role: string }; };
 type DateOff = { id: string; user_id: string; off_date: string; notes?: string; users?: { id: string; name: string; role: string }; };
@@ -30,12 +30,19 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
 function toWIBTime(iso: string): string {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
+const SHIFT_LATE_THRESHOLD: Record<"PAGI" | "SORE", number> = {
+    PAGI: 8 * 60 + 0,   
+    SORE: 16 * 60 + 0,  
+};
+
 function isLate(t: string, shift: "PAGI" | "SORE" = "PAGI"): boolean {
     const wib = new Date(new Date(t).getTime() + 7 * 60 * 60 * 1000);
-    return wib.getUTCHours() * 60 + wib.getUTCMinutes() > (shift === "PAGI" ? 8 * 60 : 16 * 60);
+    const total = wib.getUTCHours() * 60 + wib.getUTCMinutes();
+    return total > SHIFT_LATE_THRESHOLD[shift];
 }
-function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" {
+function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
     if (a.method === "FORCE") return "PRESENT";
+    if (a.method === "SKIP" || a.status === "SKIPPED_MANUAL") return "SKIP";
     if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
@@ -116,7 +123,7 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: { users: UserInfo[]; 
                             <div className="grid grid-cols-7 gap-1.5">
                                 {DAY_NAMES.map((day, dow) => { const off = local[u.id]?.has(dow) ?? false; return (<button key={dow} type="button" onClick={() => toggle(u.id, dow)} title={DAY_FULL[dow]} className={`h-9 rounded-xl text-[11px] font-bold transition-all duration-200 border ${off ? "bg-red-500 text-white border-red-500 shadow-md scale-105" : "bg-white text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600 hover:scale-105"}`}>{day}</button>); })}
                             </div>
-                            {local[u.id] && local[u.id].size > 0 && <p className="text-[11px] text-red-500 font-medium mt-2.5 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0"/>Libur: {Array.from(local[u.id]).sort().map(d => DAY_FULL[d]).join(", ")}</p>}
+                            {local[u.id] && local[u.id].size > 0 && <p className="text-[11px] text-red-500 font-medium mt-2.5 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />Libur: {Array.from(local[u.id]).sort().map(d => DAY_FULL[d]).join(", ")}</p>}
                         </div>
                     ))}
                 </div>
@@ -152,7 +159,7 @@ function DateOffModal({ users, calYear, calMonth, dateOffs, onClose, onSaved }: 
                 <select value={uid} onChange={e => setUid(e.target.value)} className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50/60 text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400/20 transition-all duration-200">
                     {users.map(u => <option key={u.id} value={u.id}>{u.name} — {u.role.replace(/_/g, " ")}</option>)}
                 </select>
-                {local.size > 0 && <p className="text-[11px] text-orange-600 font-medium mt-2 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0"/>{local.size} tanggal dipilih untuk {sel?.name}</p>}
+                {local.size > 0 && <p className="text-[11px] text-orange-600 font-medium mt-2 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />{local.size} tanggal dipilih untuk {sel?.name}</p>}
             </div>
             <div className="overflow-y-auto flex-1 px-6 py-5">
                 <div className="grid grid-cols-7 mb-3">{DAY_NAMES.map((d, i) => <div key={d} className={`text-center text-[10px] font-bold uppercase py-1 tracking-wider ${i === 0 ? "text-red-400" : "text-gray-400"}`}>{d}</div>)}</div>
@@ -417,6 +424,167 @@ function DateScheduleModal({ users, calYear, calMonth, onClose }: { users: UserI
     );
 }
 
+// ─── Today Attendance Status Card ────────────────────────────────────────────
+function TodayAttendanceCard({ status, loading, onRefresh }: {
+    status: {
+        alreadyAttended: boolean; needEnroll: boolean;
+        isAttendanceTime: boolean; isDayOff: boolean;
+        shift: string; reason?: string; openAt?: string; closeAt?: string;
+    } | null;
+    loading: boolean;
+    onRefresh: () => void;
+}) {
+    const today = new Date().toLocaleDateString("id-ID", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+        timeZone: "Asia/Jakarta",
+    });
+
+    const goAbsen = () => { window.location.href = "/face-verify?from=/dashboard/attendance"; };
+
+    // Loading state
+    if (loading) {
+        return (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100" />
+                    <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-gray-100 rounded w-32" />
+                        <div className="h-5 bg-gray-100 rounded w-48" />
+                        <div className="h-3 bg-gray-100 rounded w-24" />
+                    </div>
+                    <div className="w-32 h-10 bg-gray-100 rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!status) return null;
+
+    // ── Config tiap kondisi ─────────────────────────────────────────────────
+    type CardConfig = {
+        icon: string; gradient: string; iconBg: string; iconText: string;
+        badgeColor: string; badgeText: string; badgeDot: string;
+        title: string; subtitle: string;
+        btnLabel?: string; btnColor?: string; btnAction?: () => void;
+        showBtn: boolean;
+    };
+
+    let cfg: CardConfig;
+
+    if (status.alreadyAttended) {
+        cfg = {
+            icon: "✅", gradient: "from-emerald-50 to-green-50",
+            iconBg: "bg-emerald-100", iconText: "text-emerald-600",
+            badgeColor: "bg-emerald-100 text-emerald-700 border-emerald-200",
+            badgeDot: "bg-emerald-400", badgeText: "Sudah Absen",
+            title: "Absensi Hari Ini Tercatat",
+            subtitle: `Shift ${status.shift} · ${today}`,
+            showBtn: false,
+        };
+    } else if (status.isDayOff) {
+        cfg = {
+            icon: "🏖️", gradient: "from-orange-50 to-amber-50",
+            iconBg: "bg-orange-100", iconText: "text-orange-500",
+            badgeColor: "bg-orange-100 text-orange-700 border-orange-200",
+            badgeDot: "bg-orange-400", badgeText: "Hari Libur",
+            title: "Kamu Libur Hari Ini",
+            subtitle: `Tidak perlu absen · ${today}`,
+            showBtn: false,
+        };
+    } else if (!status.isAttendanceTime && status.reason === "TOO_EARLY") {
+        cfg = {
+            icon: "⏳", gradient: "from-blue-50 to-indigo-50",
+            iconBg: "bg-blue-100", iconText: "text-blue-500",
+            badgeColor: "bg-blue-100 text-blue-700 border-blue-200",
+            badgeDot: "bg-blue-400", badgeText: "Belum Buka",
+            title: "Absen Belum Dibuka",
+            subtitle: `Buka pukul ${status.openAt} · Shift ${status.shift}`,
+            showBtn: false,
+        };
+    } else if (!status.isAttendanceTime && status.reason === "TOO_LATE") {
+        cfg = {
+            icon: "⌛", gradient: "from-red-50 to-rose-50",
+            iconBg: "bg-red-100", iconText: "text-red-500",
+            badgeColor: "bg-red-100 text-red-600 border-red-200",
+            badgeDot: "bg-red-400", badgeText: "Waktu Habis",
+            title: "Waktu Absen Sudah Lewat",
+            subtitle: `Batas ${status.closeAt} · Shift ${status.shift}`,
+            showBtn: false,
+        };
+    } else if (status.needEnroll) {
+        cfg = {
+            icon: "📷", gradient: "from-violet-50 to-purple-50",
+            iconBg: "bg-violet-100", iconText: "text-violet-500",
+            badgeColor: "bg-violet-100 text-violet-700 border-violet-200",
+            badgeDot: "bg-violet-400", badgeText: "Belum Daftar",
+            title: "Wajah Belum Terdaftar",
+            subtitle: `Daftarkan wajah untuk mulai absen · Shift ${status.shift}`,
+            btnLabel: "Daftar Wajah →", btnColor: "bg-violet-600 hover:bg-violet-700",
+            btnAction: goAbsen, showBtn: true,
+        };
+    } else if (status.isAttendanceTime) {
+        cfg = {
+            icon: "🟡", gradient: "from-amber-50 to-yellow-50",
+            iconBg: "bg-amber-100", iconText: "text-amber-500",
+            badgeColor: "bg-amber-100 text-amber-700 border-amber-200",
+            badgeDot: "bg-amber-400 animate-pulse", badgeText: "Belum Absen",
+            title: "Kamu Belum Absen Hari Ini",
+            subtitle: `Jam absen: ${status.openAt} – ${status.closeAt} WIB · Shift ${status.shift}`,
+            btnLabel: "Absen Sekarang →", btnColor: "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] hover:from-[#16213e] hover:to-[#0f0f1a]",
+            btnAction: goAbsen, showBtn: true,
+        };
+    } else {
+        return null;
+    }
+
+    return (
+        <div className={`bg-gradient-to-br ${cfg.gradient} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5`}>
+            <div className="flex items-center gap-4">
+                {/* Icon */}
+                <div className={`w-14 h-14 rounded-2xl ${cfg.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <span className="text-2xl">{cfg.icon}</span>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${cfg.badgeColor}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${cfg.badgeDot}`} />
+                            {cfg.badgeText}
+                        </span>
+                    </div>
+                    <p className="font-bold text-gray-800 text-sm">{cfg.title}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{cfg.subtitle}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Refresh */}
+                    <button
+                        onClick={onRefresh}
+                        className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all duration-200 shadow-sm"
+                        title="Refresh status"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+
+                    {/* CTA Button */}
+                    {cfg.showBtn && cfg.btnAction && (
+                        <button
+                            onClick={cfg.btnAction}
+                            className={`${cfg.btnColor} text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 whitespace-nowrap`}
+                        >
+                            {cfg.btnLabel}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
     const [attendances, setAttendances] = useState<Attendance[]>([]);
@@ -435,8 +603,43 @@ export default function AttendanceDashboardPage() {
     const calMonth = selectedMonth?.month ?? new Date().getMonth();
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [showDateScheduleModal, setShowDateScheduleModal] = useState(false);
+    const [todayStatus, setTodayStatus] = useState<{
+        alreadyAttended: boolean;
+        needEnroll: boolean;
+        isAttendanceTime: boolean;
+        isDayOff: boolean;
+        shift: string;
+        reason?: "TOO_EARLY" | "TOO_LATE";
+        openAt?: string;
+        closeAt?: string;
+    } | null>(null);
+    const [statusLoading, setStatusLoading] = useState(false);
 
-    useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
+    const fetchTodayStatus = async () => {
+        setStatusLoading(true);
+        try {
+            const r = await fetch("/api/auth/face-status");
+            const d = await r.json();
+            if (d.success) {
+                setTodayStatus({
+                    alreadyAttended: d.alreadyAttended ?? false,
+                    needEnroll: d.needEnroll ?? false,
+                    isAttendanceTime: d.isAttendanceTime ?? false,
+                    isDayOff: d.isDayOff ?? false,
+                    shift: d.shift ?? "PAGI",
+                    reason: d.reason,
+                    openAt: d.openAt,
+                    closeAt: d.closeAt,
+                });
+            }
+        } catch { /* ignore */ }
+        finally { setStatusLoading(false); }
+    };
+
+    useEffect(() => {
+        getCurrentUserClient().then(u => setCurrentUser(u));
+        fetchTodayStatus();
+    }, []);
 
     useEffect(() => {
         if (!selectedMonth) return;
@@ -490,10 +693,11 @@ export default function AttendanceDashboardPage() {
     }, [allUsers, attendances]);
 
     const userSummary = useMemo(() => {
-        const m: Record<string, { name: string; present: number; late: number; score: number; workdays: number; pct: number }> = {};
+        const m: Record<string, { name: string; present: number; late: number; skip: number; score: number; workdays: number; pct: number }> = {};
         thisMonthAtt.forEach(a => {
-            if (!m[a.user_name]) m[a.user_name] = { name: a.user_name, present: 0, late: 0, score: 0, workdays: 0, pct: 0 };
+            if (!m[a.user_name]) m[a.user_name] = { name: a.user_name, present: 0, late: 0, skip: 0, score: 0, workdays: 0, pct: 0 };
             if (a.displayStatus === "PRESENT") { m[a.user_name].present++; m[a.user_name].score += 1.0; }
+            else if (a.displayStatus === "SKIP") { m[a.user_name].skip++; m[a.user_name].score += 0.75; } // hadir tapi tidak verifikasi
             else { m[a.user_name].late++; m[a.user_name].score += 0.5; }
         });
         Object.values(m).forEach(u => {
@@ -559,13 +763,19 @@ export default function AttendanceDashboardPage() {
                     </div>
                 </div>
 
+                <TodayAttendanceCard
+                    status={todayStatus}
+                    loading={statusLoading}
+                    onRefresh={fetchTodayStatus}
+                />
+
                 {/* ── Modern Stat Cards with Gradients ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                        { label: "Hari Hadir",  value: thisMonthDays,    icon: "📅", gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
+                        { label: "Hari Hadir", value: thisMonthDays, icon: "📅", gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
                         { label: "Tepat Waktu", value: thisMonthPresent, icon: "✅", gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
-                        { label: "Terlambat",   value: thisMonthLate,    icon: "⏰", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
-                        { label: "Karyawan",    value: uniqueUsers.length, icon: "👥", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
+                        { label: "Terlambat", value: thisMonthLate, icon: "⏰", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
+                        { label: "Karyawan", value: uniqueUsers.length, icon: "👥", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
                     ].map(c => (
                         <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:scale-[1.02]`}>
                             <div className="flex items-start justify-between mb-3">
@@ -608,6 +818,7 @@ export default function AttendanceDashboardPage() {
                             <div className="hidden sm:flex items-center gap-4">
                                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />Tepat</div>
                                 <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />Terlambat</div>
+                                <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-gray-400 animate-pulse" />Skip</div>
                                 <div className="flex items-center gap-1.5 text-[11px] text-red-400 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-red-300 animate-pulse" />Libur</div>
                             </div>
                             <button onClick={() => setSelectedMonth(null)} className="text-[11px] text-gray-400 hover:text-[#1a1a2e] transition-all duration-200 font-semibold flex items-center gap-1 hover:gap-2">
@@ -636,6 +847,7 @@ export default function AttendanceDashboardPage() {
                                     const dd = byDate[dk] || [];
                                     const pc = dd.filter(a => a.displayStatus === "PRESENT").length;
                                     const lc = dd.filter(a => a.displayStatus === "LATE").length;
+                                    const sc = dd.filter(a => a.displayStatus === "SKIP").length;
                                     const tot = dd.length;
                                     const isTod = dk === todayKey, isSel = dk === selectedDate;
                                     let isUserDayOff = false, hasAnyDayOff = false;
@@ -645,23 +857,22 @@ export default function AttendanceDashboardPage() {
                                     return (
                                         <button key={day} onClick={() => setSelectedDate(p => p === dk ? null : dk)}
                                             title={isUserDayOff ? `Libur ${filterUser}` : undefined}
-                                            className={`relative flex flex-col items-start justify-start p-3 rounded-xl min-h-[80px] transition-all duration-300 ${
-                                                isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl scale-[1.02] ring-2 ring-[#1a1a2e]/30"
-                                                    : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200"
-                                                        : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50"
-                                                            : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md"
-                                                                : "hover:bg-gray-50 hover:shadow-sm"
-                                            }`}>
+                                            className={`relative flex flex-col items-start justify-start p-3 rounded-xl min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl scale-[1.02] ring-2 ring-[#1a1a2e]/30"
+                                                : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200"
+                                                    : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50"
+                                                        : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md"
+                                                            : "hover:bg-gray-50 hover:shadow-sm"
+                                                }`}>
                                             {isUserDayOff && filterUser !== "Semua" && <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
                                             {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-300 animate-pulse" />}
 
                                             <span className={`text-base font-black leading-none mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
-
                                             {tot > 0 && (
                                                 <div className="flex flex-col gap-1 w-full">
                                                     <div className="flex gap-1">
-                                                        {pc > 0 && <div className={`flex-1 h-1.5 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"} transition-all duration-300`} style={{ width: `${(pc/tot)*100}%` }} />}
-                                                        {lc > 0 && <div className={`flex-1 h-1.5 rounded-full ${isSel ? "bg-amber-300" : "bg-amber-400"} transition-all duration-300`} style={{ width: `${(lc/tot)*100}%` }} />}
+                                                        {pc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"} transition-all duration-300`} style={{ width: `${(pc / tot) * 100}%` }} />}
+                                                        {lc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-amber-300" : "bg-amber-400"} transition-all duration-300`} style={{ width: `${(lc / tot) * 100}%` }} />}
+                                                        {sc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-gray-300" : "bg-gray-400"} transition-all duration-300`} style={{ width: `${(sc / tot) * 100}%` }} />}
                                                     </div>
                                                     <span className={`text-[10px] font-bold ${isSel ? "text-white/70" : "text-gray-400"}`}>{tot} hadir</span>
                                                 </div>
@@ -739,14 +950,24 @@ export default function AttendanceDashboardPage() {
                                                     <span className="font-mono font-black text-gray-800 text-sm">{toWIBTime(a.check_in_time || a.created_at)}</span>
                                                 </td>
                                                 <td className="px-4 py-4">
-                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${a.displayStatus === "PRESENT" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
-                                                        {a.displayStatus === "PRESENT" ? "✓ Tepat" : "⏰ Terlambat"}
+                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${a.displayStatus === "PRESENT" ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                                        : a.displayStatus === "SKIP" ? "bg-gray-100 text-gray-500 border-gray-200"
+                                                            : "bg-amber-100 text-amber-700 border-amber-200"
+                                                        }`}>
+                                                        {a.displayStatus === "PRESENT" ? "✓ Tepat"
+                                                            : a.displayStatus === "SKIP" ? "⏭ Skip"
+                                                                : "⏰ Terlambat"}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex flex-col gap-1.5">
-                                                        <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.method === "FACE" ? "bg-blue-100 text-blue-600 border-blue-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
-                                                            {a.method === "FACE" ? "🫦 Wajah" : "✋ Manual"}
+                                                        <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.method === "FACE" ? "bg-blue-100 text-blue-600 border-blue-200"
+                                                            : a.method === "SKIP" || a.status === "SKIPPED_MANUAL" ? "bg-gray-100 text-gray-400 border-gray-200"
+                                                                : "bg-gray-100 text-gray-500 border-gray-200"
+                                                            }`}>
+                                                            {a.method === "FACE" ? "🫦 Wajah"
+                                                                : a.method === "SKIP" || a.status === "SKIPPED_MANUAL" ? "🚫 Tanpa Kamera"
+                                                                    : "✋ Manual"}
                                                         </span>
                                                         {a.user_shift && <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.user_shift === "PAGI" ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-indigo-100 text-indigo-600 border-indigo-200"}`}>{a.user_shift === "PAGI" ? "🌅" : "🌆"} {a.user_shift}</span>}
                                                     </div>
@@ -795,6 +1016,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skip</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Absen</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Wajib</th>
@@ -803,7 +1025,7 @@ export default function AttendanceDashboardPage() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
                                         {userSummary.map((u, i) => {
-                                            const absent = Math.max(0, u.workdays - u.present - u.late);
+                                            const absent = Math.max(0, u.workdays - u.present - u.late - u.skip);
                                             const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
                                             const barGradient = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
                                             return (
@@ -823,6 +1045,12 @@ export default function AttendanceDashboardPage() {
                                                     <td className="px-4 py-4 text-center">
                                                         {u.late > 0
                                                             ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200 shadow-sm">{u.late}</span>
+                                                            : <span className="text-gray-200 text-sm font-black">—</span>
+                                                        }
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.skip > 0
+                                                            ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-500 text-sm font-black border border-gray-200 shadow-sm">{u.skip}</span>
                                                             : <span className="text-gray-200 text-sm font-black">—</span>
                                                         }
                                                     </td>
@@ -857,6 +1085,7 @@ export default function AttendanceDashboardPage() {
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
                             <span className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />Tepat waktu = 1.0 poin</span>
                             <span className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" />Terlambat = 0.5 poin</span>
+                            <span className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gray-400" />Skip kamera = 0.75 poin</span>
                             <span className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-red-400" />Tidak hadir = 0 poin</span>
                             <span className="text-[10px] text-gray-400 ml-auto font-medium">Hari libur tidak dihitung sebagai wajib hadir</span>
                         </div>

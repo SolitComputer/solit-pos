@@ -211,43 +211,19 @@ export async function PUT(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-    const timeCheck = await checkAttendanceWindowForUser(user.id, supabaseAdmin);
-    if (!timeCheck.allowed) {
-      const msg = timeCheck.reason === "TOO_EARLY"
-        ? `Absen belum dibuka. Buka pukul ${timeCheck.openAt}`
-        : `Waktu absen sudah berakhir. Batas ${timeCheck.closeAt}`;
-      return NextResponse.json(
-        { success: false, message: msg, reason: timeCheck.reason, outOfTime: true },
-        { status: 403 }
-      );
-    }
 
-    const ua = request.headers.get("user-agent") ?? "";
-    const device = parseDevice(ua);
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
-
-    let body: any = {};
-    try { body = await request.json(); } catch { /* body optional */ }
-    const { latitude, longitude, accuracy } = body;
-
-    const insertPayload: Record<string, any> = {
-      user_id: user.id,
-      status: "SKIPPED_MANUAL",
-      attempt_count: 0,
-      device,
-      ip_address: ip,
-    };
-    if (latitude != null) insertPayload.latitude = latitude;
-    if (longitude != null) insertPayload.longitude = longitude;
-    if (accuracy != null) insertPayload.accuracy = accuracy;
-
-    await supabaseAdmin.from("face_verifications").insert(insertPayload);
 
     const expiry = getAttendanceExpiry();
-    const response = NextResponse.json({ success: true, message: "Absen manual berhasil" });
+    const response = NextResponse.json({ success: true, message: "Dilanjutkan tanpa absen" });
 
-    // ✅ Set kedua cookie sekaligus
-    setAttendanceCookies(response, user.id, expiry);
+    // Set cookie agar tidak redirect ke face-verify lagi
+    response.cookies.set("attendance_skipped", user.id, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+      expires:  expiry,
+    });
 
     return response;
   } catch (err) {

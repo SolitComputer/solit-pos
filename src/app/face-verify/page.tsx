@@ -451,10 +451,18 @@ export default function FaceVerifyPage() {
     if (!confirm("Yakin ingin melewati absen? Kehadiran Anda tidak akan tercatat hari ini.")) return;
     setSkipping(true);
     try {
-      await fetch("/api/auth/face-status", { method: "POST" });
+      await fetch("/api/auth/face-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: gpsCoords?.latitude ?? null,
+          longitude: gpsCoords?.longitude ?? null,
+          accuracy: gpsCoords?.accuracy ?? null,
+        }),
+      });
     } catch { /* tetap lanjut */ }
     window.location.href = redirectTo;
-  }, [redirectTo]);
+  }, [redirectTo, gpsCoords]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
