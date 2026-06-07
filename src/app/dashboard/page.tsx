@@ -43,13 +43,22 @@ interface Transaction {
   paid_at?: string; created_at: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmt = (n: number) => n.toLocaleString("id-ID");
-const fmtShort = (n: number) => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}Jt`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}Rb`;
-  return String(n);
+
+// fmtShort hanya untuk tooltip chart & label kecil — BUKAN untuk stat card utama
+const fmtShort = (n: number): string => {
+  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000)     return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
+  if (n >= 1_000)         return `Rp ${(n / 1_000).toFixed(0)}Rb`;
+  return `Rp ${n}`;
 };
+
+const fmtRupiah = (n: number): string =>
+  "Rp " + (n || 0).toLocaleString("id-ID");
+
+// PERBAIKAN: getDealPrice konsisten dengan halaman transaksi
+const getDealPrice = (item: Transaction): number =>
+  Number(item.deal_price || item.amount || 0);
+
 const getInitials = (name: string) =>
   name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
@@ -99,7 +108,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
         </button>
         <img src={url} alt="Bukti Bayar" className="w-full rounded-2xl shadow-2xl border border-white/20" />
         <a href={url} target="_blank" rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 text-white/60 hover:text-white text-xs transition-all duration-200 hover:gap-3"
+          className="mt-4 flex items-center justify-center gap-2 text-white/60 hover:text-white text-xs transition-all duration-200"
           onClick={(e) => e.stopPropagation()}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
@@ -113,15 +122,21 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
 }
 
 const ACCENT = {
-  gray: { bg: "from-gray-50 to-gray-100", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
-  emerald: { bg: "from-emerald-50 to-green-100", text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
-  amber: { bg: "from-amber-50 to-yellow-100", text: "text-amber-700", bar: "bg-amber-600", border: "border-amber-200" },
-  blue: { bg: "from-blue-50 to-indigo-100", text: "text-blue-700", bar: "bg-blue-600", border: "border-blue-200" },
+  gray:    { bg: "from-gray-50 to-gray-100",       text: "text-gray-700",    bar: "bg-gray-600",    border: "border-gray-200"   },
+  emerald: { bg: "from-emerald-50 to-green-100",   text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
+  amber:   { bg: "from-amber-50 to-yellow-100",    text: "text-amber-700",   bar: "bg-amber-600",   border: "border-amber-200"  },
+  blue:    { bg: "from-blue-50 to-indigo-100",     text: "text-blue-700",    bar: "bg-blue-600",    border: "border-blue-200"   },
 } as const;
 
+// PERBAIKAN: StatCard menerima nilai sudah diformat (string) dari luar
+// sehingga format penuh Rupiah bisa dikontrol di satu tempat
 function StatCard({ label, value, sub, icon, accent = "gray", change }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ReactNode; accent?: keyof typeof ACCENT; change?: number | null;
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ReactNode;
+  accent?: keyof typeof ACCENT;
+  change?: number | null;
 }) {
   const a = ACCENT[accent];
   return (
@@ -130,15 +145,10 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
-          {typeof value === 'number' ? (
-            <p className="font-black mt-1 text-lg sm:text-xl tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left">
-              {value.toLocaleString('id-ID')}
-            </p>
-          ) : (
-            <p className="font-black mt-1 text-base sm:text-xl tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left">
-              {value}
-            </p>
-          )}
+          {/* PERBAIKAN: tampilkan nilai apa adanya, tanpa truncate/pembulatan */}
+          <p className="font-black mt-1 text-sm sm:text-base tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left break-words">
+            {value}
+          </p>
           {sub && <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{sub}</p>}
           {change !== undefined && change !== null && (
             <div className="mt-1"><TrendBadge change={change} /></div>
@@ -181,23 +191,24 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
 // ─── Transaction Row ──────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  PENDING: "bg-amber-100 text-amber-700 border-amber-200",
+  PAID:      "bg-emerald-100 text-emerald-700 border-emerald-200",
+  PENDING:   "bg-amber-100 text-amber-700 border-amber-200",
   CANCELLED: "bg-rose-100 text-rose-600 border-rose-200",
 };
 
 const STATUS_ICON: Record<string, string> = {
-  PAID: "✅",
-  PENDING: "⏳",
+  PAID:      "✅",
+  PENDING:   "⏳",
   CANCELLED: "❌",
 };
 
 function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   item: Transaction; onPhotoClick: (url: string) => void; canSeeFinancials: boolean;
 }) {
-  const profit = item.other || 0;
-  const displayAmount = item.deal_price || item.amount;
-  const txDate = new Date(item.paid_at || item.created_at);
+  const profit       = item.other || 0;
+  // PERBAIKAN: konsisten pakai deal_price || amount, sama dengan halaman transaksi
+  const displayAmount = getDealPrice(item);
+  const txDate  = new Date(item.paid_at || item.created_at);
   const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
@@ -241,12 +252,16 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           )}
         </div>
 
-        {/* Amount */}
+        {/* Amount — PERBAIKAN: tampilkan angka penuh, bukan disingkat */}
         <div className="flex-shrink-0 text-right">
-          <p className="text-xs sm:text-sm font-bold text-gray-800">Rp {fmtShort(displayAmount)}</p>
+          <p className="text-xs sm:text-sm font-bold text-gray-800">
+            Rp {displayAmount.toLocaleString("id-ID")}
+          </p>
           <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{dateStr} · {timeStr}</p>
           {canSeeFinancials && profit > 0 && (
-            <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 mt-0.5">+{fmtShort(profit)}</p>
+            <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 mt-0.5">
+              +{profit.toLocaleString("id-ID")}
+            </p>
           )}
         </div>
       </div>
@@ -297,7 +312,7 @@ const LiveDot = () => (
   <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-200 flex-shrink-0" />
 );
 
-// ─── Refresh Button Component ────────────────────────────────────────────────
+// ─── Refresh Button ───────────────────────────────────────────────────────────
 function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoading: boolean }) {
   return (
     <button
@@ -306,31 +321,27 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
       className="relative flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 group disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <svg
-        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-all duration-500 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`}
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+        className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-all duration-500 ${isLoading ? "animate-spin" : "group-hover:rotate-180"}`}
+        fill="none" stroke="currentColor" viewBox="0 0 24 24"
       >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
       </svg>
-      <span className="hidden sm:inline">{isLoading ? 'Memuat...' : 'Refresh'}</span>
-      <span className="sm:hidden">{isLoading ? '...' : '↻'}</span>
-      {isLoading && (
-        <span className="absolute inset-0 rounded-xl bg-gray-50/50 animate-pulse" />
-      )}
+      <span className="hidden sm:inline">{isLoading ? "Memuat..." : "Refresh"}</span>
+      <span className="sm:hidden">{isLoading ? "..." : "↻"}</span>
+      {isLoading && <span className="absolute inset-0 rounded-xl bg-gray-50/50 animate-pulse" />}
     </button>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Page() {
-  const [stats, setStats] = useState<Stats>();
+  const [stats, setStats]             = useState<Stats>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading]     = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [now, setNow] = useState("");
-  const [photoModal, setPhotoModal] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [now, setNow]                 = useState("");
+  const [photoModal, setPhotoModal]   = useState<string | null>(null);
+  const [userRole, setUserRole]       = useState<UserRole | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
@@ -367,26 +378,19 @@ export default function Page() {
     }
   }, []);
 
-  const handleRefresh = () => {
-    fetchAll(true);
-  };
-
   useEffect(() => {
     const d = new Date();
     setNow(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
     fetchAll(false);
 
-    const interval = setInterval(() => {
-      fetchAll(true);
-    }, 30000);
-
+    const interval = setInterval(() => { fetchAll(true); }, 30000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 
   // ── Chart data ─────────────────────────────────────────────────────────────
-  const weeklyLabels = stats?.weeklyTrend?.map((d) => d.label) ?? [];
-  const weeklyRevenue = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
-  const weeklyProfit = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
+  const weeklyLabels   = stats?.weeklyTrend?.map((d) => d.label)    ?? [];
+  const weeklyRevenue  = stats?.weeklyTrend?.map((d) => d.revenue)  ?? [];
+  const weeklyProfit   = stats?.weeklyTrend?.map((d) => d.profit)   ?? [];
   const weeklyTrxCount = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
 
   const trendChartData = {
@@ -394,27 +398,29 @@ export default function Page() {
     datasets: [
       {
         label: "Omzet", data: weeklyRevenue,
-        borderColor: "#4B5563", backgroundColor: (ctx: any) => {
-          const canvas = ctx.chart.ctx;
-          const gradient = canvas.createLinearGradient(0, 0, 0, 160);
-          gradient.addColorStop(0, 'rgba(75,85,99,0.1)');
-          gradient.addColorStop(1, 'rgba(75,85,99,0)');
+        borderColor: "#4B5563",
+        backgroundColor: (ctx: any) => {
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+          gradient.addColorStop(0, "rgba(75,85,99,0.1)");
+          gradient.addColorStop(1, "rgba(75,85,99,0)");
           return gradient;
         },
         borderWidth: 2.5, fill: true, tension: 0.4, pointRadius: 3,
-        pointHoverRadius: 6, pointBackgroundColor: "#4B5563", pointBorderColor: "#fff", pointBorderWidth: 2,
+        pointHoverRadius: 6, pointBackgroundColor: "#4B5563",
+        pointBorderColor: "#fff", pointBorderWidth: 2,
       },
       {
         label: "Profit", data: weeklyProfit,
-        borderColor: "#10B981", backgroundColor: (ctx: any) => {
-          const canvas = ctx.chart.ctx;
-          const gradient = canvas.createLinearGradient(0, 0, 0, 160);
-          gradient.addColorStop(0, 'rgba(16,185,129,0.08)');
-          gradient.addColorStop(1, 'rgba(16,185,129,0)');
+        borderColor: "#10B981",
+        backgroundColor: (ctx: any) => {
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+          gradient.addColorStop(0, "rgba(16,185,129,0.08)");
+          gradient.addColorStop(1, "rgba(16,185,129,0)");
           return gradient;
         },
         borderWidth: 2, fill: true, tension: 0.4, pointRadius: 2.5,
-        pointHoverRadius: 5, pointBackgroundColor: "#10B981", pointBorderColor: "#fff", pointBorderWidth: 1.5,
+        pointHoverRadius: 5, pointBackgroundColor: "#10B981",
+        pointBorderColor: "#fff", pointBorderWidth: 1.5,
         borderDash: [6, 4],
       },
     ],
@@ -446,16 +452,15 @@ export default function Page() {
       legend: { display: false },
       tooltip: {
         backgroundColor: "rgba(0,0,0,0.85)",
-        titleColor: "#fff",
-        bodyColor: "#e5e7eb",
-        padding: 8,
-        cornerRadius: 8,
-        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: Rp ${fmtShort(ctx.raw as number)}` }
+        titleColor: "#fff", bodyColor: "#e5e7eb",
+        padding: 8, cornerRadius: 8,
+        // tooltip chart tetap pakai fmtShort karena ruang terbatas
+        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}` },
       },
     },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 9 }, color: "#9ca3af" } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 9 }, color: "#9ca3af", callback: (v: any) => "Rp " + fmtShort(v) } },
+      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 9 }, color: "#9ca3af", callback: (v: any) => fmtShort(v) } },
     },
   };
 
@@ -464,9 +469,8 @@ export default function Page() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(0,0,0,0.85)",
-        cornerRadius: 8,
-        callbacks: { label: (ctx: any) => `${ctx.raw} transaksi` }
+        backgroundColor: "rgba(0,0,0,0.85)", cornerRadius: 8,
+        callbacks: { label: (ctx: any) => `${ctx.raw} transaksi` },
       },
     },
     scales: {
@@ -498,10 +502,6 @@ export default function Page() {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -511,14 +511,7 @@ export default function Page() {
         .animate-scaleIn { animation: scaleIn 0.25s ease-out; }
         .animate-slideIn { animation: slideIn 0.3s ease-out; }
         .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
-        .animate-bounce { animation: bounce 1s ease-in-out infinite; }
         .animate-spin { animation: spin 0.6s linear infinite; }
-        
-        @keyframes pulse-ring {
-          0% { transform: scale(0.8); opacity: 0.5; }
-          100% { transform: scale(1.2); opacity: 0; }
-        }
-        .animate-pulse-ring { animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
 
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
@@ -553,7 +546,7 @@ export default function Page() {
           </div>
 
           <div className="flex items-center gap-2">
-            <RefreshButton onRefresh={handleRefresh} isLoading={isRefreshing} />
+            <RefreshButton onRefresh={() => fetchAll(true)} isLoading={isRefreshing} />
             <a
               href="/payment/create"
               className="inline-flex items-center gap-1 sm:gap-1.5 bg-gray-700 text-white text-[11px] sm:text-sm font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl hover:bg-gray-800 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg whitespace-nowrap"
@@ -579,21 +572,56 @@ export default function Page() {
             ))
           ) : canSeeFinancials ? (
             <>
-              <StatCard label="Omzet Hari Ini" value={`Rp ${fmtShort(stats?.todayRevenue || 0)}`}
-                sub={`${stats?.todayTransactions || 0} transaksi`} icon={<OmzetIcon />} accent="gray" change={stats?.revenueChange} />
-              <StatCard label="Profit Hari Ini" value={`Rp ${fmtShort(stats?.todayProfit || 0)}`}
-                sub="margin bersih" icon={<ProfitIcon />} accent="emerald" change={stats?.profitChange} />
-              <StatCard label="Laptop Ready" value={stats?.laptopReady || 0}
-                sub={`${stats?.stockTotal || 0} total unit`} icon={<LaptopIcon />} accent="gray" />
-              <StatCard label="Transaksi Hari Ini" value={stats?.todayTransactions || 0}
-                sub="transaksi selesai" icon={<TrxIcon />} accent="gray" change={stats?.trxChange} />
+              {/* PERBAIKAN: pakai fmtRupiah (format penuh) bukan fmtShort */}
+              <StatCard
+                label="Omzet Hari Ini"
+                value={fmtRupiah(stats?.todayRevenue || 0)}
+                sub={`${stats?.todayTransactions || 0} transaksi`}
+                icon={<OmzetIcon />}
+                accent="gray"
+                change={stats?.revenueChange}
+              />
+              <StatCard
+                label="Profit Hari Ini"
+                value={fmtRupiah(stats?.todayProfit || 0)}
+                sub="margin bersih"
+                icon={<ProfitIcon />}
+                accent="emerald"
+                change={stats?.profitChange}
+              />
+              <StatCard
+                label="Laptop Ready"
+                value={String(stats?.laptopReady || 0)}
+                sub={`${stats?.stockTotal || 0} total unit`}
+                icon={<LaptopIcon />}
+                accent="gray"
+              />
+              <StatCard
+                label="Transaksi Hari Ini"
+                value={String(stats?.todayTransactions || 0)}
+                sub="transaksi selesai"
+                icon={<TrxIcon />}
+                accent="gray"
+                change={stats?.trxChange}
+              />
             </>
           ) : (
             <>
-              <StatCard label="Transaksi Hari Ini" value={stats?.todayTransactions || 0}
-                sub="transaksi selesai" icon={<TrxIcon />} accent="gray" change={stats?.trxChange} />
-              <StatCard label="Laptop Ready" value={stats?.laptopReady || 0}
-                sub={`${stats?.stockTotal || 0} total unit`} icon={<LaptopIcon />} accent="gray" />
+              <StatCard
+                label="Transaksi Hari Ini"
+                value={String(stats?.todayTransactions || 0)}
+                sub="transaksi selesai"
+                icon={<TrxIcon />}
+                accent="gray"
+                change={stats?.trxChange}
+              />
+              <StatCard
+                label="Laptop Ready"
+                value={String(stats?.laptopReady || 0)}
+                sub={`${stats?.stockTotal || 0} total unit`}
+                icon={<LaptopIcon />}
+                accent="gray"
+              />
             </>
           )}
         </div>
@@ -680,7 +708,9 @@ export default function Page() {
                   <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
                     maxTotal={stats.topSales[0]?.total || 1}
                     extra={canSeeFinancials && s.profit > 0 ? (
-                      <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">+{fmtShort(s.profit)}</span>
+                      <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">
+                        +{fmtShort(s.profit)}
+                      </span>
                     ) : undefined}
                   />
                 ))}
@@ -728,7 +758,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Bar Chart Transaksi (only for financials role) ── */}
+        {/* ── Bar Chart (only for financials role) ── */}
         {canSeeFinancials && (
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5 fade-up" style={{ animationDelay: "0.13s" }}>
             <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -781,13 +811,18 @@ export default function Page() {
               ))
             ) : transactions.length === 0 ? (
               <div className="py-12 sm:py-16 text-center">
-                <div className="text-4xl sm:text-5xl mb-2 sm:mb-3 animate-bounce">📭</div>
+                <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">📭</div>
                 <p className="text-gray-500 text-[11px] sm:text-sm font-medium">Belum ada transaksi hari ini</p>
                 <p className="text-gray-400 text-[9px] sm:text-xs mt-1">Transaksi akan muncul setelah dibuat</p>
               </div>
             ) : (
               transactions.map((item) => (
-                <TransactionRow key={item.id} item={item} onPhotoClick={setPhotoModal} canSeeFinancials={canSeeFinancials} />
+                <TransactionRow
+                  key={item.id}
+                  item={item}
+                  onPhotoClick={setPhotoModal}
+                  canSeeFinancials={canSeeFinancials}
+                />
               ))
             )}
           </div>

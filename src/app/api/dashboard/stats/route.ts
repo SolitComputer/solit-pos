@@ -6,21 +6,36 @@ import { PERMISSIONS, withAuth } from "@/lib/auth";
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
   const nowWIB = new Date(Date.now() + WIB);
-  return nowWIB.toISOString().split("T")[0]; // "2026-06-07"
+  return nowWIB.toISOString().split("T")[0];
 }
 
 function getYesterdayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
   const nowWIB = new Date(Date.now() + WIB);
   nowWIB.setUTCDate(nowWIB.getUTCDate() - 1);
-  return nowWIB.toISOString().split("T")[0]; // "2026-06-06"
+  return nowWIB.toISOString().split("T")[0];
 }
 
 function getLast7DaysWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
   const nowWIB = new Date(Date.now() + WIB);
   nowWIB.setUTCDate(nowWIB.getUTCDate() - 6);
-  return nowWIB.toISOString().split("T")[0]; // "2026-06-01"
+  return nowWIB.toISOString().split("T")[0];
+}
+
+// ── PERBAIKAN: Konsisten pakai deal_price sebagai sumber utama ──────────────
+// Sama persis dengan logika di halaman transaksi:
+// (item.deal_price || item.amount || 0)
+function getDealPrice(item: any): number {
+  return Number(item.deal_price || item.amount || 0);
+}
+
+function calcProfit(item: any): number {
+  const dealPrice      = getDealPrice(item);
+  const inventoryPrice = Number(item.inventory_price || 0);
+  return inventoryPrice > 0
+    ? dealPrice - inventoryPrice
+    : Number(item.other || 0);
 }
 
 async function handler(req: NextRequest) {
@@ -35,7 +50,6 @@ async function handler(req: NextRequest) {
       { data: weeklyTransactions },
       { data: yesterdayTransactions },
     ] = await Promise.all([
-      // Filter by pickup_date = hari ini
       supabase
         .from("transactions")
         .select("*")
@@ -48,7 +62,6 @@ async function handler(req: NextRequest) {
         .eq("status", "SIAP_JUAL")
         .gt("qty", 0),
 
-      // Filter by pickup_date >= 7 hari lalu
       supabase
         .from("transactions")
         .select("*")
@@ -56,7 +69,6 @@ async function handler(req: NextRequest) {
         .gte("pickup_date", weekStart)
         .lte("pickup_date", today),
 
-      // Filter by pickup_date = kemarin
       supabase
         .from("transactions")
         .select("*")
@@ -64,29 +76,16 @@ async function handler(req: NextRequest) {
         .eq("pickup_date", yesterday),
     ]);
 
-    // ── Helper profit calc ────────────────────────────────────────────────
-    const calcProfit = (item: any): number => {
-      const dealPrice      = Number(item.deal_price || item.amount || 0);
-      const inventoryPrice = Number(item.inventory_price || 0);
-      return inventoryPrice > 0
-        ? dealPrice - inventoryPrice
-        : Number(item.other || 0);
-    };
-
     // ── Today stats ───────────────────────────────────────────────────────
     const todayRevenue =
-      todayTransactions?.reduce(
-        (acc, item) => acc + Number(item.deal_price || item.amount || 0), 0
-      ) || 0;
+      todayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     const todayProfit =
       todayTransactions?.reduce((acc, item) => acc + calcProfit(item), 0) || 0;
 
     // ── Yesterday stats ───────────────────────────────────────────────────
     const yesterdayRevenue =
-      yesterdayTransactions?.reduce(
-        (acc, item) => acc + Number(item.deal_price || item.amount || 0), 0
-      ) || 0;
+      yesterdayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     const yesterdayProfit =
       yesterdayTransactions?.reduce((acc, item) => acc + calcProfit(item), 0) || 0;
@@ -113,10 +112,9 @@ async function handler(req: NextRequest) {
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
 
-    // ── Weekly trend — group by pickup_date langsung ──────────────────────
+    // ── Weekly trend ──────────────────────────────────────────────────────
     const trendMap: Record<string, { revenue: number; profit: number; trxCount: number }> = {};
 
-    // Inisialisasi 7 hari
     for (let i = 6; i >= 0; i--) {
       const WIB = 7 * 60 * 60 * 1000;
       const d = new Date(Date.now() + WIB);
@@ -126,10 +124,9 @@ async function handler(req: NextRequest) {
     }
 
     weeklyTransactions?.forEach((item) => {
-      // pickup_date sudah "YYYY-MM-DD", langsung pakai sebagai key
       const dateKey = item.pickup_date as string;
       if (trendMap[dateKey]) {
-        trendMap[dateKey].revenue  += Number(item.deal_price || item.amount || 0);
+        trendMap[dateKey].revenue  += getDealPrice(item);
         trendMap[dateKey].profit   += calcProfit(item);
         trendMap[dateKey].trxCount += 1;
       }

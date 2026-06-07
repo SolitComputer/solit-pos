@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Chart as ChartJS,
@@ -16,20 +16,24 @@ ChartJS.register(
   Filler, Tooltip, Legend
 );
 
-const fmt  = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
-const fmtK = (n: number) => {
+// PERBAIKAN: fmtRupiah untuk nominal utama — tidak dibulatkan
+const fmtRupiah = (n: number): string =>
+  "Rp " + (n || 0).toLocaleString("id-ID");
+
+// fmtShort hanya untuk chart tooltip & label kecil di dalam kartu rank
+const fmtShort = (n: number): string => {
   if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
-  if (n >= 1_000_000)     return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
-  if (n >= 1_000)         return `Rp ${(n / 1_000).toFixed(0)}Rb`;
+  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
+  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}Rb`;
   return `Rp ${n}`;
 };
 
 interface Summary {
-  totalRevenue:  number;
-  totalProfit:   number;
-  totalTrx:      number;
-  avgDeal:       number;
-  profitMargin:  number;
+  totalRevenue: number;
+  totalProfit: number;
+  totalTrx: number;
+  avgDeal: number;
+  profitMargin: number;
 }
 interface TrendItem {
   key: string; label: string;
@@ -47,9 +51,7 @@ function getPreset(preset: string): { from: string; to: string } {
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   const todayStr = fmt(nowWIB);
 
-  if (preset === "today") {
-    return { from: todayStr, to: todayStr };
-  }
+  if (preset === "today") return { from: todayStr, to: todayStr };
   if (preset === "yesterday") {
     const y = new Date(nowWIB); y.setUTCDate(y.getUTCDate() - 1);
     const ys = fmt(y);
@@ -66,7 +68,7 @@ function getPreset(preset: string): { from: string; to: string } {
   }
   if (preset === "last_month") {
     const first = new Date(Date.UTC(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth() - 1, 1));
-    const last  = new Date(Date.UTC(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), 0));
+    const last = new Date(Date.UTC(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), 0));
     return { from: fmt(first), to: fmt(last) };
   }
   if (preset === "last_7") {
@@ -96,7 +98,6 @@ function SummarySkeleton() {
   );
 }
 
-// Chart Skeleton
 function ChartSkeleton() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
@@ -106,19 +107,20 @@ function ChartSkeleton() {
   );
 }
 
-// Enhanced Stat Card Component
+// PERBAIKAN: StatCard — nilai keuangan ditampilkan penuh
 function StatCard({ label, value, color, bg, border, bar, icon }: any) {
   return (
     <div className={`bg-white rounded-2xl border ${border} shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
       <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
           <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
-          <p className={`text-xl font-extrabold mt-1 tracking-tight ${color} group-hover:scale-105 transition-transform origin-left`}>
+          {/* Teks lebih kecil sedikit agar angka panjang tidak overflow */}
+          <p className={`text-base font-extrabold mt-1 tracking-tight ${color} group-hover:scale-105 transition-transform origin-left break-words`}>
             {value}
           </p>
         </div>
-        <div className={`p-2 rounded-xl ${bg} opacity-60 group-hover:opacity-100 transition-opacity`}>
+        <div className={`p-2 rounded-xl ${bg} opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0`}>
           {icon}
         </div>
       </div>
@@ -126,10 +128,9 @@ function StatCard({ label, value, color, bg, border, bar, icon }: any) {
   );
 }
 
-// Rank List Component
 function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
-  if (items.length === 0) return null;
-  
+  if (!items || items.length === 0) return null;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5">
       <div className="flex items-center gap-2 mb-4">
@@ -146,22 +147,24 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
                 {i === 0 && <span className="text-lg">🥇</span>}
                 {i === 1 && <span className="text-lg">🥈</span>}
                 {i === 2 && <span className="text-lg">🥉</span>}
-                {i > 2 && <span className="text-xs font-semibold text-gray-400 bg-gray-100 w-5 h-5 rounded-full flex items-center justify-center">{i+1}</span>}
+                {i > 2 && (
+                  <span className="text-xs font-semibold text-gray-400 bg-gray-100 w-5 h-5 rounded-full flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-700 truncate flex-1 font-medium group-hover:text-gray-900 transition">
                 {item.name}
               </p>
               <div className="text-right flex-shrink-0">
-                <p className="text-xs font-bold text-gray-800">{fmtK(item[revenueKey])}</p>
+                {/* rank list pakai fmtShort karena ruang sempit */}
+                <p className="text-xs font-bold text-gray-800">{fmtShort(item[revenueKey])}</p>
                 <p className="text-[10px] text-gray-400">{item.count}x</p>
               </div>
             </div>
             <div className="ml-7 mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-500 group-hover:opacity-80 ${
-                  color === "bg-gray-100" ? "bg-gray-600" : 
-                  color === "bg-gray-100" ? "bg-gray-600" : "bg-gray-600"
-                }`}
+                className="h-full bg-gray-600 rounded-full transition-all duration-500 group-hover:opacity-80"
                 style={{ width: `${Math.round((item[revenueKey] / items[0][revenueKey]) * 100)}%` }}
               />
             </div>
@@ -172,7 +175,6 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
   );
 }
 
-// Empty State Component
 function EmptyState() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center animate-fadeIn">
@@ -187,22 +189,22 @@ function EmptyState() {
 }
 
 export default function ReportsPage() {
-  const [dateFrom, setDateFrom]   = useState(() => getPreset("this_month").from);
-  const [dateTo,   setDateTo]     = useState(() => getPreset("this_month").to);
-  const [groupBy,  setGroupBy]    = useState("day");
+  const [dateFrom, setDateFrom] = useState(() => getPreset("this_month").from);
+  const [dateTo, setDateTo] = useState(() => getPreset("this_month").to);
+  const [groupBy, setGroupBy] = useState("day");
   const [activePreset, setActivePreset] = useState("this_month");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [summary,   setSummary]   = useState<Summary | null>(null);
-  const [trend,     setTrend]     = useState<TrendItem[]>([]);
-  const [topSales,  setTopSales]  = useState<RankItem[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [trend, setTrend] = useState<TrendItem[]>([]);
+  const [topSales, setTopSales] = useState<RankItem[]>([]);
   const [topLaptop, setTopLaptop] = useState<RankItem[]>([]);
   const [topSource, setTopSource] = useState<RankItem[]>([]);
 
   const fetchReport = async () => {
     setIsLoading(true);
     try {
-      const res    = await fetch(`/api/reports?from=${dateFrom}&to=${dateTo}&group=${groupBy}`);
+      const res = await fetch(`/api/reports?from=${dateFrom}&to=${dateTo}&group=${groupBy}`);
       const result = await res.json();
       if (result.success) {
         setSummary(result.data.summary);
@@ -231,10 +233,10 @@ export default function ReportsPage() {
     else if (preset === "this_year") setGroupBy("month");
   };
 
-  const trendLabels  = trend.map(t => t.label);
+  const trendLabels = trend.map(t => t.label);
   const trendRevenue = trend.map(t => t.revenue);
-  const trendProfit  = trend.map(t => t.profit);
-  const trendTrx     = trend.map(t => t.trxCount);
+  const trendProfit = trend.map(t => t.profit);
+  const trendTrx = trend.map(t => t.trxCount);
 
   const lineData = {
     labels: trendLabels,
@@ -286,7 +288,7 @@ export default function ReportsPage() {
   const chartOpts = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { 
+    plugins: {
       legend: { display: false },
       tooltip: {
         backgroundColor: "rgba(0,0,0,0.8)",
@@ -295,31 +297,26 @@ export default function ReportsPage() {
         padding: 8,
         cornerRadius: 8,
         callbacks: {
-          label: (context: any) => {
-            let label = context.dataset.label || '';
-            let value = context.raw;
-            return `${label}: ${fmtK(value)}`;
-          }
-        }
-      }
+          label: (context: any) => `${context.dataset.label}: ${fmtShort(context.raw)}`,
+        },
+      },
     },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af", maxRotation: 45 } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 10 }, color: "#9ca3af",
-            callback: (v: any) => fmtK(v) } },
+      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 10 }, color: "#9ca3af", callback: (v: any) => fmtShort(v) } },
     },
   } as const;
 
   const barOpts = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { 
+    plugins: {
       legend: { display: false },
-      tooltip: { 
+      tooltip: {
         backgroundColor: "rgba(0,0,0,0.8)",
         cornerRadius: 8,
-        callbacks: { label: (c: any) => `${c.raw} transaksi` } 
-      }
+        callbacks: { label: (c: any) => `${c.raw} transaksi` },
+      },
     },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af", maxRotation: 45 } },
@@ -328,20 +325,20 @@ export default function ReportsPage() {
   } as const;
 
   const PRESETS = [
-    { id: "today",      label: "Hari ini", icon: "📅" },
-    { id: "yesterday",  label: "Kemarin", icon: "📆" },
-    { id: "this_week",  label: "Minggu ini", icon: "📊" },
+    { id: "today", label: "Hari ini", icon: "📅" },
+    { id: "yesterday", label: "Kemarin", icon: "📆" },
+    { id: "this_week", label: "Minggu ini", icon: "📊" },
     { id: "this_month", label: "Bulan ini", icon: "📈" },
     { id: "last_month", label: "Bulan lalu", icon: "📉" },
-    { id: "last_30",    label: "30 hari", icon: "🗓️" },
-    { id: "this_year",  label: "Tahun ini", icon: "🎯" },
+    { id: "last_30", label: "30 hari", icon: "🗓️" },
+    { id: "this_year", label: "Tahun ini", icon: "🎯" },
   ];
 
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
 
-        {/* Header dengan animasi */}
+        {/* Header */}
         <div className="animate-fadeIn">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -351,17 +348,15 @@ export default function ReportsPage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                     <line x1="18" y1="20" x2="18" y2="10" />
                     <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6"  y1="20" x2="6"  y2="14" />
-                    <line x1="2"  y1="20" x2="22" y2="20" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                    <line x1="2" y1="20" x2="22" y2="20" />
                   </svg>
                 </div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
                   Laporan Keuangan
                 </h1>
               </div>
-              <p className="text-sm text-gray-500 ml-10">
-                Omzet, profit, dan analisis transaksi
-              </p>
+              <p className="text-sm text-gray-500 ml-10">Omzet, profit, dan analisis transaksi</p>
             </div>
             <button
               onClick={fetchReport}
@@ -376,7 +371,7 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Filter Panel yang ditingkatkan */}
+        {/* Filter Panel */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
           <div className="p-5 space-y-4">
             {/* Preset buttons */}
@@ -389,11 +384,10 @@ export default function ReportsPage() {
                   <button
                     key={p.id}
                     onClick={() => applyPreset(p.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
-                      activePreset === p.id
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${activePreset === p.id
                         ? "bg-gray-700 text-white shadow-md transform scale-105"
                         : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                    }`}
+                      }`}
                   >
                     <span>{p.icon}</span>
                     {p.label}
@@ -405,15 +399,7 @@ export default function ReportsPage() {
             {/* Date range + group by + apply */}
             <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-gray-100">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  Dari Tanggal
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Dari Tanggal</label>
                 <input
                   type="date"
                   value={dateFrom}
@@ -422,15 +408,7 @@ export default function ReportsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  Sampai Tanggal
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sampai Tanggal</label>
                 <input
                   type="date"
                   value={dateTo}
@@ -439,13 +417,7 @@ export default function ReportsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 4v16h16" />
-                    <polyline points="20 10 12 18 8 14" />
-                  </svg>
-                  Kelompokkan Per
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Kelompokkan Per</label>
                 <select
                   value={groupBy}
                   onChange={e => setGroupBy(e.target.value)}
@@ -467,53 +439,53 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Summary Cards - Enhanced */}
+        {/* Summary Cards — PERBAIKAN: fmtRupiah untuk angka penuh */}
         {isLoading ? (
           <SummarySkeleton />
         ) : summary ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <StatCard 
-              label="Total Omzet" 
-              value={fmtK(summary.totalRevenue)} 
-              color="text-gray-700" 
-              bg="bg-gray-50" 
-              border="border-gray-100" 
+            <StatCard
+              label="Total Omzet"
+              value={fmtRupiah(summary.totalRevenue)}
+              color="text-gray-700"
+              bg="bg-gray-50"
+              border="border-gray-100"
               bar="bg-gray-600"
               icon={<span className="text-lg">💰</span>}
             />
-            <StatCard 
-              label="Total Profit" 
-              value={fmtK(summary.totalProfit)} 
-              color="text-gray-700" 
-              bg="bg-gray-50" 
-              border="border-gray-100" 
+            <StatCard
+              label="Total Profit"
+              value={fmtRupiah(summary.totalProfit)}
+              color="text-gray-700"
+              bg="bg-gray-50"
+              border="border-gray-100"
               bar="bg-gray-600"
               icon={<span className="text-lg">📈</span>}
             />
-            <StatCard 
-              label="Total Transaksi" 
-              value={summary.totalTrx + " trx"} 
-              color="text-gray-700" 
-              bg="bg-gray-50" 
-              border="border-gray-100" 
+            <StatCard
+              label="Total Transaksi"
+              value={`${summary.totalTrx} trx`}
+              color="text-gray-700"
+              bg="bg-gray-50"
+              border="border-gray-100"
               bar="bg-gray-600"
               icon={<span className="text-lg">🛒</span>}
             />
-            <StatCard 
-              label="Rata-rata Deal" 
-              value={fmtK(summary.avgDeal)} 
-              color="text-gray-700" 
-              bg="bg-gray-50" 
-              border="border-gray-100" 
+            <StatCard
+              label="Rata-rata Deal"
+              value={fmtRupiah(summary.avgDeal)}
+              color="text-gray-700"
+              bg="bg-gray-50"
+              border="border-gray-100"
               bar="bg-gray-600"
               icon={<span className="text-lg">💵</span>}
             />
-            <StatCard 
-              label="Margin Profit" 
-              value={summary.profitMargin + "%"} 
-              color="text-gray-700" 
-              bg="bg-gray-50" 
-              border="border-gray-100" 
+            <StatCard
+              label="Margin Profit"
+              value={`${summary.profitMargin}%`}
+              color="text-gray-700"
+              bg="bg-gray-50"
+              border="border-gray-100"
               bar="bg-gray-600"
               icon={<span className="text-lg">📊</span>}
             />
@@ -565,27 +537,9 @@ export default function ReportsPage() {
         {/* Top Lists */}
         {(topSales.length > 0 || topLaptop.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <RankList 
-              title="Top Sales" 
-              icon="🏆" 
-              items={topSales} 
-              color="bg-gray-100"
-              revenueKey="revenue"
-            />
-            <RankList 
-              title="Laptop Terlaris" 
-              icon="💻" 
-              items={topLaptop} 
-              color="bg-gray-100"
-              revenueKey="revenue"
-            />
-            <RankList 
-              title="Sumber Penjualan" 
-              icon="📱" 
-              items={topSource} 
-              color="bg-gray-100"
-              revenueKey="revenue"
-            />
+            <RankList title="Top Sales" icon="🏆" items={topSales} color="bg-gray-100" revenueKey="revenue" />
+            <RankList title="Laptop Terlaris" icon="💻" items={topLaptop} color="bg-gray-100" revenueKey="revenue" />
+            <RankList title="Sumber Penjualan" icon="📱" items={topSource} color="bg-gray-100" revenueKey="revenue" />
           </div>
         )}
 
@@ -605,6 +559,8 @@ export default function ReportsPage() {
         }
         .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
         .animate-bounce { animation: bounce 1s ease-in-out infinite; }
+        .animate-spin { animation: spin 0.6s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </DashboardLayout>
   );

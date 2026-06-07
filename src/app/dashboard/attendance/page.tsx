@@ -31,8 +31,8 @@ function toWIBTime(iso: string): string {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
 const SHIFT_LATE_THRESHOLD: Record<"PAGI" | "SORE", number> = {
-    PAGI: 8 * 60 + 0,   
-    SORE: 16 * 60 + 0,  
+    PAGI: 8 * 60 + 0,
+    SORE: 16 * 60 + 0,
 };
 
 function isLate(t: string, shift: "PAGI" | "SORE" = "PAGI"): boolean {
@@ -904,7 +904,30 @@ export default function AttendanceDashboardPage() {
                                             ⏰ {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat
                                         </span>
                                     )}
-                                    {(() => { const off = getOffUsersForDate(selectedDate); return off.length > 0 ? (<span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-600 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 Libur: {off.slice(0, 3).join(", ")}{off.length > 3 ? ` +${off.length - 3}` : ""}</span>) : null; })()}
+                                    {
+                                        (() => {
+                                            const off = getOffUsersForDate(selectedDate);
+
+                                            return off.length > 0 ? (
+                                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                                    <div className="text-sm font-bold text-red-700 mb-2">
+                                                        🔴 Karyawan Libur ({off.length})
+                                                    </div>
+
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {off.map((name) => (
+                                                            <span
+                                                                key={name}
+                                                                className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full"
+                                                            >
+                                                                {name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : null;
+                                        })()
+                                    }
                                 </div>
                             </div>
                             <button onClick={() => setSelectedDate(null)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-200">
