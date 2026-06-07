@@ -7,20 +7,20 @@ import * as faceapi from "face-api.js";
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
-  | "out-of-range" | "out-of-time";
+  | "out-of-range" | "out-of-time" | "no-camera";
 
-const MAX_ATTEMPTS            = 5;
+const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
-const HOLD_FRAMES             = 3;
-const DETECTION_INPUT_SIZE    = 224;
+const HOLD_FRAMES = 3;
+const DETECTION_INPUT_SIZE = 224;
 
-const COMPANY_LAT         = -6.402123;
-const COMPANY_LNG         = 106.787296;
+const COMPANY_LAT = -6.402123;
+const COMPANY_LNG = 106.787296;
 const MAX_DISTANCE_METERS = 80;
 
 const SHIFT_CONFIG_CLIENT = {
-  PAGI: { startH: 7,  startM: 30, endH: 12, endM: 0 },
-  SORE: { startH: 14, startM: 0,  endH: 18, endM: 0 },
+  PAGI: { startH: 7, startM: 30, endH: 12, endM: 0 },
+  SORE: { startH: 14, startM: 0, endH: 18, endM: 0 },
 } as const;
 
 type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;
@@ -30,58 +30,58 @@ function ts() {
 }
 
 type AttendanceTimeResult =
-  | { allowed: true;  reason: "OPEN";                   openAt: string; closeAt: string }
+  | { allowed: true; reason: "OPEN"; openAt: string; closeAt: string }
   | { allowed: false; reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string };
 
 function isAttendanceTimeClient(shift: ShiftType): AttendanceTimeResult {
-  const cfg    = SHIFT_CONFIG_CLIENT[shift];
+  const cfg = SHIFT_CONFIG_CLIENT[shift];
   const nowUTC = new Date();
-  const wibMs  = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+  const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
   const nowWIB = new Date(wibMs);
-  const total  = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start  = cfg.startH * 60 + cfg.startM;
-  const end    = cfg.endH   * 60 + cfg.endM;
-  const pad    = (n: number) => String(n).padStart(2, "0");
-  const openAt  = `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`;
+  const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
+  const start = cfg.startH * 60 + cfg.startM;
+  const end = cfg.endH * 60 + cfg.endM;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const openAt = `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`;
   const closeAt = `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`;
   if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt };
-  if (total > end)   return { allowed: false, reason: "TOO_LATE",  openAt, closeAt };
-  return               { allowed: true,  reason: "OPEN",      openAt, closeAt };
+  if (total > end) return { allowed: false, reason: "TOO_LATE", openAt, closeAt };
+  return { allowed: true, reason: "OPEN", openAt, closeAt };
 }
 
 type LogType = "info" | "ok" | "warn" | "err";
-interface LogEntry  { time: string; msg: string; type: LogType }
+interface LogEntry { time: string; msg: string; type: LogType }
 interface GpsCoords { latitude: number; longitude: number; accuracy: number }
 
 export default function FaceVerifyPage() {
   const searchParams = useSearchParams();
-  const redirectTo   = searchParams.get("from") ?? "/dashboard";
+  const redirectTo = searchParams.get("from") ?? "/dashboard";
 
-  const videoRef       = useRef<HTMLVideoElement>(null);
-  const canvasRef      = useRef<HTMLCanvasElement>(null);
-  const streamRef      = useRef<MediaStream | null>(null);
-  const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const holdCountRef   = useRef(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
-  const logEndRef      = useRef<HTMLDivElement>(null);
-  const clockRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const attemptsRef    = useRef(0);
+  const logEndRef = useRef<HTMLDivElement>(null);
+  const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attemptsRef = useRef(0);
 
-  const [stage,           setStage]           = useState<Stage>("loading");
-  const [message,         setMessage]         = useState("Memuat sistem...");
-  const [attempts,        setAttempts]        = useState(0);
-  const [faceDetected,    setFaceDetected]    = useState(false);
-  const [confidence,      setConfidence]      = useState(0);
-  const [holdProgress,    setHoldProgress]    = useState(0);
-  const [clockStr,        setClockStr]        = useState(ts());
-  const [logs,            setLogs]            = useState<LogEntry[]>([
+  const [stage, setStage] = useState<Stage>("loading");
+  const [message, setMessage] = useState("Memuat sistem...");
+  const [attempts, setAttempts] = useState(0);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [confidence, setConfidence] = useState(0);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [clockStr, setClockStr] = useState(ts());
+  const [logs, setLogs] = useState<LogEntry[]>([
     { time: ts(), msg: "solit biometric engine v3.0 started", type: "ok" },
   ]);
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
-  const [gpsCoords,       setGpsCoords]       = useState<GpsCoords | null>(null);
-  const [gpsLoading,      setGpsLoading]      = useState(false);
-  const [skipping,        setSkipping]        = useState(false);
-  const [timeInfo,        setTimeInfo]        = useState<{
+  const [gpsCoords, setGpsCoords] = useState<GpsCoords | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const [timeInfo, setTimeInfo] = useState<{
     reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string;
   } | null>(null);
 
@@ -128,7 +128,7 @@ export default function FaceVerifyPage() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
-        const distance  = calculateDistance(latitude, longitude, COMPANY_LAT, COMPANY_LNG);
+        const distance = calculateDistance(latitude, longitude, COMPANY_LAT, COMPANY_LNG);
         const distRound = Math.round(distance);
         setCurrentDistance(distRound);
         setGpsCoords({ latitude, longitude, accuracy });
@@ -201,7 +201,7 @@ export default function FaceVerifyPage() {
           // Gunakan timeInfo dari timeCheck client yang sudah pakai shift benar
           setTimeInfo({
             reason: timeCheck.allowed ? "TOO_LATE" : timeCheck.reason,
-            openAt:  timeCheck.openAt,
+            openAt: timeCheck.openAt,
             closeAt: timeCheck.closeAt,
           });
           setStage("out-of-time");
@@ -235,6 +235,16 @@ export default function FaceVerifyPage() {
 
   const startCamera = useCallback(async () => {
     try {
+      // Cek apakah device punya kamera sama sekali
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasCamera = devices.some(d => d.kind === "videoinput");
+        if (!hasCamera) {
+          addLog("no camera device found", "warn");
+          return "no-camera"; // ← return string khusus
+        }
+      }
+
       addLog("initializing camera...", "info");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
@@ -243,13 +253,17 @@ export default function FaceVerifyPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch(() => { });
       }
       addLog("camera active ✓", "ok");
-      return true;
-    } catch {
-      addLog("camera unavailable", "err");
-      return false;
+      return "ok";
+    } catch (err: any) {
+      if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+        addLog("no camera found", "warn");
+        return "no-camera";
+      }
+      addLog(`camera error: ${err?.name ?? "unavailable"}`, "err");
+      return "error";
     }
   }, [addLog]);
 
@@ -267,9 +281,9 @@ export default function FaceVerifyPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         embedding, attemptCount: attempt,
-        latitude:  coords?.latitude  ?? null,
+        latitude: coords?.latitude ?? null,
         longitude: coords?.longitude ?? null,
-        accuracy:  coords?.accuracy  ?? null,
+        accuracy: coords?.accuracy ?? null,
       }),
     });
     return res.json();
@@ -333,7 +347,7 @@ export default function FaceVerifyPage() {
               setMessage("Memproses pendaftaran wajah...");
               addLog("auto-capture — enrolling...", "ok");
 
-              const enrollRes  = await fetch("/api/auth/face-enroll", {
+              const enrollRes = await fetch("/api/auth/face-enroll", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ embedding }),
@@ -351,8 +365,8 @@ export default function FaceVerifyPage() {
                   const cfg = SHIFT_CONFIG_CLIENT[userShift];
                   const pad = (n: number) => String(n).padStart(2, "0");
                   setTimeInfo({
-                    reason:   "TOO_LATE",
-                    openAt:  `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
+                    reason: "TOO_LATE",
+                    openAt: `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
                     closeAt: `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`,
                   });
                   setStage("out-of-time");
@@ -379,8 +393,8 @@ export default function FaceVerifyPage() {
                 const cfg = SHIFT_CONFIG_CLIENT[userShift];
                 const pad = (n: number) => String(n).padStart(2, "0");
                 setTimeInfo({
-                  reason:   "TOO_LATE",
-                  openAt:  `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
+                  reason: "TOO_LATE",
+                  openAt: `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
                   closeAt: `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`,
                 });
                 setStage("out-of-time");
@@ -416,18 +430,21 @@ export default function FaceVerifyPage() {
 
   useEffect(() => {
     if (stage === "enroll" || stage === "verify") {
-      startCamera().then(ok => {
-        if (ok) startFaceDetectionLoop(stage as "enroll" | "verify", gpsCoords);
-        else {
+      startCamera().then(result => {
+        if (result === "ok") {
+          startFaceDetectionLoop(stage as "enroll" | "verify", gpsCoords);
+        } else if (result === "no-camera") {
+          setStage("no-camera");
+          setMessage("Tidak ada kamera yang terdeteksi");
+        } else {
           setStage("error");
           setMessage("Kamera tidak dapat diakses. Izinkan akses kamera di browser.");
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera"].includes(stage)) {
       stopCamera();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
   const handleRejectAttendance = useCallback(async () => {
@@ -444,21 +461,21 @@ export default function FaceVerifyPage() {
     window.location.href = "/login";
   };
 
-  const showCamera   = ["enroll", "verify", "enrolling", "verifying"].includes(stage);
+  const showCamera = ["enroll", "verify", "enrolling", "verifying"].includes(stage);
   const isProcessing = ["enrolling", "verifying"].includes(stage);
 
   const confColor =
     confidence > 75 ? "rgba(255,255,255,0.75)"
-    : confidence > 50 ? "#f59e0b" : "#f87171";
+      : confidence > 50 ? "#f59e0b" : "#f87171";
 
   const logColor: Record<LogType, string> = {
     info: "rgba(255,255,255,0.3)", ok: "rgba(255,255,255,0.75)", warn: "#f59e0b", err: "#f87171",
   };
 
   // ✅ FIX: openAtStr/closeAtStr dihitung dari userShift state
-  const shiftCfg   = SHIFT_CONFIG_CLIENT[userShift];
-  const openAtStr  = `${String(shiftCfg.startH).padStart(2,"0")}:${String(shiftCfg.startM).padStart(2,"0")}`;
-  const closeAtStr = `${String(shiftCfg.endH).padStart(2,"0")}:${String(shiftCfg.endM).padStart(2,"0")}`;
+  const shiftCfg = SHIFT_CONFIG_CLIENT[userShift];
+  const openAtStr = `${String(shiftCfg.startH).padStart(2, "0")}:${String(shiftCfg.startM).padStart(2, "0")}`;
+  const closeAtStr = `${String(shiftCfg.endH).padStart(2, "0")}:${String(shiftCfg.endM).padStart(2, "0")}`;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -594,8 +611,6 @@ export default function FaceVerifyPage() {
                 Waktu sekarang: <span style={{ fontFamily: "monospace" }}>{clockStr} WIB</span>
               </div>
             </div>
-            {/* ✅ FIX: tombol ini langsung redirect, middleware tidak akan blokir
-                karena di luar jam absen middleware sudah lolos */}
             <button className="btn-main" style={{ marginTop: 16 }} onClick={() => window.location.href = redirectTo}>
               Lanjut ke Dashboard →
             </button>
@@ -631,6 +646,98 @@ export default function FaceVerifyPage() {
             </div>
             <div style={{ fontSize: 13, color: "#f87171", textAlign: "center" }}>{message}</div>
             <button className="btn-main" onClick={() => window.location.reload()} style={{ maxWidth: 180 }}>Refresh halaman</button>
+          </div>
+        )}
+
+        {/* No Camera */}
+        {stage === "no-camera" && (
+          <div style={{ padding: "8px 0 16px" }}>
+            {/* Info box */}
+            <div style={{
+              width: "100%",
+              background: "rgba(251,191,36,0.06)",
+              border: "0.5px solid rgba(251,191,36,0.25)",
+              borderRadius: 14,
+              padding: "20px",
+              textAlign: "center",
+              marginBottom: 16,
+            }}>
+              {/* Icon */}
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                background: "rgba(251,191,36,0.1)",
+                border: "0.5px solid rgba(251,191,36,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px",
+              }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round"
+                    d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                  <line x1="3" y1="3" x2="21" y2="21" stroke="#fbbf24" strokeWidth={1.5} strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                Kamera Tidak Tersedia
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
+                Perangkat ini tidak memiliki kamera.<br />
+                Absensi wajah tidak dapat dilakukan.
+              </div>
+
+              {/* Info shift tetap tampil */}
+              <div style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "0.5px solid rgba(255,255,255,0.07)",
+                borderRadius: 10, padding: "10px 16px",
+                display: "inline-flex", alignItems: "center", gap: 10,
+              }}>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                  Shift {userShift}:{" "}
+                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
+                  <span className="clock-colon"> – </span>
+                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAtStr} WIB</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              className="btn-main"
+              disabled={skipping}
+              onClick={async () => {
+                setSkipping(true);
+                try {
+                  await fetch("/api/auth/face-verify", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      latitude: gpsCoords?.latitude ?? null,
+                      longitude: gpsCoords?.longitude ?? null,
+                      accuracy: gpsCoords?.accuracy ?? null,
+                    }),
+                  });
+                } catch { /* tetap lanjut */ }
+                window.location.href = redirectTo;
+              }}
+            >
+              {skipping ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  Mengalihkan...
+                </span>
+              ) : (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                  Lanjut ke Dashboard Tanpa Absen
+                </span>
+              )}
+            </button>
+
+            <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
+              Kehadiran akan tercatat sebagai <span style={{ color: "rgba(251,191,36,0.6)" }}>SKIPPED</span>
+            </div>
           </div>
         )}
 
