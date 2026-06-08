@@ -85,9 +85,11 @@ export default function FaceVerifyPage() {
     reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string;
   } | null>(null);
 
-  // ✅ FIX: useState di dalam komponen
   const [userShift, setUserShift] = useState<ShiftType>("PAGI");
   const [needEnrollState, setNeedEnrollState] = useState(false);
+  const [scheduleInfo, setScheduleInfo] = useState<{
+    openAt: string; closeAt: string; lateAt: string;
+  } | null>(null);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
     setLogs(p => [...p.slice(-30), { time: ts(), msg, type }]);
@@ -188,29 +190,38 @@ export default function FaceVerifyPage() {
           return;
         }
 
-        // ✅ FIX: set shift dari server response
         const shift: ShiftType = (statusResult.shift as ShiftType) ?? "PAGI";
         setUserShift(shift);
         setNeedEnrollState(statusResult.needEnroll ?? false);
 
-        // ✅ FIX: cek waktu di client menggunakan shift yang benar dari server
-        // Ini sebagai defense-in-depth; validasi utama sudah di server (face-status)
-        const timeCheck = isAttendanceTimeClient(shift);
+        // ✅ NEW: simpan jadwal per-akun dari server untuk dipakai di UI
+        if (statusResult.scheduleToday) {
+          setScheduleInfo({
+            openAt: statusResult.scheduleToday.openAt,
+            closeAt: statusResult.scheduleToday.closeAt,
+            lateAt: statusResult.scheduleToday.lateAt,
+          });
+        }
 
         if (statusResult.alreadyAttended) {
           window.location.href = redirectTo;
           return;
         }
 
-        // ✅ FIX: gunakan isAttendanceTime dari server (lebih akurat)
-        // server sudah hitung berdasarkan shift yang benar
-        if (statusResult.isAttendanceTime === false) {
+        const clientCheck = isAttendanceTimeClient(shift);
+        const isOutOfTime =
+          statusResult.isAttendanceTime === false ||
+          (statusResult.isAttendanceTime == null && !clientCheck.allowed);
+
+        if (isOutOfTime) {
           addLog(`Server: di luar jam absen (shift ${shift})`, "warn");
-          // Gunakan timeInfo dari timeCheck client yang sudah pakai shift benar
+          const reason: "TOO_EARLY" | "TOO_LATE" =
+            (statusResult.reason ?? (clientCheck.allowed ? "TOO_LATE" : clientCheck.reason)) === "TOO_EARLY"
+              ? "TOO_EARLY" : "TOO_LATE";
           setTimeInfo({
-            reason: timeCheck.allowed ? "TOO_LATE" : timeCheck.reason,
-            openAt: timeCheck.openAt,
-            closeAt: timeCheck.closeAt,
+            reason,
+            openAt: statusResult.openAt ?? clientCheck.openAt,
+            closeAt: statusResult.closeAt ?? clientCheck.closeAt,
           });
           setStage("out-of-time");
           return;
@@ -370,12 +381,11 @@ export default function FaceVerifyPage() {
                   setMessage("Wajah berhasil didaftarkan dan absen tercatat ✓");
                   setTimeout(() => (window.location.href = redirectTo), 1800);
                 } else if (vd.outOfTime) {
-                  const cfg = SHIFT_CONFIG_CLIENT[userShift];
-                  const pad = (n: number) => String(n).padStart(2, "0");
+                  // ✅ FIX: pakai reason + jadwal dari server
                   setTimeInfo({
-                    reason: "TOO_LATE",
-                    openAt: `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
-                    closeAt: `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`,
+                    reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
+                    openAt: scheduleInfo?.openAt ?? "",
+                    closeAt: scheduleInfo?.closeAt ?? "",
                   });
                   setStage("out-of-time");
                 } else {
@@ -397,13 +407,10 @@ export default function FaceVerifyPage() {
                 setMessage("Absen wajah berhasil ✓ Selamat bekerja");
                 setTimeout(() => (window.location.href = redirectTo), 1500);
               } else if (vd.outOfTime) {
-                addLog("Waktu absen berakhir", "warn");
-                const cfg = SHIFT_CONFIG_CLIENT[userShift];
-                const pad = (n: number) => String(n).padStart(2, "0");
                 setTimeInfo({
-                  reason: "TOO_LATE",
-                  openAt: `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`,
-                  closeAt: `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`,
+                  reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
+                  openAt: scheduleInfo?.openAt ?? "",
+                  closeAt: scheduleInfo?.closeAt ?? "",
                 });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
@@ -504,10 +511,11 @@ export default function FaceVerifyPage() {
     info: "rgba(255,255,255,0.3)", ok: "rgba(255,255,255,0.75)", warn: "#f59e0b", err: "#f87171",
   };
 
-  // ✅ FIX: openAtStr/closeAtStr dihitung dari userShift state
   const shiftCfg = SHIFT_CONFIG_CLIENT[userShift];
-  const openAtStr = `${String(shiftCfg.startH).padStart(2, "0")}:${String(shiftCfg.startM).padStart(2, "0")}`;
-  const closeAtStr = `${String(shiftCfg.endH).padStart(2, "0")}:${String(shiftCfg.endM).padStart(2, "0")}`;
+  const fallbackOpen = `${String(shiftCfg.startH).padStart(2, "0")}:${String(shiftCfg.startM).padStart(2, "0")}`;
+  const fallbackClose = `${String(shiftCfg.endH).padStart(2, "0")}:${String(shiftCfg.endM).padStart(2, "0")}`;
+  const openAtStr = scheduleInfo?.openAt ?? fallbackOpen;
+  const closeAtStr = scheduleInfo?.closeAt ?? fallbackClose;
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", fontFamily: "'Inter', -apple-system, sans-serif" }}>

@@ -8,8 +8,8 @@ import {
   UserRole,
 } from "@/lib/auth";
 
-const PUBLIC_ROUTES    = ["/login", "/api/auth/login", "/api/auth/logout"];
-const PUBLIC_PREFIXES  = ["/receipt/", "/scan/"];
+const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
 
 const FACE_API_WHITELIST = [
@@ -23,30 +23,36 @@ const FACE_API_WHITELIST = [
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 
+const ATTENDANCE_EXEMPT_ROLES = ["ADMIN", "PROGRAMMER"];
+
+function isAttendanceExempt(role?: string): boolean {
+  return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
+}
+
 // ── Jam operasional sistem (broader range) ────────────────────────────────────
 // Middleware tidak punya akses DB, jadi kita gunakan range lebih luas:
 // Jika sekarang antara jam 06:00 dan 22:00 WIB → mungkin ada yang harus absen
 // Validasi akurat dilakukan oleh face-status API (yang bisa query DB)
-const SYSTEM_OPEN_HOUR  = 6;   // Jam mulai sistem bisa redirect ke face-verify
-const SYSTEM_CLOSE_HOUR = 22;  
+const SYSTEM_OPEN_HOUR = 6;   // Jam mulai sistem bisa redirect ke face-verify
+const SYSTEM_CLOSE_HOUR = 22;
 
 function isWithinSystemHours(): boolean {
   const nowUTC = new Date();
   const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
-  const hour   = nowWIB.getUTCHours();
+  const hour = nowWIB.getUTCHours();
   return hour >= SYSTEM_OPEN_HOUR && hour < SYSTEM_CLOSE_HOUR;
 }
 
 function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
-  const faceAttended      = request.cookies.get("face_attended")?.value;
-  const faceVerified      = request.cookies.get("face_verified")?.value;
+  const faceAttended = request.cookies.get("face_attended")?.value;
+  const faceVerified = request.cookies.get("face_verified")?.value;
   const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-  const dayOffToday       = request.cookies.get("day_off_today")?.value;
+  const dayOffToday = request.cookies.get("day_off_today")?.value;
   return (
-    faceAttended      === userId ||
-    faceVerified      === userId ||
+    faceAttended === userId ||
+    faceVerified === userId ||
     attendanceSkipped === userId ||
-    dayOffToday       === userId
+    dayOffToday === userId
   );
 }
 
@@ -54,14 +60,13 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
-  // ── Public routes ──────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
+        const exempt = isAttendanceExempt(user.role as string);
         const hasAttended = hasAttendanceBypass(request, user.id);
-        // Redirect ke face-verify jika dalam jam sistem dan belum absen
-        if (isWithinSystemHours() && !hasAttended) {
+        if (!exempt && isWithinSystemHours() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -107,11 +112,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ── Protected routes: cek attendance ─────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
+    const exempt = isAttendanceExempt(user.role as string);
     const hasAttended = hasAttendanceBypass(request, user.id);
-    // Gunakan range luas di middleware — validasi akurat ada di face-status API
-    if (isWithinSystemHours() && !hasAttended) {
+    // ✅ FIX: jangan redirect role exempt → memutus loop face-verify ⇄ dashboard
+    if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
@@ -133,9 +138,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  response.headers.set("x-user-id",   user.id);
-  response.headers.set("x-user-role",  user.role);
-  response.headers.set("x-user-name",  user.name);
+  response.headers.set("x-user-id", user.id);
+  response.headers.set("x-user-role", user.role);
+  response.headers.set("x-user-name", user.name);
   return response;
 }
 
