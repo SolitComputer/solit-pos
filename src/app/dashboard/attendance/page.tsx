@@ -32,7 +32,7 @@ type ManualAttendance = {
     user_id: string;
     attendance_date: string;
     check_in_time: string;
-    status: "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT";
+    status: "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE";
     notes: string | null;
     created_by: string | null;
     users?: { id: string; name: string; role: string; shift: string };
@@ -78,7 +78,10 @@ const OFFICE_LNG = 106.787233;
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+function isAdminRole(role?: string): boolean {
+    return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
+} const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 const MANUAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
     PRESENT: { label: "Hadir", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200", emoji: "✅" },
@@ -86,9 +89,10 @@ const MANUAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: s
     SICK: { label: "Sakit", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200", emoji: "🤒" },
     PERMIT: { label: "Izin", color: "text-violet-700", bg: "bg-violet-100", border: "border-violet-200", emoji: "📋" },
     ABSENT: { label: "Tidak Hadir", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", emoji: "❌" },
+    LEAVE: { label: "Cuti", color: "text-cyan-700", bg: "bg-cyan-100", border: "border-cyan-200", emoji: "🌴" },
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 6371000, dLat = ((lat2 - lat1) * Math.PI) / 180, dLng = ((lng2 - lng1) * Math.PI) / 180;
     const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
@@ -227,7 +231,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
         user_id: editData?.user_id ?? prefillUserId ?? users[0]?.id ?? "",
         attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
         check_in_time: defaultTime(),
-        status: (editData?.status ?? "PRESENT") as "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT",
+        status: (editData?.status ?? "PRESENT") as "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE",
         notes: editData?.notes ?? "",
     });
 
@@ -322,7 +326,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                 {/* Status */}
                 <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Status Kehadiran</label>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                         {(Object.keys(MANUAL_STATUS_LABELS) as Array<keyof typeof MANUAL_STATUS_LABELS>).map(s => {
                             const cfg = MANUAL_STATUS_LABELS[s];
                             const sel = form.status === s;
@@ -907,7 +911,6 @@ export default function AttendanceDashboardPage() {
         try { const r = await fetch("/api/auth/face-status"); const d = await r.json(); if (d.success) setTodayStatus({ alreadyAttended: d.alreadyAttended ?? false, needEnroll: d.needEnroll ?? false, isAttendanceTime: d.isAttendanceTime ?? false, isDayOff: d.isDayOff ?? false, shift: d.shift ?? "PAGI", reason: d.reason, openAt: d.openAt, closeAt: d.closeAt }); }
         catch { } finally { setStatusLoading(false); }
     }, []);
-
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
 
     useEffect(() => {
@@ -915,7 +918,7 @@ export default function AttendanceDashboardPage() {
         const { year, month } = selectedMonth;
         setLoading(true); setSelectedDate(null); setFilterUser("Semua");
         const tasks: Promise<any>[] = [fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month)];
-        if (currentUser?.role === "ADMIN") tasks.push(fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month));
+        if (isAdminRole(currentUser?.role)) tasks.push(fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month));
         Promise.all(tasks).finally(() => setLoading(false));
     }, [selectedMonth]); // eslint-disable-line
 
@@ -985,46 +988,104 @@ export default function AttendanceDashboardPage() {
     const uniqueUsers = useMemo(() => { if (allUsers.length > 0) return allUsers.map(u => u.name).sort(); return [...new Set(mergedAttendances.map(a => a.user_name))].sort(); }, [allUsers, mergedAttendances]);
     const salaryMap = useMemo(() => { const m: Record<string, UserSalary> = {}; salaries.forEach(s => m[s.user_id] = s); return m; }, [salaries]);
 
-    // ✅ FIX: userSummary dengan kalkulasi "tidak hadir" yang benar
     const userSummary = useMemo(() => {
-        const m: Record<string, { name: string; present: number; late: number; skip: number; score: number; pastWorkdays: number; totalWorkdays: number; pct: number; remainingDays: number; userId: string }> = {};
+        type UserStat = {
+            name: string;
+            present: number;
+            late: number;
+            score: number;
+            pastWorkdays: number;
+            totalWorkdays: number;
+            pct: number;
+            remainingDays: number;
+            userId: string;
+        };
+        const m: Record<string, UserStat> = {};
 
+        // ✅ FIX: Hitung kehadiran berdasarkan tanggal unik per user
+        // Prioritas: manual record > auto record
+        // Buat map: userName_dateKey → effective status
+        const effectiveStatus: Record<string, "PRESENT" | "LATE" | "ABSENT"> = {};
+
+        // Pass 1: proses auto attendance (face verifications)
         thisMonthAtt.forEach(a => {
-            if (!m[a.user_name]) m[a.user_name] = { name: a.user_name, present: 0, late: 0, skip: 0, score: 0, pastWorkdays: 0, totalWorkdays: 0, pct: 0, remainingDays: 0, userId: "" };
-            if (a.displayStatus === "PRESENT") { m[a.user_name].present++; m[a.user_name].score += 1.0; }
-            else if (a.displayStatus === "SKIP") { m[a.user_name].skip++; }
-            else { m[a.user_name].late++; m[a.user_name].score += 0.5; }
+            if (a.source !== "AUTO") return;
+            const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
+            const key = `${a.user_name}_${dateKey}`;
+            if (a.displayStatus === "PRESENT") {
+                effectiveStatus[key] = "PRESENT";
+            } else if (a.displayStatus === "LATE") {
+                effectiveStatus[key] = "LATE";
+            } else {
+                // SKIP dari face-verify = tidak hadir
+                effectiveStatus[key] = "ABSENT";
+            }
         });
 
+        // Pass 2: manual records OVERRIDE auto records
+        manualRecords.forEach(mr => {
+            const key = `${mr.users?.name ?? mr.user_id}_${mr.attendance_date}`;
+            if (!mr.users?.name) return;
+            const name = mr.users.name;
+            // Cek apakah ini bulan yang dipilih
+            if (!mr.attendance_date.startsWith(thisMonthKey)) return;
+
+            if (mr.status === "PRESENT") {
+                effectiveStatus[`${name}_${mr.attendance_date}`] = "PRESENT";
+            } else if (mr.status === "LATE") {
+                effectiveStatus[`${name}_${mr.attendance_date}`] = "LATE";
+            } else {
+                // ABSENT, SICK, PERMIT, LEAVE → semua = tidak hadir
+                effectiveStatus[`${name}_${mr.attendance_date}`] = "ABSENT";
+            }
+        });
+
+        // Build summary dari effectiveStatus
+        Object.entries(effectiveStatus).forEach(([key, status]) => {
+            const [name] = key.split("_");
+            if (!m[name]) m[name] = { name, present: 0, late: 0, score: 0, pastWorkdays: 0, totalWorkdays: 0, pct: 0, remainingDays: 0, userId: "" };
+            if (status === "PRESENT") { m[name].present++; m[name].score += 1.0; }
+            else if (status === "LATE") { m[name].late++; m[name].score += 0.5; }
+            // ABSENT: tidak tambah apapun (score 0, tidak hadir)
+        });
+
+        // Set userId dari allUsers
         allUsers.forEach(u => { if (m[u.name]) m[u.name].userId = u.id; });
 
+        // Hitung hari kerja per user
         Object.values(m).forEach(u => {
             const dows = dayOffByName[u.name] ?? new Set();
             const offs = dateOffByName[u.name] ?? new Set();
-            // ✅ pastWorkdays = hari kerja yang sudah lewat (untuk hitung absent)
             u.pastWorkdays = countEffectiveWorkingDays(calYear, calMonth, dows, offs);
-            // totalWorkdays = seluruh hari kerja bulan ini (untuk referensi)
             u.totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
-            // ✅ pct dihitung dari pastWorkdays agar tidak lebih dari 100%
-            u.pct = u.totalWorkdays > 0 ? Math.min(100, Math.round((u.score / u.totalWorkdays) * 100)) : 0;
-            u.remainingDays = getRemainingWorkingDays(calYear, calMonth, dows, offs);
+            // ✅ Persentase = skor / totalWorkdays × 100 (1 desimal)
+            u.pct = u.totalWorkdays > 0
+                ? Math.min(100, Math.round((u.score / u.totalWorkdays) * 1000) / 10)
+                : 0;
+            // ✅ Sisa = hari kerja yang belum lewat = totalWorkdays - pastWorkdays
+            u.remainingDays = u.totalWorkdays - u.pastWorkdays;
         });
 
+        // Tambahkan user yang belum ada absensi sama sekali
         allUsers.forEach(u => {
             if (!m[u.name]) {
                 const dows = dayOffByName[u.name] ?? new Set();
                 const offs = dateOffByName[u.name] ?? new Set();
+                const pastWd = countEffectiveWorkingDays(calYear, calMonth, dows, offs);
+                const totalWd = countWorkingDays(calYear, calMonth, dows, offs);
                 m[u.name] = {
-                    name: u.name, present: 0, late: 0, skip: 0, score: 0,
-                    pastWorkdays: countEffectiveWorkingDays(calYear, calMonth, dows, offs),
-                    totalWorkdays: countWorkingDays(calYear, calMonth, dows, offs),
-                    pct: 0, remainingDays: getRemainingWorkingDays(calYear, calMonth, dows, offs), userId: u.id,
+                    name: u.name, present: 0, late: 0, score: 0,
+                    pastWorkdays: pastWd,
+                    totalWorkdays: totalWd,
+                    pct: 0,
+                    remainingDays: totalWd - pastWd,
+                    userId: u.id,
                 };
             }
         });
 
-        return Object.values(m).sort((a, b) => b.pct - a.pct);
-    }, [thisMonthAtt, dayOffByName, dateOffByName, calYear, calMonth, allUsers]);
+        return Object.values(m).sort((a, b) => a.name.localeCompare(b.name, "id"));
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -1038,7 +1099,8 @@ export default function AttendanceDashboardPage() {
         if (!selectedMonth) return;
         setLoading(true);
         const { year, month } = selectedMonth;
-        Promise.all([fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), ...(currentUser?.role === "ADMIN" ? [fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month)] : [])])
+        Promise.all([fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), ...(isAdminRole(currentUser?.role)
+            ? [fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month)] : [])])
             .finally(() => setLoading(false));
     }, [selectedMonth, currentUser]);
 
@@ -1061,7 +1123,8 @@ export default function AttendanceDashboardPage() {
                         </button>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
-                                <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{currentUser?.role === "ADMIN" ? "Laporan Absensi" : "Absensi Saya"}</span>
+                                <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{isAdminRole(currentUser?.role)
+                                    ? "Laporan Absensi" : "Absensi Saya"}</span>
                                 <span className="text-gray-300">—</span>
                                 <span className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] bg-clip-text text-transparent">{MONTH_NAMES[calMonth]} {calYear}</span>
                             </h1>
@@ -1069,13 +1132,14 @@ export default function AttendanceDashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {currentUser?.role === "ADMIN" && (<>
-                            <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95">✏️ Absen Manual</button>
-                            <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 transition-all active:scale-95">📅 Libur Mingguan</button>
-                            <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">💰 Gaji</button>
-                            <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all active:scale-95">🌴 Cuti</button>
+                        {isAdminRole(currentUser?.role)
+                            && (<>
+                                <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95">✏️ Absen Manual</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 transition-all active:scale-95">📅 Libur Mingguan</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">💰 Gaji</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all active:scale-95">🌴 Cuti</button>
 
-                        </>)}
+                            </>)}
                         <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
                         </button>
@@ -1106,32 +1170,34 @@ export default function AttendanceDashboardPage() {
                 </div>
 
                 {/* ── Tabs (admin only) ── */}
-                {currentUser?.role === "ADMIN" && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
-                        {([{ id: "calendar", label: "📅 Kalender" }, { id: "summary", label: "📊 Ringkasan" }, { id: "salary", label: "💰 Rekap Gaji" }, { id: "leave", label: "🌴 Cuti" }] as const).map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* ── Filter ── */}
-                {currentUser?.role === "ADMIN" && activeTab === "calendar" && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">🎯 Filter Karyawan</p>
-                        <div className="flex flex-wrap gap-2">
-                            <button onClick={() => setFilterUser("Semua")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>Semua</button>
-                            {uniqueUsers.map(n => (
-                                <button key={n} onClick={() => setFilterUser(n)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>{n}</button>
+                {isAdminRole(currentUser?.role)
+                    && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
+                            {([{ id: "calendar", label: "📅 Kalender" }, { id: "summary", label: "📊 Ringkasan" }, { id: "salary", label: "💰 Rekap Gaji" }, { id: "leave", label: "🌴 Cuti" }] as const).map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+                                    {t.label}
+                                </button>
                             ))}
                         </div>
-                    </div>
-                )}
+                    )}
+
+                {/* ── Filter ── */}
+                {isAdminRole(currentUser?.role)
+                    && activeTab === "calendar" && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">🎯 Filter Karyawan</p>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => setFilterUser("Semua")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>Semua</button>
+                                {uniqueUsers.map(n => (
+                                    <button key={n} onClick={() => setFilterUser(n)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>{n}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                 {/* ════ TAB KALENDER ════ */}
-                {(activeTab === "calendar" || currentUser?.role !== "ADMIN") && (
+                {(activeTab === "calendar" || !isAdminRole(currentUser?.role)) && (
                     <>
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300">
                             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
@@ -1209,11 +1275,12 @@ export default function AttendanceDashboardPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {currentUser?.role === "ADMIN" && (
-                                            <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
-                                                ➕ Tambah Manual
-                                            </button>
-                                        )}
+                                        {isAdminRole(currentUser?.role)
+                                            && (
+                                                <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
+                                                    ➕ Tambah Manual
+                                                </button>
+                                            )}
                                         <button onClick={() => setSelectedDate(null)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
@@ -1228,9 +1295,10 @@ export default function AttendanceDashboardPage() {
                                                 <div className="text-center"><div className="inline-flex items-center gap-1.5 bg-red-100 border border-red-200 text-red-600 text-xs font-bold px-4 py-2 rounded-full mb-3">🔴 Hari Libur</div>{off.map(n => <p key={n} className="text-xs text-red-400 mt-1">• {n}</p>)}</div>
                                             ) : <p className="text-sm text-gray-400 font-medium">Tidak ada absensi hari ini</p>;
                                         })()}
-                                        {currentUser?.role === "ADMIN" && (
-                                            <button onClick={() => openAddManual(selectedDate)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Absen Manual</button>
-                                        )}
+                                        {isAdminRole(currentUser?.role)
+                                            && (
+                                                <button onClick={() => openAddManual(selectedDate)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Absen Manual</button>
+                                            )}
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -1243,7 +1311,8 @@ export default function AttendanceDashboardPage() {
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Catatan</th>
-                                                    {currentUser?.role === "ADMIN" && <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>}
+                                                    {isAdminRole(currentUser?.role)
+                                                        && <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>}
                                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Shift</th>
                                                 </tr>
                                             </thead>
@@ -1304,32 +1373,33 @@ export default function AttendanceDashboardPage() {
                                                                 )}
                                                             </td>
                                                             {/* ✅ NEW: Tombol Edit di tabel */}
-                                                            {currentUser?.role === "ADMIN" && (
-                                                                <td className="px-4 py-4 text-center">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            // Cari manual record yang ada, atau buat baru dari data ini
-                                                                            if (manualRec) {
-                                                                                openEditManual(manualRec);
-                                                                            } else {
-                                                                                // Edit auto record → buka modal dengan data pre-filled
-                                                                                const prefillRecord: ManualAttendance = {
-                                                                                    id: "", user_id: userId,
-                                                                                    attendance_date: dateKey,
-                                                                                    check_in_time: a.check_in_time || a.created_at,
-                                                                                    status: (a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "PRESENT") as any,
-                                                                                    notes: null, created_by: null,
-                                                                                    users: { id: userId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
-                                                                                };
-                                                                                openEditManual(prefillRecord);
-                                                                            }
-                                                                        }}
-                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
-                                                                        title="Edit absen">
-                                                                        ✏️ Edit
-                                                                    </button>
-                                                                </td>
-                                                            )}
+                                                            {isAdminRole(currentUser?.role)
+                                                                && (
+                                                                    <td className="px-4 py-4 text-center">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                // Cari manual record yang ada, atau buat baru dari data ini
+                                                                                if (manualRec) {
+                                                                                    openEditManual(manualRec);
+                                                                                } else {
+                                                                                    // Edit auto record → buka modal dengan data pre-filled
+                                                                                    const prefillRecord: ManualAttendance = {
+                                                                                        id: "", user_id: userId,
+                                                                                        attendance_date: dateKey,
+                                                                                        check_in_time: a.check_in_time || a.created_at,
+                                                                                        status: (a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "PRESENT") as any,
+                                                                                        notes: null, created_by: null,
+                                                                                        users: { id: userId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
+                                                                                    };
+                                                                                    openEditManual(prefillRecord);
+                                                                                }
+                                                                            }}
+                                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
+                                                                            title="Edit absen">
+                                                                            ✏️ Edit
+                                                                        </button>
+                                                                    </td>
+                                                                )}
                                                         </tr>
                                                     );
                                                 })}
@@ -1343,344 +1413,367 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {/* ════ TAB RINGKASAN ════ */}
-                {activeTab === "summary" && currentUser?.role === "ADMIN" && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                            <div>
-                                <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                <p className="text-[10px] text-gray-400 mt-1">
-                                    Tepat=1.0 · Terlambat=0.5 · Skip=0.75 · Tidak Hadir=0 ·
-                                    <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
-                                </p>
+                {activeTab === "summary" && isAdminRole(currentUser?.role)
+                    && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                                <div>
+                                    <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">
+                                        Tepat=1.0 · Terlambat=0.5 · Tidak Hadir=0 ·
+                                        <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
+                                    </p>
+                                </div>
+                                {/* ✅ Tombol tambah absen manual langsung dari ringkasan */}
+                                <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Manual</button>
                             </div>
-                            {/* ✅ Tombol tambah absen manual langsung dari ringkasan */}
-                            <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Manual</button>
-                        </div>
 
-                        {loading ? (
-                            <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 bg-gray-50/60">
-                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skip</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa</th>
-                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {userSummary.map((u, i) => {
-                                            // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
-                                            const absent = Math.max(0, u.pastWorkdays - u.present - u.late - u.skip);
-                                            const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
-                                            const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
-                                            return (
-                                                <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                    <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
-                                                    <td className="px-4 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
-                                                            <div>
-                                                                <span className="font-bold text-gray-800 block">{u.name}</span>
-                                                                {salaryMap[u.userId] && (
-                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${salaryMap[u.userId].salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                                                        {salaryMap[u.userId].salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
-                                                                    </span>
-                                                                )}
+                            {loading ? (
+                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
+                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {userSummary.map((u, i) => {
+                                                // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
+                                                const absent = Math.max(0, u.pastWorkdays - u.present - u.late);
+                                                const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
+                                                const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
+                                                return (
+                                                    <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                        <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
+                                                        <td className="px-4 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
+                                                                <div>
+                                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                                    {salaryMap[u.userId] && (
+                                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${salaryMap[u.userId].salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                                                            {salaryMap[u.userId].salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
-                                                    <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                    <td className="px-4 py-4 text-center">{u.skip > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-500 text-sm font-black border border-gray-200">{u.skip}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                    <td className="px-4 py-4 text-center">{absent > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200">{absent}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                    <td className="px-4 py-4 text-center"><span className="text-sm font-black text-gray-700">{u.score.toFixed(1)}</span></td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="text-sm font-bold text-gray-500">{u.pastWorkdays}h</span>
-                                                            <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center"><span className="text-sm font-bold text-blue-500">{u.remainingDays}h</span></td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
-                                                                <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
+                                                        <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                        <td className="px-4 py-4 text-center">{absent > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200">{absent}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                        <td className="px-4 py-4 text-center"><span className="text-sm font-black text-gray-700">{u.score.toFixed(1)}</span></td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className="text-sm font-bold text-gray-500">{u.pastWorkdays}h</span>
+                                                                <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
                                                             </div>
-                                                            <span className={`text-sm font-black w-12 text-right flex-shrink-0 ${pctColor}`}>{u.pct}%</span>
-                                                        </div>
-                                                    </td>
-                                                    {/* ✅ Tombol tambah absen manual per baris karyawan */}
-                                                    <td className="px-4 py-4 text-center">
-                                                        <button onClick={() => openAddManual(undefined, u.userId)}
-                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
-                                                            title={`Tambah absen manual untuk ${u.name}`}>
-                                                            ➕ Absen
-                                                        </button>
-                                                    </td>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className="text-sm font-bold text-blue-500">{u.remainingDays}h</span>
+                                                                <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
+                                                            </div>
+                                                        </td>                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                                    <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
+                                                                </div>
+                                                                <span className={`text-sm font-black w-12 text-right flex-shrink-0 ${pctColor}`}>{u.pct}%</span>
+                                                            </div>
+                                                        </td>
+                                                        {/* ✅ Tombol tambah absen manual per baris karyawan */}
+                                                        <td className="px-4 py-4 text-center">
+                                                            <button onClick={() => openAddManual(undefined, u.userId)}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
+                                                                title={`Tambah absen manual untuk ${u.name}`}>
+                                                                ➕ Absen
+                                                            </button>
+                                                        </td>
 
-                                                    <td className="px-4 py-4 text-center">
-                                                        <button onClick={() => {
-                                                            if (allUsers.length === 0) fetchAllUsers();
-                                                            setShiftModalUserId(u.userId);
-                                                            setShowShiftModal(true);
-                                                        }} className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
-                                                            title={`Atur jadwal shift ${u.name}`}>
-                                                            ⏰ Shift
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <button onClick={() => {
+                                                                if (allUsers.length === 0) fetchAllUsers();
+                                                                setShiftModalUserId(u.userId);
+                                                                setShowShiftModal(true);
+                                                            }} className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
+                                                                title={`Atur jadwal shift ${u.name}`}>
+                                                                ⏰ Shift
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
+                                {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
+                                    <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
+                                ))}
+                                <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
                             </div>
-                        )}
-
-                        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-gray-400", "Skip = 0 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
-                                <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
-                            ))}
-                            <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
                         </div>
-                    </div>
-                )}
+                    )}
 
                 {/* ════ TAB GAJI ════ */}
-                {activeTab === "salary" && currentUser?.role === "ADMIN" && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                            <div>
-                                <p className="text-base font-bold text-gray-800">Rekap Gaji — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                <p className="text-[10px] text-gray-400 mt-1">Gaji tetap = penuh · Persentase = % kehadiran × gaji pokok</p>
+                {activeTab === "salary" && isAdminRole(currentUser?.role)
+                    && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                                <div>
+                                    <p className="text-base font-bold text-gray-800">Rekap Gaji — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">Gaji tetap = penuh · Persentase = % kehadiran × gaji pokok</p>
+                                </div>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">⚙️ Atur Gaji</button>
                             </div>
-                            <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">⚙️ Atur Gaji</button>
-                        </div>
-                        {loading ? (
-                            <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm min-w-[580px]">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 bg-gray-50/60">
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:table-cell">Tipe</th>
-                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
-                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kehadiran</th>
-                                            <th className="px-3 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Diterima</th>
-                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {userSummary.map(u => {
-                                            const sal = salaryMap[u.userId];
-                                            const pct = u.pct / 100;
-                                            const earned = sal ? (sal.salary_type === "FIXED" ? sal.base_salary : sal.base_salary * pct) : null;
-                                            return (
-                                                <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                    <td className="px-4 py-4">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
-                                                            <div className="min-w-0">
-                                                                <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
-                                                                <span className="text-[10px] text-gray-400">{u.pct}% kehadiran</span>
+                            {loading ? (
+                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm min-w-[580px]">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:table-cell">Tipe</th>
+                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
+                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kehadiran</th>
+                                                <th className="px-3 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Diterima</th>
+                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {userSummary.map(u => {
+                                                const sal = salaryMap[u.userId];
+                                                // ✅ FIX: Formula = base_salary / totalWorkdays × skor
+                                                // FIXED: tetap dapat penuh (tidak potong berdasarkan persen)
+                                                // PERCENTAGE: dihitung per hari kerja × skor hadir
+                                                const earned = sal
+                                                    ? sal.salary_type === "FIXED"
+                                                        ? sal.base_salary
+                                                        : u.totalWorkdays > 0
+                                                            ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                            : 0
+                                                    : null;
+
+                                                return (
+                                                    <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                        <td className="px-4 py-4">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
+                                                                <div className="min-w-0">
+                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                    <span className="text-[10px] text-gray-400">{u.pct}% kehadiran</span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-4 text-center hidden sm:table-cell">
-                                                        {sal
-                                                            ? <span className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1.5 rounded-full border ${sal.salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
-                                                                {sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 %"}
-                                                            </span>
-                                                            : <span className="text-[10px] text-gray-300 font-bold">—</span>
-                                                        }
-                                                    </td>
-                                                    <td className="px-3 py-4 text-center">
-                                                        {sal
-                                                            ? <div className="flex flex-col items-center gap-0.5">
-                                                                <span className="font-mono font-bold text-gray-800 text-xs">{formatRupiah(sal.base_salary)}</span>
-                                                                <span className={`text-[9px] font-semibold sm:hidden ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
-                                                                    {sal.salary_type === "FIXED" ? "Tetap" : "% Absen"}
+                                                        </td>
+                                                        <td className="px-3 py-4 text-center hidden sm:table-cell">
+                                                            {sal
+                                                                ? <span className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1.5 rounded-full border ${sal.salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                                                                    {sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 %"}
                                                                 </span>
-                                                            </div>
-                                                            : <span className="text-gray-300 text-xs">—</span>
-                                                        }
-                                                    </td>
-                                                    <td className="px-3 py-4 text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{u.pct}%</span>
-                                                            <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                                <div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-4 text-right">
-                                                        {earned !== null ? (
-                                                            <div className="flex flex-col items-end gap-0.5">
-                                                                <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
-                                                                {sal && sal.salary_type === "PERCENTAGE" && u.pct < 100 && (
-                                                                    <span className="text-[9px] text-gray-400">
-                                                                        Penuh: {formatRupiah(sal.base_salary)}
+                                                                : <span className="text-[10px] text-gray-300 font-bold">—</span>
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-4 text-center">
+                                                            {sal
+                                                                ? <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="font-mono font-bold text-gray-800 text-xs">{formatRupiah(sal.base_salary)}</span>
+                                                                    <span className={`text-[9px] font-semibold sm:hidden ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
+                                                                        {sal.salary_type === "FIXED" ? "Tetap" : "% Absen"}
                                                                     </span>
-                                                                )}
-                                                                {sal && sal.salary_type === "FIXED" && u.pct < 100 && (
-                                                                    <span className="text-[9px] text-amber-500">
-                                                                        Hadir {u.pct}%
-                                                                    </span>
-                                                                )}
+                                                                </div>
+                                                                : <span className="text-gray-300 text-xs">—</span>
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-4 text-center">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{u.pct}%</span>
+                                                                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                    <div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
+                                                                </div>
                                                             </div>
-                                                        ) : (
-                                                            <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-3 py-4 text-center">
-                                                        <button
-                                                            onClick={() => setEditSalaryUser({
-                                                                userId: u.userId,
-                                                                userName: u.name,
-                                                                currentSalary: salaryMap[u.userId],
-                                                            })}
-                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
-                                                        >
-                                                            ✏️ Edit
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr className="border-t-2 border-gray-200 bg-gray-50/50">
-                                            <td colSpan={4} className="px-4 py-4 text-sm font-bold text-gray-600 text-right">
-                                                Total Gaji Bulan Ini:
-                                            </td>
-                                            <td className="px-3 py-4 text-right">
-                                                <span className="text-lg font-black text-[#1a1a2e]">
-                                                    {formatRupiah(userSummary.reduce((sum, u) => {
-                                                        const sal = salaryMap[u.userId];
-                                                        const p = u.pct / 100;
-                                                        return sum + (sal ? (sal.salary_type === "FIXED" ? sal.base_salary : sal.base_salary * p) : 0);
-                                                    }, 0))}
-                                                </span>
-                                            </td>
-                                            <td />
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                                        </td>
+                                                        <td className="px-3 py-4 text-right">
+                                                            {earned !== null ? (
+                                                                <div className="flex flex-col items-end gap-0.5">
+                                                                    <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
+                                                                    {/* Selalu tampilkan pct kehadiran */}
+                                                                    <span className={`text-[9px] font-semibold ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-500" : "text-red-500"}`}>
+                                                                        Skor {u.score.toFixed(1)} / {u.totalWorkdays}h = {u.pct}%
+                                                                    </span>
+                                                                    {sal && sal.salary_type === "PERCENTAGE" && (
+                                                                        <span className="text-[9px] text-gray-400">
+                                                                            {formatRupiah(sal.base_salary)} ÷ {u.totalWorkdays} × {u.score.toFixed(1)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-4 text-center">
+                                                            <button
+                                                                onClick={() => setEditSalaryUser({
+                                                                    userId: u.userId,
+                                                                    userName: u.name,
+                                                                    currentSalary: salaryMap[u.userId],
+                                                                })}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                            >
+                                                                ✏️ Edit
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t-2 border-gray-200 bg-gray-50/50">
+                                                <td colSpan={4} className="px-4 py-4 text-sm font-bold text-gray-600 text-right">
+                                                    Total Gaji Bulan Ini:
+                                                </td>
+                                                <td className="px-3 py-4 text-right">
+                                                    <span className="text-lg font-black text-[#1a1a2e]">
+                                                        {formatRupiah(userSummary.reduce((sum, u) => {
+                                                            const sal = salaryMap[u.userId];
+                                                            if (!sal) return sum;
+                                                            const earned = sal.salary_type === "FIXED"
+                                                                ? sal.base_salary
+                                                                : u.totalWorkdays > 0
+                                                                    ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                                    : 0;
+                                                            return sum + earned;
+                                                        }, 0))}
+                                                    </span>
+                                                </td>
+                                                <td />
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                 {/* ════ TAB CUTI ════ */}
-                {activeTab === "leave" && currentUser?.role === "ADMIN" && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                            <div>
-                                <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
+                {activeTab === "leave" && isAdminRole(currentUser?.role)
+                    && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                                <div>
+                                    <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
+                                </div>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">➕ Kelola Cuti</button>
                             </div>
-                            <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">➕ Kelola Cuti</button>
-                        </div>
-                        {loading ? (
-                            <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                        ) : leaveData.length === 0 ? (
-                            <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">🌴</span></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 bg-gray-50/60">
-                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Jatah</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Carry-over</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terpakai</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tersedia</th>
-                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {leaveData.map(ld => (
-                                            <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
-                                                        <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
-                                                <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
-                                                <td className="px-4 py-4">
-                                                    {ld.requests.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {ld.requests.map(r => (
-                                                                <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                    🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
-                                                </td>
+                            {loading ? (
+                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                            ) : leaveData.length === 0 ? (
+                                <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">🌴</span></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kuota Lembur</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Carry-over</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terpakai</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tersedia</th>
+                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal Cuti</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {leaveData.map(ld => (
+                                                <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
+                                                            <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
+                                                    <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                    <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                    <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
+                                                    <td className="px-4 py-4">
+                                                        {ld.requests.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {ld.requests.map(r => (
+                                                                    <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
+                                                                        🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
             </div>
 
             {/* ── Modals ── */}
-            {showDayOffModal && currentUser?.role === "ADMIN" && (
-                <DayOffModal users={allUsers} dayOffs={dayOffs} onClose={() => setShowDayOffModal(false)} onSaved={() => { fetchDayOffs(); setShowDayOffModal(false); }} />
-            )}
-            {showManualModal && currentUser?.role === "ADMIN" && (
-                <ManualAttendanceModal
-                    users={allUsers}
-                    prefillDate={manualPrefillDate}
-                    prefillUserId={manualPrefillUser}
-                    editData={editManualData}
-                    onClose={() => { setShowManualModal(false); setEditManualData(null); }}
-                    onSaved={refreshAll}
-                />
-            )}
-            {showSalaryModal && currentUser?.role === "ADMIN" && (
-                <SalaryModal users={allUsers} salaries={salaries} onClose={() => setShowSalaryModal(false)} onSaved={() => { fetchSalaries(); setShowSalaryModal(false); }} />
-            )}
-            {showLeaveModal && currentUser?.role === "ADMIN" && (
-                <LeaveModal users={allUsers} leaveData={leaveData} calYear={calYear} calMonth={calMonth} onClose={() => setShowLeaveModal(false)} onSaved={() => { fetchLeaveData(calYear, calMonth); }} />
-            )}
-            {showShiftModal && currentUser?.role === "ADMIN" && (
-                <ShiftConfigModal
-                    users={allUsers}
-                    initialUserId={shiftModalUserId}
-                    onClose={() => {
-                        setShowShiftModal(false);
-                        setShiftModalUserId(undefined);
-                    }}
-                />
-            )}
-            {editSalaryUser && currentUser?.role === "ADMIN" && (
-                <InlineSalaryEditModal
-                    userId={editSalaryUser.userId}
-                    userName={editSalaryUser.userName}
-                    currentSalary={editSalaryUser.currentSalary}
-                    onClose={() => setEditSalaryUser(null)}
-                    onSaved={() => { fetchSalaries(); setEditSalaryUser(null); }}
-                />
-            )}
+            {showDayOffModal && isAdminRole(currentUser?.role)
+                && (
+                    <DayOffModal users={allUsers} dayOffs={dayOffs} onClose={() => setShowDayOffModal(false)} onSaved={() => { fetchDayOffs(); setShowDayOffModal(false); }} />
+                )}
+            {showManualModal && isAdminRole(currentUser?.role)
+                && (
+                    <ManualAttendanceModal
+                        users={allUsers}
+                        prefillDate={manualPrefillDate}
+                        prefillUserId={manualPrefillUser}
+                        editData={editManualData}
+                        onClose={() => { setShowManualModal(false); setEditManualData(null); }}
+                        onSaved={refreshAll}
+                    />
+                )}
+            {showSalaryModal && isAdminRole(currentUser?.role)
+                && (
+                    <SalaryModal users={allUsers} salaries={salaries} onClose={() => setShowSalaryModal(false)} onSaved={() => { fetchSalaries(); setShowSalaryModal(false); }} />
+                )}
+            {showLeaveModal && isAdminRole(currentUser?.role)
+                && (
+                    <LeaveModal users={allUsers} leaveData={leaveData} calYear={calYear} calMonth={calMonth} onClose={() => setShowLeaveModal(false)} onSaved={() => { fetchLeaveData(calYear, calMonth); }} />
+                )}
+            {showShiftModal && isAdminRole(currentUser?.role)
+                && (
+                    <ShiftConfigModal
+                        users={allUsers}
+                        initialUserId={shiftModalUserId}
+                        onClose={() => {
+                            setShowShiftModal(false);
+                            setShiftModalUserId(undefined);
+                        }}
+                    />
+                )}
+            {editSalaryUser && isAdminRole(currentUser?.role)
+                && (
+                    <InlineSalaryEditModal
+                        userId={editSalaryUser.userId}
+                        userName={editSalaryUser.userName}
+                        currentSalary={editSalaryUser.currentSalary}
+                        onClose={() => setEditSalaryUser(null)}
+                        onSaved={() => { fetchSalaries(); setEditSalaryUser(null); }}
+                    />
+                )}
             <style jsx global>{`
         @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         @keyframes scaleIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }

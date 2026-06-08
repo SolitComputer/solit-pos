@@ -9,6 +9,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Role yang bypass absensi (tidak perlu absen)
+const ATTENDANCE_EXEMPT_ROLES = ["ADMIN", "PROGRAMMER"] as const;
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -17,6 +20,25 @@ export async function GET() {
 
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false, needLogin: true });
+
+    // ✅ FIX: Admin & Programmer tidak perlu absen → langsung return alreadyAttended: true
+    const isExempt = ATTENDANCE_EXEMPT_ROLES.includes(user.role as any);
+    if (isExempt) {
+      return NextResponse.json({
+        success: true,
+        alreadyAttended: true,
+        needEnroll: false,
+        isAttendanceTime: false,
+        isDayOff: false,
+        isTodayDayOff: false,
+        shift: (user as any).shift ?? "PAGI",
+        reason: "EXEMPT",
+        openAt: "—",
+        closeAt: "—",
+        lateAt: "—",
+        isExempt: true,
+      });
+    }
 
     const faceVerified = cookieStore.get("face_verified")?.value;
     const faceAttended = cookieStore.get("face_attended")?.value;
@@ -49,10 +71,8 @@ export async function GET() {
     const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
     const alreadyAttendedDB = Boolean(todaySuccess);
 
-    // ✅ Resolusi jadwal dari DB (pakai resolveShiftConfigFromDB)
+    // Resolusi jadwal dari DB
     const schedule = await resolveShiftConfigFromDB(user.id, supabase);
-
-    // Hitung status waktu berdasarkan schedule
     const timeStatus = isAttendanceTimeForSchedule(schedule);
 
     const pad     = (n: number) => String(n).padStart(2, "0");
@@ -84,7 +104,8 @@ export async function GET() {
       openAt,
       closeAt,
       lateAt,
-      scheduleSource:    schedule.source, // "custom" | "shift" | "user_config"
+      isExempt:          false,
+      scheduleSource:    schedule.source,
       scheduleToday: {
         openAt:  `${pad(schedule.start.h)}:${pad(schedule.start.m)}`,
         closeAt: `${pad(schedule.end.h)}:${pad(schedule.end.m)}`,

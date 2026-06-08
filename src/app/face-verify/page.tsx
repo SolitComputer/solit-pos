@@ -87,6 +87,7 @@ export default function FaceVerifyPage() {
 
   // ✅ FIX: useState di dalam komponen
   const [userShift, setUserShift] = useState<ShiftType>("PAGI");
+  const [needEnrollState, setNeedEnrollState] = useState(false);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
     setLogs(p => [...p.slice(-30), { time: ts(), msg, type }]);
@@ -142,8 +143,14 @@ export default function FaceVerifyPage() {
           setMessage(`Anda berada di luar radius (${distRound}m)`);
         } else {
           addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
-          setStage("verify");
-          setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
+          // ✅ FIX: jika akun baru (needEnroll), langsung ke enroll bukan verify
+          if (needEnrollState) {
+            setStage("enroll");
+            setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
+          } else {
+            setStage("verify");
+            setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
+          }
         }
       },
       (err) => {
@@ -154,7 +161,7 @@ export default function FaceVerifyPage() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [addLog]);
+  }, [addLog, needEnrollState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,6 +191,7 @@ export default function FaceVerifyPage() {
         // ✅ FIX: set shift dari server response
         const shift: ShiftType = (statusResult.shift as ShiftType) ?? "PAGI";
         setUserShift(shift);
+        setNeedEnrollState(statusResult.needEnroll ?? false);
 
         // ✅ FIX: cek waktu di client menggunakan shift yang benar dari server
         // Ini sebagai defense-in-depth; validasi utama sudah di server (face-status)
@@ -209,8 +217,8 @@ export default function FaceVerifyPage() {
         }
 
         if (statusResult.needEnroll) {
-          setStage("enroll");
-          setMessage("Daftarkan wajah Anda terlebih dahulu");
+          setStage("location");
+          setMessage("Daftarkan wajah — cek lokasi terlebih dahulu");
         } else {
           setStage("location");
           setMessage("Klik tombol di bawah untuk cek lokasi");
@@ -760,9 +768,14 @@ export default function FaceVerifyPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>Cek Lokasi Absen</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>
+              {needEnrollState ? "Cek Lokasi Sebelum Daftar" : "Cek Lokasi Absen"}
+            </div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 28, lineHeight: 1.6 }}>
-              Pastikan berada dalam radius <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>{MAX_DISTANCE_METERS}m</span> dari kantor
+              {needEnrollState
+                ? <span>Wajib cek lokasi sebelum mendaftarkan wajah.<br />Pastikan dalam radius <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
+                : <span>Pastikan berada dalam radius <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
+              }
             </div>
             <button className="btn-main" style={{ maxWidth: 220 }} onClick={checkLocation}>
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>

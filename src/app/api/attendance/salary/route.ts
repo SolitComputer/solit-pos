@@ -8,7 +8,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// GET — ambil salary semua user (admin) atau milik sendiri
+// ✅ Konsisten dengan permissions.ts dan route lain
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+
+// GET — ambil salary semua user (full access) atau milik sendiri
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -17,14 +20,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get("user_id");
 
+    // ✅ FIX: Ambil tanpa JOIN FK eksplisit untuk hindari error nama FK
     let q = supabase
       .from("user_salary")
-      .select(`
-        id, user_id, salary_type, base_salary, created_at, updated_at,
-        users!user_salary_user_id_fkey (id, name, role, shift)
-      `);
+      .select("id, user_id, salary_type, base_salary, created_at, updated_at");
 
-    if (user.role !== "ADMIN") {
+    if (!FULL_ACCESS_ROLES.includes(user.role)) {
       // Non-admin hanya bisa lihat miliknya sendiri
       q = q.eq("user_id", user.id);
     } else if (targetUserId) {
@@ -32,20 +33,25 @@ export async function GET(request: Request) {
     }
 
     const { data, error } = await q;
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    if (error) {
+      console.error("[salary GET] error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, data: data || [] });
-  } catch {
-    return NextResponse.json({ success: false }, { status: 500 });
+  } catch (err: any) {
+    console.error("[salary GET] exception:", err);
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
 }
 
-// POST / PUT — upsert salary untuk satu user
+// POST — upsert salary untuk satu user (full access only)
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    // ✅ FIX: ADMIN, PROGRAMMER, ASISTEN_CEO boleh edit gaji
+    if (!user || !FULL_ACCESS_ROLES.includes(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -87,9 +93,14 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    if (error) {
+      console.error("[salary POST] upsert error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true, data });
-  } catch {
-    return NextResponse.json({ success: false }, { status: 500 });
+  } catch (err: any) {
+    console.error("[salary POST] exception:", err);
+    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
 }
