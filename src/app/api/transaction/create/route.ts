@@ -9,173 +9,315 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
         const body = await req.json();
 
-        if (!body.unit_id) {
+        // ─────────────────────────────────────────────────────────────────────────
+        // 1. Normalisasi units
+        //    Mode A (baru):  body.units = [{ unit_id, laptop_id, ... }]
+        //    Mode B (lama):  body.unit_id  ← dari scan barcode
+        // ─────────────────────────────────────────────────────────────────────────
+        let units: Array<{
+            unit_id: string;
+            laptop_id: string;
+            laptop_name: string;
+            serial_number: string;
+            grade?: string;
+            selling_price?: number;
+        }> = [];
+
+        if (Array.isArray(body.units) && body.units.length > 0) {
+            // Mode A — multi-unit dari CreatePaymentClient baru
+            units = body.units;
+        } else if (body.unit_id) {
+            // Mode B — legacy single unit, fetch dari DB
+            const { data: unit, error: unitError } = await supabase
+                .from("laptop_units")
+                .select(`
+          *,
+          laptop:laptops (
+            id, laptop_name, brand, cpu, ram,
+            storage, gpu, display, qty, selling_price
+          )
+        `)
+                .eq("id", body.unit_id)
+                .single();
+
+            if (unitError || !unit) {
+                return NextResponse.json(
+                    { success: false, message: "Unit tidak ditemukan" },
+                    { status: 404 }
+                );
+            }
+
+            if (unit.status !== "SIAP_JUAL") {
+                return NextResponse.json(
+                    { success: false, message: `Unit tidak tersedia (status: ${unit.status})` },
+                    { status: 400 }
+                );
+            }
+
+            units = [{
+                unit_id: unit.id,
+                laptop_id: unit.laptop.id,
+                laptop_name: unit.laptop.laptop_name,
+                serial_number: unit.serial_number,
+                grade: unit.grade,
+                selling_price: Number(unit.purchase_price) || 0,
+            }];
+        } else {
             return NextResponse.json(
-                { success: false, message: "unit_id wajib diisi" },
+                { success: false, message: "Minimal 1 unit harus dipilih" },
                 { status: 400 }
+            );
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 2. Validasi semua unit masih SIAP_JUAL
+        // ─────────────────────────────────────────────────────────────────────────
+        const unitIds = units.map(u => u.unit_id);
+
+        const { data: unitChecks, error: unitCheckError } = await supabase
+            .from("laptop_units")
+            .select("id, serial_number, status")
+            .in("id", unitIds);
+
+        if (unitCheckError) throw unitCheckError;
+
+        const notAvailable = (unitChecks ?? []).filter(u => u.status !== "SIAP_JUAL");
+        if (notAvailable.length > 0) {
+            const sns = notAvailable.map(u => u.serial_number).join(", ");
+            return NextResponse.json(
+                { success: false, message: `Unit tidak tersedia: ${sns}` },
+                { status: 409 }
             );
         }
 
         const invoice_number = await generateInvoice();
+        const deal_price = Number(body.amount) || 0;
+        const inventory_price = units.reduce((sum, u) => sum + (u.selling_price ?? 0), 0);
+        const payment_method = body.payment_method || "CASH";
 
-        const { data: unit, error: unitError } = await supabase
-            .from("laptop_units")
-            .select(`
-                *,
-                laptop:laptops (
-                    id, laptop_name, brand, cpu, ram,
-                    storage, gpu, display, qty, selling_price
-                )
-            `)
-            .eq("id", body.unit_id)
-            .single();
+        // Trade-in
+        const is_trade_in = Boolean(body.is_trade_in);
+        const trade_in_value = is_trade_in ? (Number(body.trade_in_value) || 0) : 0;
+        const trade_in_cash = is_trade_in ? (Number(body.trade_in_cash) || 0) : 0;
 
-        if (unitError || !unit) {
+        const isTfCash = payment_method === "TF_CASH";
+        const amount_method_1 = isTfCash ? (Number(body.amount_method_1) || 0) : 0;
+        const amount_method_2 = isTfCash ? (Number(body.amount_method_2) || 0) : 0;
+
+        if (isTfCash && (amount_method_1 + amount_method_2) !== deal_price) {
             return NextResponse.json(
-                { success: false, message: "Unit tidak ditemukan" },
-                { status: 404 }
-            );
-        }
-
-        if (unit.status !== "SIAP_JUAL") {
-            return NextResponse.json(
-                { success: false, message: `Unit ini tidak tersedia untuk dijual (status: ${unit.status})` },
+                {
+                    success: false,
+                    message: `Total TF+Cash (${amount_method_1 + amount_method_2}) tidak sama dengan harga deal (${deal_price})`
+                },
                 { status: 400 }
             );
         }
 
-        const laptop = unit.laptop;
-        if (!laptop) {
-            return NextResponse.json(
-                { success: false, message: "Data laptop tidak ditemukan" },
-                { status: 404 }
-            );
-        }
-
-        const inventory_price = Number(unit.purchase_price) || 0;
-        const deal_price = Number(body.amount) || 0;
-
-        // ✅ Tentukan status transaksi & unit berdasarkan e-commerce atau tidak
+        // ─────────────────────────────────────────────────────────────────────────
+        // 4. Status transaksi & unit
+        // ─────────────────────────────────────────────────────────────────────────
         const isEcommerce = Boolean(body.is_ecommerce);
         const txStatus = isEcommerce ? "PACKING" : "PAID";
-        const unitStatus = isEcommerce ? "PACKING" : "SOLD";
+        const unitStatus = isEcommerce ? "RESERVED" : "SOLD";
 
-        const { data, error } = await supabase
+        // Display fields
+        const primaryUnit = units[0];
+        const displayLaptopName = units.length > 1
+            ? `${primaryUnit.laptop_name} (+${units.length - 1} unit)`
+            : primaryUnit.laptop_name;
+        const displaySN = units.map(u => u.serial_number).join(", ");
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 5. Insert transaction
+        // ─────────────────────────────────────────────────────────────────────────
+        const { data: transaction, error: txError } = await supabase
             .from("transactions")
             .insert({
                 invoice_number,
                 sales_id: user.id,
                 sales_name: user.name,
-                laptop_id: laptop.id,
-                unit_id: unit.id,
+                employee_role: user.role,
+
+                // Customer
                 customer_name: body.customer_name,
                 customer_type: body.customer_type || "UMUM",
                 company_name: body.company_name,
                 customer_phone: body.customer_phone,
-                laptop_name: laptop.laptop_name,
-                serial_number: unit.serial_number,
+
+                // Laptop — primary unit (backward compat)
+                laptop_id: primaryUnit.laptop_id,
+                unit_id: primaryUnit.unit_id,
+                laptop_name: displayLaptopName,
+                serial_number: displaySN,
+
+                // Multi-unit arrays
+                unit_ids: unitIds,
+                serial_numbers: units.map(u => u.serial_number),
+
+                // Harga
+                deal_price,
+                amount: deal_price,
+                inventory_price,
+                other: deal_price - inventory_price,
+
+                // Metode bayar
+                payment_method,
+                payment_method_2: isTfCash ? (body.payment_method_2 || "CASH") : null,
+                amount_method_1,
+                amount_method_2,
+
+                // Trade-in
+                is_trade_in,
+                trade_in_item: is_trade_in ? (body.trade_in_item || null) : null,
+                trade_in_value,
+                trade_in_cash,
+
+                // Pickup
                 software_request: body.software_request,
                 pickup_method: body.pickup_method,
                 pickup_date: body.pickup_date,
                 pickup_time: body.pickup_time,
                 pickup_location: body.pickup_location,
                 source_platform: body.source_platform,
-                inventory_price,
-                deal_price,
-                other: deal_price - inventory_price,
-                amount: deal_price,
-                payment_method: body.payment_method,
+                notes: body.notes,
+
+                // Foto & GPS
                 payment_photo: body.payment_photo,
                 latitude: body.latitude,
                 longitude: body.longitude,
-                notes: body.notes,
-                // ✅ Field e-commerce
+
+                // E-commerce
                 is_ecommerce: isEcommerce,
                 ecommerce_platform: body.ecommerce_platform || null,
                 ecommerce_order_id: body.ecommerce_order_id || null,
+
+                // Status
                 status: txStatus,
-                // ✅ PACKING belum paid_at, PAID langsung set
                 paid_at: isEcommerce ? null : new Date().toISOString(),
             })
             .select()
             .single();
 
-        if (error) {
-            console.error(error);
-            return NextResponse.json(
-                { success: false, message: error.message },
-                { status: 400 }
-            );
+        if (txError) throw txError;
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 6. Insert transaction_items (detail per unit, non-fatal)
+        // ─────────────────────────────────────────────────────────────────────────
+        const itemsToInsert = units.map(u => ({
+            transaction_id: transaction.id,
+            invoice_number,
+            unit_id: u.unit_id,
+            laptop_id: u.laptop_id,
+            serial_number: u.serial_number,
+            laptop_name: u.laptop_name,
+            selling_price: u.selling_price ?? 0,
+            deal_price: Math.round(deal_price / units.length),
+            grade: u.grade ?? null,
+        }));
+
+        const { error: itemsError } = await supabase
+            .from("transaction_items")
+            .insert(itemsToInsert);
+
+        if (itemsError) {
+            console.error("[transaction_items]", itemsError.message);
         }
 
-        // ✅ Update status unit — PACKING = RESERVED, PAID = SOLD
+        // ─────────────────────────────────────────────────────────────────────────
+        // 7. Update status semua unit
+        // ─────────────────────────────────────────────────────────────────────────
         await supabase
             .from("laptop_units")
             .update({
                 status: unitStatus,
-                ...(isEcommerce && {
-                    reserved_by: body.customer_name,
-                    reserved_invoice: invoice_number,
-                }),
+                reserved_by: unitStatus === "RESERVED" ? body.customer_name : null,
+                reserved_invoice: unitStatus === "RESERVED" ? invoice_number : null,
             })
-            .eq("id", unit.id);
+            .in("id", unitIds);
 
-        const { data: remainingUnits } = await supabase
-            .from("laptop_units")
-            .select("id")
-            .eq("laptop_id", laptop.id)
-            .eq("status", "SIAP_JUAL");
+        // ─────────────────────────────────────────────────────────────────────────
+        // 8. Update qty tiap laptop yang terlibat
+        // ─────────────────────────────────────────────────────────────────────────
+        const uniqueLaptopIds = [...new Set(units.map(u => u.laptop_id))];
 
-        const newQty = remainingUnits?.length ?? 0;
-        await supabase
-            .from("laptops")
-            .update({
-                qty: newQty,
-                status: newQty <= 0 ? (isEcommerce ? "BELUM_SIAP" : "SOLD") : "SIAP_JUAL",
-            })
-            .eq("id", laptop.id);
+        await Promise.all(uniqueLaptopIds.map(async (lid) => {
+            const { data: remaining } = await supabase
+                .from("laptop_units")
+                .select("id")
+                .eq("laptop_id", lid)
+                .eq("status", "SIAP_JUAL");
 
+            const newQty = remaining?.length ?? 0;
+            await supabase
+                .from("laptops")
+                .update({
+                    qty: newQty,
+                    status: newQty <= 0
+                        ? (isEcommerce ? "BELUM_SIAP" : "SOLD")
+                        : "SIAP_JUAL",
+                })
+                .eq("id", lid);
+        }));
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 9. Buat warranty per unit (hanya jika PAID, bukan PACKING)
+        // ─────────────────────────────────────────────────────────────────────────
         if (!isEcommerce) {
             const warrantyDuration = Number(body.warranty_duration) || 30;
             const warrantyStart = new Date();
             const warrantyEnd = new Date();
             warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
 
-            await supabase.from("warranties").insert({
+            const warrantiesToInsert = units.map(u => ({
                 invoice_number,
-                serial_number: unit.serial_number.toUpperCase(),
+                serial_number: u.serial_number.toUpperCase(),
                 customer_name: body.customer_name,
                 customer_phone: body.customer_phone || null,
-                laptop_name: laptop.laptop_name,
-                laptop_id: laptop.id,
-                unit_id: unit.id,
+                laptop_name: u.laptop_name,
+                laptop_id: u.laptop_id,
+                unit_id: u.unit_id,
                 warranty_start: warrantyStart.toISOString().split("T")[0],
                 warranty_end: warrantyEnd.toISOString().split("T")[0],
                 warranty_duration: warrantyDuration,
                 status: "ACTIVE",
                 created_by: user.name,
-            });
+            }));
+
+            const { error: warrantyError } = await supabase
+                .from("warranties")
+                .insert(warrantiesToInsert);
+
+            if (warrantyError) {
+                console.error("[warranty insert]", warrantyError.message);
+            }
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // 10. Activity log
+        // ─────────────────────────────────────────────────────────────────────────
         await logActivity({
             userId: user.id,
             userName: user.name,
             userRole: user.role,
             action: "CREATE",
             entity: "transaction",
-            entityId: data.id,
-            entityLabel: `${invoice_number} — ${body.customer_name} [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""}`,
-            afterData: data,
+            entityId: transaction.id,
+            entityLabel: `${invoice_number} — ${body.customer_name} (${units.length} unit) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""}`,
+            afterData: transaction,
         });
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // 11. Kirim WhatsApp (non-blocking, fire & forget)
+        // ─────────────────────────────────────────────────────────────────────────
         if (body.customer_phone) {
             const message = buildPaymentMessage({
                 customer_name: body.customer_name,
                 invoice_number,
-                laptop_name: laptop.laptop_name,
-                serial_number: unit.serial_number,
+                laptop_name: displayLaptopName,
+                serial_number: displaySN,
                 amount: deal_price,
-                payment_method: body.payment_method,
+                payment_method,
                 pickup_method: body.pickup_method,
                 pickup_date: body.pickup_date,
                 pickup_time: body.pickup_time,
@@ -186,14 +328,21 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
             sendWhatsapp(body.customer_phone, message)
                 .then(sent => console.log(sent ? "✅ WA BERHASIL" : "⚠️ WA GAGAL"))
-                .catch(err => console.error("❌ Error kirim WA:", err));
+                .catch(err => console.error("❌ WA Error:", err));
         }
 
-        return NextResponse.json({ success: true, data, invoice_number });
-    } catch (error) {
-        console.error("Error handler:", error);
+        return NextResponse.json({
+            success: true,
+            data: transaction,
+            invoice_number,
+            message: `Transaksi berhasil (${units.length} unit)`,
+        });
+
+    } catch (err: any) {
+        console.error("[transaction/create]", err);
+        const message = err?.message ?? err?.error_description ?? JSON.stringify(err) ?? "Unknown error";
         return NextResponse.json(
-            { success: false, message: String(error) },
+            { success: false, message },
             { status: 500 }
         );
     }

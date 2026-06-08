@@ -300,6 +300,27 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <span>{item.payment_method === "TRANSFER" ? "Transfer" : item.payment_method === "CASH" ? "Tunai" : item.payment_method}</span>
             </span>
           )}
+
+          {item.payment_method === "TF_CASH" && item.amount_method_1 > 0 && (
+            <div className="flex items-center gap-0.5">
+              <span className="text-[7px] text-gray-400">🔀</span>
+              <span className="text-[8px] text-gray-500">
+                TF {(item.amount_method_1).toLocaleString("id-ID")} + Cash {(item.amount_method_2).toLocaleString("id-ID")}
+              </span>
+            </div>
+          )}
+
+          {Array.isArray(item.serial_numbers) && item.serial_numbers.length > 1 && (
+            <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+              📦 {item.serial_numbers.length} unit
+            </span>
+          )}
+
+          {item.is_trade_in && (
+            <span className="text-[8px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+              🔁 Tukar Tambah
+            </span>
+          )}
           {item.source_platform && item.source_platform !== "-" && (
             <div className="flex items-center gap-0.5">
               <span className="text-[7px] text-gray-400">🌐</span>
@@ -373,7 +394,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         </div>
       </div>
 
-      {/* Expanded detail - enhanced */}
       {expanded && (
         <div className="px-2.5 py-2 border-t border-gray-200 bg-gray-50 text-[9px]">
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
@@ -386,6 +406,36 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             )}
             {item.pickup_location && (
               <div className="col-span-2 flex items-start gap-1"><span className="text-gray-400 min-w-[40px]">📍 Alamat</span><p className="text-gray-700 font-medium flex-1">{item.pickup_location}</p></div>
+            )}
+            {item.is_trade_in && (
+              <>
+                <div className="col-span-2 h-px bg-gray-200 my-0.5" />
+                <div className="flex items-start gap-1">
+                  <span className="text-gray-400 min-w-[40px]">🔁 Tukar</span>
+                  <p className="text-gray-700 font-medium">{item.trade_in_item || "—"}</p>
+                </div>
+                <div className="flex items-start gap-1">
+                  <span className="text-gray-400 min-w-[40px]">💰 Nilai</span>
+                  <p className="text-gray-700 font-medium">Rp{(item.trade_in_value || 0).toLocaleString("id-ID")}</p>
+                </div>
+                <div className="flex items-start gap-1">
+                  <span className="text-gray-400 min-w-[40px]">💵 Cash</span>
+                  <p className="text-gray-700 font-medium">Rp{(item.trade_in_cash || 0).toLocaleString("id-ID")}</p>
+                </div>
+              </>
+            )}
+
+            {Array.isArray(item.serial_numbers) && item.serial_numbers.length > 1 && (
+              <div className="col-span-2 flex items-start gap-1">
+                <span className="text-gray-400 min-w-[40px]">📦 SN</span>
+                <div className="flex flex-wrap gap-1">
+                  {item.serial_numbers.map((sn: string) => (
+                    <code key={sn} className="text-[8px] font-mono text-gray-600 bg-gray-100 px-1 py-0.5 rounded-md">
+                      {sn}
+                    </code>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
           {item.notes && (
@@ -695,8 +745,8 @@ export default function Page() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition ${hasActiveFilter
-                  ? "bg-gray-800 text-white border-gray-800 shadow-sm"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                ? "bg-gray-800 text-white border-gray-800 shadow-sm"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                 }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -743,12 +793,12 @@ export default function Page() {
                   ].map((ct) => (
                     <button key={ct.val} onClick={() => setCustomerType(ct.val)}
                       className={`h-8 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1 ${customerType === ct.val
-                          ? ct.color === "amber"
-                            ? "bg-amber-500 text-white border-amber-500 shadow-sm"
-                            : ct.color === "indigo"
-                              ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
-                              : "bg-gray-800 text-white border-gray-800 shadow-sm"
-                          : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                        ? ct.color === "amber"
+                          ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+                          : ct.color === "indigo"
+                            ? "bg-indigo-500 text-white border-indigo-500 shadow-sm"
+                            : "bg-gray-800 text-white border-gray-800 shadow-sm"
+                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                         }`}>
                       {ct.icon && <span>{ct.icon}</span>}
                       {ct.label}

@@ -63,6 +63,20 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
     if (body.customer_type !== undefined) allowedFields.customer_type = body.customer_type;
+    if (body.payment_method_2 !== undefined)
+      allowedFields.payment_method_2 = body.payment_method_2;
+    if (body.amount_method_1 !== undefined)
+      allowedFields.amount_method_1 = Number(body.amount_method_1);
+    if (body.amount_method_2 !== undefined)
+      allowedFields.amount_method_2 = Number(body.amount_method_2);
+    if (body.is_trade_in !== undefined)
+      allowedFields.is_trade_in = Boolean(body.is_trade_in);
+    if (body.trade_in_item !== undefined)
+      allowedFields.trade_in_item = body.trade_in_item;
+    if (body.trade_in_value !== undefined)
+      allowedFields.trade_in_value = Number(body.trade_in_value);
+    if (body.trade_in_cash !== undefined)
+      allowedFields.trade_in_cash = Number(body.trade_in_cash);
 
     if (body.deal_price !== undefined || body.amount !== undefined) {
       const inventoryPrice = before?.inventory_price ?? 0;

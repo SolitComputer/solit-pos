@@ -3,11 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createPaymentSchema, CreatePaymentType } from "@/lib/validation";
+import { createPaymentSchema, CreatePaymentType, UnitItem } from "@/lib/validation";
 import { supabase } from "@/services/supabase";
 import imageCompression from "browser-image-compression";
 import { useSearchParams } from "next/navigation";
-import { UseFormSetValue } from "react-hook-form";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,33 +28,87 @@ interface UnitOption {
     selling_price: number;
     condition_note: string;
     status: string;
+    laptop_name?: string;
+    laptop_id?: string;
 }
 
-const DRAFT_KEY = "payment_draft_v1";
-
+const DRAFT_KEY = "payment_draft_v2";
 function saveDraft(data: object) {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch { }
 }
-
 function loadDraft(): Record<string, any> | null {
-    try {
-        const raw = localStorage.getItem(DRAFT_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    try { const r = localStorage.getItem(DRAFT_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
 }
-
 function clearDraft() {
-    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(DRAFT_KEY); } catch { }
 }
 
+// ─── Format Currency ──────────────────────────────────────────────────────────
+function fmt(n: number) {
+    return "Rp" + (n || 0).toLocaleString("id-ID");
+}
+
+// ─── ConfirmRow Helper ────────────────────────────────────────────────────────
+function ConfirmRow({ icon, label, value, bold, mono }: {
+    icon: string; label: string; value: string; bold?: boolean; mono?: boolean;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-sm">{icon}</span>
+                <span className="text-xs text-gray-400">{label}</span>
+            </div>
+            <span className={`text-xs text-right truncate max-w-[55%] ${bold ? "font-semibold text-gray-800" : "text-gray-600"} ${mono ? "font-mono" : ""}`}>
+                {value}
+            </span>
+        </div>
+    );
+}
+
+// ─── Unit Card (di daftar terpilih) ──────────────────────────────────────────
+function SelectedUnitCard({ unit, index, onRemove }: {
+    unit: UnitItem & { grade?: string; condition_note?: string };
+    index: number;
+    onRemove: () => void;
+}) {
+    return (
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        {index + 1}
+                    </span>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{unit.laptop_name}</p>
+                    {unit.grade && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                            {unit.grade}
+                        </span>
+                    )}
+                </div>
+                <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">SN: {unit.serial_number}</p>
+                <p className="text-[10px] text-gray-400 ml-5.5">{fmt(unit.selling_price)}</p>
+            </div>
+            <button
+                type="button"
+                onClick={onRemove}
+                className="ml-2 text-red-400 hover:text-red-600 transition flex-shrink-0"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function CreatePaymentPage() {
     const searchParams = useSearchParams();
     const urlUnitId = searchParams.get("unit_id") || "";
-    const urlLaptopId = searchParams.get("laptop_id") || "";
     const urlSn = searchParams.get("sn") || "";
-
     const fromScan = Boolean(urlUnitId && urlSn);
 
+    // ── Core state ────────────────────────────────────────────────────────────
     const [step, setStep] = useState(1);
     const [paymentPhoto, setPaymentPhoto] = useState<File | null>(null);
     const [latitude, setLatitude] = useState("");
@@ -63,89 +116,75 @@ export default function CreatePaymentPage() {
     const [gpsLoading, setGpsLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [warrantyDuration, setWarrantyDuration] = useState<number>(30);
-
-    // Laptop list
-    const [laptops, setLaptops] = useState<LaptopOption[]>([]);
-    const [isLoadingLaptops, setIsLoadingLaptops] = useState(true);
-
-    const [units, setUnits] = useState<UnitOption[]>([]);
-    const [isLoadingUnits, setIsLoadingUnits] = useState(false);
-
-    // Selected state
-    const [selectedLaptop, setSelectedLaptop] = useState<LaptopOption | null>(null);
-    const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null);
-    const [snSearch, setSnSearch] = useState("");
-    const [snResults, setSnResults] = useState<(UnitOption & { laptop_name: string; laptop_id: string })[]>([]);
-
-    const [rawDealPrice, setRawDealPrice] = useState<number>(0);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
     const [draftRestored, setDraftRestored] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingSubmitData, setPendingSubmitData] = useState<CreatePaymentType | null>(null);
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
-    const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
+    // ── Multi-unit state ──────────────────────────────────────────────────────
+    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string })[]>([]);
+    const [snSearch, setSnSearch] = useState("");
+    const [snResults, setSnResults] = useState<(UnitOption & { laptop_name: string; laptop_id: string })[]>([]);
+    const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
+    // ── Pricing ───────────────────────────────────────────────────────────────
+    const [rawDealPrice, setRawDealPrice] = useState<number>(0);
+
+    // ── Payment method ────────────────────────────────────────────────────────
+    const [splitTF, setSplitTF] = useState<number>(0);
+    const [splitCash, setSplitCash] = useState<number>(0);
+
+    // ── Trade-in ──────────────────────────────────────────────────────────────
+    const [isTradeIn, setIsTradeIn] = useState(false);
+    const [tradeInItem, setTradeInItem] = useState("");
+    const [tradeInValue, setTradeInValue] = useState<number>(0);
+    const [tradeInCash, setTradeInCash] = useState<number>(0);
+
+    // ── E-commerce ────────────────────────────────────────────────────────────
     const [isEcommerce, setIsEcommerce] = useState(false);
     const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
     const [ecommerceOrderId, setEcommerceOrderId] = useState("");
-    const [isSubmitted, setIsSubmitted] = useState(false);
 
-    const {
-        register,
-        handleSubmit,
-        watch,
-        setValue,
-        formState: { errors }
-    } = useForm<CreatePaymentType>({
-        resolver: zodResolver(createPaymentSchema),
-        defaultValues: {
-            company_name: "Solit 03",
-            payment_method: "CASH" as const,
-            pickup_method: "DATANG",
-            source_platform: "Instagram",
-            customer_type: "UMUM" as const,
-            customer_name: "",
-            customer_phone: "",
-            laptop_id: "",
-            laptop_name: "",
-            unit_id: "",
-            serial_number: "",
-            pickup_date: "",
-            pickup_time: "",
-            amount: 0,
-        } as CreatePaymentType,
-    });
+    // ── Customer type ─────────────────────────────────────────────────────────
+    const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
 
+    const { register, handleSubmit, watch, setValue, formState: { errors } } =
+        useForm<CreatePaymentType, any, CreatePaymentType>({
+            resolver: zodResolver(createPaymentSchema) as any,
+            defaultValues: {
+                company_name: "Solit 03",
+                payment_method: "CASH",
+                pickup_method: "DATANG",
+                source_platform: "Instagram",
+                customer_type: "UMUM",
+                customer_name: "",
+                customer_phone: "",
+                laptop_id: "",
+                laptop_name: "",
+                unit_id: "",
+                serial_number: "",
+                pickup_date: "",
+                pickup_time: "",
+                amount: 0,
+                units: [],
+                is_trade_in: false,
+                trade_in_value: 0,
+                trade_in_cash: 0,
+                amount_method_1: 0,
+                amount_method_2: 0,
+            },
+        });
+
+    const paymentMethod = watch("payment_method");
     const pickupMethod = watch("pickup_method");
-    const other = selectedUnit
-        ? rawDealPrice - (selectedUnit.selling_price || selectedLaptop?.selling_price || 0)
-        : 0;
 
-    // ✅ Watch customer_type dari form
-    const watchedCustomerType = watch("customer_type");
-
-    // Update local state when form value changes
-    useEffect(() => {
-        if (watchedCustomerType && (watchedCustomerType === "UMUM" || watchedCustomerType === "RESELLER" || watchedCustomerType === "MITRA")) {
-            setCustomerType(watchedCustomerType);
-        }
-    }, [watchedCustomerType]);
-
-    useEffect(() => {
-        const fetchLaptops = async () => {
-            setIsLoadingLaptops(true);
-            try {
-                const res = await fetch("/api/laptops/ready");
-                const result = await res.json();
-                setLaptops(result.data || []);
-            } catch {
-                setLaptops([]);
-            } finally {
-                setIsLoadingLaptops(false);
-            }
-        };
-        fetchLaptops();
-    }, []);
+    // Total harga modal semua unit terpilih
+    const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.selling_price || 0), 0);
+    // Selisih: deal price - modal
+    const margin = rawDealPrice - totalInventoryPrice;
+    // Kalau trade-in: cash yang diterima = deal_price - trade_in_value
+    const tradeInReceived = isTradeIn ? (rawDealPrice - tradeInValue) : 0;
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -154,195 +193,124 @@ export default function CreatePaymentPage() {
             .catch(() => setUserRole(null));
     }, []);
 
-    // ── Restore draft dari localStorage ──────────────────────────────────────────
-    useEffect(() => {
-        if (fromScan) return;
-
-        const draft = loadDraft();
-        if (!draft) return;
-
-        const fields = [
-            "customer_name", "customer_phone", "company_name",
-            "source_platform", "pickup_method", "pickup_date",
-            "pickup_time", "pickup_location", "payment_method",
-            "software_request", "notes", "amount", "customer_type",
-        ] as const;
-
-        fields.forEach(field => {
-            if (draft[field] !== undefined) {
-                setValue(field as any, draft[field]);
-            }
-        });
-
-        if (draft._step) setStep(draft._step);
-        if (draft._customerType) setCustomerType(draft._customerType);
-
-        if (draft._selectedLaptop) setSelectedLaptop(draft._selectedLaptop);
-        if (draft._selectedUnit) {
-            const validateUnit = async () => {
-                try {
-                    const res = await fetch(
-                        `/api/units/search-sn?q=${encodeURIComponent(draft._selectedUnit.serial_number)}`
-                    );
-                    const result = await res.json();
-                    const stillValid = (result.data || []).find(
-                        (u: any) => u.id === draft._selectedUnit.id && u.status === "SIAP_JUAL"
-                    );
-                    if (stillValid) {
-                        setSelectedUnit(draft._selectedUnit);
-                        setSnSearch(draft._selectedUnit.serial_number || "");
-                    } else {
-                        console.warn("Unit dari draft sudah tidak SIAP_JUAL, di-reset");
-                    }
-                } catch {
-                }
-            };
-            validateUnit();
-        }
-        if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
-
-        setDraftRestored(true);
-    }, []);
-
-    const watchedFields = watch();
-    useEffect(() => {
-        if (fromScan || isSubmitted) return;
-
-        const draft = {
-            ...watchedFields,
-            _step: step,
-            _customerType: customerType,
-            _selectedLaptop: selectedLaptop,
-            _selectedUnit: selectedUnit,
-            _rawDealPrice: rawDealPrice,
-            _savedAt: new Date().toISOString(),
-        };
-        saveDraft(draft);
-    }, [watchedFields, step, customerType, selectedLaptop, selectedUnit, rawDealPrice, isSubmitted]);
-
-    // ── Jika dari scan: pre-load unit langsung ────────────────────────────────
-    useEffect(() => {
-        if (!fromScan || !urlUnitId) return;
-        const loadUnitFromScan = async () => {
-            try {
-                const res = await fetch(`/api/units/check-sn?sn=${encodeURIComponent(urlSn)}`);
-                const result = await res.json();
-                if (!result.success) return;
-
-                const unit = result.data;
-                const laptop = unit.laptop;
-
-                setSelectedLaptop({
-                    id: laptop.id,
-                    laptop_name: laptop.laptop_name,
-                    brand: laptop.brand,
-                    cpu: laptop.cpu,
-                    ram: laptop.ram,
-                    storage: laptop.storage,
-                    selling_price: unit.selling_price,
-                    qty: 1,
-                });
-
-                setSelectedUnit({
-                    id: unit.id,
-                    serial_number: unit.serial_number,
-                    grade: unit.grade,
-                    selling_price: unit.selling_price,
-                    condition_note: unit.condition_note,
-                    status: unit.status,
-                });
-
-                setValue("laptop_name", laptop.laptop_name);
-                setValue("serial_number", unit.serial_number);
-                setValue("laptop_id", laptop.id);
-                setValue("unit_id", unit.id);
-            } catch { /* ignore */ }
-        };
-        loadUnitFromScan();
-    }, [fromScan, urlUnitId, urlSn, setValue]);
-
     const canSeeMargin = userRole
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
 
-    const fetchUnitsForLaptop = useCallback(async (laptopId: string) => {
-        if (!laptopId) { setUnits([]); setSelectedUnit(null); return; }
+    // ── Draft restore ─────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (fromScan) return;
+        const draft = loadDraft();
+        if (!draft) return;
+
+        const fields = [
+            "customer_name", "customer_phone", "company_name", "source_platform",
+            "pickup_method", "pickup_date", "pickup_time", "pickup_location",
+            "payment_method", "software_request", "notes", "amount", "customer_type",
+        ] as const;
+        fields.forEach(f => { if (draft[f] !== undefined) setValue(f as any, draft[f]); });
+
+        if (draft._step) setStep(draft._step);
+        if (draft._customerType) setCustomerType(draft._customerType);
+        if (draft._selectedUnits) setSelectedUnits(draft._selectedUnits);
+        if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
+        if (draft._isTradeIn) setIsTradeIn(draft._isTradeIn);
+        if (draft._tradeInItem) setTradeInItem(draft._tradeInItem);
+        if (draft._tradeInValue) setTradeInValue(draft._tradeInValue);
+        if (draft._tradeInCash) setTradeInCash(draft._tradeInCash);
+        if (draft._splitTF) setSplitTF(draft._splitTF);
+        if (draft._splitCash) setSplitCash(draft._splitCash);
+
+        setDraftRestored(true);
+    }, []);
+
+    // ── Auto-save draft ───────────────────────────────────────────────────────
+    const watchedFields = watch();
+    useEffect(() => {
+        if (fromScan || isSubmitted) return;
+        saveDraft({
+            ...watchedFields,
+            _step: step, _customerType: customerType,
+            _selectedUnits: selectedUnits, _rawDealPrice: rawDealPrice,
+            _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
+            _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
+            _splitTF: splitTF, _splitCash: splitCash,
+            _savedAt: new Date().toISOString(),
+        });
+    }, [watchedFields, step, customerType, selectedUnits, rawDealPrice,
+        isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
+
+    // ── Load unit dari scan ───────────────────────────────────────────────────
+    useEffect(() => {
+        if (!fromScan || !urlUnitId) return;
+        const load = async () => {
+            try {
+                const res = await fetch(`/api/units/check-sn?sn=${encodeURIComponent(urlSn)}`);
+                const result = await res.json();
+                if (!result.success) return;
+                const unit = result.data;
+                const laptop = unit.laptop;
+                const item: UnitItem & { grade?: string; condition_note?: string } = {
+                    unit_id: unit.id,
+                    laptop_id: laptop.id,
+                    serial_number: unit.serial_number,
+                    laptop_name: laptop.laptop_name,
+                    grade: unit.grade,
+                    selling_price: unit.selling_price ?? 0,
+                    condition_note: unit.condition_note,
+                };
+                setSelectedUnits([item]);
+                setValue("units", [item]);
+                setValue("laptop_name", laptop.laptop_name);
+                setValue("serial_number", unit.serial_number);
+                setValue("laptop_id", laptop.id);
+                setValue("unit_id", unit.id);
+            } catch { }
+        };
+        load();
+    }, [fromScan, urlUnitId, urlSn, setValue]);
+
+    // ── Search SN ─────────────────────────────────────────────────────────────
+    const handleSnSearch = useCallback(async (q: string) => {
+        if (q.length < 2) { setSnResults([]); return; }
         setIsLoadingUnits(true);
         try {
-            const res = await fetch(`/api/laptops/${laptopId}/units`);
+            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
             const result = await res.json();
-            const siap: UnitOption[] = (result.data || []).filter(
-                (u: UnitOption) => u.status === "SIAP_JUAL"
-            );
-            setUnits(siap);
-            if (siap.length === 1) {
-                setSelectedUnit(siap[0]);
-                setValue("serial_number", siap[0].serial_number);
-                setValue("unit_id", siap[0].id);
-            } else {
-                setSelectedUnit(null);
-            }
-        } catch {
-            setUnits([]);
-        } finally {
-            setIsLoadingUnits(false);
-        }
-    }, [setValue]);
-
-    const handleLaptopChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const id = e.target.value;
-        const laptop = laptops.find(l => l.id === id) || null;
-        setSelectedLaptop(laptop);
-        setSelectedUnit(null);
-        setValue("laptop_id", id);
-        setValue("laptop_name", laptop?.laptop_name || "");
-        setValue("unit_id", "");
-        setValue("serial_number", "");
-        if (id) fetchUnitsForLaptop(id);
-        else setUnits([]);
-    };
-
-    const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const id = e.target.value;
-        const unit = units.find(u => u.id === id) || null;
-        setSelectedUnit(unit);
-        setValue("unit_id", id);
-        setValue("serial_number", unit?.serial_number || "");
-    };
-
-    const handleSnSearch = useCallback(async (query: string) => {
-        if (query.length < 2) { setSnResults([]); return; }
-        setIsLoadingUnits(true);
-        try {
-            const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(query)}`);
-            const result = await res.json();
-            setSnResults(result.data || []);
+            // Filter out already-selected units
+            const selectedIds = new Set(selectedUnits.map(u => u.unit_id));
+            setSnResults((result.data || []).filter((u: any) => !selectedIds.has(u.id)));
         } catch {
             setSnResults([]);
         } finally {
             setIsLoadingUnits(false);
         }
-    }, []);
+    }, [selectedUnits]);
 
     const handleSelectSnResult = (u: UnitOption & { laptop_name: string; laptop_id: string }) => {
-        setSelectedUnit(u);
-        setSelectedLaptop({
-            id: u.laptop_id,
+        const item: UnitItem & { grade?: string; condition_note?: string } = {
+            unit_id: u.id,
+            laptop_id: u.laptop_id,
+            serial_number: u.serial_number,
             laptop_name: u.laptop_name,
-            brand: "",
-            cpu: "",
-            ram: "",
-            storage: "",
-            selling_price: u.selling_price,
-            qty: 1,
-        });
-        setValue("unit_id", u.id);
-        setValue("serial_number", u.serial_number);
-        setValue("laptop_id", u.laptop_id);
-        setValue("laptop_name", u.laptop_name);
+            grade: u.grade,
+            selling_price: u.selling_price ?? 0,
+            condition_note: u.condition_note,
+        };
+        const newUnits = [...selectedUnits, item];
+        setSelectedUnits(newUnits);
+        setValue("units", newUnits);
+        setSnSearch("");
         setSnResults([]);
     };
 
+    const handleRemoveUnit = (idx: number) => {
+        const newUnits = selectedUnits.filter((_, i) => i !== idx);
+        setSelectedUnits(newUnits);
+        setValue("units", newUnits);
+    };
+
+    // ── GPS ───────────────────────────────────────────────────────────────────
     const getLocation = () => {
         setGpsLoading(true);
         navigator.geolocation.getCurrentPosition(
@@ -356,42 +324,70 @@ export default function CreatePaymentPage() {
         );
     };
 
-    const onSubmit = async (data: CreatePaymentType) => {
-        if (!paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
-        if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
-        if (!selectedUnit) { alert("Pilih unit / serial number dulu"); return; }
+    // ── Photo ─────────────────────────────────────────────────────────────────
+    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressed = await imageCompression(file, {
+                maxSizeMB: 0.1, maxWidthOrHeight: 800,
+                useWebWorker: true, initialQuality: 0.7,
+            });
+            setPaymentPhoto(new File([compressed], file.name, { type: compressed.type }));
+        } catch { setPaymentPhoto(file); }
+    };
 
-        // Re-validasi unit masih SIAP_JUAL
-        const checkRes = await fetch(
-            `/api/units/search-sn?q=${encodeURIComponent(selectedUnit.serial_number)}`
-        );
-        const checkResult = await checkRes.json();
-        const stillAvailable = (checkResult.data || []).find(
-            (u: any) => u.id === selectedUnit.id
-        );
-        if (!stillAvailable) {
-            alert(`Unit SN: ${selectedUnit.serial_number} sudah tidak tersedia.\n\nSilakan pilih unit lain.`);
-            setSelectedUnit(null);
-            setSelectedLaptop(null);
-            setSnSearch("");
-            setValue("unit_id", "");
-            setValue("serial_number", "");
-            setValue("laptop_id", "");
-            setValue("laptop_name", "");
-            setStep(2);
+    const onSubmit = async (data: CreatePaymentType) => {
+        if (!selectedUnits.length) { alert("Pilih minimal 1 unit"); return; }
+
+        if (!rawDealPrice || rawDealPrice < 1000) {
+            alert("Harga deal minimal Rp1.000");
             return;
         }
 
-        setPendingSubmitData(data);
+        if (!paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
+        if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
+
+        if (data.payment_method === "TF_CASH") {
+            if (splitTF <= 0 && splitCash <= 0) {
+                alert("Isi nominal Transfer dan Cash terlebih dahulu");
+                return;
+            }
+            if (splitTF + splitCash !== rawDealPrice) {
+                alert(
+                    `Jumlah TF (${fmt(splitTF)}) + Cash (${fmt(splitCash)}) = ${fmt(splitTF + splitCash)}\n` +
+                    `Harus sama dengan total: ${fmt(rawDealPrice)}`
+                );
+                return;
+            }
+        }
+
+        if (isEcommerce && !ecommercePlatform) {
+            alert("Pilih platform e-commerce terlebih dahulu");
+            return;
+        }
+
+        setPendingSubmitData({
+            ...data,
+            units: selectedUnits,
+            amount: rawDealPrice,
+            amount_method_1: data.payment_method === "TF_CASH" ? splitTF : 0,
+            amount_method_2: data.payment_method === "TF_CASH" ? splitCash : 0,
+            payment_method_2: data.payment_method === "TF_CASH" ? "CASH" : undefined,
+            is_trade_in: isTradeIn,
+            trade_in_item: isTradeIn ? tradeInItem : undefined,
+            trade_in_value: isTradeIn ? tradeInValue : 0,
+            trade_in_cash: isTradeIn ? tradeInCash : 0,
+        });
         setShowConfirmModal(true);
     };
 
     const handleConfirmedSubmit = async () => {
-        if (!pendingSubmitData || !selectedUnit || !paymentPhoto) return;
-
+        if (!pendingSubmitData || !paymentPhoto) return;
         setShowConfirmModal(false);
         setSubmitting(true);
         try {
+            // Upload foto
             const fileName = `${Date.now()}-${paymentPhoto.name}`;
             const { error: uploadError } = await supabase.storage
                 .from("payment-proof")
@@ -407,15 +403,8 @@ export default function CreatePaymentPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...pendingSubmitData,
-                    customer_type: customerType,
-                    unit_id: selectedUnit.id,
-                    laptop_id: selectedLaptop?.id,
-                    serial_number: selectedUnit.serial_number,
-                    laptop_name: selectedLaptop?.laptop_name,
                     payment_photo: imageData.publicUrl,
-                    latitude,
-                    longitude,
-                    amount: rawDealPrice,
+                    latitude, longitude,
                     warranty_duration: warrantyDuration,
                     is_ecommerce: isEcommerce,
                     ecommerce_platform: isEcommerce ? ecommercePlatform : null,
@@ -427,7 +416,6 @@ export default function CreatePaymentPage() {
 
             setIsSubmitted(true);
             clearDraft();
-
             window.location.href = `/receipt/${result.invoice_number}`;
         } catch {
             alert("Terjadi kesalahan");
@@ -437,31 +425,14 @@ export default function CreatePaymentPage() {
         }
     };
 
-    // ── Photo compress ────────────────────────────────────────────────────────
-    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        try {
-            const compressed = await imageCompression(file, {
-                maxSizeMB: 0.1, maxWidthOrHeight: 800,
-                useWebWorker: true, initialQuality: 0.7,
-            });
-            setPaymentPhoto(new File([compressed], file.name, { type: compressed.type }));
-        } catch {
-            setPaymentPhoto(file);
-        }
-    };
-
     // ── Styles ────────────────────────────────────────────────────────────────
     const inputClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 bg-white w-full transition-all duration-200";
     const selectClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 w-full transition-all duration-200";
     const btnSecondary = "flex-1 bg-white text-gray-600 border border-gray-200 rounded-xl h-11 font-medium hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all duration-200 text-sm";
     const btnPrimary = "flex-1 bg-gray-700 text-white rounded-xl h-11 font-medium hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-sm shadow-sm";
 
-    const stepLabels = ["Data Pembeli", "Laptop & Unit", "Pengambilan", "Pembayaran"];
-
-    const goToStep3 = () => setStep(3);
-    const backFromStep3 = () => fromScan ? setStep(1) : setStep(2);
+    const stepLabels = ["Data Pembeli", "Pilih Unit", "Pengambilan", "Pembayaran"];
+    const goBack3 = () => fromScan ? setStep(1) : setStep(2);
 
     return (
         <div className="max-w-lg mx-auto px-4 py-6">
@@ -471,22 +442,22 @@ export default function CreatePaymentPage() {
                 <div className="mb-5">
                     <div className="flex items-center gap-2 mb-1">
                         <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">Buat Payment</h1>
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
+                            Buat Payment
+                        </h1>
                     </div>
                     <p className="text-xs text-gray-400 ml-3">{stepLabels[step - 1]}</p>
                 </div>
 
                 {/* Step indicator */}
                 <div className="flex gap-1.5 mb-6">
-                    {[1, 2, 3, 4].map((item) => (
-                        <div key={item} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > item ? "bg-gray-600"
-                            : step === item ? "bg-gray-400"
-                                : "bg-gray-200"
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > i ? "bg-gray-600" : step === i ? "bg-gray-400" : "bg-gray-200"
                             }`} />
                     ))}
                 </div>
 
-                {/* Banner scan */}
+                {/* Scan banner */}
                 {fromScan && (
                     <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
                         <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,64 +478,46 @@ export default function CreatePaymentPage() {
                             </svg>
                             <p className="text-xs font-semibold text-gray-700">Draft tersimpan dipulihkan</p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                clearDraft();
-                                window.location.reload();
-                            }}
-                            className="text-xs text-gray-500 hover:text-gray-700 transition underline"
-                        >
+                        <button type="button" onClick={() => { clearDraft(); window.location.reload(); }}
+                            className="text-xs text-gray-500 hover:text-gray-700 transition underline">
                             Mulai baru
                         </button>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-                    {/* Hidden fields */}
                     <input type="hidden" {...register("laptop_id")} />
                     <input type="hidden" {...register("laptop_name")} />
                     <input type="hidden" {...register("serial_number")} />
                     <input type="hidden" {...register("unit_id" as any)} />
                     <input type="hidden" {...register("customer_type")} />
 
-                    {/* ── STEP 1: Data Pembeli ── */}
+                    {/* ──────────────────────── STEP 1: Data Pembeli ─────────────────── */}
                     {step === 1 && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
 
-                            {/* ✅ Tipe Customer */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tipe Customer *</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {[
-                                        { value: "UMUM", label: "Umum", icon: "👤", description: "Pembeli biasa" },
-                                        { value: "RESELLER", label: "Reseller", icon: "🔄", description: "Membeli untuk dijual kembali" },
-                                        { value: "MITRA", label: "Mitra", icon: "🤝", description: "Mitra bisnis Solit 03" }
-                                    ].map(option => (
-                                        <button
-                                            key={option.value}
-                                            type="button"
-                                            onClick={() => {
-                                                setCustomerType(option.value as any);
-                                                setValue("customer_type", option.value as any);
-                                            }}
-                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${customerType === option.value
+                                        { value: "UMUM", label: "Umum", icon: "👤", desc: "Pembeli biasa" },
+                                        { value: "RESELLER", label: "Reseller", icon: "🔄", desc: "Jual kembali" },
+                                        { value: "MITRA", label: "Mitra", icon: "🤝", desc: "Mitra bisnis" },
+                                    ].map(o => (
+                                        <button key={o.value} type="button"
+                                            onClick={() => { setCustomerType(o.value as any); setValue("customer_type", o.value as any); }}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${customerType === o.value
                                                 ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
                                                 : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            <span className="text-xl">{option.icon}</span>
-                                            <span className={`text-xs font-medium ${customerType === option.value ? "text-gray-800" : "text-gray-600"}`}>
-                                                {option.label}
-                                            </span>
-                                            <span className="text-[9px] text-gray-400">{option.description}</span>
+                                            <span className="text-xl">{o.icon}</span>
+                                            <span className={`text-xs font-medium ${customerType === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
+                                            <span className="text-[9px] text-gray-400">{o.desc}</span>
                                         </button>
                                     ))}
                                 </div>
-                                {errors.customer_type && (
-                                    <p className="text-xs text-red-500 mt-1">{errors.customer_type.message}</p>
-                                )}
                             </div>
 
                             <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />
@@ -577,30 +530,28 @@ export default function CreatePaymentPage() {
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
-                                {errors.source_platform && <p className="text-xs text-red-500 mt-1">{errors.source_platform.message}</p>}
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
-                                    if (!watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
-                                    fromScan ? setStep(3) : setStep(2);
-                                }}
-                                className={`w-full ${btnPrimary}`}
-                            >
+                            <button type="button" onClick={() => {
+                                if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
+                                if (!watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
+                                fromScan ? setStep(3) : setStep(2);
+                            }} className={`w-full ${btnPrimary}`}>
                                 Lanjut →
                             </button>
                         </>
                     )}
 
-                    {/* ── STEP 2: Cari via SN langsung ── */}
+                    {/* ──────────────────────── STEP 2: Pilih Unit ───────────────────── */}
                     {step === 2 && !fromScan && (
                         <>
                             {/* Search SN */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">
-                                    Cari Serial Number (SN)
+                                    Cari & Tambah Serial Number
+                                    {selectedUnits.length > 0 && (
+                                        <span className="ml-1.5 text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                                    )}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -608,10 +559,7 @@ export default function CreatePaymentPage() {
                                         placeholder="Ketik SN unit..."
                                         className={inputClass}
                                         value={snSearch}
-                                        onChange={(e) => {
-                                            setSnSearch(e.target.value);
-                                            handleSnSearch(e.target.value);
-                                        }}
+                                        onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
                                     />
                                     {isLoadingUnits && (
                                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -621,144 +569,209 @@ export default function CreatePaymentPage() {
                                 </div>
 
                                 {/* Dropdown hasil search */}
-                                {snResults.length > 0 && !selectedUnit && (
+                                {snResults.length > 0 && (
                                     <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                        {snResults.map((u) => (
-                                            <button
-                                                key={u.id}
-                                                type="button"
-                                                onClick={() => handleSelectSnResult(u)}
-                                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0"
-                                            >
-                                                <p className="font-mono text-sm font-semibold text-gray-800">
-                                                    {u.serial_number}
-                                                </p>
+                                        {snResults.map(u => (
+                                            <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
+                                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                                                <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
                                                 <p className="text-xs text-gray-500 mt-0.5">
                                                     {u.laptop_name} · Grade {u.grade}
-                                                    {u.selling_price
-                                                        ? ` · Rp${u.selling_price.toLocaleString("id-ID")}`
-                                                        : ""}
+                                                    {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
                                                 </p>
                                             </button>
                                         ))}
                                     </div>
                                 )}
 
-                                {/* Tidak ditemukan */}
-                                {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && !selectedUnit && (
-                                    <p className="text-xs text-red-500 mt-1.5 px-1">
-                                        SN tidak ditemukan atau unit tidak SIAP_JUAL
-                                    </p>
+                                {snSearch.length >= 2 && snResults.length === 0 && !isLoadingUnits && (
+                                    <p className="text-xs text-red-500 mt-1.5 px-1">SN tidak ditemukan atau sudah dipilih</p>
                                 )}
                             </div>
 
-                            {/* Info card unit yang dipilih */}
-                            {selectedLaptop && selectedUnit && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedUnit(null);
-                                            setSelectedLaptop(null);
-                                            setSnSearch("");
-                                            setSnResults([]);
-                                            setValue("unit_id", "");
-                                            setValue("serial_number", "");
-                                            setValue("laptop_id", "");
-                                            setValue("laptop_name", "");
-                                        }}
-                                        className="text-xs text-red-400 hover:text-red-600 transition flex items-center gap-1"
-                                    >
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                        Ganti unit
-                                    </button>
-                                    <UnitInfoCard
-                                        laptop={selectedLaptop}
-                                        unit={selectedUnit}
-                                        rawDealPrice={rawDealPrice}
-                                        setRawDealPrice={setRawDealPrice}
-                                        setValue={setValue}
-                                        other={other}
-                                        inputClass={inputClass}
-                                        canSeeMargin={canSeeMargin}
-                                    />
-                                </>
+                            {/* Daftar unit terpilih */}
+                            {selectedUnits.length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold text-gray-600">
+                                            Unit Terpilih ({selectedUnits.length})
+                                        </label>
+                                        {canSeeMargin && (
+                                            <span className="text-xs text-gray-400">
+                                                Total modal: {fmt(totalInventoryPrice)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {selectedUnits.map((u, i) => (
+                                        <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
+                                    ))}
+
+                                    {/* Harga Deal */}
+                                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                                        <div>
+                                            <label className="text-xs text-gray-500 mb-1.5 block">
+                                                Total Harga Deal * ({selectedUnits.length > 1 ? `${selectedUnits.length} unit` : "1 unit"})
+                                            </label>
+                                            <input
+                                                type="text" inputMode="numeric"
+                                                placeholder="Masukkan total harga deal"
+                                                className={inputClass}
+                                                defaultValue={rawDealPrice > 0 ? rawDealPrice.toLocaleString("id-ID") : ""}
+                                                onChange={e => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    const num = raw ? Number(raw) : 0;
+                                                    setRawDealPrice(num);
+                                                    setValue("amount", num);
+                                                }}
+                                                onBlur={e => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                }}
+                                                onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                            />
+                                        </div>
+                                        {rawDealPrice > 0 && canSeeMargin && (
+                                            <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                                                <span className="text-gray-500">Selisih / Margin</span>
+                                                <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
+                                                    {margin >= 0 ? "+" : ""}{fmt(margin)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* ── Trade-In Toggle ── */}
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsTradeIn(!isTradeIn)}
+                                            className={`w-full flex items-center justify-between px-4 py-3 transition ${isTradeIn ? "bg-amber-50 border-amber-200" : "bg-white hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-base">🔁</span>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-semibold text-gray-700">Tukar Tambah</p>
+                                                    <p className="text-[10px] text-gray-400">Customer punya barang untuk ditukar</p>
+                                                </div>
+                                            </div>
+                                            <div className={`w-10 h-6 rounded-full transition-colors relative ${isTradeIn ? "bg-amber-500" : "bg-gray-200"}`}>
+                                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${isTradeIn ? "left-5" : "left-1"}`} />
+                                            </div>
+                                        </button>
+
+                                        {isTradeIn && (
+                                            <div className="px-4 pb-4 pt-2 space-y-3 bg-amber-50 border-t border-amber-200">
+                                                <div>
+                                                    <label className="text-xs text-gray-500 mb-1.5 block">Nama Barang Tukar *</label>
+                                                    <input
+                                                        type="text" placeholder="Contoh: Laptop Dell XPS 15"
+                                                        className={inputClass}
+                                                        value={tradeInItem}
+                                                        onChange={e => setTradeInItem(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-500 mb-1.5 block">Nilai Barang Tukar *</label>
+                                                    <input
+                                                        type="text" inputMode="numeric"
+                                                        placeholder="Harga barang yang ditukar"
+                                                        className={inputClass}
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            const num = raw ? Number(raw) : 0;
+                                                            setTradeInValue(num);
+                                                            // Cash tambahan = deal_price - trade_in_value
+                                                            setTradeInCash(rawDealPrice > 0 ? Math.max(0, rawDealPrice - num) : 0);
+                                                        }}
+                                                        onBlur={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                        }}
+                                                        onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                    />
+                                                </div>
+                                                {tradeInValue > 0 && rawDealPrice > 0 && (
+                                                    <div className="bg-white rounded-xl border border-amber-200 px-3 py-2.5 space-y-1.5">
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500">Harga laptop</span>
+                                                            <span className="font-medium text-gray-700">{fmt(rawDealPrice)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-500">Nilai barang tukar</span>
+                                                            <span className="font-medium text-amber-700">− {fmt(tradeInValue)}</span>
+                                                        </div>
+                                                        <div className="h-px bg-amber-100" />
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-gray-600 font-semibold">Cash tambahan dari customer</span>
+                                                            <span className="font-bold text-gray-800">{fmt(Math.max(0, rawDealPrice - tradeInValue))}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
 
-                            <input
-                                type="text"
-                                placeholder="Request Software (opsional)"
-                                className={inputClass}
-                                {...register("software_request")}
-                            />
+                            <input type="text" placeholder="Request Software (opsional)" className={inputClass} {...register("software_request")} />
 
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>
-                                    ← Kembali
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (!selectedUnit) { alert("Cari dan pilih SN unit dulu"); return; }
-                                        if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
-                                        setStep(3);
-                                    }}
-                                    className={btnPrimary}
-                                >
+                                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={() => {
+                                    if (!selectedUnits.length) { alert("Cari dan pilih minimal 1 unit dulu"); return; }
+                                    if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
+                                    if (isTradeIn && !tradeInItem) { alert("Isi nama barang tukar"); return; }
+                                    if (isTradeIn && !tradeInValue) { alert("Isi nilai barang tukar"); return; }
+                                    setStep(3);
+                                }} className={btnPrimary}>
                                     Lanjut →
                                 </button>
                             </div>
                         </>
                     )}
 
-                    {/* ── STEP 3: Pengambilan ── */}
+                    {/* ──────────────────────── STEP 3: Pengambilan ──────────────────── */}
                     {(step === 3 || (step === 2 && fromScan)) && (
                         <>
-                            {/* Ringkasan unit jika dari scan */}
-                            {fromScan && selectedLaptop && selectedUnit && (
+                            {/* Ringkasan unit (scan) */}
+                            {fromScan && selectedUnits.length > 0 && (
                                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2 mb-1">
                                     <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Unit Terpilih</p>
-                                    <p className="font-semibold text-gray-800 text-sm">{selectedLaptop.laptop_name}</p>
-                                    <p className="text-xs text-gray-500 font-mono">SN: {selectedUnit.serial_number} · Grade {selectedUnit.grade}</p>
+                                    {selectedUnits.map((u, i) => (
+                                        <div key={u.unit_id} className="text-xs text-gray-700">
+                                            <span className="font-semibold">{u.laptop_name}</span>
+                                            <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
+                                        </div>
+                                    ))}
                                     <div>
                                         <label className="text-xs text-gray-500 mb-1.5 block">Harga Deal *</label>
                                         <input
-                                            type="text"
-                                            inputMode="numeric"
+                                            type="text" inputMode="numeric"
                                             placeholder="Masukkan harga deal"
                                             className={inputClass}
-                                            onChange={(e) => {
+                                            onChange={e => {
                                                 const raw = e.target.value.replace(/\D/g, "");
                                                 const num = raw ? Number(raw) : 0;
                                                 setRawDealPrice(num);
                                                 setValue("amount", num);
                                             }}
-                                            onBlur={(e) => {
+                                            onBlur={e => {
                                                 const raw = e.target.value.replace(/\D/g, "");
                                                 if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
                                             }}
-                                            onFocus={(e) => {
-                                                const raw = e.target.value.replace(/\D/g, "");
-                                                e.target.value = raw;
-                                            }}
+                                            onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
                                         />
                                         {rawDealPrice > 0 && canSeeMargin && (
-                                            <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
+                                            <div className="flex justify-between text-sm pt-1 border-t border-gray-200 mt-2">
                                                 <span className="text-gray-500">Selisih</span>
-                                                <span className={`font-semibold ${other >= 0 ? "text-gray-600" : "text-red-500"}`}>
-                                                    {other >= 0 ? "+" : ""}Rp{other.toLocaleString("id-ID")}
+                                                <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
+                                                    {margin >= 0 ? "+" : ""}{fmt(margin)}
                                                 </span>
                                             </div>
                                         )}
                                     </div>
-                                    <input
-                                        type="text"
-                                        placeholder="Request Software (opsional)"
-                                        className={inputClass}
-                                        {...register("software_request")}
-                                    />
+                                    <input type="text" placeholder="Request Software (opsional)" className={inputClass} {...register("software_request")} />
                                 </div>
                             )}
 
@@ -768,61 +781,45 @@ export default function CreatePaymentPage() {
                                     <option value="DATANG">Datang ke toko</option>
                                     <option value="DIANTAR">Diantar</option>
                                 </select>
-                                {errors.pickup_method && <p className="text-xs text-red-500 mt-1">{errors.pickup_method.message}</p>}
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tanggal</label>
                                 <input type="date" className={inputClass} {...register("pickup_date")} />
-                                {errors.pickup_date && <p className="text-xs text-red-500 mt-1">{errors.pickup_date.message}</p>}
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Jam</label>
                                 <input type="time" className={inputClass} {...register("pickup_time")} />
-                                {errors.pickup_time && <p className="text-xs text-red-500 mt-1">{errors.pickup_time.message}</p>}
                             </div>
                             {pickupMethod === "DIANTAR" && (
                                 <input type="text" placeholder="Alamat pengiriman" className={inputClass} {...register("pickup_location")} />
                             )}
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={backFromStep3} className={btnSecondary}>← Kembali</button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (fromScan && !rawDealPrice) { alert("Masukkan harga deal dulu"); return; }
-                                        setStep(4);
-                                    }}
-                                    className={btnPrimary}
-                                >
+                                <button type="button" onClick={goBack3} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={() => {
+                                    if (fromScan && !rawDealPrice) { alert("Masukkan harga deal dulu"); return; }
+                                    setStep(4);
+                                }} className={btnPrimary}>
                                     Lanjut →
                                 </button>
                             </div>
                         </>
                     )}
 
-                    {/* ── STEP 4: Pembayaran ── */}
+                    {/* ──────────────────────── STEP 4: Pembayaran ───────────────────── */}
                     {step === 4 && (
                         <>
+                            {/* Jenis penjualan */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Jenis Penjualan</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
-                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce
-                                            ? "bg-gray-700 text-white border-gray-700 shadow-sm"
-                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                                            }`}
-                                    >
+                                    <button type="button" onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce ? "bg-gray-700 text-white border-gray-700 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}>
                                         🏪 Offline / Langsung
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsEcommerce(true)}
-                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce
-                                            ? "bg-gray-600 text-white border-gray-600 shadow-sm"
-                                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                                            }`}
-                                    >
+                                    <button type="button" onClick={() => setIsEcommerce(true)}
+                                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce ? "bg-gray-600 text-white border-gray-600 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                            }`}>
                                         📦 E-Commerce
                                     </button>
                                 </div>
@@ -830,83 +827,123 @@ export default function CreatePaymentPage() {
 
                             {isEcommerce && (
                                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-                                    <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 3H8l-2 4h12l-2-4z" />
-                                        </svg>
-                                        Transaksi E-Commerce — status PACKING sampai dana cair
-                                    </p>
+                                    <p className="text-xs font-semibold text-gray-700">📦 Status PACKING sampai dana cair</p>
                                     <div>
                                         <label className="text-xs text-gray-500 mb-1.5 block">Platform *</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {(["SHOPEE", "TOKOPEDIA", "TIKTOK", "LAZADA"] as const).map(p => (
-                                                <button
-                                                    key={p}
-                                                    type="button"
-                                                    onClick={() => setEcommercePlatform(p)}
-                                                    className={`h-10 rounded-xl border text-xs font-semibold transition ${ecommercePlatform === p
-                                                        ? "bg-gray-600 text-white border-gray-600 shadow-sm"
-                                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                                                        }`}
-                                                >
-                                                    {p === "SHOPEE" ? "🛍 Shopee"
-                                                        : p === "TOKOPEDIA" ? "🟢 Tokopedia"
-                                                            : p === "TIKTOK" ? "🎵 TikTok Shop"
-                                                                : "🟠 Lazada"}
+                                                <button key={p} type="button" onClick={() => setEcommercePlatform(p)}
+                                                    className={`h-10 rounded-xl border text-xs font-semibold transition ${ecommercePlatform === p ? "bg-gray-600 text-white border-gray-600 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                        }`}>
+                                                    {p === "SHOPEE" ? "🛍 Shopee" : p === "TOKOPEDIA" ? "🟢 Tokopedia" : p === "TIKTOK" ? "🎵 TikTok" : "🟠 Lazada"}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-gray-500 mb-1.5 block">No. Order (opsional)</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Contoh: 240605ABCDEF"
-                                            className={inputClass}
-                                            value={ecommerceOrderId}
-                                            onChange={e => setEcommerceOrderId(e.target.value)}
-                                        />
-                                    </div>
+                                    <input type="text" placeholder="No. Order (opsional)" className={inputClass}
+                                        value={ecommerceOrderId} onChange={e => setEcommerceOrderId(e.target.value)} />
                                 </div>
                             )}
+
+                            {/* ── Metode Pembayaran ── */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Metode Pembayaran</label>
-                                <select className={selectClass} {...register("payment_method")}>
-                                    <option value="QRIS">QRIS</option>
-                                    <option value="TRANSFER">Transfer</option>
-                                    <option value="CASH">Cash</option>
-                                </select>
-                                {errors.payment_method && <p className="text-xs text-red-500 mt-1">{errors.payment_method.message}</p>}
-                            </div>
-
-                            <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block flex items-center gap-1.5">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                    </svg>
-                                    Durasi Garansi
-                                </label>
-                                <div className="flex gap-2">
-                                    {[7, 14, 30, 90].map(d => (
-                                        <button
-                                            key={d}
-                                            type="button"
-                                            onClick={() => setWarrantyDuration(d)}
-                                            className={`flex-1 h-10 rounded-xl border text-xs font-semibold transition ${warrantyDuration === d
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { value: "CASH", label: "💵 Cash", desc: "Uang tunai" },
+                                        { value: "TRANSFER", label: "🏦 Transfer", desc: "Transfer bank" },
+                                        { value: "QRIS", label: "📱 QRIS", desc: "QR Code" },
+                                        { value: "TF_CASH", label: "🔀 TF + Cash", desc: "Sebagian TF, sebagian tunai" },
+                                    ].map(m => (
+                                        <button key={m.value} type="button"
+                                            onClick={() => {
+                                                setValue("payment_method", m.value as any);
+                                                if (m.value !== "TF_CASH") { setSplitTF(0); setSplitCash(0); }
+                                            }}
+                                            className={`flex flex-col items-center justify-center gap-0.5 h-14 rounded-xl border text-sm font-medium transition ${paymentMethod === m.value
                                                 ? "bg-gray-700 text-white border-gray-700 shadow-sm"
                                                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
+                                            <span className="text-base leading-none">{m.label.split(" ")[0]}</span>
+                                            <span className="text-xs">{m.label.split(" ").slice(1).join(" ")}</span>
+                                            <span className={`text-[9px] ${paymentMethod === m.value ? "text-gray-300" : "text-gray-400"}`}>{m.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Split TF + Cash form */}
+                                {paymentMethod === "TF_CASH" && rawDealPrice > 0 && (
+                                    <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
+                                        <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+                                            🔀 Rincian Pembayaran — Total: <span className="font-bold">{fmt(rawDealPrice)}</span>
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-blue-600 mb-1 block">Transfer (Rp)</label>
+                                                <input
+                                                    type="text" inputMode="numeric" placeholder="0"
+                                                    className="border border-blue-200 rounded-xl h-10 px-3 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                                                    onChange={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        const num = raw ? Number(raw) : 0;
+                                                        setSplitTF(num);
+                                                        setSplitCash(Math.max(0, rawDealPrice - num));
+                                                    }}
+                                                    onBlur={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                    }}
+                                                    onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-blue-600 mb-1 block">Cash (Rp)</label>
+                                                <input
+                                                    type="text" inputMode="numeric" placeholder="0"
+                                                    className="border border-blue-200 rounded-xl h-10 px-3 text-sm bg-white w-full focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+                                                    value={splitCash > 0 ? splitCash.toLocaleString("id-ID") : ""}
+                                                    onChange={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        const num = raw ? Number(raw) : 0;
+                                                        setSplitCash(num);
+                                                        setSplitTF(Math.max(0, rawDealPrice - num));
+                                                    }}
+                                                    onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                    onBlur={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        {/* Validasi visual */}
+                                        {splitTF + splitCash > 0 && (
+                                            <div className={`flex justify-between text-xs px-1 ${splitTF + splitCash === rawDealPrice ? "text-green-700" : "text-red-600"
+                                                }`}>
+                                                <span>Total diisi: {fmt(splitTF + splitCash)}</span>
+                                                <span>{splitTF + splitCash === rawDealPrice ? "✓ Sesuai" : `Kurang/Lebih ${fmt(Math.abs(rawDealPrice - splitTF - splitCash))}`}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Garansi */}
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block flex items-center gap-1.5">
+                                    🛡️ Durasi Garansi
+                                </label>
+                                <div className="flex gap-2">
+                                    {[7, 14, 30, 90].map(d => (
+                                        <button key={d} type="button" onClick={() => setWarrantyDuration(d)}
+                                            className={`flex-1 h-10 rounded-xl border text-xs font-semibold transition ${warrantyDuration === d ? "bg-gray-700 text-white border-gray-700 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                }`}>
                                             {d}h
                                         </button>
                                     ))}
                                     <div className="relative flex-1">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={365}
-                                            value={warrantyDuration}
+                                        <input type="number" min={1} max={365} value={warrantyDuration}
                                             onChange={e => setWarrantyDuration(Number(e.target.value))}
                                             className="w-full h-10 border border-gray-200 rounded-xl px-3 pr-8 text-xs text-center bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 transition"
                                         />
@@ -915,18 +952,17 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
+                            {/* Foto */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Foto Bukti Pembayaran *</label>
-                                <input
-                                    type="file" accept="image/*" capture="environment"
+                                <input type="file" accept="image/*" capture="environment"
                                     className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
                                     onChange={handlePhotoChange}
                                 />
-                                {paymentPhoto && (
-                                    <p className="text-xs text-gray-600 mt-1">✓ {paymentPhoto.name}</p>
-                                )}
+                                {paymentPhoto && <p className="text-xs text-gray-600 mt-1">✓ {paymentPhoto.name}</p>}
                             </div>
 
+                            {/* GPS */}
                             <div className="border border-gray-200 rounded-xl p-4 flex justify-between items-center">
                                 <div>
                                     <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
@@ -934,13 +970,9 @@ export default function CreatePaymentPage() {
                                         {latitude ? "✓ Koordinat berhasil diambil" : "Wajib diambil sebelum simpan"}
                                     </p>
                                 </div>
-                                <button
-                                    type="button" onClick={getLocation}
-                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude
-                                        ? "bg-gray-100 text-gray-700 border border-gray-200"
-                                        : "bg-gray-700 text-white hover:bg-gray-800"
-                                        }`}
-                                >
+                                <button type="button" onClick={getLocation}
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-gray-700 text-white hover:bg-gray-800"
+                                        }`}>
                                     {gpsLoading ? "..." : latitude ? "✓ Diambil" : "Ambil GPS"}
                                 </button>
                             </div>
@@ -950,7 +982,13 @@ export default function CreatePaymentPage() {
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(3)} className={btnSecondary}>← Kembali</button>
                                 <button
-                                    type="submit" disabled={submitting}
+                                    type="button"         
+                                    disabled={submitting}
+                                    onClick={() => {
+                                        setValue("units", selectedUnits);
+                                        setValue("amount", rawDealPrice);
+                                        handleSubmit(onSubmit)();
+                                    }}
                                     className={`${btnPrimary} disabled:opacity-50`}
                                 >
                                     {submitting ? "Menyimpan..." : "Simpan Transaksi"}
@@ -960,15 +998,11 @@ export default function CreatePaymentPage() {
                     )}
                 </form>
 
-                {/* ── Modal Konfirmasi Transaksi ── */}
-                {showConfirmModal && selectedUnit && selectedLaptop && (
+                {/* ── Modal Konfirmasi ── */}
+                {showConfirmModal && selectedUnits.length > 0 && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-                        <div
-                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                            onClick={() => setShowConfirmModal(false)}
-                        />
-
-                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[85vh]">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+                        <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]">
 
                             <div className="bg-gray-700 px-5 py-4">
                                 <div className="flex items-center gap-3">
@@ -979,71 +1013,61 @@ export default function CreatePaymentPage() {
                                     </div>
                                     <div>
                                         <p className="font-bold text-white text-sm">Konfirmasi Transaksi</p>
-                                        <p className="text-xs text-gray-300 mt-0.5">Periksa detail sebelum menyimpan</p>
+                                        <p className="text-xs text-gray-300 mt-0.5">
+                                            {selectedUnits.length} unit · {fmt(rawDealPrice)}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1">
+                                {/* Total */}
                                 <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex justify-between items-center">
                                     <div>
                                         <p className="text-xs text-gray-500 font-medium">Total Pembayaran</p>
-                                        <p className="text-xl font-black text-gray-800 mt-0.5">
-                                            Rp{rawDealPrice.toLocaleString("id-ID")}
-                                        </p>
+                                        <p className="text-xl font-black text-gray-800 mt-0.5">{fmt(rawDealPrice)}</p>
                                     </div>
-                                    <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200">
-                                        {watch("payment_method")}
-                                    </span>
+                                    <div className="text-right">
+                                        <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200">
+                                            {paymentMethod === "TF_CASH" ? `TF ${fmt(splitTF)} + Cash ${fmt(splitCash)}` : paymentMethod}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                                     <ConfirmRow icon="👤" label="Pembeli" value={watch("customer_name") || "—"} />
-                                    <ConfirmRow
-                                        icon={customerType === "RESELLER" ? "🔄" : customerType === "MITRA" ? "🤝" : "👤"}
-                                        label="Tipe"
-                                        value={customerType === "RESELLER" ? "Reseller" : customerType === "MITRA" ? "Mitra" : "Umum"}
-                                    />
                                     <ConfirmRow icon="📱" label="WhatsApp" value={watch("customer_phone") || "—"} />
                                     <div className="h-px bg-gray-200" />
-                                    <ConfirmRow icon="💻" label="Laptop" value={selectedLaptop.laptop_name} bold />
-                                    <ConfirmRow icon="🔢" label="Serial Number" value={selectedUnit.serial_number} mono />
-                                    <ConfirmRow icon="⭐" label="Grade" value={`Grade ${selectedUnit.grade}`} />
-                                    {watch("software_request") && (
-                                        <ConfirmRow icon="💿" label="Software" value={watch("software_request") || ""} />
-                                    )}
-                                    <div className="h-px bg-gray-200" />
-                                    <ConfirmRow icon="📦" label="Pengambilan" value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"} />
-                                    {watch("pickup_date") && (
-                                        <ConfirmRow
-                                            icon="📅"
-                                            label="Tanggal"
-                                            value={new Date(watch("pickup_date") || "").toLocaleDateString("id-ID", {
-                                                weekday: "short", day: "numeric", month: "short", year: "numeric"
-                                            })}
-                                        />
-                                    )}
-                                    {watch("pickup_time") && (
-                                        <ConfirmRow icon="⏰" label="Jam" value={watch("pickup_time") || ""} />
-                                    )}
-                                    <div className="h-px bg-gray-200" />
-                                    <ConfirmRow icon="🛡️" label="Garansi" value={`${warrantyDuration} hari`} />
-                                    {isEcommerce && (
+
+                                    {/* Unit list */}
+                                    <div>
+                                        <p className="text-xs text-gray-400 mb-1.5">💻 Unit ({selectedUnits.length})</p>
+                                        {selectedUnits.map((u, i) => (
+                                            <div key={u.unit_id} className="flex justify-between text-xs mb-1">
+                                                <span className="text-gray-600 truncate max-w-[55%]">{i + 1}. {u.laptop_name}</span>
+                                                <span className="font-mono text-gray-500">{u.serial_number}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Trade-in */}
+                                    {isTradeIn && tradeInValue > 0 && (
                                         <>
                                             <div className="h-px bg-gray-200" />
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-sm">📦</span>
-                                                    <span className="text-xs text-gray-400">E-Commerce</span>
-                                                </div>
-                                                <span className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
-                                                    {ecommercePlatform}
-                                                </span>
+                                            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 space-y-1">
+                                                <p className="text-[10px] font-bold text-amber-700">🔁 Tukar Tambah</p>
+                                                <ConfirmRow icon="📦" label="Barang" value={tradeInItem} />
+                                                <ConfirmRow icon="💰" label="Nilai" value={fmt(tradeInValue)} />
+                                                <ConfirmRow icon="💵" label="Cash terima" value={fmt(Math.max(0, rawDealPrice - tradeInValue))} bold />
                                             </div>
-                                            {ecommerceOrderId && (
-                                                <ConfirmRow icon="🔢" label="No. Order" value={ecommerceOrderId} mono />
-                                            )}
                                         </>
+                                    )}
+
+                                    <div className="h-px bg-gray-200" />
+                                    <ConfirmRow icon="📦" label="Pickup" value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"} />
+                                    <ConfirmRow icon="🛡️" label="Garansi" value={`${warrantyDuration} hari`} />
+                                    {isEcommerce && (
+                                        <ConfirmRow icon="📦" label="Platform" value={ecommercePlatform} />
                                     )}
                                 </div>
 
@@ -1058,31 +1082,16 @@ export default function CreatePaymentPage() {
                             </div>
 
                             <div className="px-5 pb-6 pt-3 flex gap-3 border-t border-gray-100 bg-white flex-shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmModal(false)}
-                                    className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition active:scale-[0.98]"
-                                >
+                                <button type="button" onClick={() => setShowConfirmModal(false)}
+                                    className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
                                     Periksa Lagi
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={handleConfirmedSubmit}
-                                    disabled={submitting}
-                                    className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
-                                >
+                                <button type="button" onClick={handleConfirmedSubmit} disabled={submitting}
+                                    className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
                                     {submitting ? (
-                                        <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Menyimpan...
-                                        </>
+                                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
                                     ) : (
-                                        <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            Ya, Simpan Transaksi
-                                        </>
+                                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Ya, Simpan</>
                                     )}
                                 </button>
                             </div>
@@ -1090,130 +1099,6 @@ export default function CreatePaymentPage() {
                     </div>
                 )}
             </div>
-        </div>
-    );
-}
-
-// ─── Helper Components ────────────────────────────────────────────────────────
-function ConfirmRow({ icon, label, value, bold, mono }: {
-    icon: string;
-    label: string;
-    value: string;
-    bold?: boolean;
-    mono?: boolean;
-}) {
-    return (
-        <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="text-sm">{icon}</span>
-                <span className="text-xs text-gray-400">{label}</span>
-            </div>
-            <span className={`text-xs text-right truncate max-w-[55%] ${bold ? "font-semibold text-gray-800" : "text-gray-600"} ${mono ? "font-mono" : ""}`}>
-                {value}
-            </span>
-        </div>
-    );
-}
-
-function UnitInfoCard({
-    laptop,
-    unit,
-    rawDealPrice,
-    setRawDealPrice,
-    setValue,
-    other,
-    inputClass,
-    canSeeMargin,
-}: {
-    laptop: LaptopOption;
-    unit: UnitOption;
-    rawDealPrice: number;
-    setRawDealPrice: (n: number) => void;
-    setValue: (name: any, value: any) => void;
-    other: number;
-    inputClass: string;
-    canSeeMargin: boolean;
-}) {
-    const gradeColor = {
-        A: "text-gray-700 bg-gray-100 border-gray-200",
-        B: "text-gray-700 bg-gray-100 border-gray-200",
-        C: "text-red-700 bg-red-50 border-red-200",
-    };
-
-    return (
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
-            <div>
-                <p className="font-semibold text-gray-800 text-sm">{laptop.laptop_name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                    {[laptop.cpu, laptop.ram, laptop.storage].filter(Boolean).join(" · ")}
-                </p>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                <div className="flex-1">
-                    <p className="text-xs text-gray-400 mb-0.5">Serial Number</p>
-                    <p className="font-mono text-sm font-semibold text-gray-800">{unit.serial_number}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${gradeColor[unit.grade] || gradeColor.A}`}>
-                        Grade {unit.grade}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${unit.status === "SIAP_JUAL"
-                        ? "bg-gray-100 text-gray-700 border-gray-200"
-                        : "bg-red-50 text-red-600 border-red-200"
-                        }`}>
-                        {unit.status === "SIAP_JUAL" ? "✓ Siap Jual" : `⚠ ${unit.status}`}
-                    </span>
-                </div>
-            </div>
-
-            {unit.condition_note && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                    {unit.condition_note}
-                </p>
-            )}
-
-            {canSeeMargin && (
-                <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
-                    <span className="text-gray-500">Harga inventory</span>
-                    <span className="font-medium text-gray-800">
-                        Rp{(unit.selling_price || laptop.selling_price || 0).toLocaleString("id-ID")}
-                    </span>
-                </div>
-            )}
-
-            <div>
-                <label className="text-xs text-gray-500 mb-1.5 block">Harga Deal *</label>
-                <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="Masukkan harga deal"
-                    className={inputClass}
-                    onChange={(e) => {
-                        const raw = e.target.value.replace(/\D/g, "");
-                        const num = raw ? Number(raw) : 0;
-                        setRawDealPrice(num);
-                        setValue("amount", num);
-                    }}
-                    onBlur={(e) => {
-                        const raw = e.target.value.replace(/\D/g, "");
-                        if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
-                    }}
-                    onFocus={(e) => {
-                        const raw = e.target.value.replace(/\D/g, "");
-                        e.target.value = raw;
-                    }}
-                />
-            </div>
-
-            {rawDealPrice > 0 && (
-                <div className="flex justify-between text-sm pt-1 border-t border-gray-200">
-                    <span className="text-gray-500">Selisih</span>
-                    <span className={`font-semibold ${other >= 0 ? "text-gray-600" : "text-red-500"}`}>
-                        {other >= 0 ? "+" : ""}Rp{other.toLocaleString("id-ID")}
-                    </span>
-                </div>
-            )}
         </div>
     );
 }
