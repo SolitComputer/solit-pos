@@ -670,7 +670,11 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: {
 
 // ─── Today Attendance Card ─────────────────────────────────────────────────────
 function TodayAttendanceCard({ status, loading, onRefresh }: {
-    status: { alreadyAttended: boolean; needEnroll: boolean; isAttendanceTime: boolean; isDayOff: boolean; shift: string; reason?: string; openAt?: string; closeAt?: string } | null;
+    status: {
+        alreadyAttended: boolean; needEnroll: boolean; isAttendanceTime: boolean;
+        isDayOff: boolean; isExempt?: boolean; shift: string;
+        reason?: string; openAt?: string; closeAt?: string;
+    } | null;
     loading: boolean; onRefresh: () => void;
 }) {
     if (loading) return (
@@ -679,19 +683,86 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         </div>
     );
     if (!status) return null;
+
     const goAbsen = () => { window.location.href = "/face-verify?from=/dashboard/attendance"; };
-    let cfg: any;
-    if (status.alreadyAttended) {
-        cfg = { icon: "✅", gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100", badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-400", badgeText: "Sudah Absen", title: "Absensi Hari Ini Tercatat", sub: `Shift ${status.shift}`, showBtn: false };
-    } else if (status.isDayOff) {
-        cfg = { icon: "🏖️", gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100", badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400", badgeText: "Hari Libur", title: "Kamu Libur Hari Ini", sub: "Tidak perlu absen", showBtn: false };
-    } else if (!status.isAttendanceTime && status.reason === "TOO_EARLY") {
-        cfg = { icon: "⏳", gradient: "from-blue-50 to-indigo-50", iconBg: "bg-blue-100", badge: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-400", badgeText: "Belum Buka", title: "Absen Belum Dibuka", sub: `Buka pukul ${status.openAt} · Shift ${status.shift}`, showBtn: false };
-    } else if (!status.isAttendanceTime && status.reason === "TOO_LATE") {
-        cfg = { icon: "⌛", gradient: "from-red-50 to-rose-50", iconBg: "bg-red-100", badge: "bg-red-100 text-red-600 border-red-200", dot: "bg-red-400", badgeText: "Waktu Habis", title: "Waktu Absen Sudah Lewat", sub: `Batas ${status.closeAt} · Shift ${status.shift}`, showBtn: false };
-    } else if (status.isAttendanceTime) {
-        cfg = { icon: "🟡", gradient: "from-amber-50 to-yellow-50", iconBg: "bg-amber-100", badge: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-400 animate-pulse", badgeText: "Belum Absen", title: "Kamu Belum Absen Hari Ini", sub: `Jam absen: ${status.openAt} – ${status.closeAt} WIB · Shift ${status.shift}`, showBtn: true, btnLabel: "Absen Sekarang →", btnColor: "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]", btnAction: goAbsen };
-    } else { return null; }
+    const openAt = status.openAt ?? "—";
+    const closeAt = status.closeAt ?? "—";
+    const needEnroll = status.needEnroll;
+
+    // ✅ FIX: turunkan SATU state eksplisit (reason-first). Tidak ada lagi return null.
+    // Prioritas: exempt → sudah absen → libur → belum waktunya → waktu habis → belum absen
+    type CardState = "EXEMPT" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
+    let state: CardState;
+    if (status.isExempt) state = "EXEMPT";
+    else if (status.alreadyAttended) state = "ATTENDED";
+    else if (status.isDayOff) state = "DAY_OFF";
+    else if (status.reason === "TOO_EARLY") state = "TOO_EARLY";
+    else if (status.reason === "TOO_LATE") state = "TOO_LATE";
+    else state = "OPEN"; // OPEN / reason kosong / isAttendanceTime true → tetap tampil "Belum Absen"
+
+    let cfg: {
+        icon: string; gradient: string; iconBg: string; badge: string; dot: string;
+        badgeText: string; title: string; sub: string; showBtn: boolean;
+        btnLabel?: string; btnColor?: string; btnAction?: () => void;
+    };
+
+    switch (state) {
+        case "EXEMPT":
+            cfg = {
+                icon: "🛡️", gradient: "from-slate-50 to-gray-100", iconBg: "bg-slate-100",
+                badge: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400",
+                badgeText: "Bebas Absen", title: "Tidak Wajib Absen",
+                sub: `Role kamu dikecualikan dari absensi · Shift ${status.shift}`, showBtn: false,
+            };
+            break;
+        case "ATTENDED":
+            cfg = {
+                icon: "✅", gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
+                badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-400",
+                badgeText: "Sudah Absen", title: "Absensi Hari Ini Tercatat",
+                sub: `Shift ${status.shift}`, showBtn: false,
+            };
+            break;
+        case "DAY_OFF":
+            cfg = {
+                icon: "🏖️", gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
+                badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400",
+                badgeText: "Hari Libur", title: "Kamu Libur Hari Ini",
+                sub: "Tidak perlu absen", showBtn: false,
+            };
+            break;
+        case "TOO_EARLY":
+            cfg = {
+                icon: "⏳", gradient: "from-blue-50 to-indigo-50", iconBg: "bg-blue-100",
+                badge: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-400",
+                badgeText: "Belum Waktunya", title: "Belum Waktunya Absen",
+                sub: `Absen dibuka pukul ${openAt} · Shift ${status.shift}`, showBtn: false,
+            };
+            break;
+        case "TOO_LATE":
+            cfg = {
+                icon: "⌛", gradient: "from-red-50 to-rose-50", iconBg: "bg-red-100",
+                badge: "bg-red-100 text-red-600 border-red-200", dot: "bg-red-400",
+                badgeText: "Waktu Habis", title: "Waktu Absen Sudah Lewat",
+                sub: `Batas absen pukul ${closeAt} · Shift ${status.shift}`, showBtn: false,
+            };
+            break;
+        case "OPEN":
+        default:
+            cfg = {
+                icon: "🟡", gradient: "from-amber-50 to-yellow-50", iconBg: "bg-amber-100",
+                badge: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-400 animate-pulse",
+                badgeText: "Belum Absen",
+                title: needEnroll ? "Belum Absen — Daftar Wajah Dulu" : "Kamu Belum Absen Hari Ini",
+                sub: `Jam absen: ${openAt} – ${closeAt} WIB · Shift ${status.shift}`,
+                showBtn: true,
+                btnLabel: needEnroll ? "Daftar & Absen →" : "Absen Sekarang →",
+                btnColor: "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]",
+                btnAction: goAbsen,
+            };
+            break;
+    }
+
     return (
         <div className={`bg-gradient-to-br ${cfg.gradient} rounded-2xl border border-gray-100 shadow-sm p-5`}>
             <div className="flex items-center gap-4">
@@ -908,8 +979,22 @@ export default function AttendanceDashboardPage() {
 
     const fetchTodayStatus = useCallback(async () => {
         setStatusLoading(true);
-        try { const r = await fetch("/api/auth/face-status"); const d = await r.json(); if (d.success) setTodayStatus({ alreadyAttended: d.alreadyAttended ?? false, needEnroll: d.needEnroll ?? false, isAttendanceTime: d.isAttendanceTime ?? false, isDayOff: d.isDayOff ?? false, shift: d.shift ?? "PAGI", reason: d.reason, openAt: d.openAt, closeAt: d.closeAt }); }
-        catch { } finally { setStatusLoading(false); }
+        try {
+            const r = await fetch("/api/auth/face-status");
+            const d = await r.json();
+            if (d.success) setTodayStatus({
+                alreadyAttended: d.alreadyAttended ?? false,
+                needEnroll: d.needEnroll ?? false,
+                isAttendanceTime: d.isAttendanceTime ?? false,
+                isDayOff: d.isDayOff ?? false,
+                isExempt: d.isExempt ?? false,
+                shift: d.shift ?? "PAGI",
+                reason: d.reason,
+                openAt: d.openAt,
+                closeAt: d.closeAt,
+            });
+        } catch { /* abaikan, biarkan status sebelumnya */ }
+        finally { setStatusLoading(false); }
     }, []);
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
 
