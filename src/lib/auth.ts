@@ -123,7 +123,6 @@ export async function resolveShiftConfigFromDB(
 
   const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
 
-  // Prioritas 1: jadwal tanggal spesifik hari ini
   if (dateSchedule) {
     return {
       start:    { h: dateSchedule.start_hour,  m: dateSchedule.start_minute  },
@@ -133,7 +132,6 @@ export async function resolveShiftConfigFromDB(
     };
   }
 
-  // Prioritas 2: jadwal mingguan custom hari ini
   if (weeklySchedule) {
     return {
       start:    { h: weeklySchedule.start_hour,  m: weeklySchedule.start_minute  },
