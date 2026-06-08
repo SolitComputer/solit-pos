@@ -27,6 +27,7 @@ type OvertimeRequest = {
     completed_at: string | null;
     duration_minutes: number | null;
     total_pay: number | null;
+    work_description: string | null;
     created_at: string;
     user?: { id: string; name: string; role: string; shift: string };
     approver?: { id: string; name: string; role: string } | null;
@@ -301,9 +302,12 @@ function CompleteModal({ overtime, onClose, onSaved }: { overtime: OvertimeReque
 
             // Upload foto ke Supabase Storage jika ada
             if (photoFile) {
-                const fileName = `overtime_${overtime.id}_${Date.now()}.${photoFile.name.split(".").pop()}`;
+                // ✅ Tambah watermark waktu sebelum upload
+                const watermarkedFile = await addWatermarkToFile(photoFile);
+                const ext = photoFile.name.split(".").pop();
+                const fileName = `overtime_${overtime.id}_${Date.now()}.${ext}`;
                 const formData = new FormData();
-                formData.append("file", photoFile);
+                formData.append("file", watermarkedFile);
                 formData.append("filename", fileName);
 
                 const uploadRes = await fetch("/api/attendance/overtime/upload", {
@@ -450,6 +454,178 @@ function RateModal({ rates, onClose, onSaved }: { rates: OvertimeRate[]; onClose
     );
 }
 
+async function addWatermarkToFile(file: File): Promise<File> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d")!;
+
+            // Gambar foto asli
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(objectUrl);
+
+            // Format waktu WIB
+            const now = new Date();
+            const wibOffset = 7 * 60 * 60 * 1000;
+            const wib = new Date(now.getTime() + wibOffset);
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const timeStr = `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())} WIB`;
+            const dateStr = wib.toLocaleDateString("id-ID", {
+                day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta",
+            });
+            const label = `${dateStr}  •  ${timeStr}`;
+
+            // Ukuran font adaptif berdasarkan lebar gambar
+            const fontSize = Math.max(20, Math.round(img.width * 0.03));
+            ctx.font = `bold ${fontSize}px -apple-system, Arial, sans-serif`;
+
+            const textW = ctx.measureText(label).width;
+            const padX = fontSize * 0.8;
+            const padY = fontSize * 0.6;
+            const bgH = fontSize + padY * 2;
+            const bgW = textW + padX * 2;
+            const margin = fontSize * 0.6;
+            const x = margin;
+            const y = img.height - margin - bgH;
+
+            // Background pill semi-transparan
+            ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+            ctx.beginPath();
+            const r = bgH / 2;
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + bgW - r, y);
+            ctx.arcTo(x + bgW, y, x + bgW, y + bgH, r);
+            ctx.lineTo(x + bgW, y + r);
+            ctx.arcTo(x + bgW, y + bgH, x + bgW - r, y + bgH, r);
+            ctx.lineTo(x + r, y + bgH);
+            ctx.arcTo(x, y + bgH, x, y + bgH - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "rgba(255,255,255,0.95)";
+            ctx.textBaseline = "middle";
+            ctx.fillText(label, x + padX, y + bgH / 2);
+
+            canvas.toBlob((blob) => {
+                if (!blob) { resolve(file); return; }
+                resolve(new File([blob], file.name, { type: file.type }));
+            }, file.type, 0.92);
+        };
+        img.onerror = () => resolve(file);
+        img.src = objectUrl;
+    });
+}
+
+function StartModal({ overtime, onClose, onStarted }: {
+    overtime: OvertimeRequest; onClose: () => void; onStarted: () => void;
+}) {
+    const [workDesc, setWorkDesc] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        if (!workDesc.trim()) { setError("Uraian pekerjaan wajib diisi"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/overtime", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: overtime.id,
+                    action: "START",
+                    work_description: workDesc.trim(),
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal memulai lembur"); return; }
+            onStarted(); onClose();
+        } catch { setError("Gagal memulai lembur"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">▶ Mulai Lembur</p>
+                        <p className="text-xs text-white/70 mt-1">
+                            {overtime.scheduled_start
+                                ? `Jadwal: ${toWIBStr(overtime.scheduled_start)} – ${overtime.scheduled_end ? toWIBStr(overtime.scheduled_end) : "-"} WIB`
+                                : overtime.request_date
+                            }
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
+                    {/* Info alasan lembur */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Alasan Lembur</p>
+                        <p className="text-sm text-gray-700">{overtime.reason}</p>
+                    </div>
+
+                    {/* Input uraian pekerjaan */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                            Uraian Pekerjaan <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                            value={workDesc}
+                            onChange={e => setWorkDesc(e.target.value)}
+                            placeholder="Jelaskan pekerjaan yang akan dikerjakan selama lembur...&#10;Contoh: Menyelesaikan packing 50 unit laptop untuk pesanan batch bulan ini"
+                            rows={4}
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 resize-none"
+                            autoFocus
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">
+                            Uraian ini akan dicatat sebagai dokumentasi pekerjaan lembur
+                        </p>
+                    </div>
+
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700">
+                        ⏱️ Waktu mulai akan dicatat <strong>sekarang</strong> setelah kamu klik "Mulai".
+                    </div>
+                </div>
+
+                <div className="px-6 pb-6 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Batal
+                    </button>
+                    <button
+                        onClick={submit}
+                        disabled={saving || !workDesc.trim()}
+                        className="flex-1 h-11 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memulai...</>
+                            : "▶ Mulai Lembur"
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SetPayModal({ overtime, onClose, onSaved }: {
     overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
@@ -581,28 +757,28 @@ function SetPayModal({ overtime, onClose, onSaved }: {
                         ) : (
                             <p className="text-sm text-gray-400">
                                 {isValid && totalPay !== null ? (
-                                <div>
-                                    <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
-                                    <p className="text-[10px] text-emerald-600 mt-0.5">
-                                        {formatRupiah(rate)}/jam × {billedHours} jam
-                                        {durationMins % 60 > 0 && (
-                                            <span className="text-emerald-500/70 ml-1">
-                                                (aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
-                                            </span>
-                                        )}
-                                    </p>
-                                </div>
-                            ) : durationMins > 0 && billedHours === 0 ? (
-                                // Durasi ada tapi < 1 jam penuh
-                                <div>
-                                    <p className="text-base font-bold text-amber-600">Tidak terhitung</p>
-                                    <p className="text-[10px] text-amber-500 mt-0.5">
-                                        Durasi {formatDuration(durationMins)} — minimal 1 jam penuh untuk mendapat bayaran
-                                    </p>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
-                            )}</p>
+                                    <div>
+                                        <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
+                                        <p className="text-[10px] text-emerald-600 mt-0.5">
+                                            {formatRupiah(rate)}/jam × {billedHours} jam
+                                            {durationMins % 60 > 0 && (
+                                                <span className="text-emerald-500/70 ml-1">
+                                                    (aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                ) : durationMins > 0 && billedHours === 0 ? (
+                                    // Durasi ada tapi < 1 jam penuh
+                                    <div>
+                                        <p className="text-base font-bold text-amber-600">Tidak terhitung</p>
+                                        <p className="text-[10px] text-amber-500 mt-0.5">
+                                            Durasi {formatDuration(durationMins)} — minimal 1 jam penuh untuk mendapat bayaran
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
+                                )}</p>
                         )}
                     </div>
                 </div>
@@ -639,6 +815,7 @@ export default function OvertimePage() {
     const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
     const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
     const [showRates, setShowRates] = useState(false);
+    const [startData, setStartData] = useState<OvertimeRequest | null>(null);
     const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
 
     const today = getWIBToday();
@@ -690,17 +867,9 @@ export default function OvertimePage() {
         fetchOvertimes();
     };
 
-    const startOverttime = async (id: string) => {
-        const res = await fetch("/api/attendance/overtime", {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, action: "START" }),
-        });
-        const d = await res.json();
-        if (!d.success) {
-            alert(d.message ?? "Gagal memulai lembur");
-            return;
-        }
-        fetchOvertimes();
+    // Buka StartModal — isi uraian pekerjaan dulu sebelum mulai
+    const openStartModal = (overtime: OvertimeRequest) => {
+        setStartData(overtime);
     };
 
     const rateMap = useMemo(() => {
@@ -783,7 +952,7 @@ export default function OvertimePage() {
                                                 return (
                                                     <div className="flex flex-col items-end gap-1">
                                                         <button
-                                                            onClick={() => ss.canStart && startOverttime(o.id)}
+                                                            onClick={() => ss.canStart && openStartModal(o)}
                                                             disabled={!ss.canStart}
                                                             className={`text-xs font-bold px-4 py-2 rounded-xl transition border ${ss.canStart
                                                                 ? "text-emerald-700 bg-emerald-100 border-emerald-200 hover:bg-emerald-200 cursor-pointer"
@@ -888,6 +1057,11 @@ export default function OvertimePage() {
                                                 <td className="px-4 py-4">
                                                     <p className="font-bold text-gray-700 text-sm">{new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</p>
                                                     <p className="text-[10px] text-gray-400 truncate max-w-[120px]">{o.reason}</p>
+                                                    {o.work_description && (
+                                                        <p className="text-[10px] text-emerald-600 truncate max-w-[120px] mt-0.5" title={o.work_description}>
+                                                            📋 {o.work_description}
+                                                        </p>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-4">
                                                     {o.scheduled_start && o.scheduled_end ? (
@@ -938,12 +1112,31 @@ export default function OvertimePage() {
                                                                 🏁 Selesai
                                                             </button>
                                                         )}
-                                                        {isOwn && o.status === "APPROVED" && (
-                                                            <button onClick={() => startOverttime(o.id)}
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition">
-                                                                ▶ Mulai
-                                                            </button>
-                                                        )}
+                                                        {isOwn && o.status === "APPROVED" && (() => {
+                                                            const ss = getStartStatus(o.scheduled_start);
+                                                            return (
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <button
+                                                                        onClick={() => ss.canStart && openStartModal(o)}
+                                                                        disabled={!ss.canStart}
+                                                                        title={!ss.canStart && o.scheduled_start
+                                                                            ? `Mulai pukul ${new Date(o.scheduled_start).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB`
+                                                                            : "Mulai lembur"
+                                                                        }
+                                                                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${ss.canStart
+                                                                            ? "bg-green-50 text-green-600 border-green-200 hover:bg-green-100 cursor-pointer"
+                                                                            : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
+                                                                            }`}>
+                                                                        {ss.label}
+                                                                    </button>
+                                                                    {!ss.canStart && o.scheduled_start && (
+                                                                        <span className="text-[9px] text-gray-400">
+                                                                            {new Date(o.scheduled_start).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         {(isOwn || isApprover(currentUser?.role)) && ["PENDING", "APPROVED"].includes(o.status) && (
                                                             <button onClick={() => cancel(o.id)}
                                                                 className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition">
@@ -989,6 +1182,7 @@ export default function OvertimePage() {
             {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={fetchOvertimes} />}
             {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={fetchOvertimes} />}
             {showRates && <RateModal rates={rates} onClose={() => setShowRates(false)} onSaved={() => { fetchRates(); setShowRates(false); }} />}
+            {startData && <StartModal overtime={startData} onClose={() => setStartData(null)} onStarted={() => { fetchOvertimes(); setStartData(null); }} />}
             {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { fetchOvertimes(); setSetPayData(null); }} />}
             <style jsx global>{`
         @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }

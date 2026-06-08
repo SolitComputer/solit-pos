@@ -38,13 +38,14 @@ export async function GET(request: Request) {
         let q = supabase
             .from("overtime_requests")
             .select(`
-        id, user_id, request_date, reason, requested_start,
-        status, approved_by, approved_at,
-        scheduled_start, scheduled_end, actual_start, rate_per_hour,
-        rejection_note, actual_end, proof_photo_url,
-        completed_at, duration_minutes, total_pay,
-        created_at, updated_at
-      `)
+                id, user_id, request_date, reason, requested_start,
+                status, approved_by, approved_at,
+                scheduled_start, scheduled_end, actual_start, rate_per_hour,
+                rejection_note, actual_end, proof_photo_url,
+                completed_at, duration_minutes, total_pay,
+                work_description,
+                created_at, updated_at
+            `)
             .gte("request_date", startDate)
             .lte("request_date", endDate)
             .order("created_at", { ascending: false });
@@ -135,7 +136,7 @@ export async function PATCH(request: Request) {
 
         const body = await request.json();
         const { id, action, scheduled_start, scheduled_end, rate_per_hour,
-            rejection_note, proof_photo_url, total_pay } = body;
+            rejection_note, proof_photo_url, total_pay, work_description } = body;
 
         if (!id || !action) {
             return NextResponse.json({ success: false, message: "id dan action wajib" }, { status: 400 });
@@ -213,7 +214,15 @@ export async function PATCH(request: Request) {
                 return NextResponse.json({ success: false, message: "Request belum disetujui" }, { status: 400 });
             }
 
-            // ✅ Validasi: hanya bisa mulai saat sudah >= scheduled_start
+            // ✅ Validasi uraian pekerjaan wajib diisi
+            if (!work_description?.trim()) {
+                return NextResponse.json(
+                    { success: false, message: "Uraian pekerjaan wajib diisi sebelum memulai lembur" },
+                    { status: 400 }
+                );
+            }
+
+            // Validasi waktu: hanya bisa mulai saat sudah >= scheduled_start
             if (overtime.scheduled_start) {
                 const nowMs = Date.now();
                 const scheduledMs = new Date(overtime.scheduled_start).getTime();
@@ -223,7 +232,7 @@ export async function PATCH(request: Request) {
                         {
                             success: false,
                             message: `Belum waktunya mulai. Lembur dijadwalkan mulai pukul ${new Date(overtime.scheduled_start).toLocaleTimeString("id-ID", {
-                                hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta"
+                                hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta",
                             })
                                 } WIB (${diffMins} menit lagi)`,
                             notYetTime: true,
@@ -240,6 +249,7 @@ export async function PATCH(request: Request) {
                 .update({
                     status: "ONGOING",
                     actual_start: actualStartNow,
+                    work_description: work_description.trim(),
                     updated_at: new Date().toISOString(),
                 })
                 .eq("id", id).select().single();
@@ -269,7 +279,8 @@ export async function PATCH(request: Request) {
             const { data, error } = await supabase
                 .from("overtime_requests")
                 .update({
-                    status: "COMPLETED", actual_end: actualEnd,
+                    status: "COMPLETED",
+                    actual_end: actualEnd,
                     proof_photo_url: proof_photo_url ?? null,
                     completed_at: actualEnd,
                     duration_minutes: durationMins,
@@ -283,7 +294,6 @@ export async function PATCH(request: Request) {
         }
 
         // ─── SET_PAY ──────────────────────────────────────────────────────────
-        // ✅ UPDATE: bisa update rate_per_hour + hitung ulang total, atau set total manual
         if (action === "SET_PAY") {
             if (!canApprove(user.role, targetUser?.role ?? "")) {
                 return NextResponse.json({ success: false, message: "Tidak berwenang mengubah total bayar" }, { status: 403 });
@@ -296,7 +306,7 @@ export async function PATCH(request: Request) {
             let finalRate = rate_per_hour;
 
             if (finalRate !== undefined && finalTotalPay === undefined) {
-              const billedHours = Math.floor((overtime.duration_minutes ?? 0) / 60);
+                const billedHours = Math.floor((overtime.duration_minutes ?? 0) / 60);
                 finalTotalPay = billedHours * finalRate;
             }
 
@@ -308,7 +318,6 @@ export async function PATCH(request: Request) {
                 total_pay: finalTotalPay,
                 updated_at: new Date().toISOString(),
             };
-            // Simpan juga rate baru jika diberikan
             if (finalRate !== undefined) {
                 updatePayload.rate_per_hour = finalRate;
             }
