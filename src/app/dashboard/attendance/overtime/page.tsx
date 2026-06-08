@@ -451,154 +451,180 @@ function RateModal({ rates, onClose, onSaved }: { rates: OvertimeRate[]; onClose
 }
 
 function SetPayModal({ overtime, onClose, onSaved }: {
-  overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
+    overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
-  const [ratePerHour, setRatePerHour] = useState(
-    overtime.rate_per_hour != null && overtime.rate_per_hour > 0
-      ? overtime.rate_per_hour.toString()
-      : ""
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState("");
- 
-  const durationMins  = overtime.duration_minutes ?? 0;
-  const durationHours = durationMins / 60;
- 
-  // Total selalu dihitung otomatis dari rate — tidak ada input manual
-  const rate    = parseFloat(ratePerHour);
-  const isValid = !isNaN(rate) && rate > 0 && durationMins > 0;
-  const totalPay = isValid ? Math.round(durationHours * rate) : null;
- 
-  const save = async () => {
-    if (!isValid || totalPay === null) { setError("Masukkan rate per jam yang valid"); return; }
-    setSaving(true); setError("");
-    try {
-      const res = await fetch("/api/attendance/overtime", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id:           overtime.id,
-          action:       "SET_PAY",
-          rate_per_hour: rate,
-          total_pay:    totalPay,
-        }),
-      });
-      const d = await res.json();
-      if (!d.success) { setError(d.message || "Gagal"); return; }
-      onSaved(); onClose();
-    } catch { setError("Gagal menyimpan"); }
-    finally { setSaving(false); }
-  };
- 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
- 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
-          <div>
-            <p className="font-bold text-white text-base">💰 Set Gaji Lembur</p>
-            <p className="text-xs text-white/70 mt-1">{overtime.user?.name} · {overtime.request_date}</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
- 
-        <div className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
-              ⚠️ {error}
+    const [ratePerHour, setRatePerHour] = useState(
+        overtime.rate_per_hour != null && overtime.rate_per_hour > 0
+            ? overtime.rate_per_hour.toString()
+            : ""
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const durationMins = overtime.duration_minutes ?? 0;
+    const billedHours = Math.floor(durationMins / 60);
+
+    const rate = parseFloat(ratePerHour);
+    const isValid = !isNaN(rate) && rate > 0 && billedHours > 0;
+    const totalPay = isValid ? billedHours * rate : null;
+
+    const save = async () => {
+        if (!isValid || totalPay === null) { setError("Masukkan rate per jam yang valid"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/overtime", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: overtime.id,
+                    action: "SET_PAY",
+                    rate_per_hour: rate,
+                    total_pay: totalPay,
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal"); return; }
+            onSaved(); onClose();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+
+                {/* Header */}
+                <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">💰 Set Gaji Lembur</p>
+                        <p className="text-xs text-white/70 mt-1">{overtime.user?.name} · {overtime.request_date}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
+                    {/* Ringkasan durasi */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Ringkasan Lembur</p>
+                        <div className="grid grid-cols-2 gap-y-1.5 text-xs">
+                            {overtime.actual_start && (
+                                <>
+                                    <span className="text-gray-400">Mulai aktual</span>
+                                    <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_start)} WIB</span>
+                                </>
+                            )}
+                            {overtime.actual_end && (
+                                <>
+                                    <span className="text-gray-400">Selesai aktual</span>
+                                    <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_end)} WIB</span>
+                                </>
+                            )}
+                            {durationMins > 0 && (
+                                <>
+                                    <span className="text-gray-400">Total durasi</span>
+                                    <span className="font-bold text-gray-700">{formatDuration(durationMins)}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Input Rate/Jam saja */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                            Rate per Jam (Rp)
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                            <input
+                                type="number"
+                                min={0}
+                                value={ratePerHour}
+                                onChange={e => setRatePerHour(e.target.value)}
+                                placeholder="Contoh: 25000"
+                                className="w-full h-12 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    {/* Preview kalkulasi total */}
+                    <div className={`rounded-xl border px-4 py-3 transition-all ${isValid
+                        ? "bg-emerald-50 border-emerald-200"
+                        : "bg-gray-50 border-gray-100"
+                        }`}>
+                        <p className="text-[10px] font-bold uppercase tracking-wide mb-1 ${isValid ? 'text-emerald-600' : 'text-gray-400'}">
+                            {isValid ? "✓ Total Gaji Lembur" : "Total Gaji Lembur"}
+                        </p>
+                        {isValid && totalPay !== null ? (
+                            <div>
+                                <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
+                                <p className="text-[10px] text-emerald-600 mt-0.5">
+                                    {formatRupiah(rate)}/jam × {billedHours} jam
+                                    {durationMins % 60 > 0 && (
+                                        <span className="text-emerald-500/70 ml-1">
+                                            (total aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-400">
+                                {isValid && totalPay !== null ? (
+                                <div>
+                                    <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
+                                    <p className="text-[10px] text-emerald-600 mt-0.5">
+                                        {formatRupiah(rate)}/jam × {billedHours} jam
+                                        {durationMins % 60 > 0 && (
+                                            <span className="text-emerald-500/70 ml-1">
+                                                (aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                            ) : durationMins > 0 && billedHours === 0 ? (
+                                // Durasi ada tapi < 1 jam penuh
+                                <div>
+                                    <p className="text-base font-bold text-amber-600">Tidak terhitung</p>
+                                    <p className="text-[10px] text-amber-500 mt-0.5">
+                                        Durasi {formatDuration(durationMins)} — minimal 1 jam penuh untuk mendapat bayaran
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
+                            )}</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="px-6 pb-6 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Batal
+                    </button>
+                    <button
+                        onClick={save}
+                        disabled={saving || !isValid}
+                        className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                            : "💾 Simpan Gaji"
+                        }
+                    </button>
+                </div>
             </div>
-          )}
- 
-          {/* Ringkasan durasi */}
-          <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Ringkasan Lembur</p>
-            <div className="grid grid-cols-2 gap-y-1.5 text-xs">
-              {overtime.actual_start && (
-                <>
-                  <span className="text-gray-400">Mulai aktual</span>
-                  <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_start)} WIB</span>
-                </>
-              )}
-              {overtime.actual_end && (
-                <>
-                  <span className="text-gray-400">Selesai aktual</span>
-                  <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_end)} WIB</span>
-                </>
-              )}
-              {durationMins > 0 && (
-                <>
-                  <span className="text-gray-400">Total durasi</span>
-                  <span className="font-bold text-gray-700">{formatDuration(durationMins)}</span>
-                </>
-              )}
-            </div>
-          </div>
- 
-          {/* Input Rate/Jam saja */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-              Rate per Jam (Rp)
-            </label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
-              <input
-                type="number"
-                min={0}
-                value={ratePerHour}
-                onChange={e => setRatePerHour(e.target.value)}
-                placeholder="Contoh: 25000"
-                className="w-full h-12 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
-                autoFocus
-              />
-            </div>
-          </div>
- 
-          {/* Preview kalkulasi total */}
-          <div className={`rounded-xl border px-4 py-3 transition-all ${
-            isValid
-              ? "bg-emerald-50 border-emerald-200"
-              : "bg-gray-50 border-gray-100"
-          }`}>
-            <p className="text-[10px] font-bold uppercase tracking-wide mb-1 ${isValid ? 'text-emerald-600' : 'text-gray-400'}">
-              {isValid ? "✓ Total Gaji Lembur" : "Total Gaji Lembur"}
-            </p>
-            {isValid && totalPay !== null ? (
-              <div>
-                <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
-                <p className="text-[10px] text-emerald-600 mt-0.5">
-                  {formatRupiah(rate)}/jam × {formatDuration(durationMins)}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
-            )}
-          </div>
         </div>
- 
-        <div className="px-6 pb-6 flex gap-3">
-          <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
-            Batal
-          </button>
-          <button
-            onClick={save}
-            disabled={saving || !isValid}
-            className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving
-              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-              : "💾 Simpan Gaji"
-            }
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 
