@@ -472,6 +472,22 @@ export default function FaceVerifyPage() {
     window.location.href = redirectTo;
   }, [redirectTo, gpsCoords]);
 
+  const handleSkipToRedirect = useCallback(async () => {
+    setSkipping(true);
+    try {
+      await fetch("/api/auth/face-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: gpsCoords?.latitude ?? null,
+          longitude: gpsCoords?.longitude ?? null,
+          accuracy: gpsCoords?.accuracy ?? null,
+        }),
+      });
+    } catch { /* tetap lanjut */ }
+    window.location.href = redirectTo;
+  }, [redirectTo, gpsCoords]);
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -627,8 +643,13 @@ export default function FaceVerifyPage() {
                 Waktu sekarang: <span style={{ fontFamily: "monospace" }}>{clockStr} WIB</span>
               </div>
             </div>
-            <button className="btn-main" style={{ marginTop: 16 }} onClick={() => window.location.href = redirectTo}>
-              Lanjut ke Dashboard →
+            <button className="btn-main" style={{ marginTop: 16 }} disabled={skipping} onClick={handleSkipToRedirect}>
+              {skipping ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  Mengalihkan...
+                </span>
+              ) : "Lanjut ke Dashboard →"}
             </button>
           </div>
         )}

@@ -8,7 +8,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Role mapping: siapa bisa approve siapa
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_SALES:     ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES"],
   KEPALA_MARKETING: ["MARKETING", "KEPALA_MARKETING"],
@@ -21,7 +20,6 @@ function canApprove(approverRole: string, targetRole: string): boolean {
   return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
 }
 
-// GET — ambil daftar overtime
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -30,7 +28,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const year   = searchParams.get("year")  ?? new Date().getFullYear().toString();
     const month  = searchParams.get("month") ?? String(new Date().getMonth() + 1);
-    const status = searchParams.get("status"); // filter by status
+    const status = searchParams.get("status");
 
     const paddedMonth = String(month).padStart(2, "0");
     const startDate   = `${year}-${paddedMonth}-01`;
@@ -42,7 +40,7 @@ export async function GET(request: Request) {
       .select(`
         id, user_id, request_date, reason, requested_start,
         status, approved_by, approved_at,
-        scheduled_start, scheduled_end, rate_per_hour,
+        scheduled_start, scheduled_end, actual_start, rate_per_hour,
         rejection_note, actual_end, proof_photo_url,
         completed_at, duration_minutes, total_pay,
         created_at, updated_at
@@ -53,12 +51,9 @@ export async function GET(request: Request) {
 
     if (status) q = q.eq("status", status);
 
-    // Non-admin hanya lihat miliknya sendiri
     const isAdmin = FULL_ACCESS.includes(user.role) ||
       Object.keys(DIVISION_HEAD_MAP).includes(user.role);
-    if (!isAdmin) {
-      q = q.eq("user_id", user.id);
-    }
+    if (!isAdmin) q = q.eq("user_id", user.id);
 
     const { data: overtimes, error } = await q;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -67,24 +62,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // Ambil user info
     const userIds = [...new Set([
       ...overtimes.map((o: any) => o.user_id),
       ...overtimes.filter((o: any) => o.approved_by).map((o: any) => o.approved_by),
     ])].filter(Boolean);
 
     const { data: usersData } = await supabase
-      .from("users")
-      .select("id, name, role, shift")
-      .in("id", userIds);
+      .from("users").select("id, name, role, shift").in("id", userIds);
 
     const usersMap: Record<string, any> = {};
     (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
 
     const result = overtimes.map((o: any) => ({
       ...o,
-      user:       usersMap[o.user_id] ?? null,
-      approver:   o.approved_by ? usersMap[o.approved_by] ?? null : null,
+      user:     usersMap[o.user_id] ?? null,
+      approver: o.approved_by ? usersMap[o.approved_by] ?? null : null,
     }));
 
     return NextResponse.json({ success: true, data: result });
@@ -93,7 +85,6 @@ export async function GET(request: Request) {
   }
 }
 
-// POST — buat request lembur (semua karyawan bisa)
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -109,7 +100,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cek sudah ada request pending/approved untuk tanggal yang sama
     const { data: existing } = await supabase
       .from("overtime_requests")
       .select("id, status")
@@ -127,56 +117,39 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("overtime_requests")
-      .insert({
-        user_id:         user.id,
-        request_date,
-        reason,
-        requested_start,
-        status:          "PENDING",
-      })
+      .insert({ user_id: user.id, request_date, reason, requested_start, status: "PENDING" })
       .select()
       .single();
 
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-
-    // TODO: Kirim notif WA ke kepala divisi + admin via Fonnte
-
     return NextResponse.json({ success: true, data });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
   }
 }
 
-// PATCH — approve/reject/complete overtime
 export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const body = await request.json();
-    const { id, action, scheduled_start, scheduled_end, rate_per_hour, rejection_note, proof_photo_url } = body;
+    const { id, action, scheduled_start, scheduled_end, rate_per_hour,
+            rejection_note, proof_photo_url, total_pay } = body;
 
     if (!id || !action) {
       return NextResponse.json({ success: false, message: "id dan action wajib" }, { status: 400 });
     }
 
-    // Ambil overtime request
     const { data: overtime } = await supabase
-      .from("overtime_requests")
-      .select("*, user_id")
-      .eq("id", id)
-      .single();
+      .from("overtime_requests").select("*").eq("id", id).single();
 
     if (!overtime) return NextResponse.json({ success: false, message: "Request tidak ditemukan" }, { status: 404 });
 
-    // Ambil role user yang di-request
     const { data: targetUser } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", overtime.user_id)
-      .single();
+      .from("users").select("role").eq("id", overtime.user_id).single();
 
-    // ─── APPROVE ─────────────────────────────────────────────────────
+    // ─── APPROVE ──────────────────────────────────────────────────────────
     if (action === "APPROVE") {
       if (!canApprove(user.role, targetUser?.role ?? "")) {
         return NextResponse.json({ success: false, message: "Tidak berwenang menyetujui" }, { status: 403 });
@@ -188,37 +161,30 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // Ambil rate default dari overtime_rates jika tidak di-override
       let finalRate = rate_per_hour;
       if (!finalRate) {
         const { data: rateData } = await supabase
-          .from("overtime_rates")
-          .select("rate_per_hour")
-          .eq("role", targetUser?.role ?? "")
-          .maybeSingle();
+          .from("overtime_rates").select("rate_per_hour")
+          .eq("role", targetUser?.role ?? "").maybeSingle();
         finalRate = rateData?.rate_per_hour ?? 0;
       }
 
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
-          status:          "APPROVED",
-          approved_by:     user.id,
-          approved_at:     new Date().toISOString(),
-          scheduled_start,
-          scheduled_end,
-          rate_per_hour:   finalRate,
-          updated_at:      new Date().toISOString(),
+          status: "APPROVED", approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          scheduled_start, scheduled_end,
+          rate_per_hour: finalRate,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .select()
-        .single();
+        .eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
     }
 
-    // ─── REJECT ──────────────────────────────────────────────────────
+    // ─── REJECT ───────────────────────────────────────────────────────────
     if (action === "REJECT") {
       if (!canApprove(user.role, targetUser?.role ?? "")) {
         return NextResponse.json({ success: false, message: "Tidak berwenang menolak" }, { status: 403 });
@@ -227,21 +193,18 @@ export async function PATCH(request: Request) {
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
-          status:         "REJECTED",
-          approved_by:    user.id,
-          approved_at:    new Date().toISOString(),
+          status: "REJECTED", approved_by: user.id,
+          approved_at: new Date().toISOString(),
           rejection_note: rejection_note ?? null,
-          updated_at:     new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .select()
-        .single();
+        .eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
     }
 
-    // ─── START (karyawan mulai lembur) ───────────────────────────────
+    // ─── START ────────────────────────────────────────────────────────────
     if (action === "START") {
       if (overtime.user_id !== user.id) {
         return NextResponse.json({ success: false, message: "Bukan request milikmu" }, { status: 403 });
@@ -250,21 +213,43 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "Request belum disetujui" }, { status: 400 });
       }
 
+      // ✅ Validasi: hanya bisa mulai saat sudah >= scheduled_start
+      if (overtime.scheduled_start) {
+        const nowMs       = Date.now();
+        const scheduledMs = new Date(overtime.scheduled_start).getTime();
+        if (nowMs < scheduledMs) {
+          const diffMins = Math.ceil((scheduledMs - nowMs) / 60000);
+          return NextResponse.json(
+            {
+              success:     false,
+              message:     `Belum waktunya mulai. Lembur dijadwalkan mulai pukul ${
+                new Date(overtime.scheduled_start).toLocaleTimeString("id-ID", {
+                  hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta"
+                })
+              } WIB (${diffMins} menit lagi)`,
+              notYetTime:  true,
+              scheduledStart: overtime.scheduled_start,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      const actualStartNow = new Date().toISOString();
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
-          status:     "ONGOING",
+          status: "ONGOING",
+          actual_start: actualStartNow,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .select()
-        .single();
+        .eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
     }
 
-    // ─── COMPLETE (karyawan selesai lembur + upload foto) ────────────
+    // ─── COMPLETE ─────────────────────────────────────────────────────────
     if (action === "COMPLETE") {
       if (overtime.user_id !== user.id) {
         return NextResponse.json({ success: false, message: "Bukan request milikmu" }, { status: 403 });
@@ -274,35 +259,72 @@ export async function PATCH(request: Request) {
       }
 
       const actualEnd      = new Date().toISOString();
-      const startTime      = new Date(overtime.scheduled_start);
-      const endTime        = new Date(actualEnd);
-      const durationMs     = endTime.getTime() - startTime.getTime();
-      const durationMins   = Math.round(durationMs / 60000);
-      const ratePerHour    = overtime.rate_per_hour ?? 0;
-      const totalPay       = Math.round((durationMins / 60) * ratePerHour);
+      const startReference = overtime.actual_start ?? overtime.scheduled_start;
+      const durationMins   = startReference
+        ? Math.round((new Date(actualEnd).getTime() - new Date(startReference).getTime()) / 60000)
+        : 0;
+      const ratePerHour  = overtime.rate_per_hour ?? 0;
+      const calculatedPay = Math.round((durationMins / 60) * ratePerHour);
 
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
-          status:          "COMPLETED",
-          actual_end:      actualEnd,
+          status: "COMPLETED", actual_end: actualEnd,
           proof_photo_url: proof_photo_url ?? null,
-          completed_at:    actualEnd,
+          completed_at: actualEnd,
           duration_minutes: durationMins,
-          total_pay:       totalPay,
-          updated_at:      new Date().toISOString(),
+          total_pay: calculatedPay,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", id)
-        .select()
-        .single();
+        .eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
     }
 
-    // ─── CANCEL ──────────────────────────────────────────────────────
+    // ─── SET_PAY ──────────────────────────────────────────────────────────
+    // ✅ UPDATE: bisa update rate_per_hour + hitung ulang total, atau set total manual
+    if (action === "SET_PAY") {
+      if (!canApprove(user.role, targetUser?.role ?? "")) {
+        return NextResponse.json({ success: false, message: "Tidak berwenang mengubah total bayar" }, { status: 403 });
+      }
+      if (overtime.status !== "COMPLETED") {
+        return NextResponse.json({ success: false, message: "Hanya untuk lembur yang sudah selesai" }, { status: 400 });
+      }
+
+      let finalTotalPay = total_pay;
+      let finalRate     = rate_per_hour;
+
+      // Jika rate diberikan tapi total tidak, hitung otomatis
+      if (finalRate !== undefined && finalTotalPay === undefined) {
+        const durationMins = overtime.duration_minutes ?? 0;
+        finalTotalPay = Math.round((durationMins / 60) * finalRate);
+      }
+
+      if (finalTotalPay === undefined || finalTotalPay === null || finalTotalPay < 0) {
+        return NextResponse.json({ success: false, message: "total_pay atau rate_per_hour harus diisi" }, { status: 400 });
+      }
+
+      const updatePayload: any = {
+        total_pay:  finalTotalPay,
+        updated_at: new Date().toISOString(),
+      };
+      // Simpan juga rate baru jika diberikan
+      if (finalRate !== undefined) {
+        updatePayload.rate_per_hour = finalRate;
+      }
+
+      const { data, error } = await supabase
+        .from("overtime_requests")
+        .update(updatePayload)
+        .eq("id", id).select().single();
+
+      if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+      return NextResponse.json({ success: true, data });
+    }
+
+    // ─── CANCEL ───────────────────────────────────────────────────────────
     if (action === "CANCEL") {
-      // Karyawan bisa cancel miliknya, admin bisa cancel semua
       const isOwner = overtime.user_id === user.id;
       const isAdmin = FULL_ACCESS.includes(user.role) || canApprove(user.role, targetUser?.role ?? "");
       if (!isOwner && !isAdmin) {
@@ -311,13 +333,8 @@ export async function PATCH(request: Request) {
 
       const { data, error } = await supabase
         .from("overtime_requests")
-        .update({
-          status:     "CANCELLED",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+        .update({ status: "CANCELLED", updated_at: new Date().toISOString() })
+        .eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
