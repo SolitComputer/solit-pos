@@ -195,7 +195,6 @@ function ApproveModal({ overtime, onClose, onSaved }: { overtime: OvertimeReques
     const [form, setForm] = useState({
         scheduled_start: defaultStart,
         scheduled_end: overtime.request_date + "T22:00",
-        rate_per_hour: "",
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -210,7 +209,6 @@ function ApproveModal({ overtime, onClose, onSaved }: { overtime: OvertimeReques
                     id: overtime.id, action: "APPROVE",
                     scheduled_start: new Date(form.scheduled_start).toISOString(),
                     scheduled_end: new Date(form.scheduled_end).toISOString(),
-                    rate_per_hour: form.rate_per_hour ? parseInt(form.rate_per_hour) : undefined,
                 }),
             });
             const d = await res.json();
@@ -267,16 +265,6 @@ function ApproveModal({ overtime, onClose, onSaved }: { overtime: OvertimeReques
                                 onChange={e => setForm(f => ({ ...f, scheduled_end: e.target.value }))}
                                 className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none" />
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                            Rate/Jam (Rp) <span className="normal-case font-normal text-gray-400">— kosongkan untuk pakai rate default role</span>
-                        </label>
-                        <input type="number" min={0} value={form.rate_per_hour}
-                            onChange={e => setForm(f => ({ ...f, rate_per_hour: e.target.value }))}
-                            placeholder="Contoh: 25000"
-                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none" />
                     </div>
                 </div>
                 <div className="px-6 pb-6 flex gap-3">
@@ -462,47 +450,38 @@ function RateModal({ rates, onClose, onSaved }: { rates: OvertimeRate[]; onClose
     );
 }
 
-function SetPayModal({ overtime, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
-  const [ratePerHour, setRatePerHour] = useState(overtime.rate_per_hour?.toString() ?? "");
-  const [totalPay, setTotalPay]       = useState(overtime.total_pay?.toString() ?? "");
-  const [saving, setSaving]           = useState(false);
-  const [error, setError]             = useState("");
+function SetPayModal({ overtime, onClose, onSaved }: {
+  overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
+}) {
+  const [ratePerHour, setRatePerHour] = useState(
+    overtime.rate_per_hour != null && overtime.rate_per_hour > 0
+      ? overtime.rate_per_hour.toString()
+      : ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
  
-  const durationMins = overtime.duration_minutes ?? 0;
+  const durationMins  = overtime.duration_minutes ?? 0;
   const durationHours = durationMins / 60;
  
-  // Auto-calculate total dari rate
-  const calculatedFromRate = ratePerHour && !isNaN(parseFloat(ratePerHour)) && durationMins > 0
-    ? Math.round(durationHours * parseFloat(ratePerHour))
-    : null;
- 
-  // Gunakan kalkulasi rate jika total belum diubah manual
-  const [totalManuallyEdited, setTotalManuallyEdited] = useState(false);
-  const displayTotal = !totalManuallyEdited && calculatedFromRate !== null
-    ? calculatedFromRate.toString()
-    : totalPay;
- 
-  const handleRateChange = (val: string) => {
-    setRatePerHour(val);
-    // Auto-fill total jika user belum manual edit
-    if (!totalManuallyEdited && val && !isNaN(parseFloat(val)) && durationMins > 0) {
-      const calc = Math.round(durationHours * parseFloat(val));
-      setTotalPay(calc.toString());
-    }
-  };
+  // Total selalu dihitung otomatis dari rate — tidak ada input manual
+  const rate    = parseFloat(ratePerHour);
+  const isValid = !isNaN(rate) && rate > 0 && durationMins > 0;
+  const totalPay = isValid ? Math.round(durationHours * rate) : null;
  
   const save = async () => {
-    const finalTotal = parseFloat(totalPay || displayTotal || "0");
-    if (isNaN(finalTotal) || finalTotal < 0) { setError("Masukkan nominal yang valid"); return; }
+    if (!isValid || totalPay === null) { setError("Masukkan rate per jam yang valid"); return; }
     setSaving(true); setError("");
     try {
-      const payload: any = { id: overtime.id, action: "SET_PAY", total_pay: finalTotal };
-      if (ratePerHour && !isNaN(parseFloat(ratePerHour))) {
-        payload.rate_per_hour = parseFloat(ratePerHour);
-      }
       const res = await fetch("/api/attendance/overtime", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id:           overtime.id,
+          action:       "SET_PAY",
+          rate_per_hour: rate,
+          total_pay:    totalPay,
+        }),
       });
       const d = await res.json();
       if (!d.success) { setError(d.message || "Gagal"); return; }
@@ -515,107 +494,106 @@ function SetPayModal({ overtime, onClose, onSaved }: { overtime: OvertimeRequest
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+ 
+        {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
           <div>
             <p className="font-bold text-white text-base">💰 Set Gaji Lembur</p>
             <p className="text-xs text-white/70 mt-1">{overtime.user?.name} · {overtime.request_date}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-        <div className="p-6 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
  
-          {/* Info durasi */}
+        <div className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+              ⚠️ {error}
+            </div>
+          )}
+ 
+          {/* Ringkasan durasi */}
           <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
             <p className="text-xs font-bold text-gray-500 uppercase mb-2">Ringkasan Lembur</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-y-1.5 text-xs">
               {overtime.actual_start && (
-                <div>
-                  <p className="text-gray-400">Mulai aktual</p>
-                  <p className="font-bold text-gray-700">{toWIBStr(overtime.actual_start)} WIB</p>
-                </div>
+                <>
+                  <span className="text-gray-400">Mulai aktual</span>
+                  <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_start)} WIB</span>
+                </>
               )}
               {overtime.actual_end && (
-                <div>
-                  <p className="text-gray-400">Selesai aktual</p>
-                  <p className="font-bold text-gray-700">{toWIBStr(overtime.actual_end)} WIB</p>
-                </div>
+                <>
+                  <span className="text-gray-400">Selesai aktual</span>
+                  <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_end)} WIB</span>
+                </>
               )}
               {durationMins > 0 && (
-                <div>
-                  <p className="text-gray-400">Durasi</p>
-                  <p className="font-bold text-gray-700">{formatDuration(durationMins)}</p>
-                </div>
-              )}
-              {overtime.rate_per_hour && (
-                <div>
-                  <p className="text-gray-400">Rate saat ini</p>
-                  <p className="font-bold text-gray-700">{formatRupiah(overtime.rate_per_hour)}/jam</p>
-                </div>
+                <>
+                  <span className="text-gray-400">Total durasi</span>
+                  <span className="font-bold text-gray-700">{formatDuration(durationMins)}</span>
+                </>
               )}
             </div>
           </div>
  
-          {/* Input Rate/Jam */}
+          {/* Input Rate/Jam saja */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
               Rate per Jam (Rp)
-              <span className="normal-case font-normal text-gray-400 ml-1">— total dihitung otomatis</span>
             </label>
-            <input
-              type="number" min={0} value={ratePerHour}
-              onChange={e => handleRateChange(e.target.value)}
-              placeholder="Contoh: 25000"
-              className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
-            />
-            {ratePerHour && calculatedFromRate !== null && (
-              <p className="text-[11px] text-emerald-600 mt-1">
-                {formatRupiah(parseFloat(ratePerHour))}/jam × {formatDuration(durationMins)} = <strong>{formatRupiah(calculatedFromRate)}</strong>
-              </p>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+              <input
+                type="number"
+                min={0}
+                value={ratePerHour}
+                onChange={e => setRatePerHour(e.target.value)}
+                placeholder="Contoh: 25000"
+                className="w-full h-12 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
+                autoFocus
+              />
+            </div>
+          </div>
+ 
+          {/* Preview kalkulasi total */}
+          <div className={`rounded-xl border px-4 py-3 transition-all ${
+            isValid
+              ? "bg-emerald-50 border-emerald-200"
+              : "bg-gray-50 border-gray-100"
+          }`}>
+            <p className="text-[10px] font-bold uppercase tracking-wide mb-1 ${isValid ? 'text-emerald-600' : 'text-gray-400'}">
+              {isValid ? "✓ Total Gaji Lembur" : "Total Gaji Lembur"}
+            </p>
+            {isValid && totalPay !== null ? (
+              <div>
+                <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">
+                  {formatRupiah(rate)}/jam × {formatDuration(durationMins)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
             )}
           </div>
- 
-          {/* Input Total (bisa override manual) */}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-              Total Bayar (Rp)
-              <span className="normal-case font-normal text-gray-400 ml-1">— override manual jika perlu</span>
-            </label>
-            <input
-              type="number" min={0}
-              value={!totalManuallyEdited && calculatedFromRate !== null ? calculatedFromRate.toString() : totalPay}
-              onChange={e => { setTotalManuallyEdited(true); setTotalPay(e.target.value); }}
-              placeholder="Otomatis dari rate × durasi"
-              className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono font-bold"
-            />
-            {/* Preview rupiah */}
-            {(() => {
-              const val = !totalManuallyEdited && calculatedFromRate !== null ? calculatedFromRate : parseFloat(totalPay);
-              return val > 0 ? (
-                <p className="text-[11px] text-gray-500 mt-1.5">= <span className="font-bold text-gray-800">{formatRupiah(val)}</span></p>
-              ) : null;
-            })()}
-          </div>
- 
-          {/* Reset ke kalkulasi rate */}
-          {totalManuallyEdited && calculatedFromRate !== null && (
-            <button
-              onClick={() => { setTotalManuallyEdited(false); setTotalPay(calculatedFromRate.toString()); }}
-              className="w-full h-9 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition"
-            >
-              Reset ke kalkulasi otomatis ({formatRupiah(calculatedFromRate)})
-            </button>
-          )}
         </div>
+ 
         <div className="px-6 pb-6 flex gap-3">
-          <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
+          <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+            Batal
+          </button>
           <button
             onClick={save}
-            disabled={saving || (!ratePerHour && !totalPay && !calculatedFromRate)}
-            className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-            {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
+            disabled={saving || !isValid}
+            className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving
+              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+              : "💾 Simpan Gaji"
+            }
           </button>
         </div>
       </div>
@@ -782,8 +760,8 @@ export default function OvertimePage() {
                                                             onClick={() => ss.canStart && startOverttime(o.id)}
                                                             disabled={!ss.canStart}
                                                             className={`text-xs font-bold px-4 py-2 rounded-xl transition border ${ss.canStart
-                                                                    ? "text-emerald-700 bg-emerald-100 border-emerald-200 hover:bg-emerald-200 cursor-pointer"
-                                                                    : "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed opacity-70"
+                                                                ? "text-emerald-700 bg-emerald-100 border-emerald-200 hover:bg-emerald-200 cursor-pointer"
+                                                                : "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed opacity-70"
                                                                 }`}>
                                                             {ss.label}
                                                         </button>
@@ -912,8 +890,10 @@ export default function OvertimePage() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-4 text-right">
-                                                    {o.total_pay ? (
+                                                    {o.total_pay != null && o.total_pay > 0 ? (
                                                         <span className="font-black text-gray-800 text-sm">{formatRupiah(o.total_pay)}</span>
+                                                    ) : o.status === "COMPLETED" && isApprover(currentUser?.role) ? (
+                                                        <span className="text-[10px] text-amber-500 font-semibold">Belum diisi</span>
                                                     ) : (
                                                         <span className="text-gray-300 text-xs">—</span>
                                                     )}
