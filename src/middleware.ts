@@ -6,15 +6,11 @@ import {
   ROUTE_PERMISSIONS,
   ROLE_DEFAULT_REDIRECT,
   UserRole,
-  isAttendanceTime,
 } from "@/lib/auth";
 
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
-const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
-const PUBLIC_API_ROUTES = [
-  "/api/warranty/check",
-  "/api/auth/set-password",
-];
+const PUBLIC_ROUTES    = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_PREFIXES  = ["/receipt/", "/scan/"];
+const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
 
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
@@ -26,6 +22,20 @@ const FACE_API_WHITELIST = [
 ];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
+
+// ── Jam operasional sistem (broader range) ────────────────────────────────────
+// Middleware tidak punya akses DB, jadi kita gunakan range lebih luas:
+// Jika sekarang antara jam 06:00 dan 22:00 WIB → mungkin ada yang harus absen
+// Validasi akurat dilakukan oleh face-status API (yang bisa query DB)
+const SYSTEM_OPEN_HOUR  = 6;   // Jam mulai sistem bisa redirect ke face-verify
+const SYSTEM_CLOSE_HOUR = 22;  
+
+function isWithinSystemHours(): boolean {
+  const nowUTC = new Date();
+  const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
+  const hour   = nowWIB.getUTCHours();
+  return hour >= SYSTEM_OPEN_HOUR && hour < SYSTEM_CLOSE_HOUR;
+}
 
 function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
   const faceAttended      = request.cookies.get("face_attended")?.value;
@@ -50,9 +60,8 @@ export async function middleware(request: NextRequest) {
       const user = await verifyToken(token);
       if (user) {
         const hasAttended = hasAttendanceBypass(request, user.id);
-        // ✅ FIX: baca shift dari JWT token, bukan hardcode default
-        const userShift = (user as any).shift ?? "PAGI";
-        if (isAttendanceTime(userShift) && !hasAttended) {
+        // Redirect ke face-verify jika dalam jam sistem dan belum absen
+        if (isWithinSystemHours() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         return NextResponse.redirect(
@@ -67,7 +76,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
@@ -76,11 +85,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_API_ROUTES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
+  if (FACE_API_WHITELIST.some(p => pathname.startsWith(p))) {
     if (!token) return NextResponse.json({ success: false }, { status: 401 });
     return NextResponse.next();
   }
@@ -99,11 +108,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Protected routes: cek attendance ─────────────────────────────────────
-  if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const hasAttended = hasAttendanceBypass(request, user.id);
-    // ✅ FIX: baca shift dari JWT, bukan default
-    const userShift = (user as any).shift ?? "PAGI";
-    if (isAttendanceTime(userShift) && !hasAttended) {
+    // Gunakan range luas di middleware — validasi akurat ada di face-status API
+    if (isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
@@ -112,7 +120,7 @@ export async function middleware(request: NextRequest) {
 
   // ── Route permission check ─────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
-    .filter((route) => pathname.startsWith(route))
+    .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
 
   if (matchedRoute) {

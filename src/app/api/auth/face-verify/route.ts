@@ -1,58 +1,19 @@
+// src/app/api/auth/face-verify/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  getAttendanceExpiry,
+  verifyToken,
+  calcAttendanceWeightFromSchedule,
+  resolveShiftConfigFromDB,
+  isAttendanceTimeForSchedule,
+} from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-import { SHIFT_CONFIG, ShiftType, calcAttendanceWeight, getAttendanceExpiry, verifyToken } from "@/lib/auth";
-
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const ATTENDANCE_START_HOUR = 7;
-const ATTENDANCE_START_MIN = 30;
-const ATTENDANCE_END_HOUR = 12;
-const ATTENDANCE_END_MIN = 0;
-
-async function checkAttendanceWindowForUser(userId: string, supabaseAdmin: any): Promise<{
-  allowed: boolean;
-  reason: "TOO_EARLY" | "TOO_LATE" | "OPEN";
-  openAt: string;
-  closeAt: string;
-  shift: ShiftType;
-  schedule: import("@/lib/auth").DaySchedule;
-}> {
-  const nowUTC   = new Date();
-  const nowWIB   = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
-  const todayDow  = nowWIB.getUTCDay();
-  const todayDate = nowWIB.toISOString().slice(0, 10); 
-
-  const [{ data: userData }, { data: customData }, { data: dateData }] = await Promise.all([
-    supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
-    supabaseAdmin.from("user_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
-      .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
-    supabaseAdmin.from("user_date_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
-      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(), 
-  ]);
-
-  const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
-  const { resolveSchedule } = await import("@/lib/auth");
-  const schedule = resolveSchedule(shift, dateData ?? customData);
-
-  const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-  const start = schedule.start.h * 60 + schedule.start.m;
-  const end   = schedule.end.h   * 60 + schedule.end.m;
-  const pad   = (n: number) => String(n).padStart(2, "0");
-  const openAt  = `${pad(schedule.start.h)}:${pad(schedule.start.m)} WIB`;
-  const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
-
-  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt, shift, schedule };
-  if (total > end)   return { allowed: false, reason: "TOO_LATE",  openAt, closeAt, shift, schedule };
-  return               { allowed: true,  reason: "OPEN",      openAt, closeAt, shift, schedule };
-}
-
 
 function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
@@ -60,8 +21,7 @@ function euclideanDistance(a: number[], b: number[]): number {
 
 function parseDevice(ua: string): string {
   if (!ua) return "Unknown Device";
-  let os = "Unknown OS";
-  let browser = "Unknown Browser";
+  let os = "Unknown OS", browser = "Unknown Browser";
   if (/Windows NT 10|Windows NT 11/i.test(ua)) os = "Windows 10/11";
   else if (/Macintosh|Mac OS X/i.test(ua)) os = "macOS";
   else if (/Android/i.test(ua)) os = "Android";
@@ -75,15 +35,15 @@ function parseDevice(ua: string): string {
 }
 
 function setAttendanceCookies(response: NextResponse, userId: string, expiry: Date) {
-  const cookieOptions = {
+  const opts = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure:   process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path: "/",
-    expires: expiry,
+    path:     "/",
+    expires:  expiry,
   };
-  response.cookies.set("face_verified", userId, cookieOptions);
-  response.cookies.set("face_attended", userId, cookieOptions);
+  response.cookies.set("face_verified",  userId, opts);
+  response.cookies.set("face_attended",  userId, opts);
 }
 
 export async function POST(request: Request) {
@@ -95,7 +55,9 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false, message: "Token invalid" }, { status: 401 });
 
-    const timeCheck = await checkAttendanceWindowForUser(user.id, supabaseAdmin);
+    // ✅ Resolusi jadwal dari DB — mendukung user_shift_config + per-hari custom
+    const schedule  = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
+    const timeCheck = isAttendanceTimeForSchedule(schedule);
 
     if (!timeCheck.allowed) {
       const msg = timeCheck.reason === "TOO_EARLY"
@@ -110,9 +72,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { embedding, attemptCount = 1, latitude, longitude, accuracy } = body;
 
-    const ua = request.headers.get("user-agent") ?? "";
+    const ua     = request.headers.get("user-agent") ?? "";
     const device = parseDevice(ua);
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
+    const ip     = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
 
     const { data: userFullData } = await supabaseAdmin
       .from("users")
@@ -120,15 +82,16 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single();
 
-    const userShift: ShiftType = (userFullData?.shift as ShiftType) ?? "PAGI";
-    const { calcAttendanceWeightFromSchedule } = await import("@/lib/auth");
-    const { weight, status: attendanceStatus } = calcAttendanceWeightFromSchedule(
+    const userShift = (userFullData?.shift ?? "PAGI") as "PAGI" | "SORE";
+
+    // Hitung weight berdasarkan schedule yang sudah diresolved
+    const { weight } = calcAttendanceWeightFromSchedule(
       new Date().toISOString(),
-      timeCheck.schedule   
+      schedule
     );
 
-
-    const nowWIB = new Date(Date.now() + 7 * 3600_000);
+    // Cek apakah sudah absen hari ini
+    const nowWIB    = new Date(Date.now() + 7 * 3600_000);
     const todayDate = nowWIB.toISOString().slice(0, 10);
 
     const { data: alreadyToday } = await supabaseAdmin
@@ -141,7 +104,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (alreadyToday) {
-      const expiry = getAttendanceExpiry();
+      const expiry   = getAttendanceExpiry();
       const response = NextResponse.json({
         success: true,
         message: "Sudah absen hari ini",
@@ -160,21 +123,21 @@ export async function POST(request: Request) {
     }
 
     const THRESHOLD = 0.45;
-    const distance = euclideanDistance(embedding, userFullData.face_embedding);
-    const matched = distance < THRESHOLD;
+    const distance  = euclideanDistance(embedding, userFullData.face_embedding);
+    const matched   = distance < THRESHOLD;
 
     const insertPayload: Record<string, any> = {
-      user_id: user.id,
-      status: matched ? "SUCCESS" : "FAILED",
+      user_id:      user.id,
+      status:       matched ? "SUCCESS" : "FAILED",
       attempt_count: Number(attemptCount),
       device,
-      ip_address: ip,
-      shift: userShift,
-      late_weight: matched ? weight : null,
+      ip_address:   ip,
+      shift:        userShift,
+      late_weight:  matched ? weight : null,
     };
-    if (latitude != null) insertPayload.latitude = latitude;
+    if (latitude  != null) insertPayload.latitude  = latitude;
     if (longitude != null) insertPayload.longitude = longitude;
-    if (accuracy != null) insertPayload.accuracy = accuracy;
+    if (accuracy  != null) insertPayload.accuracy  = accuracy;
 
     const { error: insertError } = await supabaseAdmin
       .from("face_verifications")
@@ -189,12 +152,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const expiry = getAttendanceExpiry();
-    const response = NextResponse.json({ success: true, message: "Absen wajah berhasil", distance });
-
-    // ✅ Set kedua cookie sekaligus
+    const expiry   = getAttendanceExpiry();
+    const response = NextResponse.json({
+      success: true,
+      message: "Absen wajah berhasil",
+      distance,
+    });
     setAttendanceCookies(response, user.id, expiry);
-
     return response;
   } catch (err: any) {
     console.error("EXCEPTION di face-verify POST:", err);
@@ -211,17 +175,14 @@ export async function PUT(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-
-
-    const expiry = getAttendanceExpiry();
+    const expiry   = getAttendanceExpiry();
     const response = NextResponse.json({ success: true, message: "Dilanjutkan tanpa absen" });
 
-    // Set cookie agar tidak redirect ke face-verify lagi
     response.cookies.set("attendance_skipped", user.id, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
-      path: "/",
+      path:     "/",
       expires:  expiry,
     });
 

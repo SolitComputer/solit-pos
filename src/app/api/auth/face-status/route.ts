@@ -1,169 +1,155 @@
+// src/app/api/auth/face-status/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken, resolveSchedule } from "@/lib/auth";
+import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function GET() {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get("token")?.value;
-        if (!token) return NextResponse.json({ success: false, needLogin: true });
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+    if (!token) return NextResponse.json({ success: false, needLogin: true });
 
-        const user = await verifyToken(token);
-        if (!user) return NextResponse.json({ success: false, needLogin: true });
+    const user = await verifyToken(token);
+    if (!user) return NextResponse.json({ success: false, needLogin: true });
 
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+    const faceVerified = cookieStore.get("face_verified")?.value;
+    const faceAttended = cookieStore.get("face_attended")?.value;
+    const dayOffCookie = cookieStore.get("day_off_today")?.value;
 
-        const faceVerified = cookieStore.get("face_verified")?.value;
-        const faceAttended = cookieStore.get("face_attended")?.value;
-        const skipCookie = cookieStore.get("attendance_skipped")?.value;
-        const dayOffCookie = cookieStore.get("day_off_today")?.value;
+    const nowUTC    = new Date();
+    const wibMs     = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+    const nowWIB    = new Date(wibMs);
+    const todayDow  = nowWIB.getUTCDay();
+    const todayDate = nowWIB.toISOString().slice(0, 10);
 
-        const nowUTC = new Date();
-        const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-        const nowWIB = new Date(wibMs);
-        const todayDow = nowWIB.getUTCDay();
-        const todayDate = nowWIB.toISOString().slice(0, 10);
+    // Ambil semua data paralel
+    const [
+      { data: weeklyOff },
+      { data: specificOff },
+      { data: todaySuccess },
+      { data: userData },
+    ] = await Promise.all([
+      supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
+      supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
+      supabase.from("face_verifications").select("id, created_at")
+        .eq("user_id", user.id).eq("status", "SUCCESS")
+        .gte("created_at", `${todayDate}T00:00:00+07:00`)
+        .lte("created_at", `${todayDate}T23:59:59+07:00`)
+        .maybeSingle(),
+      supabase.from("users").select("face_embedding, shift").eq("id", user.id).single(),
+    ]);
 
-        const [
-            { data: weeklyOff },
-            { data: specificOff },
-            { data: todaySuccess },   // SUCCESS
-            { data: userData },
-            { data: customSchedule },
-            { data: dateSchedule },
-        ] = await Promise.all([
-            supabase.from("user_day_off").select("id")
-                .eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
-            supabase.from("user_date_off").select("id")
-                .eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
-            supabase.from("face_verifications").select("id, created_at")
-                .eq("user_id", user.id).eq("status", "SUCCESS")
-                .gte("created_at", `${todayDate}T00:00:00+07:00`)
-                .lte("created_at", `${todayDate}T23:59:59+07:00`)
-                .maybeSingle(),
-            supabase.from("users").select("face_embedding, shift")
-                .eq("id", user.id).single(),
-            supabase.from("user_schedule")
-                .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
-                .eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
-            supabase.from("user_date_schedule")
-                .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
-                .eq("user_id", user.id).eq("schedule_date", todayDate).maybeSingle(),
-        ]);
+    const userShift     = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
+    const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
+    const alreadyAttendedDB = Boolean(todaySuccess);
 
-        const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
-        const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
-        const alreadyAttendedDB = Boolean(todaySuccess);
+    // ✅ Resolusi jadwal dari DB (pakai resolveShiftConfigFromDB)
+    const schedule = await resolveShiftConfigFromDB(user.id, supabase);
 
-        // Resolusi jadwal
-        const schedule = resolveSchedule(userShift, dateSchedule ?? customSchedule);
+    // Hitung status waktu berdasarkan schedule
+    const timeStatus = isAttendanceTimeForSchedule(schedule);
 
-        const total = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-        const start = schedule.start.h * 60 + schedule.start.m;
-        const end = schedule.end.h * 60 + schedule.end.m;
+    const pad     = (n: number) => String(n).padStart(2, "0");
+    const openAt  = `${pad(schedule.start.h)}:${pad(schedule.start.m)} WIB`;
+    const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
+    const lateAt  = `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)} WIB`;
 
-        // fix Bug 2: hitung reason, openAt, closeAt untuk dikirim ke client
-        const pad = (n: number) => String(n).padStart(2, "0");
-        const openAt = `${pad(schedule.start.h)}:${pad(schedule.start.m)}`;
-        const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)}`;
-        const lateAt = `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)}`;
+    const isAttendanceTimeNow = timeStatus.reason === "OPEN";
+    const reason              = timeStatus.reason;
+    const needEnroll          = !(userData as any)?.face_embedding;
 
+    const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
+    const alreadyAttended   = alreadyFromCookie || alreadyAttendedDB;
 
-        let reason: "TOO_EARLY" | "TOO_LATE" | "OPEN" = "OPEN";
-        if (total < start) reason = "TOO_EARLY";
-        else if (total > end) reason = "TOO_LATE";
+    const getMidnightWIB = () => new Date(Date.UTC(
+      nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
+      nowWIB.getUTCDate() + 1, 17, 0, 0
+    ));
 
-        const isAttendanceTime = reason === "OPEN";
-        const needEnroll = !(userData as any)?.face_embedding;
+    const response = NextResponse.json({
+      success:           true,
+      alreadyAttended,
+      needEnroll,
+      isAttendanceTime:  isAttendanceTimeNow,
+      isTodayDayOff,
+      isDayOff:          isTodayDayOff,
+      shift:             userShift,
+      reason,
+      openAt,
+      closeAt,
+      lateAt,
+      scheduleSource:    schedule.source, // "custom" | "shift" | "user_config"
+      scheduleToday: {
+        openAt:  `${pad(schedule.start.h)}:${pad(schedule.start.m)}`,
+        closeAt: `${pad(schedule.end.h)}:${pad(schedule.end.m)}`,
+        lateAt:  `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)}`,
+        source:  schedule.source,
+      },
+    });
 
-        const alreadyFromCookie =
-            faceVerified === user.id ||
-            faceAttended === user.id;
-        const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
-
-        const getMidnightWIB = () => new Date(Date.UTC(
-            nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-            nowWIB.getUTCDate() + 1, 17, 0, 0
-        ));
-
-        const response = NextResponse.json({
-            success: true,
-            alreadyAttended,
-            needEnroll,
-            isAttendanceTime,
-            isTodayDayOff,    // fix Bug 2: field terpisah
-            isDayOff: isTodayDayOff, // alias untuk TodayAttendanceCard
-            shift: userShift,
-            reason,           // fix Bug 2: "TOO_EARLY" | "TOO_LATE" | "OPEN"
-            openAt: `${openAt} WIB`,   // fix Bug 2: langsung di root
-            closeAt: `${closeAt} WIB`,  // fix Bug 2: langsung di root
-            scheduleToday: {
-                openAt: `${openAt}`,
-                closeAt: `${closeAt}`,
-                lateAt: `${lateAt}`,
-                source: schedule.source,
-            },
-        });
-
-        if (isTodayDayOff && dayOffCookie !== user.id) {
-            response.cookies.set("day_off_today", user.id, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "lax", path: "/",
-                expires: getMidnightWIB(),
-            });
-        }
-
-        if (alreadyAttendedDB && faceAttended !== user.id) {
-            const expiry = getMidnightWIB();
-            response.cookies.set("face_attended", user.id, {
-                httpOnly: true, secure: process.env.NODE_ENV === "production",
-                sameSite: "lax", path: "/", expires: expiry,
-            });
-            response.cookies.set("face_verified", user.id, {
-                httpOnly: true, secure: process.env.NODE_ENV === "production",
-                sameSite: "lax", path: "/", expires: expiry,
-            });
-        }
-
-        return response;
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ success: false, message: "Server error" }, { status: 500 });
+    // Set day_off cookie
+    if (isTodayDayOff && dayOffCookie !== user.id) {
+      response.cookies.set("day_off_today", user.id, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === "production",
+        sameSite: "lax", path: "/",
+        expires:  getMidnightWIB(),
+      });
     }
+
+    // Sync cookie jika sudah absen di DB
+    if (alreadyAttendedDB && faceAttended !== user.id) {
+      const expiry = getMidnightWIB();
+      response.cookies.set("face_attended", user.id, {
+        httpOnly: true, secure: process.env.NODE_ENV === "production",
+        sameSite: "lax", path: "/", expires: expiry,
+      });
+      response.cookies.set("face_verified", user.id, {
+        httpOnly: true, secure: process.env.NODE_ENV === "production",
+        sameSite: "lax", path: "/", expires: expiry,
+      });
+    }
+
+    return response;
+  } catch (error) {
+    console.error("[face-status GET]", error);
+    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get("token")?.value;
-        if (!token) return NextResponse.json({ success: false }, { status: 401 });
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+    if (!token) return NextResponse.json({ success: false }, { status: 401 });
 
-        const user = await verifyToken(token);
-        if (!user) return NextResponse.json({ success: false }, { status: 401 });
+    const user = await verifyToken(token);
+    if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-        const nowUTC = new Date();
-        const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-        const nowWIB = new Date(wibMs);
-        const midnight = new Date(Date.UTC(
-            nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-            nowWIB.getUTCDate() + 1, 17, 0, 0
-        ));
+    const nowUTC  = new Date();
+    const wibMs   = nowUTC.getTime() + 7 * 60 * 60 * 1000;
+    const nowWIB  = new Date(wibMs);
+    const midnight = new Date(Date.UTC(
+      nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
+      nowWIB.getUTCDate() + 1, 17, 0, 0
+    ));
 
-        const response = NextResponse.json({ success: true });
-        response.cookies.set("attendance_skipped", user.id, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax", path: "/",
-            expires: midnight,
-        });
-        return response;
-    } catch (err) {
-        console.error("[face-status POST]", err);
-        return NextResponse.json({ success: false }, { status: 500 });
-    }
+    const response = NextResponse.json({ success: true });
+    response.cookies.set("attendance_skipped", user.id, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === "production",
+      sameSite: "lax", path: "/",
+      expires:  midnight,
+    });
+    return response;
+  } catch (err) {
+    console.error("[face-status POST]", err);
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
 }
