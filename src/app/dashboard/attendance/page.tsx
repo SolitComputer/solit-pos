@@ -134,15 +134,21 @@ function countWorkingDays(year: number, month: number, dayOffDows: Set<number>, 
     return c;
 }
 
-// ✅ FIX: Hitung hari kerja yang SUDAH LEWAT (kemarin dan sebelumnya) dalam bulan ini
-// Ini dipakai untuk menghitung "tidak hadir yang valid"
-function countPastWorkingDays(year: number, month: number, dayOffDows: Set<number>, offDates: Set<string>): number {
-    const todayWIB = getWIBToday(); // "YYYY-MM-DD" hari ini WIB
+function countEffectiveWorkingDays(
+    year: number,
+    month: number,
+    dayOffDows: Set<number>,
+    offDates: Set<string>
+): number {
+    const todayWIB = getWIBToday();
+    const todayYear = parseInt(todayWIB.slice(0, 4));
+    const todayMonth = parseInt(todayWIB.slice(5, 7)) - 1;
     const dim = new Date(year, month + 1, 0).getDate();
+    const isCurrentMonth = (year === todayYear && month === todayMonth);
     let c = 0;
     for (let d = 1; d <= dim; d++) {
         const dk = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        if (dk >= todayWIB) break; // stop di hari ini — hanya hitung hari yang sudah lewat
+        if (isCurrentMonth && dk > todayWIB) break;
         const dow = new Date(dk + "T12:00:00").getDay();
         if (!dayOffDows.has(dow) && !offDates.has(dk)) c++;
     }
@@ -744,6 +750,113 @@ function MonthSelector({ onSelect }: { onSelect: (year: number, month: number) =
     );
 }
 
+function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSaved }: {
+    userId: string;
+    userName: string;
+    currentSalary?: UserSalary;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [salaryType, setSalaryType] = useState<"FIXED" | "PERCENTAGE">(
+        currentSalary?.salary_type ?? "FIXED"
+    );
+    const [baseSalary, setBaseSalary] = useState(
+        currentSalary?.base_salary?.toString() ?? ""
+    );
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        if (!baseSalary || parseFloat(baseSalary) < 0) {
+            setError("Nominal gaji harus diisi"); return;
+        }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/salary", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    salary_type: salaryType,
+                    base_salary: parseFloat(baseSalary),
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved(); onClose();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">💰 Edit Gaji</p>
+                        <p className="text-xs text-white/70 mt-1">{userName}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>
+                    )}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tipe Gaji</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["FIXED", "PERCENTAGE"] as const).map(t => (
+                                <button key={t} type="button" onClick={() => setSalaryType(t)}
+                                    className={`py-3 rounded-xl text-xs font-bold border transition-all ${salaryType === t
+                                        ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                        }`}>
+                                    {t === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                            {salaryType === "FIXED"
+                                ? "Gaji penuh tiap bulan, tidak tergantung kehadiran"
+                                : "Gaji = % kehadiran × nominal pokok"}
+                        </p>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+                            {salaryType === "FIXED" ? "Nominal Gaji (Rp)" : "Gaji Pokok (Rp)"}
+                        </label>
+                        <input type="number" min={0} value={baseSalary}
+                            onChange={e => setBaseSalary(e.target.value)}
+                            placeholder="contoh: 3000000"
+                            className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 transition-all font-mono font-bold"
+                        />
+                        {baseSalary && parseFloat(baseSalary) > 0 && (
+                            <p className="text-[11px] text-gray-500 mt-1.5">
+                                = <span className="font-bold text-gray-800">
+                                    {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(parseFloat(baseSalary))}
+                                </span>
+                                {salaryType === "PERCENTAGE" && <span className="text-gray-400"> × persen kehadiran</span>}
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <div className="px-6 pb-6 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={save} disabled={saving || !baseSalary}
+                        className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
@@ -776,6 +889,9 @@ export default function AttendanceDashboardPage() {
     const calMonth = selectedMonth?.month ?? new Date().getMonth();
     const [showShiftModal, setShowShiftModal] = useState(false);
     const [shiftModalUserId, setShiftModalUserId] = useState<string | undefined>(undefined);
+    const [editSalaryUser, setEditSalaryUser] = useState<{
+        userId: string; userName: string; currentSalary?: UserSalary;
+    } | null>(null);
 
     // ── Fetchers ─────────────────────────────────────────────────────────────
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
@@ -876,7 +992,7 @@ export default function AttendanceDashboardPage() {
         thisMonthAtt.forEach(a => {
             if (!m[a.user_name]) m[a.user_name] = { name: a.user_name, present: 0, late: 0, skip: 0, score: 0, pastWorkdays: 0, totalWorkdays: 0, pct: 0, remainingDays: 0, userId: "" };
             if (a.displayStatus === "PRESENT") { m[a.user_name].present++; m[a.user_name].score += 1.0; }
-            else if (a.displayStatus === "SKIP") { m[a.user_name].skip++; m[a.user_name].score += 0.75; }
+            else if (a.displayStatus === "SKIP") { m[a.user_name].skip++; }
             else { m[a.user_name].late++; m[a.user_name].score += 0.5; }
         });
 
@@ -886,11 +1002,11 @@ export default function AttendanceDashboardPage() {
             const dows = dayOffByName[u.name] ?? new Set();
             const offs = dateOffByName[u.name] ?? new Set();
             // ✅ pastWorkdays = hari kerja yang sudah lewat (untuk hitung absent)
-            u.pastWorkdays = countPastWorkingDays(calYear, calMonth, dows, offs);
+            u.pastWorkdays = countEffectiveWorkingDays(calYear, calMonth, dows, offs);
             // totalWorkdays = seluruh hari kerja bulan ini (untuk referensi)
             u.totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
             // ✅ pct dihitung dari pastWorkdays agar tidak lebih dari 100%
-            u.pct = u.pastWorkdays > 0 ? Math.round((u.score / u.pastWorkdays) * 100) : 0;
+            u.pct = u.totalWorkdays > 0 ? Math.min(100, Math.round((u.score / u.totalWorkdays) * 100)) : 0;
             u.remainingDays = getRemainingWorkingDays(calYear, calMonth, dows, offs);
         });
 
@@ -900,7 +1016,7 @@ export default function AttendanceDashboardPage() {
                 const offs = dateOffByName[u.name] ?? new Set();
                 m[u.name] = {
                     name: u.name, present: 0, late: 0, skip: 0, score: 0,
-                    pastWorkdays: countPastWorkingDays(calYear, calMonth, dows, offs),
+                    pastWorkdays: countEffectiveWorkingDays(calYear, calMonth, dows, offs),
                     totalWorkdays: countWorkingDays(calYear, calMonth, dows, offs),
                     pct: 0, remainingDays: getRemainingWorkingDays(calYear, calMonth, dows, offs), userId: u.id,
                 };
@@ -1147,7 +1263,15 @@ export default function AttendanceDashboardPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-4"><span className="font-mono font-black text-gray-800 text-sm">{toWIBTime(a.check_in_time || a.created_at)}</span></td>
+                                                            <td className="px-4 py-4">
+                                                                {manualRec && (["ABSENT", "SICK", "PERMIT"] as string[]).includes(manualRec.status) ? (
+                                                                    <span className="text-[10px] text-gray-300 font-bold">—</span>
+                                                                ) : (
+                                                                    <span className="font-mono font-black text-gray-800 text-sm">
+                                                                        {toWIBTime(a.check_in_time || a.created_at)}
+                                                                    </span>
+                                                                )}
+                                                            </td>
                                                             <td className="px-4 py-4">
                                                                 {manualRec ? (
                                                                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${MANUAL_STATUS_LABELS[manualRec.status]?.bg} ${MANUAL_STATUS_LABELS[manualRec.status]?.color} ${MANUAL_STATUS_LABELS[manualRec.status]?.border}`}>
@@ -1226,7 +1350,7 @@ export default function AttendanceDashboardPage() {
                                 <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
                                 <p className="text-[10px] text-gray-400 mt-1">
                                     Tepat=1.0 · Terlambat=0.5 · Skip=0.75 · Tidak Hadir=0 ·
-                                    <span className="text-blue-500 font-semibold"> % dihitung dari hari kerja yang sudah lewat</span>
+                                    <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
                                 </p>
                             </div>
                             {/* ✅ Tombol tambah absen manual langsung dari ringkasan */}
@@ -1247,7 +1371,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skip</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Lewat</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa</th>
                                             <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
@@ -1323,10 +1447,10 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-gray-400", "Skip = 0.75 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-gray-400", "Skip = 0 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
-                            <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ hari kerja yang sudah lewat</span>
+                            <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
                         </div>
                     </div>
                 )}
@@ -1345,14 +1469,15 @@ export default function AttendanceDashboardPage() {
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-sm min-w-[580px]">
                                     <thead>
                                         <tr className="border-b border-gray-100 bg-gray-50/60">
-                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipe</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
-                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">% Kehadiran</th>
-                                            <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Diterima</th>
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:table-cell">Tipe</th>
+                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
+                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kehadiran</th>
+                                            <th className="px-3 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Diterima</th>
+                                            <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
@@ -1362,26 +1487,72 @@ export default function AttendanceDashboardPage() {
                                             const earned = sal ? (sal.salary_type === "FIXED" ? sal.base_salary : sal.base_salary * pct) : null;
                                             return (
                                                 <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
-                                                            <div><span className="font-bold text-gray-800 block">{u.name}</span><span className="text-[10px] text-gray-400">{u.pct}% kehadiran</span></div>
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
+                                                            <div className="min-w-0">
+                                                                <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                <span className="text-[10px] text-gray-400">{u.pct}% kehadiran</span>
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        {sal ? (<span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border ${sal.salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>{sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 Persentase"}</span>) : <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>}
+                                                    <td className="px-3 py-4 text-center hidden sm:table-cell">
+                                                        {sal
+                                                            ? <span className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1.5 rounded-full border ${sal.salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                                                                {sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 %"}
+                                                            </span>
+                                                            : <span className="text-[10px] text-gray-300 font-bold">—</span>
+                                                        }
                                                     </td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        {sal ? <span className="font-mono font-bold text-gray-800 text-sm">{formatRupiah(sal.base_salary)}</span> : <span className="text-gray-300 text-sm">—</span>}
+                                                    <td className="px-3 py-4 text-center">
+                                                        {sal
+                                                            ? <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="font-mono font-bold text-gray-800 text-xs">{formatRupiah(sal.base_salary)}</span>
+                                                                <span className={`text-[9px] font-semibold sm:hidden ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
+                                                                    {sal.salary_type === "FIXED" ? "Tetap" : "% Absen"}
+                                                                </span>
+                                                            </div>
+                                                            : <span className="text-gray-300 text-xs">—</span>
+                                                        }
                                                     </td>
-                                                    <td className="px-4 py-4 text-center">
+                                                    <td className="px-3 py-4 text-center">
                                                         <div className="flex flex-col items-center gap-1">
                                                             <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{u.pct}%</span>
-                                                            <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} /></div>
+                                                            <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-right">
-                                                        {earned !== null ? <span className="font-black text-gray-800 text-base">{formatRupiah(earned)}</span> : <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="text-[10px] font-bold text-emerald-600 hover:underline">Atur gaji →</button>}
+                                                    <td className="px-3 py-4 text-right">
+                                                        {earned !== null ? (
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
+                                                                {sal && sal.salary_type === "PERCENTAGE" && u.pct < 100 && (
+                                                                    <span className="text-[9px] text-gray-400">
+                                                                        Penuh: {formatRupiah(sal.base_salary)}
+                                                                    </span>
+                                                                )}
+                                                                {sal && sal.salary_type === "FIXED" && u.pct < 100 && (
+                                                                    <span className="text-[9px] text-amber-500">
+                                                                        Hadir {u.pct}%
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-4 text-center">
+                                                        <button
+                                                            onClick={() => setEditSalaryUser({
+                                                                userId: u.userId,
+                                                                userName: u.name,
+                                                                currentSalary: salaryMap[u.userId],
+                                                            })}
+                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                        >
+                                                            ✏️ Edit
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             );
@@ -1389,12 +1560,19 @@ export default function AttendanceDashboardPage() {
                                     </tbody>
                                     <tfoot>
                                         <tr className="border-t-2 border-gray-200 bg-gray-50/50">
-                                            <td colSpan={4} className="px-6 py-4 text-sm font-bold text-gray-600 text-right">Total Gaji Bulan Ini:</td>
-                                            <td className="px-4 py-4 text-right">
+                                            <td colSpan={4} className="px-4 py-4 text-sm font-bold text-gray-600 text-right">
+                                                Total Gaji Bulan Ini:
+                                            </td>
+                                            <td className="px-3 py-4 text-right">
                                                 <span className="text-lg font-black text-[#1a1a2e]">
-                                                    {formatRupiah(userSummary.reduce((sum, u) => { const sal = salaryMap[u.userId]; const p = u.pct / 100; return sum + (sal ? (sal.salary_type === "FIXED" ? sal.base_salary : sal.base_salary * p) : 0); }, 0))}
+                                                    {formatRupiah(userSummary.reduce((sum, u) => {
+                                                        const sal = salaryMap[u.userId];
+                                                        const p = u.pct / 100;
+                                                        return sum + (sal ? (sal.salary_type === "FIXED" ? sal.base_salary : sal.base_salary * p) : 0);
+                                                    }, 0))}
                                                 </span>
                                             </td>
+                                            <td />
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -1492,6 +1670,15 @@ export default function AttendanceDashboardPage() {
                         setShowShiftModal(false);
                         setShiftModalUserId(undefined);
                     }}
+                />
+            )}
+            {editSalaryUser && currentUser?.role === "ADMIN" && (
+                <InlineSalaryEditModal
+                    userId={editSalaryUser.userId}
+                    userName={editSalaryUser.userName}
+                    currentSalary={editSalaryUser.currentSalary}
+                    onClose={() => setEditSalaryUser(null)}
+                    onSaved={() => { fetchSalaries(); setEditSalaryUser(null); }}
                 />
             )}
             <style jsx global>{`
