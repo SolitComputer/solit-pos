@@ -1177,7 +1177,9 @@ export default function AttendanceDashboardPage() {
     const thisMonthDays = new Set(thisMonthAtt.map(a => toWIBDateKey(a.check_in_time || a.created_at))).size;
 
     const selectedAttendances = selectedDate
-        ? (byDate[selectedDate] || []).sort((a, b) => new Date(a.check_in_time).getTime() - new Date(b.check_in_time).getTime())
+        ? [...(byDate[selectedDate] || [])].sort((a, b) =>
+            a.user_name.localeCompare(b.user_name, "id-ID", { sensitivity: "base" })
+        )
         : [];
 
     const refreshAll = useCallback(() => {
