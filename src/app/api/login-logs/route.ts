@@ -10,12 +10,12 @@ const supabaseAdmin = createClient(
 export const GET = withAuth(
   async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
-    const page   = parseInt(searchParams.get("page")  ?? "1");
-    const limit  = parseInt(searchParams.get("limit") ?? "25");
+    const page = parseInt(searchParams.get("page") ?? "1");
+    const limit = parseInt(searchParams.get("limit") ?? "25");
     const status = searchParams.get("status"); // SUCCESS | FAILED
     const search = searchParams.get("search") ?? "";
-    const from   = (page - 1) * limit;
-    const to     = from + limit - 1;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
     let query = supabaseAdmin
       .from("login_logs")
@@ -34,5 +34,6 @@ export const GET = withAuth(
 
     return NextResponse.json({ logs: data, total: count, page, limit });
   },
-  ["ADMIN"] // hanya ADMIN
+  ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] // ADMIN, PROGRAMMER, ASISTEN_CEO bisa akses full log
+
 );

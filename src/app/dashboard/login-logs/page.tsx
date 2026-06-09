@@ -15,41 +15,41 @@ type LoginLog = {
 };
 
 const ROLE_LABEL: Record<string, string> = {
-    ADMIN:            "Admin",
-    KEPALA_SALES:     "Kepala Sales",
-    CREW_SALES:       "Crew Sales",
-    ACCOUNTING:       "Accounting",
+    ADMIN: "Admin",
+    KEPALA_SALES: "Kepala Sales",
+    CREW_SALES: "Crew Sales",
+    ACCOUNTING: "Accounting",
     PENGELOLA_BARANG: "Pengelola Barang",
-    TEKNISI:          "Teknisi",
-    UNKNOWN:          "Unknown",
+    TEKNISI: "Teknisi",
+    UNKNOWN: "Unknown",
 };
 
 const ROLE_COLOR: Record<string, string> = {
-    ADMIN:            "bg-gray-100 text-gray-700",
-    KEPALA_SALES:     "bg-gray-100 text-gray-700",
-    CREW_SALES:       "bg-gray-100 text-gray-700",
-    ACCOUNTING:       "bg-gray-100 text-gray-700",
+    ADMIN: "bg-gray-100 text-gray-700",
+    KEPALA_SALES: "bg-gray-100 text-gray-700",
+    CREW_SALES: "bg-gray-100 text-gray-700",
+    ACCOUNTING: "bg-gray-100 text-gray-700",
     PENGELOLA_BARANG: "bg-gray-100 text-gray-700",
-    TEKNISI:          "bg-gray-100 text-gray-700",
-    UNKNOWN:          "bg-gray-100 text-gray-500",
+    TEKNISI: "bg-gray-100 text-gray-700",
+    UNKNOWN: "bg-gray-100 text-gray-500",
 };
 
 const ROLE_ICON: Record<string, string> = {
-    ADMIN:            "👑",
-    KEPALA_SALES:     "📊",
-    CREW_SALES:       "💼",
-    ACCOUNTING:       "💰",
+    ADMIN: "👑",
+    KEPALA_SALES: "📊",
+    CREW_SALES: "💼",
+    ACCOUNTING: "💰",
     PENGELOLA_BARANG: "📦",
-    TEKNISI:          "🔧",
-    UNKNOWN:          "❓",
+    TEKNISI: "🔧",
+    UNKNOWN: "❓",
 };
 
 function formatDate(iso: string) {
     return new Intl.DateTimeFormat("id-ID", {
-        day:    "2-digit",
-        month:  "short",
-        year:   "numeric",
-        hour:   "2-digit",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
     }).format(new Date(iso));
@@ -132,7 +132,7 @@ export default function LoginLogsPage() {
     const fetchLogs = async () => {
         setLoading(true);
         const params = new URLSearchParams({
-            page:  String(page),
+            page: String(page),
             limit: String(limit),
             ...(filterStatus ? { status: filterStatus } : {}),
             ...(search.trim() ? { search: search.trim() } : {}),
@@ -177,7 +177,7 @@ export default function LoginLogsPage() {
                                 </h1>
                             </div>
                             <p className="text-sm text-gray-500 ml-10">
-                                Riwayat login semua user — <span className="text-gray-600 font-medium">hanya terlihat oleh Admin</span>
+                                Riwayat login semua user — <span className="text-gray-600 font-medium">terlihat oleh Admin, Programmer, & Asisten CEO</span>
                             </p>
                         </div>
                         {!loading && total > 0 && (
@@ -280,26 +280,23 @@ export default function LoginLogsPage() {
 
                             <div className="divide-y divide-gray-100">
                                 {logs.map((log, idx) => (
-                                    <div 
+                                    <div
                                         key={log.id}
-                                        className={`grid grid-cols-1 lg:grid-cols-[2fr_2fr_1.2fr_0.8fr] gap-3 lg:gap-4 px-5 py-4 transition-all duration-200 hover:bg-gray-50 ${
-                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                                        }`}
+                                        className={`grid grid-cols-1 lg:grid-cols-[2fr_2fr_1.2fr_0.8fr] gap-3 lg:gap-4 px-5 py-4 transition-all duration-200 hover:bg-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                                            }`}
                                     >
                                         {/* User info - enhanced */}
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md ${
-                                                    log.status === "SUCCESS" 
-                                                        ? "bg-gray-600" 
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md ${log.status === "SUCCESS"
+                                                        ? "bg-gray-600"
                                                         : "bg-gray-400"
-                                                }`}>
+                                                    }`}>
                                                     {log.user_name?.charAt(0)?.toUpperCase() ?? "?"}
                                                 </div>
                                                 <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-white flex items-center justify-center">
-                                                    <div className={`w-2 h-2 rounded-full ${
-                                                        log.status === "SUCCESS" ? "bg-green-500" : "bg-red-500"
-                                                    } animate-pulse`} />
+                                                    <div className={`w-2 h-2 rounded-full ${log.status === "SUCCESS" ? "bg-green-500" : "bg-red-500"
+                                                        } animate-pulse`} />
                                                 </div>
                                             </div>
                                             <div className="min-w-0">
@@ -385,7 +382,7 @@ export default function LoginLogsPage() {
                             </svg>
                             Sebelumnya
                         </button>
-                        
+
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg">
                                 {page}
@@ -393,7 +390,7 @@ export default function LoginLogsPage() {
                             <span className="text-sm text-gray-400">/</span>
                             <span className="text-sm text-gray-500">{totalPages}</span>
                         </div>
-                        
+
                         <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
