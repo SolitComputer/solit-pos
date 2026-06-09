@@ -23,7 +23,7 @@ const FACE_API_WHITELIST = [
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 
-const ATTENDANCE_EXEMPT_ROLES = ["ADMIN", "PROGRAMMER"];
+const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
 
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
