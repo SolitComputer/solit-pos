@@ -10,7 +10,7 @@ const supabase = createClient(
 );
 
 // Role yang bypass absensi (tidak perlu absen)
-const ATTENDANCE_EXEMPT_ROLES = ["ADMIN", "PROGRAMMER"] as const;
+const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"] as const;
 
 export async function GET() {
   try {
