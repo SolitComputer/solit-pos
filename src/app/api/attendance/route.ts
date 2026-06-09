@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       .in("status", ["SUCCESS"])
       .order("created_at", { ascending: true });
 
-    if (user.role !== "ADMIN") {
+    if (!isFullAccess(user.role)) {
       query = query.eq("user_id", user.id);
     }
 
@@ -50,21 +50,21 @@ export async function GET(request: Request) {
     });
 
     const formattedData = deduplicated.map((item: any) => ({
-      id:            item.id,
-      user_name:     item.users?.name  || "Unknown",
-      user_role:     item.users?.role  || "STAFF",
-      user_shift:    item.users?.shift ?? "PAGI",
-      date:          item.created_at,
+      id: item.id,
+      user_name: item.users?.name || "Unknown",
+      user_role: item.users?.role || "STAFF",
+      user_shift: item.users?.shift ?? "PAGI",
+      date: item.created_at,
       check_in_time: item.created_at,
-      status:        item.status,                                         
-      method:        item.status === "SUCCESS" ? "FACE" : "SKIP",        
-      latitude:      item.latitude,
-      longitude:     item.longitude,
-      accuracy:      item.accuracy,
-      device:        item.device,
-      ip_address:    item.ip_address,
+      status: item.status,
+      method: item.status === "SUCCESS" ? "FACE" : "SKIP",
+      latitude: item.latitude,
+      longitude: item.longitude,
+      accuracy: item.accuracy,
+      device: item.device,
+      ip_address: item.ip_address,
       face_distance: item.face_distance,
-      created_at:    item.created_at,
+      created_at: item.created_at,
     }));
 
     return NextResponse.json({ success: true, data: formattedData });

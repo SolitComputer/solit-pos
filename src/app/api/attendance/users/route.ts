@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -10,11 +10,10 @@ const supabase = createClient(
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
-    // ✅ Log untuk debug — hapus setelah fix
+
     console.log("[attendance/users] current user:", user?.id, user?.role);
-    
-    if (!user || user.role !== "ADMIN") {
+
+    if (!user || !isFullAccess(user.role)) {
       console.log("[attendance/users] blocked — role:", user?.role);
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
@@ -22,7 +21,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("users")
       .select("id, name, role")
-      .order("name", { ascending: true }); // ✅ alfabetis
+      .order("name", { ascending: true }); 
 
     if (error) {
       console.error("[attendance/users] DB error:", error);

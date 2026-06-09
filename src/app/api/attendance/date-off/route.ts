@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       .select("id, user_id, off_date, notes, created_at")
       .order("off_date", { ascending: true });
 
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN", "PROGRAMMER", "ASISTEN_CEO") {
       q = q.eq("user_id", user.id);
     }
 

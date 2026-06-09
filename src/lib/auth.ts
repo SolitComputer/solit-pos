@@ -1,4 +1,3 @@
-// src/lib/auth.ts
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -16,6 +15,12 @@ export interface AuthUser {
   name: string;
   role: import("@/lib/permissions").UserRole;
   shift?: "PAGI" | "SORE";
+}
+
+export const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+
+export function isFullAccess(role?: string): boolean {
+  return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
 const getSecret = () =>

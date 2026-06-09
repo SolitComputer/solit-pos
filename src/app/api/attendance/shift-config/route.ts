@@ -1,6 +1,5 @@
-// src/app/api/attendance/shift-config/route.ts
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -10,8 +9,8 @@ const supabase = createClient(
 
 // Default config per shift — fallback jika tidak ada custom config
 const SHIFT_DEFAULTS = {
-  PAGI: { open_hour:7,  open_minute:30, late_hour:8,  late_minute:0,  close_hour:12, close_minute:0 },
-  SORE: { open_hour:14, open_minute:0,  late_hour:16, late_minute:0,  close_hour:18, close_minute:0 },
+  PAGI: { open_hour: 7, open_minute: 30, late_hour: 8, late_minute: 0, close_hour: 12, close_minute: 0 },
+  SORE: { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0 },
 } as const;
 
 // GET — ambil config semua user (admin) atau milik sendiri
@@ -24,7 +23,7 @@ export async function GET(request: Request) {
     const targetUserId = searchParams.get("user_id");
 
     // Jika admin request config satu user
-    if (user.role === "ADMIN" && targetUserId) {
+    if (isFullAccess(user.role) && targetUserId) {
       const { data, error } = await supabase
         .from("user_shift_config")
         .select("*")
@@ -54,18 +53,18 @@ export async function GET(request: Request) {
         const config = configMap[u.id];
         const defaults = SHIFT_DEFAULTS[u.shift as keyof typeof SHIFT_DEFAULTS] ?? SHIFT_DEFAULTS.PAGI;
         return {
-          user_id:      u.id,
-          user_name:    u.name,
-          user_role:    u.role,
-          shift:        u.shift ?? "PAGI",
-          has_custom:   !!config,
-          open_hour:    config?.open_hour    ?? defaults.open_hour,
-          open_minute:  config?.open_minute  ?? defaults.open_minute,
-          late_hour:    config?.late_hour    ?? defaults.late_hour,
-          late_minute:  config?.late_minute  ?? defaults.late_minute,
-          close_hour:   config?.close_hour   ?? defaults.close_hour,
+          user_id: u.id,
+          user_name: u.name,
+          user_role: u.role,
+          shift: u.shift ?? "PAGI",
+          has_custom: !!config,
+          open_hour: config?.open_hour ?? defaults.open_hour,
+          open_minute: config?.open_minute ?? defaults.open_minute,
+          late_hour: config?.late_hour ?? defaults.late_hour,
+          late_minute: config?.late_minute ?? defaults.late_minute,
+          close_hour: config?.close_hour ?? defaults.close_hour,
           close_minute: config?.close_minute ?? defaults.close_minute,
-          config_id:    config?.id ?? null,
+          config_id: config?.id ?? null,
         };
       });
 
@@ -80,7 +79,7 @@ export async function GET(request: Request) {
       .single();
 
     const userShift = (userData?.shift ?? "PAGI") as keyof typeof SHIFT_DEFAULTS;
-    const defaults  = SHIFT_DEFAULTS[userShift] ?? SHIFT_DEFAULTS.PAGI;
+    const defaults = SHIFT_DEFAULTS[userShift] ?? SHIFT_DEFAULTS.PAGI;
 
     const { data: config } = await supabase
       .from("user_shift_config")
@@ -91,14 +90,14 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        user_id:      user.id,
-        shift:        userShift,
-        has_custom:   !!config,
-        open_hour:    config?.open_hour    ?? defaults.open_hour,
-        open_minute:  config?.open_minute  ?? defaults.open_minute,
-        late_hour:    config?.late_hour    ?? defaults.late_hour,
-        late_minute:  config?.late_minute  ?? defaults.late_minute,
-        close_hour:   config?.close_hour   ?? defaults.close_hour,
+        user_id: user.id,
+        shift: userShift,
+        has_custom: !!config,
+        open_hour: config?.open_hour ?? defaults.open_hour,
+        open_minute: config?.open_minute ?? defaults.open_minute,
+        late_hour: config?.late_hour ?? defaults.late_hour,
+        late_minute: config?.late_minute ?? defaults.late_minute,
+        close_hour: config?.close_hour ?? defaults.close_hour,
         close_minute: config?.close_minute ?? defaults.close_minute,
       },
     });
@@ -111,8 +110,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user || !isFullAccess(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -129,8 +128,8 @@ export async function POST(request: Request) {
     }
 
     // Validasi logika waktu: open <= late <= close
-    const openTotal  = open_hour  * 60 + open_minute;
-    const lateTotal  = late_hour  * 60 + late_minute;
+    const openTotal = open_hour * 60 + open_minute;
+    const lateTotal = late_hour * 60 + late_minute;
     const closeTotal = close_hour * 60 + close_minute;
 
     if (openTotal >= lateTotal) {
@@ -147,11 +146,11 @@ export async function POST(request: Request) {
         {
           user_id,
           shift: shift || "PAGI",
-          open_hour,  open_minute,
-          late_hour,  late_minute,
+          open_hour, open_minute,
+          late_hour, late_minute,
           close_hour, close_minute,
-          created_by:  user.id,
-          updated_at:  new Date().toISOString(),
+          created_by: user.id,
+          updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }
       )
@@ -175,8 +174,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user || !isFullAccess(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

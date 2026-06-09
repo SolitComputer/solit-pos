@@ -71,6 +71,8 @@ type UserLeaveData = {
 type DayOff = { id: string; user_id: string; day_of_week: number; users?: { id: string; name: string; role: string } };
 type DateOff = { id: string; user_id: string; off_date: string; users?: { id: string; name: string; role: string } };
 type UserInfo = { id: string; name: string; role: string };
+type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
+type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = -6.402593;
@@ -90,6 +92,14 @@ const MANUAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: s
     PERMIT: { label: "Izin", color: "text-violet-700", bg: "bg-violet-100", border: "border-violet-200", emoji: "📋" },
     ABSENT: { label: "Tidak Hadir", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", emoji: "❌" },
     LEAVE: { label: "Cuti", color: "text-cyan-700", bg: "bg-cyan-100", border: "border-cyan-200", emoji: "🌴" },
+};
+
+const ABSENCE_REASON_LABELS: Record<AbsenceReason, { label: string; emoji: string; bg: string; color: string; border: string }> = {
+    ALPHA: { label: "Tanpa Keterangan", emoji: "🚫", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
+    ABSENT: { label: "Tidak Hadir", emoji: "❌", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
+    SICK: { label: "Sakit", emoji: "🤒", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
+    PERMIT: { label: "Izin", emoji: "📋", bg: "bg-violet-50", color: "text-violet-700", border: "border-violet-200" },
+    LEAVE: { label: "Cuti", emoji: "🌴", bg: "bg-cyan-50", color: "text-cyan-700", border: "border-cyan-200" },
 };
 
 
@@ -175,6 +185,10 @@ function getRemainingWorkingDays(year: number, month: number, dayOffDows: Set<nu
 
 function formatRupiah(n: number): string {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+}
+
+function formatPct(n: number): string {
+    return String(Math.floor(n * 100 + 1e-6) / 100);
 }
 
 function initials(name: string): string {
@@ -932,6 +946,70 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
     );
 }
 
+function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
+    name: string; absences: AbsenceItem[]; offDates: string[]; monthLabel: string; onClose: () => void;
+}) {
+    const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-red-600 to-rose-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">❌ Detail Ketidakhadiran</p>
+                        <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Hari tidak hadir ({absences.length})</p>
+                        {absences.length === 0 ? (
+                            <p className="text-sm text-gray-400">Tidak ada ketidakhadiran 🎉</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {absences.map(a => {
+                                    const cfg = ABSENCE_REASON_LABELS[a.reason];
+                                    return (
+                                        <div key={a.date} className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-gray-800">{fmt(a.date)}</p>
+                                                {a.note && <p className="text-[11px] text-gray-400 truncate">📝 {a.note}</p>}
+                                            </div>
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                                                {cfg.emoji} {cfg.label}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {offDates.length > 0 && (
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Libur — tidak dihitung ({offDates.length})</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {offDates.map(d => (
+                                    <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200 px-2 py-1 rounded-lg">
+                                        🏖️ {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                    </span>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-2">Hari libur tidak masuk hitungan kewajiban hadir, jadi tidak dianggap absen.</p>
+                        </div>
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
@@ -967,6 +1045,7 @@ export default function AttendanceDashboardPage() {
     const [editSalaryUser, setEditSalaryUser] = useState<{
         userId: string; userName: string; currentSalary?: UserSalary;
     } | null>(null);
+    const [absenceDetail, setAbsenceDetail] = useState<{ name: string; absences: AbsenceItem[]; offDates: string[] } | null>(null);
 
     // ── Fetchers ─────────────────────────────────────────────────────────────
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
@@ -1075,101 +1154,88 @@ export default function AttendanceDashboardPage() {
 
     const userSummary = useMemo(() => {
         type UserStat = {
-            name: string;
-            present: number;
-            late: number;
-            score: number;
-            pastWorkdays: number;
-            totalWorkdays: number;
-            pct: number;
-            remainingDays: number;
-            userId: string;
+            name: string; present: number; late: number; score: number;
+            pastWorkdays: number; totalWorkdays: number; pct: number;
+            remainingDays: number; userId: string;
+            absences: AbsenceItem[]; offDates: string[];
         };
-        const m: Record<string, UserStat> = {};
 
-        // ✅ FIX: Hitung kehadiran berdasarkan tanggal unik per user
-        // Prioritas: manual record > auto record
-        // Buat map: userName_dateKey → effective status
-        const effectiveStatus: Record<string, "PRESENT" | "LATE" | "ABSENT"> = {};
+        const todayWIB = getWIBToday();
+        const isCurrentMonth = thisMonthKey === todayWIB.slice(0, 7);
+        const dim = new Date(calYear, calMonth + 1, 0).getDate();
 
-        // Pass 1: proses auto attendance (face verifications)
+        // 1) Status efektif per nama per tanggal (manual override auto)
+        const effByName: Record<string, Record<string, "PRESENT" | "LATE" | "ABSENT">> = {};
+        const setEff = (name: string, date: string, status: "PRESENT" | "LATE" | "ABSENT") => {
+            if (!effByName[name]) effByName[name] = {};
+            effByName[name][date] = status;
+        };
+
+        // Pass 1: auto (face verification)
         thisMonthAtt.forEach(a => {
             if (a.source !== "AUTO") return;
-            const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
-            const key = `${a.user_name}_${dateKey}`;
-            if (a.displayStatus === "PRESENT") {
-                effectiveStatus[key] = "PRESENT";
-            } else if (a.displayStatus === "LATE") {
-                effectiveStatus[key] = "LATE";
-            } else {
-                // SKIP dari face-verify = tidak hadir
-                effectiveStatus[key] = "ABSENT";
-            }
+            const dk = toWIBDateKey(a.check_in_time || a.created_at);
+            setEff(a.user_name, dk,
+                a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
 
-        // Pass 2: manual records OVERRIDE auto records
+        // Pass 2: manual override + simpan record untuk alasan
+        const manualByName: Record<string, Record<string, ManualAttendance>> = {};
         manualRecords.forEach(mr => {
-            const key = `${mr.users?.name ?? mr.user_id}_${mr.attendance_date}`;
-            if (!mr.users?.name) return;
-            const name = mr.users.name;
-            // Cek apakah ini bulan yang dipilih
-            if (!mr.attendance_date.startsWith(thisMonthKey)) return;
+            const name = mr.users?.name;
+            if (!name || !mr.attendance_date.startsWith(thisMonthKey)) return;
+            if (!manualByName[name]) manualByName[name] = {};
+            manualByName[name][mr.attendance_date] = mr;
+            setEff(name, mr.attendance_date,
+                mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
+        });
 
-            if (mr.status === "PRESENT") {
-                effectiveStatus[`${name}_${mr.attendance_date}`] = "PRESENT";
-            } else if (mr.status === "LATE") {
-                effectiveStatus[`${name}_${mr.attendance_date}`] = "LATE";
-            } else {
-                // ABSENT, SICK, PERMIT, LEAVE → semua = tidak hadir
-                effectiveStatus[`${name}_${mr.attendance_date}`] = "ABSENT";
+        // 2) Daftar user = gabungan allUsers + nama yang muncul di absensi
+        const names = new Set<string>();
+        allUsers.forEach(u => names.add(u.name));
+        Object.keys(effByName).forEach(n => names.add(n));
+
+        const userIdByName: Record<string, string> = {};
+        allUsers.forEach(u => { userIdByName[u.name] = u.id; });
+
+        // 3) Enumerasi hari kerja yang SUDAH LEWAT per user → present/late/absent konsisten
+        const result: UserStat[] = [];
+        names.forEach(name => {
+            const dows = dayOffByName[name] ?? new Set<number>();
+            const offs = dateOffByName[name] ?? new Set<string>();
+
+            let present = 0, late = 0, score = 0;
+            const absences: AbsenceItem[] = [];
+            const offDates: string[] = [];
+
+            for (let d = 1; d <= dim; d++) {
+                const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
+                if (isCurrentMonth && dk > todayWIB) break;
+                const dow = new Date(dk + "T12:00:00").getDay();
+                if (dows.has(dow) || offs.has(dk)) { offDates.push(dk); continue; }
+
+                const eff = effByName[name]?.[dk];
+                if (eff === "PRESENT") { present++; score += 1; }
+                else if (eff === "LATE") { late++; score += 0.5; }
+                else {
+                    const mr = manualByName[name]?.[dk];
+                    absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
+                }
             }
+
+            const pastWorkdays = present + late + absences.length;
+            const totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
+            const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
+
+            result.push({
+                name, present, late, score, pastWorkdays, totalWorkdays, pct,
+                remainingDays: totalWorkdays - pastWorkdays,
+                userId: userIdByName[name] ?? "",
+                absences, offDates,
+            });
         });
 
-        // Build summary dari effectiveStatus
-        Object.entries(effectiveStatus).forEach(([key, status]) => {
-            const [name] = key.split("_");
-            if (!m[name]) m[name] = { name, present: 0, late: 0, score: 0, pastWorkdays: 0, totalWorkdays: 0, pct: 0, remainingDays: 0, userId: "" };
-            if (status === "PRESENT") { m[name].present++; m[name].score += 1.0; }
-            else if (status === "LATE") { m[name].late++; m[name].score += 0.5; }
-            // ABSENT: tidak tambah apapun (score 0, tidak hadir)
-        });
-
-        // Set userId dari allUsers
-        allUsers.forEach(u => { if (m[u.name]) m[u.name].userId = u.id; });
-
-        // Hitung hari kerja per user
-        Object.values(m).forEach(u => {
-            const dows = dayOffByName[u.name] ?? new Set();
-            const offs = dateOffByName[u.name] ?? new Set();
-            u.pastWorkdays = countEffectiveWorkingDays(calYear, calMonth, dows, offs);
-            u.totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
-            // ✅ Persentase = skor / totalWorkdays × 100 (1 desimal)
-            u.pct = u.totalWorkdays > 0
-                ? Math.min(100, Math.round((u.score / u.totalWorkdays) * 1000) / 10)
-                : 0;
-            // ✅ Sisa = hari kerja yang belum lewat = totalWorkdays - pastWorkdays
-            u.remainingDays = u.totalWorkdays - u.pastWorkdays;
-        });
-
-        // Tambahkan user yang belum ada absensi sama sekali
-        allUsers.forEach(u => {
-            if (!m[u.name]) {
-                const dows = dayOffByName[u.name] ?? new Set();
-                const offs = dateOffByName[u.name] ?? new Set();
-                const pastWd = countEffectiveWorkingDays(calYear, calMonth, dows, offs);
-                const totalWd = countWorkingDays(calYear, calMonth, dows, offs);
-                m[u.name] = {
-                    name: u.name, present: 0, late: 0, score: 0,
-                    pastWorkdays: pastWd,
-                    totalWorkdays: totalWd,
-                    pct: 0,
-                    remainingDays: totalWd - pastWd,
-                    userId: u.id,
-                };
-            }
-        });
-
-        return Object.values(m).sort((a, b) => a.name.localeCompare(b.name, "id"));
+        return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
     }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
@@ -1540,7 +1606,7 @@ export default function AttendanceDashboardPage() {
                                         <tbody className="divide-y divide-gray-50">
                                             {userSummary.map((u, i) => {
                                                 // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
-                                                const absent = Math.max(0, u.pastWorkdays - u.present - u.late);
+                                                const absent = u.absences.length;
                                                 const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
                                                 const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
                                                 return (
@@ -1561,7 +1627,18 @@ export default function AttendanceDashboardPage() {
                                                         </td>
                                                         <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
                                                         <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                        <td className="px-4 py-4 text-center">{absent > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200">{absent}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            {absent > 0 ? (
+                                                                <button
+                                                                    onClick={() => setAbsenceDetail({ name: u.name, absences: u.absences, offDates: u.offDates })}
+                                                                    className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200 hover:bg-red-200 hover:scale-105 transition-all cursor-pointer"
+                                                                    title={`Lihat detail ketidakhadiran ${u.name}`}>
+                                                                    {absent}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-200 text-sm font-black">—</span>
+                                                            )}
+                                                        </td>
                                                         <td className="px-4 py-4 text-center"><span className="text-sm font-black text-gray-700">{u.score.toFixed(1)}</span></td>
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex flex-col items-center">
@@ -1579,7 +1656,7 @@ export default function AttendanceDashboardPage() {
                                                                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
                                                                     <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
                                                                 </div>
-                                                                <span className={`text-sm font-black w-12 text-right flex-shrink-0 ${pctColor}`}>{u.pct}%</span>
+                                                                <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                             </div>
                                                         </td>
                                                         {/* ✅ Tombol tambah absen manual per baris karyawan */}
@@ -1665,7 +1742,7 @@ export default function AttendanceDashboardPage() {
                                                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
                                                                 <div className="min-w-0">
                                                                     <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
-                                                                    <span className="text-[10px] text-gray-400">{u.pct}% kehadiran</span>
+                                                                    <span className="text-[10px] text-gray-400">{formatPct(u.pct)}% kehadiran</span>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1690,7 +1767,7 @@ export default function AttendanceDashboardPage() {
                                                         </td>
                                                         <td className="px-3 py-4 text-center">
                                                             <div className="flex flex-col items-center gap-1">
-                                                                <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{u.pct}%</span>
+                                                                <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{formatPct(u.pct)}%</span>
                                                                 <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                                                     <div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
                                                                 </div>
@@ -1702,7 +1779,7 @@ export default function AttendanceDashboardPage() {
                                                                     <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
                                                                     {/* Selalu tampilkan pct kehadiran */}
                                                                     <span className={`text-[9px] font-semibold ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-500" : "text-red-500"}`}>
-                                                                        Skor {u.score.toFixed(1)} / {u.totalWorkdays}h = {u.pct}%
+                                                                        Skor {u.score.toFixed(1)} / {u.totalWorkdays}h = {formatPct(u.pct)}%
                                                                     </span>
                                                                     {sal && sal.salary_type === "PERCENTAGE" && (
                                                                         <span className="text-[9px] text-gray-400">
@@ -1865,6 +1942,16 @@ export default function AttendanceDashboardPage() {
                         onSaved={() => { fetchSalaries(); setEditSalaryUser(null); }}
                     />
                 )}
+
+            {absenceDetail && (
+                <AbsenceDetailModal
+                    name={absenceDetail.name}
+                    absences={absenceDetail.absences}
+                    offDates={absenceDetail.offDates}
+                    monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
+                    onClose={() => setAbsenceDetail(null)}
+                />
+            )}
             <style jsx global>{`
         @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         @keyframes scaleIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
@@ -1874,3 +1961,4 @@ export default function AttendanceDashboardPage() {
         </DashboardLayout>
     );
 }
+

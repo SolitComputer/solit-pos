@@ -1,6 +1,5 @@
-// src/app/api/attendance/leave/route.ts
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -8,9 +7,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ── Helper: hitung saldo cuti untuk user bulan tertentu ──────────────────────
-// Logic: saldo = carry_over + quota - used
-// Carry-over = sisa bulan sebelumnya (max 12 bulan ke belakang)
 async function ensureLeaveBalance(userId: string, year: number, month: number) {
   // Cek apakah sudah ada record bulan ini
   const { data: existing } = await supabase
@@ -26,7 +22,7 @@ async function ensureLeaveBalance(userId: string, year: number, month: number) {
   // Hitung carry-over dari bulan sebelumnya
   let carryOver = 0;
   const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear  = month === 1 ? year - 1 : year;
+  const prevYear = month === 1 ? year - 1 : year;
 
   const { data: prevBalance } = await supabase
     .from("user_leave_balance")
@@ -66,15 +62,14 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year         = parseInt(searchParams.get("year")  || String(new Date().getFullYear()));
-    const month        = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
+    const year = parseInt(searchParams.get("year") || String(new Date().getFullYear()));
+    const month = parseInt(searchParams.get("month") || String(new Date().getMonth() + 1));
     const targetUserId = searchParams.get("user_id");
 
     // Tentukan user ID yang akan dicek
-    const checkUserId = user.role === "ADMIN" && targetUserId ? targetUserId : user.id;
+    const checkUserId = isFullAccess(user.role) && targetUserId ? targetUserId : user.id;
 
-    // Jika admin dan tidak ada targetUserId → ambil semua user
-    if (user.role === "ADMIN" && !targetUserId) {
+    if (isFullAccess(user.role) && !targetUserId) {
       // Ambil semua user
       const { data: allUsers } = await supabase
         .from("users")
@@ -152,8 +147,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { user_id, leave_date, reason } = body;
 
-    // Admin bisa ajukan untuk siapa saja, user biasa hanya untuk diri sendiri
-    const targetUserId = user.role === "ADMIN" ? (user_id || user.id) : user.id;
+    const targetUserId = isFullAccess(user.role) ? (user_id || user.id) : user.id;
 
     if (!leave_date) {
       return NextResponse.json(
@@ -169,7 +163,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const leaveYear  = parseInt(leave_date.slice(0, 4));
+    const leaveYear = parseInt(leave_date.slice(0, 4));
     const leaveMonth = parseInt(leave_date.slice(5, 7));
 
     // Pastikan ada record saldo
@@ -241,8 +235,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user || !isFullAccess(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -263,7 +257,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, message: "Data cuti tidak ditemukan" }, { status: 404 });
     }
 
-    const leaveYear  = parseInt(leaveReq.leave_date.slice(0, 4));
+    const leaveYear = parseInt(leaveReq.leave_date.slice(0, 4));
     const leaveMonth = parseInt(leaveReq.leave_date.slice(5, 7));
 
     // Hapus pengajuan

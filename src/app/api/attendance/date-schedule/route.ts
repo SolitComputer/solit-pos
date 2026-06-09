@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get("user_id");
-    const year  = searchParams.get("year");
+    const year = searchParams.get("year");
     const month = searchParams.get("month");
 
     let q = supabase
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       .select("id, user_id, schedule_date, start_hour, start_minute, late_hour, late_minute, end_hour, end_minute, notes")
       .order("schedule_date", { ascending: true });
 
-    if (user.role !== "ADMIN") {
+    if (user.role !== "ADMIN", "PROGRAMMER", "ASISTEN_CEO") {
       q = q.eq("user_id", user.id);
     } else if (targetUserId) {
       q = q.eq("user_id", targetUserId);
@@ -30,9 +30,9 @@ export async function GET(request: Request) {
 
     if (year && month) {
       const paddedMonth = String(month).padStart(2, "0");
-      const from    = `${year}-${paddedMonth}-01`;
+      const from = `${year}-${paddedMonth}-01`;
       const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      const to      = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+      const to = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
       q = q.gte("schedule_date", from).lte("schedule_date", to);
     }
 
@@ -47,8 +47,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user || !isFullAccess(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -73,8 +73,8 @@ export async function POST(request: Request) {
       .upsert({
         user_id, schedule_date,
         start_hour, start_minute,
-        late_hour,  late_minute,
-        end_hour,   end_minute,
+        late_hour, late_minute,
+        end_hour, end_minute,
         notes: notes || null,
         created_by: user.id,
       }, { onConflict: "user_id,schedule_date" })
@@ -95,7 +95,7 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const user_id       = searchParams.get("user_id");
+    const user_id = searchParams.get("user_id");
     const schedule_date = searchParams.get("schedule_date");
 
     if (!user_id || !schedule_date) {
