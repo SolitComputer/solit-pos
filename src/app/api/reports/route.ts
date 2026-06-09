@@ -178,4 +178,4 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(handler, ["ADMIN", "ACCOUNTING", "KEPALA_MARKETING"]);
+export const GET = withAuth(handler, ["ADMIN", "ACCOUNTING", "KEPALA_MARKETING", "PROGRAMMER", "ASISTEN_CEO"]);
