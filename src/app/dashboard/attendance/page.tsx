@@ -1390,7 +1390,7 @@ export default function AttendanceDashboardPage() {
                                             )}
                                     </div>
                                 ) : (
-                                    <div className="hidden md:block overflow-x-auto">
+                                    <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b border-gray-100 bg-gray-50/50">
@@ -1520,7 +1520,7 @@ export default function AttendanceDashboardPage() {
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                             ) : (
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -1630,7 +1630,7 @@ export default function AttendanceDashboardPage() {
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                             ) : (
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="overflow-x-auto">
                                     <table className="w-full text-sm min-w-[580px]">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -1772,7 +1772,7 @@ export default function AttendanceDashboardPage() {
                             ) : leaveData.length === 0 ? (
                                 <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">🌴</span></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
                             ) : (
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
