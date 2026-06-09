@@ -26,23 +26,23 @@ const ACTION_STYLE: Record<string, string> = {
 const ACTION_ICON: Record<string, React.ReactNode> = {
     CREATE: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
         </svg>
     ),
     EDIT: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round" />
-            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" />
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round"/>
         </svg>
     ),
     DELETE: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" strokeLinecap="round" />
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" strokeLinecap="round"/>
         </svg>
     ),
     RESTORE: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" strokeLinecap="round" />
+            <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" strokeLinecap="round"/>
         </svg>
     ),
 };
@@ -129,8 +129,8 @@ function DiffView({ before, after }: { before: any; after: any }) {
                         {before && before[k] !== undefined && (
                             <div className="flex items-center gap-2 bg-red-50 text-red-600 px-3 py-1.5 rounded-xl border border-red-100 text-xs">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" />
-                                    <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" />
+                                    <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round"/>
+                                    <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round"/>
                                 </svg>
                                 <span className="line-through break-all">{String(before[k] ?? "—")}</span>
                             </div>
@@ -138,7 +138,7 @@ function DiffView({ before, after }: { before: any; after: any }) {
                         {after && after[k] !== undefined && (
                             <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-xl border border-green-100 text-xs">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <polyline points="20 6 9 17 4 12" strokeLinecap="round" />
+                                    <polyline points="20 6 9 17 4 12" strokeLinecap="round"/>
                                 </svg>
                                 <span className="break-all">{String(after[k] ?? "—")}</span>
                             </div>
@@ -227,7 +227,7 @@ export default function ActivityLogPage() {
                         <div className="w-1 h-8 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
                         <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl flex items-center justify-center shadow-lg">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" strokeLinecap="round" />
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" strokeLinecap="round"/>
                                 <circle cx="12" cy="7" r="4" />
                             </svg>
                         </div>
@@ -236,7 +236,7 @@ export default function ActivityLogPage() {
                         </h1>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-500 ml-0 sm:ml-10">
-                        Seluruh aktivitas sistem tercatat di sini — <span className="text-gray-600 font-medium">terlihat oleh Admin, Programmer, & Asisten CEO</span>
+                        Seluruh aktivitas sistem tercatat di sini — <span className="text-gray-600 font-medium">hanya terlihat oleh Admin</span>
                     </p>
                 </div>
 
@@ -257,12 +257,12 @@ export default function ActivityLogPage() {
                                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                 )}
                             </div>
-                            <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
+                            <svg 
+                                width="16" 
+                                height="16" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
                                 strokeWidth="2"
                                 className={`transition-transform duration-200 ${showMobileFilters ? "rotate-180" : ""}`}
                             >
@@ -280,7 +280,7 @@ export default function ActivityLogPage() {
                                 </svg>
                                 <span className="text-sm font-medium text-gray-600">Filter:</span>
                             </div>
-
+                            
                             <div className="flex-1 flex flex-wrap gap-2">
                                 <select
                                     value={filterEntity}
@@ -315,8 +315,8 @@ export default function ActivityLogPage() {
                                             className="text-xs text-gray-400 hover:text-red-500 transition-colors duration-200 flex items-center gap-1 px-2 py-1"
                                         >
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round" />
-                                                <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round" />
+                                                <line x1="18" y1="6" x2="6" y2="18" strokeLinecap="round"/>
+                                                <line x1="6" y1="6" x2="18" y2="18" strokeLinecap="round"/>
                                             </svg>
                                             Reset
                                         </button>
@@ -345,10 +345,11 @@ export default function ActivityLogPage() {
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {logs.map((log, idx) => (
-                                <div
-                                    key={log.id}
-                                    className={`p-4 sm:px-5 sm:py-4 transition-all duration-200 hover:bg-gray-50 active:bg-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                                        }`}
+                                <div 
+                                    key={log.id} 
+                                    className={`p-4 sm:px-5 sm:py-4 transition-all duration-200 hover:bg-gray-50 active:bg-gray-100 ${
+                                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                                    }`}
                                 >
                                     <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                                         {/* Action badge - responsive */}
@@ -375,11 +376,11 @@ export default function ActivityLogPage() {
                                                 </span>
                                                 <span className="text-[11px] sm:text-xs text-gray-400">
                                                     {log.action === "CREATE" ? "menambahkan" :
-                                                        log.action === "EDIT" ? "mengubah" :
-                                                            log.action === "RESTORE" ? "memulihkan" : "menghapus"}
+                                                     log.action === "EDIT" ? "mengubah" :
+                                                     log.action === "RESTORE" ? "memulihkan" : "menghapus"}
                                                 </span>
                                             </div>
-
+                                            
                                             {/* Entity info - responsive */}
                                             <div className="flex flex-wrap items-center gap-2 mb-2">
                                                 <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-medium text-gray-600 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100">
@@ -389,13 +390,13 @@ export default function ActivityLogPage() {
                                                 {log.entity_label && (
                                                     <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full">
                                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                            <path d="M20 12H4M12 4v16" strokeLinecap="round" />
+                                                            <path d="M20 12H4M12 4v16" strokeLinecap="round"/>
                                                         </svg>
                                                         {log.entity_label}
                                                     </span>
                                                 )}
                                             </div>
-
+                                            
                                             {/* Timestamp - responsive */}
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <div className="flex items-center gap-1">
@@ -419,16 +420,16 @@ export default function ActivityLogPage() {
                                                     onClick={() => setExpanded(expanded === log.id ? null : log.id)}
                                                     className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] text-gray-500 hover:text-gray-700 mt-2 transition-all duration-200 group"
                                                 >
-                                                    <svg
-                                                        width="12"
-                                                        height="12"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
+                                                    <svg 
+                                                        width="12" 
+                                                        height="12" 
+                                                        viewBox="0 0 24 24" 
+                                                        fill="none" 
+                                                        stroke="currentColor" 
                                                         strokeWidth="2.5"
                                                         className={`transition-transform duration-200 ${expanded === log.id ? "rotate-180" : ""}`}
                                                     >
-                                                        <polyline points="6 9 12 15 18 9" strokeLinecap="round" />
+                                                        <polyline points="6 9 12 15 18 9" strokeLinecap="round"/>
                                                     </svg>
                                                     <span className="underline underline-offset-2 group-hover:no-underline">
                                                         {expanded === log.id ? "Sembunyikan detail" : "Lihat detail perubahan"}
@@ -463,18 +464,18 @@ export default function ActivityLogPage() {
                             className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 group whitespace-nowrap"
                         >
                             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <polyline points="15 18 9 12 15 6" strokeLinecap="round" />
+                                <polyline points="15 18 9 12 15 6" strokeLinecap="round"/>
                             </svg>
                             <span className="hidden sm:inline">Sebelumnya</span>
                             <span className="sm:hidden">Prev</span>
                         </button>
-
+                        
                         <div className="flex items-center gap-1.5 sm:gap-2">
                             {(() => {
                                 let pages = [];
                                 let start = Math.max(1, page - 2);
                                 let end = Math.min(totalPages, page + 2);
-
+                                
                                 if (start > 1) {
                                     pages.push(1);
                                     if (start > 2) pages.push('...');
@@ -484,7 +485,7 @@ export default function ActivityLogPage() {
                                     if (end < totalPages - 1) pages.push('...');
                                     pages.push(totalPages);
                                 }
-
+                                
                                 return pages.map((p, idx) => (
                                     p === '...' ? (
                                         <span key={idx} className="text-xs sm:text-sm text-gray-400 px-1">...</span>
@@ -492,10 +493,11 @@ export default function ActivityLogPage() {
                                         <button
                                             key={idx}
                                             onClick={() => setPage(p as number)}
-                                            className={`min-w-[32px] sm:min-w-[40px] h-8 sm:h-9 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${page === p
+                                            className={`min-w-[32px] sm:min-w-[40px] h-8 sm:h-9 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${
+                                                page === p
                                                     ? "bg-gradient-to-r from-gray-700 to-gray-900 text-white shadow-md"
                                                     : "text-gray-600 hover:bg-gray-100"
-                                                }`}
+                                            }`}
                                         >
                                             {p}
                                         </button>
@@ -503,7 +505,7 @@ export default function ActivityLogPage() {
                                 ));
                             })()}
                         </div>
-
+                        
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
@@ -512,7 +514,7 @@ export default function ActivityLogPage() {
                             <span className="hidden sm:inline">Selanjutnya</span>
                             <span className="sm:hidden">Next</span>
                             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <polyline points="9 18 15 12 9 6" strokeLinecap="round" />
+                                <polyline points="9 18 15 12 9 6" strokeLinecap="round"/>
                             </svg>
                         </button>
                     </div>
