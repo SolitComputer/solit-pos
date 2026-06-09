@@ -1298,13 +1298,14 @@ export default function AttendanceDashboardPage() {
                             </div>
 
                             <div className="p-4 sm:p-6">
-                                <div className="grid grid-cols-7 mb-4">
-                                    {DAY_NAMES.map(d => <div key={d} className="text-center text-[10px] font-black uppercase py-2 text-gray-400 tracking-widest">{d}</div>)}
+                                <div className="grid grid-cols-7 mb-2 sm:mb-4">
+                                    {DAY_NAMES.map(d => <div key={d} className="text-center text-[9px] sm:text-[10px] font-black uppercase py-1.5 sm:py-2 text-gray-400 tracking-wider sm:tracking-widest">{d}</div>)}
                                 </div>
                                 {loading ? (
-                                    <div className="grid grid-cols-7 gap-2">{Array(35).fill(0).map((_, i) => <div key={i} className="h-20 rounded-xl bg-gray-50 animate-pulse" />)}</div>
+                                    <div className="grid grid-cols-7 gap-1 sm:gap-2">{Array(35).fill(0).map((_, i) => <div key={i} className="h-[58px] sm:h-20 rounded-lg sm:rounded-xl bg-gray-50 animate-pulse" />)}</div>
+
                                 ) : (
-                                    <div className="grid grid-cols-7 gap-2">
+                                    <div className="grid grid-cols-7 gap-1 sm:gap-2">
                                         {calDays.map((day, idx) => {
                                             if (day === null) return <div key={`e-${idx}`} />;
                                             const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(day)}`;
@@ -1320,20 +1321,23 @@ export default function AttendanceDashboardPage() {
                                             const hasManual = mc > 0;
                                             return (
                                                 <button key={day} onClick={() => setSelectedDate(p => p === dk ? null : dk)}
-                                                    className={`relative flex flex-col items-start justify-start p-3 rounded-xl min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
-                                                    {isUserDayOff && filterUser !== "Semua" && <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
-                                                    {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-300 animate-pulse" />}
-                                                    {hasManual && <span className="absolute top-2 left-2 w-2 h-2 rounded-full bg-blue-400" />}
-                                                    <span className={`text-base font-black leading-none mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
+                                                    className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
+                                                    {isUserDayOff && filterUser !== "Semua" && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
+                                                    {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-300 animate-pulse" />}
+                                                    {hasManual && <span className="hidden sm:block absolute top-2 left-2 w-2 h-2 rounded-full bg-blue-400" />}
+                                                    <span className={`text-xs sm:text-base font-black leading-none mb-1 sm:mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
                                                     {tot > 0 && (
-                                                        <div className="flex flex-col gap-1 w-full">
-                                                            <div className="flex gap-1">
-                                                                {pc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"}`} style={{ width: `${(pc / tot) * 100}%` }} />}
-                                                                {lc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-amber-300" : "bg-amber-400"}`} style={{ width: `${(lc / tot) * 100}%` }} />}
-                                                                {sc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-gray-300" : "bg-gray-400"}`} style={{ width: `${(sc / tot) * 100}%` }} />}
-                                                                {mc > 0 && <div className={`h-1.5 rounded-full ${isSel ? "bg-blue-300" : "bg-blue-400"}`} style={{ width: `${(mc / tot) * 100}%` }} />}
+                                                        <div className="flex flex-col gap-1 w-full mt-auto">
+                                                            <div className="flex gap-0.5 sm:gap-1">
+                                                                {pc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"}`} style={{ width: `${(pc / tot) * 100}%` }} />}
+                                                                {lc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-amber-300" : "bg-amber-400"}`} style={{ width: `${(lc / tot) * 100}%` }} />}
+                                                                {sc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-gray-300" : "bg-gray-400"}`} style={{ width: `${(sc / tot) * 100}%` }} />}
+                                                                {mc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-blue-300" : "bg-blue-400"}`} style={{ width: `${(mc / tot) * 100}%` }} />}
                                                             </div>
-                                                            <span className={`text-[10px] font-bold ${isSel ? "text-white/70" : "text-gray-400"}`}>{tot} hadir{mc > 0 ? ` · ${mc}✏️` : ""}</span>
+                                                            <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
+                                                                <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc}✏️` : ""}</span>
+                                                                <span className="sm:hidden">{tot}{mc > 0 ? "✏️" : ""}</span>
+                                                            </span>
                                                         </div>
                                                     )}
                                                 </button>
@@ -1386,7 +1390,7 @@ export default function AttendanceDashboardPage() {
                                             )}
                                     </div>
                                 ) : (
-                                    <div className="overflow-x-auto">
+                                    <div className="hidden md:block overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b border-gray-100 bg-gray-50/50">
@@ -1516,7 +1520,7 @@ export default function AttendanceDashboardPage() {
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -1626,7 +1630,7 @@ export default function AttendanceDashboardPage() {
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-sm min-w-[580px]">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -1768,7 +1772,7 @@ export default function AttendanceDashboardPage() {
                             ) : leaveData.length === 0 ? (
                                 <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">🌴</span></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
                             ) : (
-                                <div className="overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-gray-100 bg-gray-50/60">
