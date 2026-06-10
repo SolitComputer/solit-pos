@@ -376,7 +376,13 @@ export async function PATCH(request: Request) {
           { status: 403 }
         );
       }
-      if (!["APPROVED", "ONGOING"].includes(overtime.status)) {
+
+      // ✅ PERBAIKI VALIDASI INI
+      // Allow: APPROVED, ONGOING, atau COMPLETED (auto-completed) tanpa bukti foto
+      if (
+        !["APPROVED", "ONGOING"].includes(overtime.status) &&
+        !(overtime.status === "COMPLETED" && !overtime.proof_photo_url)
+      ) {
         return NextResponse.json(
           { success: false, message: "Status tidak valid untuk complete" },
           { status: 400 }
@@ -387,10 +393,10 @@ export async function PATCH(request: Request) {
       const startReference = overtime.actual_start ?? overtime.scheduled_start;
       const durationMins = startReference
         ? Math.round(
-            (new Date(actualEnd).getTime() -
-              new Date(startReference).getTime()) /
-              60000
-          )
+          (new Date(actualEnd).getTime() -
+            new Date(startReference).getTime()) /
+          60000
+        )
         : 0;
       const ratePerHour = overtime.rate_per_hour ?? 0;
       const billedHours = Math.floor(durationMins / 60);
