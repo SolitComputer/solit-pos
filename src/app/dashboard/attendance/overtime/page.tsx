@@ -22,6 +22,7 @@ type OvertimeRequest = {
   created_at: string;
   reason?: string;
   requested_start?: string;
+  completed_at?: string;
   users?: { id: string; name: string; role: string };
 };
 
@@ -95,6 +96,158 @@ function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
+// ─── ProofPhotoModal ───────────────────────────────────────────────────────
+function ProofPhotoModal({
+  overtime,
+  onClose,
+}: {
+  overtime: OvertimeRequest;
+  onClose: () => void;
+}) {
+  if (!overtime.proof_photo_url) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-scaleIn">
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-5 sm:py-6 flex items-start justify-between">
+          <div className="flex-1">
+            <p className="font-bold text-white text-base sm:text-lg">👁️ Bukti Lemburan</p>
+            <p className="text-xs text-white/80 mt-2">{overtime.users?.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/20 transition-all flex-shrink-0 ml-2"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-6 space-y-5 max-h-[85vh] overflow-y-auto">
+          {/* Foto Bukti */}
+          <div>
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">
+              Foto Bukti
+            </p>
+            <img
+              src={overtime.proof_photo_url}
+              alt="Bukti Lemburan"
+              className="w-full rounded-lg border border-gray-200 shadow-sm"
+            />
+            <p className="text-[10px] text-gray-400 mt-2">
+              💡 Tanggal upload tercantum di bawah kiri foto
+            </p>
+          </div>
+
+          {/* Info Lemburan */}
+          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+            <p className="font-semibold text-sm text-purple-900 mb-3">📋 Info Lemburan</p>
+            <div className="space-y-2 text-sm text-purple-700">
+              <div>
+                <span className="font-medium">Karyawan:</span>{" "}
+                <span className="font-bold">{overtime.users?.name}</span>
+              </div>
+              <div>
+                <span className="font-medium">Tanggal:</span>{" "}
+                <span className="font-bold">
+                  {new Date(overtime.request_date).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">Waktu:</span>{" "}
+                <span className="font-bold">
+                  {formatTime(overtime.scheduled_start)} – {formatTime(overtime.scheduled_end)}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">Status:</span>{" "}
+                <span
+                  className={`font-bold px-2 py-1 rounded text-xs ${overtime.status === "COMPLETED"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700"
+                    }`}
+                >
+                  {overtime.status === "COMPLETED" ? "✅ Selesai" : overtime.status}
+                </span>
+              </div>
+              {overtime.total_pay && (
+                <div>
+                  <span className="font-medium">Bayaran:</span>{" "}
+                  <span className="font-bold">{formatRupiah(overtime.total_pay)}</span>
+                </div>
+              )}
+              {overtime.work_description && (
+                <div>
+                  <span className="font-medium block mb-1">Deskripsi Pekerjaan:</span>
+                  <p className="text-sm text-purple-600 bg-white/50 p-2 rounded">
+                    {overtime.work_description}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Waktu Upload */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">
+              ⏰ Informasi Dokumentasi
+            </p>
+            <div className="space-y-2 text-sm text-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">📅 Tanggal Diupload:</span>
+                <span className="font-bold font-mono">
+                  {(() => {
+                    const uploadDate = new Date();
+                    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+                    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                    const dayName = days[uploadDate.getDay()];
+                    const dateNum = String(uploadDate.getDate()).padStart(2, "0");
+                    const monthName = months[uploadDate.getMonth()];
+                    const year = uploadDate.getFullYear();
+                    const hours = String(uploadDate.getHours()).padStart(2, "0");
+                    const minutes = String(uploadDate.getMinutes()).padStart(2, "0");
+
+                    return `${dateNum}-${monthName}-${year} (${dayName}) • ${hours}:${minutes} WIB`;
+                  })()}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 italic">
+                ✓ Tanggal dan waktu sudah ditambahkan di watermark foto
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="flex-1 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-bold hover:shadow-lg active:scale-[0.98] transition-all"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ApproveModal ──────────────────────────────────────────────────────────────
 function ApproveModal({
   overtime,
@@ -133,7 +286,6 @@ function ApproveModal({
     setApproving(true);
     setError("");
     try {
-      // ✅ FIXED VERSION!
       const formatTime = (timeStr: string): string => {
         return timeStr.length === 5 ? `${timeStr}:00` : timeStr;
       };
@@ -758,6 +910,78 @@ function SetPayModal({
   );
 }
 
+// ─── Helper: Add watermark to image ───────────────────────────────────────
+function addWatermarkToImage(
+  imageDataUrl: string,
+  callback: (watermarkedBlob: Blob, previewUrl: string) => void
+) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Draw original image
+    ctx.drawImage(img, 0, 0);
+
+    // Format tanggal Indonesia dengan WIB
+    const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ];
+    const dayName = days[now.getUTCDay()];
+    const date = now.getUTCDate();
+    const monthName = months[now.getUTCMonth()];
+    const year = now.getUTCFullYear();
+    const hours = String(now.getUTCHours()).padStart(2, "0");
+    const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+
+    const watermarkText = `${date}-${monthName}-${year} (${dayName}) • ${hours}:${minutes} WIB`;
+
+    // Add semi-transparent background for watermark
+    const padding = 12;
+    const fontSize = Math.max(16, canvas.width / 40);
+    ctx.font = `bold ${fontSize}px Arial`;
+    const textMetrics = ctx.measureText(watermarkText);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize;
+
+    const bgX = padding;
+    const bgY = canvas.height - textHeight - padding - 10;
+    const bgWidth = textWidth + padding * 2;
+    const bgHeight = textHeight + padding;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bgX, bgY, bgWidth, bgHeight);
+
+    ctx.fillStyle = "white";
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textBaseline = "middle";
+    ctx.fillText(watermarkText, bgX + padding, bgY + textHeight / 2 + padding / 2);
+
+    // ✅ Pass blob directly + preview URL
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const previewUrl = URL.createObjectURL(blob);
+        callback(blob, previewUrl);
+      }
+    }, "image/jpeg", 0.95);
+  };
+  img.onerror = () => {
+    console.error("Failed to load image for watermarking");
+  };
+  img.src = imageDataUrl;
+}
+
 // ─── CompleteModal ────────────────────────────────────────────────────────────────
 function CompleteModal({
   overtime,
@@ -774,6 +998,7 @@ function CompleteModal({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -784,13 +1009,28 @@ function CompleteModal({
       return;
     }
 
-    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
-      setPhotoPreview(event.target?.result as string);
+      const imageDataUrl = event.target?.result as string;
+      setIsProcessing(true);
+
+      // ✅ FIX: Pass blob directly + preview URL
+      addWatermarkToImage(imageDataUrl, (watermarkedBlob, previewUrl) => {
+        setPhotoPreview(previewUrl);
+        setIsProcessing(false);
+
+        // ✅ Create File directly from blob
+        const watermarkedFile = new File(
+          [watermarkedBlob],
+          file.name,
+          { type: "image/jpeg" }
+        );
+        setPhotoFile(watermarkedFile);
+      });
+
+      setError("");
     };
     reader.readAsDataURL(file);
-    setError("");
   };
 
   const upload = async () => {
@@ -810,7 +1050,10 @@ function CompleteModal({
         body: formData,
       });
 
-      if (!uploadRes.ok) throw new Error("Upload gagal");
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json();
+        throw new Error(errorData.message || "Upload gagal");
+      }
 
       const uploadData = await uploadRes.json();
       const photoUrl = uploadData.url;
@@ -834,6 +1077,7 @@ function CompleteModal({
       onSaved();
       onClose();
     } catch (err: any) {
+      console.error("Upload error:", err);
       setError(err.message || "Gagal upload");
     } finally {
       setUploading(false);
@@ -884,16 +1128,30 @@ function CompleteModal({
             </div>
           )}
 
+          {isProcessing && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                <p className="text-sm font-semibold text-blue-700">
+                  Menambahkan tanggal pada foto...
+                </p>
+              </div>
+            </div>
+          )}
+
           {photoPreview ? (
             <div>
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider block mb-3">
-                Foto Bukti
+                Foto Bukti (Dengan Tanggal)
               </p>
               <img
                 src={photoPreview}
                 alt="Preview"
                 className="w-full h-56 object-cover rounded-lg border border-gray-200"
               />
+              <p className="text-[10px] text-gray-400 mt-2">
+                ✓ Tanggal sudah ditambahkan di bawah kiri foto
+              </p>
               <button
                 onClick={() => {
                   setPhotoFile(null);
@@ -916,11 +1174,15 @@ function CompleteModal({
                   onChange={handleFileSelect}
                   className="hidden"
                   id="photoInput"
+                  disabled={isProcessing}
                 />
                 <label htmlFor="photoInput" className="block cursor-pointer">
                   <div className="text-4xl mb-3">📸</div>
                   <p className="text-sm font-bold text-gray-700">Klik untuk upload foto</p>
                   <p className="text-xs text-gray-500 mt-2">atau drag file ke sini</p>
+                  <p className="text-[10px] text-blue-600 mt-2 font-medium">
+                    Tanggal otomatis ditambahkan saat upload
+                  </p>
                 </label>
               </div>
             </div>
@@ -936,7 +1198,7 @@ function CompleteModal({
           </button>
           <button
             onClick={upload}
-            disabled={uploading || !photoFile}
+            disabled={uploading || !photoFile || isProcessing}
             className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
             {uploading ? (
@@ -978,6 +1240,7 @@ export default function OvertimePage() {
   const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
   const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
   const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
+  const [proofPhotoData, setProofPhotoData] = useState<OvertimeRequest | null>(null);
 
   // Fetchers
   const fetchOvertimes = useCallback(async () => {
@@ -1493,27 +1756,51 @@ export default function OvertimePage() {
                             )}
                           </td>
                           <td className="px-3 sm:px-4 py-3 sm:py-4 text-center">
-                            <div className="flex justify-center">
-                              {/* TOMBOL ADMIN */}
+                            <div className="flex justify-center gap-2 flex-wrap">
                               {isAdminRole(currentUser?.role) && (
                                 <>
                                   {o.status === "PENDING" && (
-                                    <button onClick={() => setApproveData(o)} className="...">✅ Setujui</button>
+                                    <button
+                                      onClick={() => setApproveData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
+                                      ✅ Setujui
+                                    </button>
                                   )}
                                   {o.status === "ONGOING" && !o.actual_end && !o.rate_per_hour && (
-                                    <button onClick={() => setSetPayData(o)} className="...">💰 Bayar</button>
+                                    <button
+                                      onClick={() => setSetPayData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
+                                      💰 Bayar
+                                    </button>
+                                  )}
+                                  {o.status === "COMPLETED" && o.proof_photo_url && (
+                                    <button
+                                      onClick={() => setProofPhotoData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-purple-100 text-purple-600 border border-purple-200 hover:bg-purple-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
+                                      👁️ Lihat Bukti
+                                    </button>
                                   )}
                                 </>
                               )}
 
-                              {/* TOMBOL KARYAWAN OWNER */}
                               {!isAdminRole(currentUser?.role) && currentUser?.id === o.user_id && (
                                 <>
                                   {o.status === "APPROVED" && !o.actual_start && (
-                                    <button onClick={() => setStartData(o)} className="...">🟢 Mulai</button>
+                                    <button
+                                      onClick={() => setStartData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-orange-100 text-orange-600 border border-orange-200 hover:bg-orange-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
+                                      🟢 Mulai
+                                    </button>
                                   )}
                                   {o.status === "ONGOING" && !o.actual_end && o.rate_per_hour && (
-                                    <button onClick={() => setCompleteData(o)} className="...">
+                                    <button
+                                      onClick={() => setCompleteData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-blue-100 text-blue-600 border border-blue-200 hover:bg-blue-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
                                       🏁 Selesai
                                     </button>
                                   )}
@@ -1528,7 +1815,6 @@ export default function OvertimePage() {
                                 </>
                               )}
 
-                              {/* TIDAK ADA AKSI */}
                               {!isAdminRole(currentUser?.role) && currentUser?.id !== o.user_id && (
                                 <span className="text-xs text-gray-300">—</span>
                               )}
@@ -1698,8 +1984,7 @@ export default function OvertimePage() {
                             )}
                           </td>
                           <td className="px-3 sm:px-4 py-3 sm:py-4 text-center">
-                            <div className="flex justify-center">
-                              {/* TOMBOL ADMIN */}
+                            <div className="flex justify-center gap-2 flex-wrap">
                               {isAdminRole(currentUser?.role) && (
                                 <>
                                   {o.status === "PENDING" && (
@@ -1718,10 +2003,17 @@ export default function OvertimePage() {
                                       💰 Bayar
                                     </button>
                                   )}
+                                  {o.status === "COMPLETED" && o.proof_photo_url && (
+                                    <button
+                                      onClick={() => setProofPhotoData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-purple-100 text-purple-600 border border-purple-200 hover:bg-purple-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
+                                      👁️ Lihat Bukti
+                                    </button>
+                                  )}
                                 </>
                               )}
 
-                              {/* TOMBOL KARYAWAN OWNER */}
                               {!isAdminRole(currentUser?.role) && currentUser?.id === o.user_id && (
                                 <>
                                   {o.status === "APPROVED" && !o.actual_start && (
@@ -1733,7 +2025,10 @@ export default function OvertimePage() {
                                     </button>
                                   )}
                                   {o.status === "ONGOING" && !o.actual_end && o.rate_per_hour && (
-                                    <button onClick={() => setCompleteData(o)} className="...">
+                                    <button
+                                      onClick={() => setCompleteData(o)}
+                                      className="text-xs sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-blue-100 text-blue-600 border border-blue-200 hover:bg-blue-200 active:scale-95 transition-all whitespace-nowrap"
+                                    >
                                       🏁 Selesai
                                     </button>
                                   )}
@@ -1748,7 +2043,6 @@ export default function OvertimePage() {
                                 </>
                               )}
 
-                              {/* TIDAK ADA AKSI */}
                               {!isAdminRole(currentUser?.role) && currentUser?.id !== o.user_id && (
                                 <span className="text-xs text-gray-300">—</span>
                               )}
@@ -1815,6 +2109,12 @@ export default function OvertimePage() {
             setCompleteData(null);
           }}
           isAutoCompleted={completeData.auto_completed}
+        />
+      )}
+      {proofPhotoData && (
+        <ProofPhotoModal
+          overtime={proofPhotoData}
+          onClose={() => setProofPhotoData(null)}
         />
       )}
 
