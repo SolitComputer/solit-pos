@@ -4,6 +4,13 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import bcrypt from "bcryptjs";
 
+// ── Full access roles (ADMIN, PROGRAMMER, ASISTEN_CEO) ──────────────────
+const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+
+function isFullAccess(role: string): boolean {
+  return FULL_ACCESS_ROLES.has(role);
+}
+
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("62")) return digits;
@@ -14,8 +21,8 @@ function normalizePhone(raw: string): string {
 
 // ── GET — list semua user ──────────────────────────────────────────────────
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  if (user.role !== "ADMIN") {
-    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!isFullAccess(user.role)) {
+    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
   const { data, error } = await supabaseAdmin
@@ -39,10 +46,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, users });
 }
 
-// ── POST — admin buat user baru ────────────────────────────────────────────
+// ── POST — admin/programmer/asisten_ceo buat user baru ────────────────────
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  if (user.role !== "ADMIN") {
-    return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+  if (!isFullAccess(user.role)) {
+    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
   const body = await req.json();
@@ -93,10 +100,10 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, user: newUser });
 }
 
-// ── PUT — admin update user ────────────────────────────────────────────────
+// ── PUT — admin/programmer/asisten_ceo update user ────────────────────────
 async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
-  if (currentUser.role !== "ADMIN") {
-    return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+  if (!isFullAccess(currentUser.role)) {
+    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
   let body: any;
@@ -155,10 +162,10 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   return NextResponse.json({ success: true, user: data });
 }
 
-// ── DELETE — admin hapus user ──────────────────────────────────────────────
+// ── DELETE — admin/programmer/asisten_ceo hapus user ──────────────────────
 async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
-  if (currentUser.role !== "ADMIN") {
-    return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+  if (!isFullAccess(currentUser.role)) {
+    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
