@@ -18,13 +18,13 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year  = searchParams.get("year")  ?? new Date().getFullYear().toString();
+    const year = searchParams.get("year") ?? new Date().getFullYear().toString();
     const month = searchParams.get("month") ?? String(new Date().getMonth() + 1);
 
     const paddedMonth = String(month).padStart(2, "0");
-    const startDate   = `${year}-${paddedMonth}-01`;
-    const lastDay     = new Date(Number(year), Number(month), 0).getDate();
-    const endDate     = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+    const startDate = `${year}-${paddedMonth}-01`;
+    const lastDay = new Date(Number(year), Number(month), 0).getDate();
+    const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
     // Ambil attendance_manual tanpa JOIN FK
     let q = supabase
@@ -115,6 +115,29 @@ export async function POST(request: Request) {
       .select()
       .single();
 
+    if (status === "PRESENT" || status === "LATE") {
+      try {
+        const dateStart = `${attendance_date}T00:00:00+07:00`;
+        const dateEnd = `${attendance_date}T23:59:59+07:00`;
+
+        const { data: deleted, error: deleteError } = await supabase
+          .from("face_verifications")
+          .delete()
+          .eq("user_id", user_id)
+          .gte("created_at", dateStart)
+          .lte("created_at", dateEnd)
+          .select();
+
+        if (deleteError) {
+          console.error("[attendance/manual POST] Failed to delete:", deleteError);
+        } else {
+          console.log(`[attendance/manual POST] Deleted ${deleted?.length ?? 0} face records`);
+        }
+      } catch (deleteErr: any) {
+        console.error("[attendance/manual POST] Exception:", deleteErr);
+      }
+    }
+
     if (error) {
       console.error("[attendance/manual POST] upsert error:", error);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -139,7 +162,7 @@ export async function POST(request: Request) {
 // Helper: sync LEAVE ke user_leave_requests + update balance
 async function handleLeaveSync(userId: string, leaveDate: string, notes: string | null) {
   const [yearStr, monthStr] = leaveDate.split("-");
-  const leaveYear  = parseInt(yearStr);
+  const leaveYear = parseInt(yearStr);
   const leaveMonth = parseInt(monthStr);
 
   const { data: existing } = await supabase
@@ -162,10 +185,10 @@ async function handleLeaveSync(userId: string, leaveDate: string, notes: string 
   const { error: leaveError } = await supabase
     .from("user_leave_requests")
     .insert({
-      user_id:    userId,
+      user_id: userId,
       leave_date: leaveDate,
-      reason:     notes ?? "Cuti (input manual oleh admin)",
-      status:     "APPROVED",
+      reason: notes ?? "Cuti (input manual oleh admin)",
+      status: "APPROVED",
     });
 
   if (leaveError) throw new Error(leaveError.message);
@@ -190,7 +213,7 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const user_id         = searchParams.get("user_id");
+    const user_id = searchParams.get("user_id");
     const attendance_date = searchParams.get("attendance_date");
 
     if (!user_id || !attendance_date) {

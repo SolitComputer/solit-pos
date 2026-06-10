@@ -51,6 +51,7 @@ export async function GET(request: Request) {
 
     const formattedData = deduplicated.map((item: any) => ({
       id: item.id,
+      user_id: item.user_id,
       user_name: item.users?.name || "Unknown",
       user_role: item.users?.role || "STAFF",
       user_shift: item.users?.shift ?? "PAGI",

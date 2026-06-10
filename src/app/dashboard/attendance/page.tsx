@@ -222,36 +222,70 @@ function ModalShell({ onClose, headerColor, title, subtitle, children, footer, w
     );
 }
 
-// ─── Modal: Absen Manual (IMPROVED) ───────────────────────────────────────────
 function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, onClose, onSaved }: {
     users: UserInfo[];
     prefillDate: string | null;
     prefillUserId?: string;
-    editData?: ManualAttendance | null; // jika diisi → mode edit
+    editData?: ManualAttendance | null;
     onClose: () => void;
     onSaved: () => void;
 }) {
     const isEdit = !!editData;
 
-    const defaultTime = () => {
-        if (isEdit && editData) return toWIBTime(editData.check_in_time).replace(".", ":"); // "08:30"
+    // ✅ FIX: Parse check_in_time lebih robust
+    const parseTimeFromISO = (iso: string | undefined): string => {
+        if (!iso) return "08:00";
+
+        // ISO format: "2026-06-10T09:56:00+07:00" atau "2026-06-10T09:56:00"
+        if (iso.includes("T")) {
+            const timePart = iso.split("T")[1]; // "09:56:00+07:00"
+            return timePart.substring(0, 5); // "09:56"
+        }
+
+        // Jika sudah format time: "09:56"
+        if (iso.includes(":")) {
+            return iso.substring(0, 5);
+        }
+
         return "08:00";
     };
 
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState("");
+
+    // ✅ FIX: Initialize form dengan proper values
     const [form, setForm] = useState({
         user_id: editData?.user_id ?? prefillUserId ?? users[0]?.id ?? "",
         attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
-        check_in_time: defaultTime(),
+        check_in_time: parseTimeFromISO(editData?.check_in_time),
         status: (editData?.status ?? "PRESENT") as "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE",
         notes: editData?.notes ?? "",
     });
 
+    // ✅ FIX: Update form ketika editData berubah (dependency)
+    useEffect(() => {
+        setForm({
+            user_id: editData?.user_id ?? prefillUserId ?? users[0]?.id ?? "",
+            attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
+            check_in_time: parseTimeFromISO(editData?.check_in_time),
+            status: (editData?.status ?? "PRESENT") as "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE",
+            notes: editData?.notes ?? "",
+        });
+    }, [editData, prefillDate, prefillUserId, users]);
+
     const save = async () => {
+        console.log("[ManualAttendanceModal.save]", {
+            user_id: form.user_id,
+            attendance_date: form.attendance_date,
+            check_in_time: form.check_in_time,
+            status: form.status,
+            notes: form.notes,
+        });
+
         if (!form.user_id || !form.attendance_date || !form.check_in_time) {
-            setError("Karyawan, tanggal, dan jam masuk wajib diisi"); return;
+            setError("Karyawan, tanggal, dan jam masuk wajib diisi");
+            return;
         }
         setSaving(true); setError("");
         try {
@@ -682,12 +716,19 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: {
     );
 }
 
-// ─── Today Attendance Card ─────────────────────────────────────────────────────
 function TodayAttendanceCard({ status, loading, onRefresh }: {
     status: {
-        alreadyAttended: boolean; needEnroll: boolean; isAttendanceTime: boolean;
-        isDayOff: boolean; isExempt?: boolean; shift: string;
-        reason?: string; openAt?: string; closeAt?: string;
+        alreadyAttended: boolean;
+        needEnroll: boolean;
+        isAttendanceTime: boolean;
+        isDayOff: boolean;
+        isExempt?: boolean;
+        shift: string;
+        reason?: string;
+        openAt?: string;
+        closeAt?: string;
+        manualAlreadyExists?: boolean;
+        manualStatus?: string;
     } | null;
     loading: boolean; onRefresh: () => void;
 }) {
@@ -703,16 +744,15 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     const closeAt = status.closeAt ?? "—";
     const needEnroll = status.needEnroll;
 
-    // ✅ FIX: turunkan SATU state eksplisit (reason-first). Tidak ada lagi return null.
-    // Prioritas: exempt → sudah absen → libur → belum waktunya → waktu habis → belum absen
-    type CardState = "EXEMPT" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
+    type CardState = "EXEMPT" | "MANUAL" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
     let state: CardState;
     if (status.isExempt) state = "EXEMPT";
+    else if (status.manualAlreadyExists) state = "MANUAL";
     else if (status.alreadyAttended) state = "ATTENDED";
     else if (status.isDayOff) state = "DAY_OFF";
     else if (status.reason === "TOO_EARLY") state = "TOO_EARLY";
     else if (status.reason === "TOO_LATE") state = "TOO_LATE";
-    else state = "OPEN"; // OPEN / reason kosong / isAttendanceTime true → tetap tampil "Belum Absen"
+    else state = "OPEN";
 
     let cfg: {
         icon: string; gradient: string; iconBg: string; badge: string; dot: string;
@@ -727,6 +767,28 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 badge: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400",
                 badgeText: "Bebas Absen", title: "Tidak Wajib Absen",
                 sub: `Role kamu dikecualikan dari absensi · Shift ${status.shift}`, showBtn: false,
+            };
+            break;
+        case "MANUAL":
+            const manualStatusMap: Record<string, { label: string; color: string }> = {
+                "PRESENT": { label: "Hadir", color: "text-emerald-700" },
+                "LATE": { label: "Terlambat", color: "text-amber-700" },
+                "SICK": { label: "Sakit", color: "text-blue-700" },
+                "PERMIT": { label: "Izin", color: "text-violet-700" },
+                "ABSENT": { label: "Tidak Hadir", color: "text-red-700" },
+                "LEAVE": { label: "Cuti", color: "text-cyan-700" },
+            };
+            const manualInfo = manualStatusMap[status.manualStatus || "PRESENT"] || { label: "Tercatat", color: "text-gray-700" };
+            cfg = {
+                icon: "✏️",
+                gradient: "from-blue-50 to-indigo-50",
+                iconBg: "bg-blue-100",
+                badge: "bg-blue-100 text-blue-700 border-blue-200",
+                dot: "bg-blue-400",
+                badgeText: "Absen Manual",
+                title: "Sudah Di-absenkan Manual",
+                sub: `Status: ${manualInfo.label} · Diinput oleh admin`,
+                showBtn: false,
             };
             break;
         case "ATTENDED":
@@ -1010,7 +1072,173 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
     );
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
+type SalarySlip = {
+    id: string;
+    user_id: string;
+    year: number;
+    month: number;
+    salary_type: "FIXED" | "PERCENTAGE";
+    base_salary: number;
+    allowance_wife: number;
+    allowance_child: number;
+    allowance_transport: number;
+    bonus: number;
+    overtime: number;
+    total_income: number;
+    deduction_violation: number;
+    deduction_loan: number;
+    deduction_pension: number;
+    total_deduction: number;
+    net_salary: number;
+    status: "DRAFT" | "FINALIZED";
+    finalized_at: string | null;
+    notes: string | null;
+    users?: { id: string; name: string; role: string };
+};
+
+function SalarySlipCard({ slip, onFinalize }: { slip: SalarySlip; onFinalize: () => void }) {
+    const [finalizing, setFinalizing] = useState(false);
+
+    const handleFinalize = async () => {
+        if (!confirm("Finalisasi slip gaji ini? Tidak bisa diubah lagi setelah finalisasi.")) return;
+        setFinalizing(true);
+        try {
+            const r = await fetch("/api/attendance/salary-slip", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: slip.user_id,
+                    year: slip.year,
+                    month: slip.month,
+                }),
+            });
+            const d = await r.json();
+            if (d.success) onFinalize();
+        } finally {
+            setFinalizing(false);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition">
+            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <p className="font-bold text-gray-800">{slip.users?.name || "Unknown"}</p>
+                    <p className="text-xs text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${slip.status === "FINALIZED"
+                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                            : "bg-amber-100 text-amber-700 border-amber-200"
+                            }`}
+                    >
+                        {slip.status === "FINALIZED" ? "✅ Finalisasi" : "⏳ Draft"}
+                    </span>
+                    {slip.status === "DRAFT" && (
+                        <button
+                            onClick={handleFinalize}
+                            disabled={finalizing}
+                            className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
+                        >
+                            {finalizing ? "..." : "Finalisasi"}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="p-6">
+                <div className="grid grid-cols-2 gap-8 mb-6">
+                    {/* Penghasilan */}
+                    <div>
+                        <p className="text-sm font-bold text-gray-800 mb-3">PENGHASILAN</p>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between text-gray-600">
+                                <span>Gaji Pokok</span>
+                                <span className="font-mono">{formatRupiah(slip.base_salary)}</span>
+                            </div>
+                            {slip.allowance_wife > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Tunjangan Istri</span>
+                                    <span className="font-mono">{formatRupiah(slip.allowance_wife)}</span>
+                                </div>
+                            )}
+                            {slip.allowance_child > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Tunjangan Anak</span>
+                                    <span className="font-mono">{formatRupiah(slip.allowance_child)}</span>
+                                </div>
+                            )}
+                            {slip.allowance_transport > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Tunjangan Transport</span>
+                                    <span className="font-mono">{formatRupiah(slip.allowance_transport)}</span>
+                                </div>
+                            )}
+                            {slip.bonus > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Bonus</span>
+                                    <span className="font-mono">{formatRupiah(slip.bonus)}</span>
+                                </div>
+                            )}
+                            {slip.overtime > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Lemburan</span>
+                                    <span className="font-mono">{formatRupiah(slip.overtime)}</span>
+                                </div>
+                            )}
+                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
+                                <span>Total Penghasilan</span>
+                                <span className="font-mono">{formatRupiah(slip.total_income)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Potongan */}
+                    <div>
+                        <p className="text-sm font-bold text-gray-800 mb-3">POTONGAN</p>
+                        <div className="space-y-2 text-sm">
+                            {slip.deduction_violation > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Pelanggaran</span>
+                                    <span className="font-mono">{formatRupiah(slip.deduction_violation)}</span>
+                                </div>
+                            )}
+                            {slip.deduction_loan > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Cicilan Pinjaman</span>
+                                    <span className="font-mono">{formatRupiah(slip.deduction_loan)}</span>
+                                </div>
+                            )}
+                            {slip.deduction_pension > 0 && (
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Dana Pensiun</span>
+                                    <span className="font-mono">{formatRupiah(slip.deduction_pension)}</span>
+                                </div>
+                            )}
+                            {slip.total_deduction === 0 && (
+                                <p className="text-gray-400 italic">—</p>
+                            )}
+                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
+                                <span>Total Potongan</span>
+                                <span className="font-mono">{formatRupiah(slip.total_deduction)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Gaji Bersih */}
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-emerald-700">GAJI BERSIH</p>
+                        <p className="text-2xl font-black text-emerald-700">{formatRupiah(slip.net_salary)}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
     const [attendances, setAttendances] = useState<Attendance[]>([]);
@@ -1026,7 +1254,7 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "leave">("calendar");
+    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "salary-slip" | "leave" | "my-salary">("calendar");
 
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);
@@ -1056,6 +1284,22 @@ export default function AttendanceDashboardPage() {
     const fetchSalaries = useCallback(async () => { const r = await fetch("/api/attendance/salary"); const d = await r.json(); if (d.success) setSalaries(d.data?.map((s: any) => s) || []); }, []);
     const fetchLeaveData = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setLeaveData(d.data || []); }, []);
 
+    const [salarySlips, setSalarySlips] = useState<any[]>([]);
+    const [selectedSlipMonth, setSelectedSlipMonth] = useState<{ year: number; month: number }>({
+        year: new Date().getFullYear(),
+        month: new Date().getMonth(),
+    });
+
+    const fetchSalarySlips = useCallback(async (y: number, m: number) => {
+        try {
+            const r = await fetch(`/api/attendance/salary-slip?year=${y}&month=${m + 1}`);
+            const d = await r.json();
+            if (d.success) setSalarySlips(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch salary slips:", err);
+        }
+    }, []);
+
     const fetchTodayStatus = useCallback(async () => {
         setStatusLoading(true);
         try {
@@ -1084,6 +1328,9 @@ export default function AttendanceDashboardPage() {
         const tasks: Promise<any>[] = [fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month)];
         if (isAdminRole(currentUser?.role)) tasks.push(fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month));
         Promise.all(tasks).finally(() => setLoading(false));
+        if (isAdminRole(currentUser?.role)) {
+            fetchSalarySlips(year, month);
+        }
     }, [selectedMonth]); // eslint-disable-line
 
     // ── Helpers open modal ───────────────────────────────────────────────────
@@ -1164,14 +1411,12 @@ export default function AttendanceDashboardPage() {
         const isCurrentMonth = thisMonthKey === todayWIB.slice(0, 7);
         const dim = new Date(calYear, calMonth + 1, 0).getDate();
 
-        // 1) Status efektif per nama per tanggal (manual override auto)
         const effByName: Record<string, Record<string, "PRESENT" | "LATE" | "ABSENT">> = {};
         const setEff = (name: string, date: string, status: "PRESENT" | "LATE" | "ABSENT") => {
             if (!effByName[name]) effByName[name] = {};
             effByName[name][date] = status;
         };
 
-        // Pass 1: auto (face verification)
         thisMonthAtt.forEach(a => {
             if (a.source !== "AUTO") return;
             const dk = toWIBDateKey(a.check_in_time || a.created_at);
@@ -1219,7 +1464,13 @@ export default function AttendanceDashboardPage() {
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
                     const mr = manualByName[name]?.[dk];
-                    absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
+                    const hasLeaveToday = leaveData.find(ld => ld.user.id === userIdByName[name])?.requests.some(r => r.leave_date === dk);
+
+                    if (!hasLeaveToday) {
+                        absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
+                    } else {
+                        offDates.push(dk);
+                    }
                 }
             }
 
@@ -1322,13 +1573,18 @@ export default function AttendanceDashboardPage() {
                     ))}
                 </div>
 
-                {/* ── Tabs (admin only) ── */}
                 {isAdminRole(currentUser?.role)
                     && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
-                            {([{ id: "calendar", label: "📅 Kalender" }, { id: "summary", label: "📊 Ringkasan" }, { id: "salary", label: "💰 Rekap Gaji" }, { id: "leave", label: "🌴 Cuti" }] as const).map(t => (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
+                            {([
+                                { id: "calendar", label: "📅 Kalender" },
+                                { id: "summary", label: "📊 Ringkasan" },
+                                { id: "salary", label: "💰 Rekap Gaji" },
+                                { id: "salary-slip", label: "📄 Slip Gaji" },
+                                { id: "leave", label: "🌴 Cuti" }
+                            ] as const).map(t => (
                                 <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+                                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
                                     {t.label}
                                 </button>
                             ))}
@@ -1447,14 +1703,47 @@ export default function AttendanceDashboardPage() {
                                 {selectedAttendances.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16">
                                         <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><span className="text-3xl opacity-40">📅</span></div>
+                                        {/* ── Tabs ── */}
                                         {(() => {
-                                            const off = getOffUsersForDate(selectedDate); return off.length > 0 ? (
-                                                <div className="text-center"><div className="inline-flex items-center gap-1.5 bg-red-100 border border-red-200 text-red-600 text-xs font-bold px-4 py-2 rounded-full mb-3">🔴 Hari Libur</div>{off.map(n => <p key={n} className="text-xs text-red-400 mt-1">• {n}</p>)}</div>
-                                            ) : <p className="text-sm text-gray-400 font-medium">Tidak ada absensi hari ini</p>;
+                                            const isAdmin = isAdminRole(currentUser?.role);
+                                            const tabs: Array<{ id: "calendar" | "summary" | "salary" | "leave" | "my-salary"; label: string }> = [
+                                                { id: "calendar", label: "📅 Kalender" },
+                                                { id: "summary", label: "📊 Ringkasan" },
+                                            ];
+                                            if (isAdmin) {
+                                                tabs.push({ id: "salary", label: "💰 Rekap Gaji" });
+                                                tabs.push({ id: "leave", label: "🌴 Cuti" });
+                                            } else {
+                                                tabs.push({ id: "my-salary", label: "💰 Gaji Saya" });
+                                            }
+
+                                            return (
+                                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
+                                                    {tabs.map(t => (
+                                                        <button key={t.id} onClick={() => setActiveTab(t.id as any)}
+                                                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+                                                            {t.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            );
                                         })()}
                                         {isAdminRole(currentUser?.role)
                                             && (
-                                                <button onClick={() => openAddManual(selectedDate)} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Absen Manual</button>
+                                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
+                                                    {([
+                                                        { id: "calendar", label: "📅 Kalender" },
+                                                        { id: "summary", label: "📊 Ringkasan" },
+                                                        { id: "salary", label: "💰 Rekap Gaji" },
+                                                        { id: "salary-slip", label: "📄 Slip Gaji" },
+                                                        { id: "leave", label: "🌴 Cuti" }
+                                                    ] as const).map(t => (
+                                                        <button key={t.id} onClick={() => setActiveTab(t.id)}
+                                                            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+                                                            {t.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             )}
                                     </div>
                                 ) : (
@@ -1479,7 +1768,11 @@ export default function AttendanceDashboardPage() {
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
                                                     return (
-                                                        <tr key={a.id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/20" : ""}`}>
+                                                        <tr key={a.id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" && (
+                                                            <span className="inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border bg-blue-100 text-blue-700 border-blue-200">
+                                                                ✏️ Manual
+                                                            </span>
+                                                        )}`}>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 shadow-md ${a.displayStatus === "PRESENT" ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gradient-to-br from-amber-500 to-orange-500"}`}>{initials(a.user_name)}</div>
@@ -1535,18 +1828,21 @@ export default function AttendanceDashboardPage() {
                                                                     <td className="px-4 py-4 text-center">
                                                                         <button
                                                                             onClick={() => {
-                                                                                // Cari manual record yang ada, atau buat baru dari data ini
                                                                                 if (manualRec) {
                                                                                     openEditManual(manualRec);
                                                                                 } else {
-                                                                                    // Edit auto record → buka modal dengan data pre-filled
+                                                                                    const foundUser = allUsers.find(u => u.name === a.user_name);
+                                                                                    const resolvedUserId = foundUser?.id || a.user_id || "";
+
                                                                                     const prefillRecord: ManualAttendance = {
-                                                                                        id: "", user_id: userId,
+                                                                                        id: "",
+                                                                                        user_id: resolvedUserId,
                                                                                         attendance_date: dateKey,
                                                                                         check_in_time: a.check_in_time || a.created_at,
                                                                                         status: (a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "PRESENT") as any,
-                                                                                        notes: null, created_by: null,
-                                                                                        users: { id: userId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
+                                                                                        notes: null,
+                                                                                        created_by: null,
+                                                                                        users: { id: resolvedUserId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
                                                                                     };
                                                                                     openEditManual(prefillRecord);
                                                                                 }
@@ -1777,15 +2073,17 @@ export default function AttendanceDashboardPage() {
                                                             {earned !== null ? (
                                                                 <div className="flex flex-col items-end gap-0.5">
                                                                     <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
-                                                                    {/* Selalu tampilkan pct kehadiran */}
+                                                                    {/* Kehadiran % */}
                                                                     <span className={`text-[9px] font-semibold ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-500" : "text-red-500"}`}>
-                                                                        Skor {u.score.toFixed(1)} / {u.totalWorkdays}h = {formatPct(u.pct)}%
+                                                                        {formatPct(u.pct)}% kehadiran
                                                                     </span>
-                                                                    {sal && sal.salary_type === "PERCENTAGE" && (
-                                                                        <span className="text-[9px] text-gray-400">
-                                                                            {formatRupiah(sal.base_salary)} ÷ {u.totalWorkdays} × {u.score.toFixed(1)}
+
+                                                                    {sal && sal.salary_type === "FIXED" && (
+                                                                        <span className="text-[9px] text-gray-400 mt-0.5">
+                                                                            Jika %: {formatRupiah(Math.round((sal.base_salary / u.totalWorkdays) * u.score))}
                                                                         </span>
                                                                     )}
+
                                                                 </div>
                                                             ) : (
                                                                 <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>
@@ -1896,6 +2194,207 @@ export default function AttendanceDashboardPage() {
                         </div>
                     )}
             </div>
+
+            {/* ════ TAB GAJI SAYA (non-admin) ════ */}
+            {activeTab === "my-salary" && !isAdminRole(currentUser?.role) && (
+                <div className="max-w-2xl mx-auto space-y-6">
+                    {/* Header */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-2xl shadow-lg">
+                                💰
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-400 font-semibold uppercase tracking-wide">Gaji Bulan Ini</p>
+                                <p className="text-3xl font-black text-gray-800 tracking-tight mt-1">
+                                    {loading ? (
+                                        <span className="inline-block w-48 h-8 bg-gray-200 rounded-lg animate-pulse" />
+                                    ) : salaries.length > 0 && salaries[0] ? (
+                                        (() => {
+                                            const sal = salaries[0];
+                                            const stat = userSummary.find(u => u.userId === currentUser?.id);
+                                            if (!stat) return "—";
+                                            const earned = sal.salary_type === "FIXED"
+                                                ? sal.base_salary
+                                                : stat.totalWorkdays > 0
+                                                    ? Math.round((sal.base_salary / stat.totalWorkdays) * stat.score)
+                                                    : 0;
+                                            return formatRupiah(earned);
+                                        })()
+                                    ) : (
+                                        "Belum diatur"
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Breakdown Cards */}
+                        {salaries.length > 0 && salaries[0] && (() => {
+                            const sal = salaries[0];
+                            const stat = userSummary.find(u => u.userId === currentUser?.id);
+                            if (!stat) return null;
+
+                            return (
+                                <div className="space-y-4">
+                                    {/* Gaji Pokok */}
+                                    <div className="bg-gradient-to-br from-slate-50 to-gray-50 border border-gray-200 rounded-2xl p-4">
+                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Gaji Pokok</p>
+                                        <p className="text-2xl font-black text-gray-800">{formatRupiah(sal.base_salary)}</p>
+                                        <p className="text-[11px] text-gray-400 mt-1">
+                                            Tipe: <span className={`font-bold ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
+                                                {sal.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 Persentase Absen"}
+                                            </span>
+                                        </p>
+                                    </div>
+
+                                    {/* Kehadiran */}
+                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4">
+                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📊 Kehadiran Bulan Ini</p>
+                                        <div className="flex items-baseline gap-2">
+                                            <p className="text-2xl font-black text-blue-700">{formatPct(stat.pct)}%</p>
+                                            <span className="text-sm text-blue-600 font-semibold">
+                                                {stat.score.toFixed(1)} dari {stat.totalWorkdays} hari kerja
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 flex gap-3 flex-wrap">
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                ✅ {stat.present} tepat
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                                ⏰ {stat.late} terlambat
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                                                ❌ {stat.absences.length} tidak hadir
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Perhitungan */}
+                                    {sal.salary_type === "PERCENTAGE" && (
+                                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
+                                            <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Cara Hitung</p>
+                                            <div className="space-y-2 text-sm text-amber-900">
+                                                <p>
+                                                    <span className="font-semibold">{formatRupiah(sal.base_salary)}</span> ÷ {stat.totalWorkdays} hari =
+                                                    <span className="font-semibold"> {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}</span>/hari
+                                                </p>
+                                                <p>
+                                                    {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}/hari × {stat.score.toFixed(1)} score =
+                                                    <span className="font-bold text-lg"> {formatRupiah(Math.round((sal.base_salary / stat.totalWorkdays) * stat.score))}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {sal.salary_type === "FIXED" && (
+                                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-4">
+                                            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">ℹ️ Gaji Tetap</p>
+                                            <p className="text-sm text-emerald-900">
+                                                Gaji kamu tetap <span className="font-bold">{formatRupiah(sal.base_salary)}</span> per bulan, tidak tergantung kehadiran.
+                                            </p>
+                                            <div className="mt-3 p-3 bg-white/50 rounded-lg border border-emerald-100">
+                                                <p className="text-xs text-emerald-700 font-semibold">💡 Jika menggunakan % absen:</p>
+                                                <p className="text-sm font-bold text-emerald-900 mt-1">
+                                                    {formatRupiah(Math.round((sal.base_salary / stat.totalWorkdays) * stat.score))}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Note */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-700">
+                                        <p className="font-semibold mb-1">📌 Catatan:</p>
+                                        <ul className="space-y-1 text-blue-600">
+                                            <li>• Gaji diproses setiap akhir bulan</li>
+                                            <li>• Perhitungan berdasarkan kehadiran bulan ini</li>
+                                            <li>• Hubungi admin jika ada pertanyaan</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    {salaries.length === 0 && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl opacity-50">💰</span>
+                            </div>
+                            <p className="text-sm text-gray-400 font-medium">Gaji belum diatur oleh admin</p>
+                            <p className="text-xs text-gray-300 mt-1">Hubungi admin untuk setup gaji kamu</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ════ TAB SLIP GAJI (admin only) ════ */}
+            {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
+                <div className="space-y-6">
+                    {/* Month Selector */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <div>
+                                <p className="text-base font-bold text-gray-800">Pilih Bulan</p>
+                                <p className="text-xs text-gray-400 mt-1">Lihat slip gaji bulan tertentu</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() =>
+                                        setSelectedSlipMonth(s => ({
+                                            ...s,
+                                            month: s.month === 0 ? 11 : s.month - 1,
+                                            year: s.month === 0 ? s.year - 1 : s.year,
+                                        }))
+                                    }
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
+                                >
+                                    ◀
+                                </button>
+                                <div className="px-6 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-sm min-w-[140px] text-center">
+                                    {MONTH_NAMES[selectedSlipMonth.month]} {selectedSlipMonth.year}
+                                </div>
+                                <button
+                                    onClick={() =>
+                                        setSelectedSlipMonth(s => ({
+                                            ...s,
+                                            month: s.month === 11 ? 0 : s.month + 1,
+                                            year: s.month === 11 ? s.year + 1 : s.year,
+                                        }))
+                                    }
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
+                                >
+                                    ▶
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Slip Gaji List */}
+                    {loading ? (
+                        <div className="space-y-3">
+                            {Array(3)
+                                .fill(0)
+                                .map((_, i) => (
+                                    <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+                                ))}
+                        </div>
+                    ) : salarySlips.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl opacity-50">📄</span>
+                            </div>
+                            <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji bulan ini</p>
+                            <p className="text-xs text-gray-300 mt-1">Slip gaji akan tersedia setelah difinalisasi</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {salarySlips.map(slip => (
+                                <SalarySlipCard key={slip.id} slip={slip} onFinalize={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Modals ── */}
             {showDayOffModal && isAdminRole(currentUser?.role)
