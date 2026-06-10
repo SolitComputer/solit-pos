@@ -136,7 +136,7 @@ const Icons = {
 
 // ── Shared items ──────────────────────────────────────────────────────────────
 const ITEM_ABSENSI: MenuItem  = { name: "Absensi", href: "/dashboard/attendance",          icon: Icons.attendance };
-const ITEM_LEMBUR:  MenuItem  = { name: "Lembur",  href: "/dashboard/attendance/overtime", icon: Icons.overtime  };
+const ITEM_LEMBUR:  MenuItem  = { name: "Kouta Lembur",  href: "/dashboard/attendance/overtime", icon: Icons.overtime  };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -222,12 +222,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS,
     ADMIN_TRANSAKSI,
-    {
-      label: "Developer",
-      items: [
-        { name: "Pengaturan Sistem", href: "/dashboard/users", icon: Icons.code },
-      ],
-    },
   ],
 
   ASISTEN_CEO: [
