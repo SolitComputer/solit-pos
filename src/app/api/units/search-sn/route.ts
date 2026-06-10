@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         id,
         serial_number,
         grade,
+        purchase_price,
         selling_price,
         condition_note,
         status,
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
         )
     `)
         .ilike("serial_number", `%${q}%`)
-        .eq("status", "SIAP_JUAL")  
+        .eq("status", "SIAP_JUAL")
         .limit(8)
         .order("serial_number");
 
@@ -41,6 +42,7 @@ export async function GET(req: NextRequest) {
         id: u.id,
         serial_number: u.serial_number,
         grade: u.grade,
+        purchase_price: u.purchase_price,  // ✅ ADD INI!
         selling_price: u.selling_price,
         condition_note: u.condition_note,
         status: u.status,

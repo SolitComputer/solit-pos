@@ -24,6 +24,7 @@ interface LaptopOption {
 interface UnitOption {
     id: string;
     serial_number: string;
+    purchase_price?: number;
     grade: "A" | "B" | "C";
     selling_price: number;
     condition_note: string;
@@ -67,7 +68,7 @@ function ConfirmRow({ icon, label, value, bold, mono }: {
 
 // ─── Unit Card (di daftar terpilih) ──────────────────────────────────────────
 function SelectedUnitCard({ unit, index, onRemove }: {
-    unit: UnitItem & { grade?: string; condition_note?: string };
+    unit: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number }
     index: number;
     onRemove: () => void;
 }) {
@@ -86,7 +87,7 @@ function SelectedUnitCard({ unit, index, onRemove }: {
                     )}
                 </div>
                 <p className="text-[10px] font-mono text-gray-500 mt-0.5 ml-5.5">SN: {unit.serial_number}</p>
-                <p className="text-[10px] text-gray-400 ml-5.5">{fmt(unit.selling_price)}</p>
+                <p className="text-[10px] text-gray-400 ml-5.5">Jual: {fmt(unit.selling_price)}</p>
             </div>
             <button
                 type="button"
@@ -123,7 +124,7 @@ export default function CreatePaymentPage() {
     const [isSubmitted, setIsSubmitted] = useState(false);
 
     // ── Multi-unit state ──────────────────────────────────────────────────────
-    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string })[]>([]);
+    const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number })[]>([]);
     const [snSearch, setSnSearch] = useState("");
     const [snResults, setSnResults] = useState<(UnitOption & { laptop_name: string; laptop_id: string })[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
@@ -180,7 +181,7 @@ export default function CreatePaymentPage() {
     const pickupMethod = watch("pickup_method");
 
     // Total harga modal semua unit terpilih
-    const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.selling_price || 0), 0);
+    const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
     // Selisih: deal price - modal
     const margin = rawDealPrice - totalInventoryPrice;
     // Kalau trade-in: cash yang diterima = deal_price - trade_in_value
@@ -250,7 +251,7 @@ export default function CreatePaymentPage() {
                 if (!result.success) return;
                 const unit = result.data;
                 const laptop = unit.laptop;
-                const item: UnitItem & { grade?: string; condition_note?: string } = {
+                const item: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number } = {
                     unit_id: unit.id,
                     laptop_id: laptop.id,
                     serial_number: unit.serial_number,
@@ -288,10 +289,11 @@ export default function CreatePaymentPage() {
     }, [selectedUnits]);
 
     const handleSelectSnResult = (u: UnitOption & { laptop_name: string; laptop_id: string }) => {
-        const item: UnitItem & { grade?: string; condition_note?: string } = {
+        const item: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number } = {
             unit_id: u.id,
             laptop_id: u.laptop_id,
             serial_number: u.serial_number,
+            purchase_price: u.purchase_price ?? 0,
             laptop_name: u.laptop_name,
             grade: u.grade,
             selling_price: u.selling_price ?? 0,
@@ -596,11 +598,6 @@ export default function CreatePaymentPage() {
                                         <label className="text-xs font-semibold text-gray-600">
                                             Unit Terpilih ({selectedUnits.length})
                                         </label>
-                                        {canSeeMargin && (
-                                            <span className="text-xs text-gray-400">
-                                                Total modal: {fmt(totalInventoryPrice)}
-                                            </span>
-                                        )}
                                     </div>
                                     {selectedUnits.map((u, i) => (
                                         <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
@@ -982,7 +979,7 @@ export default function CreatePaymentPage() {
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(3)} className={btnSecondary}>← Kembali</button>
                                 <button
-                                    type="button"         
+                                    type="button"
                                     disabled={submitting}
                                     onClick={() => {
                                         setValue("units", selectedUnits);

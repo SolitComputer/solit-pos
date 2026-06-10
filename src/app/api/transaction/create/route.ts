@@ -5,13 +5,25 @@ import { generateInvoice } from "@/lib/invoice";
 import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 import { logActivity } from "@/lib/activityLogger";
 
+function toNumber(value: any): number {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+
+    // Handle string "1000000.00" dari DECIMAL database
+    const str = String(value).trim().replace(',', '.');
+    const num = parseFloat(str);
+
+    return isNaN(num) ? 0 : num;
+}
+
+
 async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
         const body = await req.json();
 
         // ─────────────────────────────────────────────────────────────────────────
         // 1. Normalisasi units
-        //    Mode A (baru):  body.units = [{ unit_id, laptop_id, ... }]
+        //    Mode A (baru):  body.units = [{ unit_id, laptop_id, cost_price, ... }]
         //    Mode B (lama):  body.unit_id  ← dari scan barcode
         // ─────────────────────────────────────────────────────────────────────────
         let units: Array<{
@@ -20,12 +32,20 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             laptop_name: string;
             serial_number: string;
             grade?: string;
-            selling_price?: number;
+            cost_price?: number;  // ✅ RENAMED: selling_price → cost_price (JELAS!)
+            selling_price?: number; // Optional: harga jual default (info saja, tidak untuk kalkulasi profit)
         }> = [];
 
         if (Array.isArray(body.units) && body.units.length > 0) {
-            // Mode A — multi-unit dari CreatePaymentClient baru
-            units = body.units;
+            units = body.units.map((u: any) => ({
+                unit_id: u.unit_id,
+                laptop_id: u.laptop_id,
+                laptop_name: u.laptop_name,
+                serial_number: u.serial_number,
+                grade: u.grade,
+                cost_price: toNumber(u.purchase_price || u.cost_price || u.selling_price || 0),  
+                selling_price: toNumber(u.selling_price || 0),
+            }));
         } else if (body.unit_id) {
             // Mode B — legacy single unit, fetch dari DB
             const { data: unit, error: unitError } = await supabase
@@ -60,7 +80,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 laptop_name: unit.laptop.laptop_name,
                 serial_number: unit.serial_number,
                 grade: unit.grade,
-                selling_price: Number(unit.purchase_price) || 0,
+                cost_price: toNumber(unit.purchase_price),
+                selling_price: Number(unit.selling_price) || 0, // FYI: harga jual default
             }];
         } else {
             return NextResponse.json(
@@ -70,7 +91,22 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 2. Validasi semua unit masih SIAP_JUAL
+        // 2. ✅ VALIDASI BARU: cost_price harus > 0!
+        // ─────────────────────────────────────────────────────────────────────────
+        const invalidUnits = units.filter(u => !u.cost_price || u.cost_price <= 0);
+        if (invalidUnits.length > 0) {
+            const sns = invalidUnits.map(u => u.serial_number).join(", ");
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: `❌ HARGA MODAL tidak boleh kosong/nol! Unit: ${sns}. Silakan set harga modal di Laptops → Units terlebih dahulu.`
+                },
+                { status: 400 }
+            );
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 3. Validasi semua unit masih SIAP_JUAL
         // ─────────────────────────────────────────────────────────────────────────
         const unitIds = units.map(u => u.unit_id);
 
@@ -92,7 +128,10 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
         const invoice_number = await generateInvoice();
         const deal_price = Number(body.amount) || 0;
-        const inventory_price = units.reduce((sum, u) => sum + (u.selling_price ?? 0), 0);
+
+        // ✅ JELAS: inventory_price = TOTAL COST PRICE (harga modal) dari semua unit
+        const inventory_price = units.reduce((sum, u) => sum + (u.cost_price ?? 0), 0);
+
         const payment_method = body.payment_method || "CASH";
 
         // Trade-in
@@ -115,22 +154,27 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 3. GROSS PROFIT CALCULATION (PENTING!)
+        // 4. GROSS PROFIT CALCULATION (PENTING!)
         // ─────────────────────────────────────────────────────────────────────────
-        // GROSS PROFIT = Deal Price - Inventory Price
+        // GROSS PROFIT = Deal Price - Total Cost Price (harga modal)
         // Contoh:
-        // - Customer membeli laptop seharga Rp 5.000.000 (deal_price)
-        // - Harga modal di database: Rp 4.000.000 (inventory_price)
-        // - GROSS PROFIT = Rp 5.000.000 - Rp 4.000.000 = Rp 1.000.000
-        // - Margin % = (1.000.000 / 5.000.000) * 100 = 20%
+        // - Customer membeli 1 laptop seharga Rp 2.500.000 (deal_price)
+        // - Harga modal (cost): Rp 1.200.000 (inventory_price)
+        // - GROSS PROFIT = Rp 2.500.000 - Rp 1.200.000 = Rp 1.300.000 ✓
+        // - Margin % = (1.300.000 / 2.500.000) * 100 = 52%
         //
-        // Field "other" di transactions table = Gross Profit
-        // BUKAN "biaya lain" atau "additional charges"!
+        // Field "other" di transactions table = GROSS PROFIT (bukan "biaya lain")
         // ─────────────────────────────────────────────────────────────────────────
         const gross_profit = deal_price - inventory_price;
 
+        // ✅ INFO UNTUK DEBUG/LOG
+        const profitStatus =
+            gross_profit > 0 ? `✓ PROFIT` :
+                gross_profit < 0 ? `⚠️ LOSS` :
+                    `➖ BREAK EVEN`;
+
         // ─────────────────────────────────────────────────────────────────────────
-        // 4. Status transaksi & unit
+        // 5. Status transaksi & unit
         // ─────────────────────────────────────────────────────────────────────────
         const isEcommerce = Boolean(body.is_ecommerce);
         const txStatus = isEcommerce ? "PACKING" : "PAID";
@@ -144,7 +188,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const displaySN = units.map(u => u.serial_number).join(", ");
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 5. Insert transaction
+        // 6. Insert transaction
         // ─────────────────────────────────────────────────────────────────────────
         const { data: transaction, error: txError } = await supabase
             .from("transactions")
@@ -173,7 +217,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 // Harga
                 deal_price,
                 amount: deal_price,
-                inventory_price,
+                inventory_price,  // ✅ JELAS: ini adalah TOTAL COST PRICE (harga modal)
                 // PENTING: "other" field = GROSS PROFIT (deal_price - inventory_price)
                 other: gross_profit,
 
@@ -218,7 +262,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         if (txError) throw txError;
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 6. Insert transaction_items (detail per unit, non-fatal)
+        // 7. Insert transaction_items (detail per unit, non-fatal)
         // ─────────────────────────────────────────────────────────────────────────
         const itemsToInsert = units.map(u => ({
             transaction_id: transaction.id,
@@ -227,7 +271,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             laptop_id: u.laptop_id,
             serial_number: u.serial_number,
             laptop_name: u.laptop_name,
-            selling_price: u.selling_price ?? 0,
+            selling_price: u.cost_price ?? 0,  // ✅ Jelas: ini adalah cost price per unit
             deal_price: Math.round(deal_price / units.length),
             grade: u.grade ?? null,
         }));
@@ -241,7 +285,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 7. Update status semua unit
+        // 8. Update status semua unit
         // ─────────────────────────────────────────────────────────────────────────
         await supabase
             .from("laptop_units")
@@ -253,7 +297,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             .in("id", unitIds);
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 8. Update qty tiap laptop yang terlibat
+        // 9. Update qty tiap laptop yang terlibat
         // ─────────────────────────────────────────────────────────────────────────
         const uniqueLaptopIds = [...new Set(units.map(u => u.laptop_id))];
 
@@ -277,7 +321,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }));
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 9. Buat warranty per unit (hanya jika PAID, bukan PACKING)
+        // 10. Buat warranty per unit (hanya jika PAID, bukan PACKING)
         // ─────────────────────────────────────────────────────────────────────────
         if (!isEcommerce) {
             const warrantyDuration = Number(body.warranty_duration) || 30;
@@ -310,7 +354,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 10. Activity log
+        // 11. Activity log
         // ─────────────────────────────────────────────────────────────────────────
         await logActivity({
             userId: user.id,
@@ -319,12 +363,12 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             action: "CREATE",
             entity: "transaction",
             entityId: transaction.id,
-            entityLabel: `${invoice_number} — ${body.customer_name} (${units.length} unit) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""} | Gross Profit: Rp${gross_profit.toLocaleString("id-ID")}`,
+            entityLabel: `${invoice_number} — ${body.customer_name} (${units.length} unit) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""} | ${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}`,
             afterData: transaction,
         });
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 11. Kirim WhatsApp (non-blocking, fire & forget)
+        // 12. Kirim WhatsApp (non-blocking, fire & forget)
         // ─────────────────────────────────────────────────────────────────────────
         if (body.customer_phone) {
             const message = buildPaymentMessage({
@@ -351,7 +395,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             success: true,
             data: transaction,
             invoice_number,
-            message: `Transaksi berhasil (${units.length} unit) | Gross Profit: Rp${gross_profit.toLocaleString("id-ID")}`,
+            message: `✓ Transaksi berhasil (${units.length} unit) | ${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}`,
         });
 
     } catch (err: any) {
