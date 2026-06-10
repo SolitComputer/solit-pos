@@ -140,4 +140,4 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
 export const GET = withAuth(getHandler);
 export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
-export const DELETE = withAuth(deleteHandler, ["ADMIN", "PENGELOLA_BARANG"]);
+export const DELETE = withAuth(deleteHandler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"]);

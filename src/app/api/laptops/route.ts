@@ -24,11 +24,13 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 
 export const GET = withAuth(handler, [
   "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
   "PENGELOLA_BARANG",
   "KEPALA_SALES",
   "CREW_SALES",
   "ACCOUNTING",
   "PENGANTARAN",
-  "MARKETING", 
+  "MARKETING",
   "KEPALA_MARKETING"
 ]);
