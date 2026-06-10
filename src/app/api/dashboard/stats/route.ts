@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth } from "@/lib/auth";
 
-// pickup_date adalah string "YYYY-MM-DD" — tidak perlu ISO conversion
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
   const nowWIB = new Date(Date.now() + WIB);
@@ -23,19 +22,18 @@ function getLast7DaysWIB(): string {
   return nowWIB.toISOString().split("T")[0];
 }
 
-// ── PERBAIKAN: Konsisten pakai deal_price sebagai sumber utama ──────────────
-// Sama persis dengan logika di halaman transaksi:
-// (item.deal_price || item.amount || 0)
+// ── GET DEAL PRICE ──────────────────────────────────────────────────────────
 function getDealPrice(item: any): number {
   return Number(item.deal_price || item.amount || 0);
 }
 
-function calcProfit(item: any): number {
-  const dealPrice      = getDealPrice(item);
+// ── GROSS PROFIT (FIXED FORMULA) ────────────────────────────────────────────
+// GROSS PROFIT = deal_price - inventory_price
+// NO FALLBACK to "other" field — selalu pakai formula di atas
+function calcGrossProfit(item: any): number {
+  const dealPrice = getDealPrice(item);
   const inventoryPrice = Number(item.inventory_price || 0);
-  return inventoryPrice > 0
-    ? dealPrice - inventoryPrice
-    : Number(item.other || 0);
+  return dealPrice - inventoryPrice;
 }
 
 async function handler(req: NextRequest) {
@@ -76,31 +74,31 @@ async function handler(req: NextRequest) {
         .eq("pickup_date", yesterday),
     ]);
 
-    // ── Today stats ───────────────────────────────────────────────────────
+    // ── TODAY STATS ───────────────────────────────────────────────────────
     const todayRevenue =
       todayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
-    const todayProfit =
-      todayTransactions?.reduce((acc, item) => acc + calcProfit(item), 0) || 0;
+    const todayGrossProfit =
+      todayTransactions?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
 
-    // ── Yesterday stats ───────────────────────────────────────────────────
+    // ── YESTERDAY STATS ───────────────────────────────────────────────────
     const yesterdayRevenue =
       yesterdayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
-    const yesterdayProfit =
-      yesterdayTransactions?.reduce((acc, item) => acc + calcProfit(item), 0) || 0;
+    const yesterdayGrossProfit =
+      yesterdayTransactions?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
 
     const yesterdayTrxCount = yesterdayTransactions?.length || 0;
 
-    // ── % change ──────────────────────────────────────────────────────────
+    // ── % CHANGE ──────────────────────────────────────────────────────────
     const revenueChange =
       yesterdayRevenue > 0
         ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
         : null;
 
     const profitChange =
-      yesterdayProfit > 0
-        ? Math.round(((todayProfit - yesterdayProfit) / yesterdayProfit) * 100)
+      yesterdayGrossProfit > 0
+        ? Math.round(((todayGrossProfit - yesterdayGrossProfit) / yesterdayGrossProfit) * 100)
         : null;
 
     const trxChange =
@@ -108,11 +106,11 @@ async function handler(req: NextRequest) {
         ? Math.round((((todayTransactions?.length || 0) - yesterdayTrxCount) / yesterdayTrxCount) * 100)
         : null;
 
-    // ── Stock ─────────────────────────────────────────────────────────────
+    // ── STOCK ─────────────────────────────────────────────────────────────
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
 
-    // ── Weekly trend ──────────────────────────────────────────────────────
+    // ── WEEKLY TREND ──────────────────────────────────────────────────────
     const trendMap: Record<string, { revenue: number; profit: number; trxCount: number }> = {};
 
     for (let i = 6; i >= 0; i--) {
@@ -126,9 +124,9 @@ async function handler(req: NextRequest) {
     weeklyTransactions?.forEach((item) => {
       const dateKey = item.pickup_date as string;
       if (trendMap[dateKey]) {
-        trendMap[dateKey].revenue  += getDealPrice(item);
-        trendMap[dateKey].profit   += calcProfit(item);
-        trendMap[dateKey].trxCount += 1;
+        trendMap[dateKey].revenue   += getDealPrice(item);
+        trendMap[dateKey].profit    += calcGrossProfit(item);
+        trendMap[dateKey].trxCount  += 1;
       }
     });
 
@@ -141,13 +139,13 @@ async function handler(req: NextRequest) {
       return { date, label, ...data };
     });
 
-    // ── Top Sales ─────────────────────────────────────────────────────────
+    // ── TOP SALES ─────────────────────────────────────────────────────────
     const salesMap: Record<string, { total: number; profit: number }> = {};
     todayTransactions?.forEach((item) => {
       const sales = item.sales_name || "Unknown";
       if (!salesMap[sales]) salesMap[sales] = { total: 0, profit: 0 };
       salesMap[sales].total  += 1;
-      salesMap[sales].profit += calcProfit(item);
+      salesMap[sales].profit += calcGrossProfit(item);
     });
 
     const topSales = Object.entries(salesMap)
@@ -155,7 +153,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // ── Top Sources (weekly) ──────────────────────────────────────────────
+    // ── TOP SOURCES (WEEKLY) ──────────────────────────────────────────────
     const sourceMap: Record<string, number> = {};
     weeklyTransactions?.forEach((item) => {
       const source = item.source_platform || "Unknown";
@@ -167,7 +165,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    // ── Top Laptop ────────────────────────────────────────────────────────
+    // ── TOP LAPTOP ────────────────────────────────────────────────────────
     const laptopMap: Record<string, number> = {};
     todayTransactions?.forEach((item) => {
       const laptop = item.laptop_name || "Unknown";
@@ -183,9 +181,9 @@ async function handler(req: NextRequest) {
       success: true,
       data: {
         todayRevenue,
-        todayProfit,
+        todayProfit: todayGrossProfit,          // ← GROSS PROFIT (not other field)
         todayTransactions: todayTransactions?.length || 0,
-        laptopReady:       laptops?.length || 0,
+        laptopReady: laptops?.length || 0,
         stockTotal,
         revenueChange,
         profitChange,

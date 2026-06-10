@@ -115,6 +115,21 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
+        // 3. GROSS PROFIT CALCULATION (PENTING!)
+        // ─────────────────────────────────────────────────────────────────────────
+        // GROSS PROFIT = Deal Price - Inventory Price
+        // Contoh:
+        // - Customer membeli laptop seharga Rp 5.000.000 (deal_price)
+        // - Harga modal di database: Rp 4.000.000 (inventory_price)
+        // - GROSS PROFIT = Rp 5.000.000 - Rp 4.000.000 = Rp 1.000.000
+        // - Margin % = (1.000.000 / 5.000.000) * 100 = 20%
+        //
+        // Field "other" di transactions table = Gross Profit
+        // BUKAN "biaya lain" atau "additional charges"!
+        // ─────────────────────────────────────────────────────────────────────────
+        const gross_profit = deal_price - inventory_price;
+
+        // ─────────────────────────────────────────────────────────────────────────
         // 4. Status transaksi & unit
         // ─────────────────────────────────────────────────────────────────────────
         const isEcommerce = Boolean(body.is_ecommerce);
@@ -159,7 +174,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 deal_price,
                 amount: deal_price,
                 inventory_price,
-                other: deal_price - inventory_price,
+                // PENTING: "other" field = GROSS PROFIT (deal_price - inventory_price)
+                other: gross_profit,
 
                 // Metode bayar
                 payment_method,
@@ -303,7 +319,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             action: "CREATE",
             entity: "transaction",
             entityId: transaction.id,
-            entityLabel: `${invoice_number} — ${body.customer_name} (${units.length} unit) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""}`,
+            entityLabel: `${invoice_number} — ${body.customer_name} (${units.length} unit) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""} | Gross Profit: Rp${gross_profit.toLocaleString("id-ID")}`,
             afterData: transaction,
         });
 
@@ -335,7 +351,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             success: true,
             data: transaction,
             invoice_number,
-            message: `Transaksi berhasil (${units.length} unit)`,
+            message: `Transaksi berhasil (${units.length} unit) | Gross Profit: Rp${gross_profit.toLocaleString("id-ID")}`,
         });
 
     } catch (err: any) {
