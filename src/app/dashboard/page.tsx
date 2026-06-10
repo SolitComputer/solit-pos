@@ -576,8 +576,8 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Stat Cards Grid ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
+        {/* ── Stat Cards Grid (Always 4 cols) ── */}
+       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up auto-rows-fr" style={{ animationDelay: "0.05s" }}>
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
               <div key={i} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-4 shadow-sm space-y-2">
@@ -586,79 +586,68 @@ export default function Page() {
                 <Shimmer className="w-20 sm:w-24 h-2 sm:h-3" />
               </div>
             ))
-          ) : canSeeFinancials ? (
-            <>
-              {/* UBAH: Omzet sekarang clickable */}
-              <button
-                onClick={() => setShowRevenueModal(true)}
-                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
-              >
-                <StatCard
-                  label="Omzet Hari Ini"
-                  value={fmtRupiah(stats?.todayRevenue || 0)}
-                  sub={`${stats?.todayTransactions || 0} transaksi`}
-                  icon={<OmzetIcon />}
-                  accent="gray"
-                  change={stats?.revenueChange}
-                />
-              </button>
-
-              <button
-                onClick={() => setShowGrossProfitModal(true)}
-                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95">
-                <StatCard label="Gross Profit Hari Ini"
-                  value={fmtRupiah(stats?.todayProfit || 0)}
-                  sub="margin keuntungan"
-                  icon={<ProfitIcon />}
-                  accent="emerald"
-                  change={stats?.profitChange}
-                />
-              </button>
-
-              {/* UBAH: Laptop Ready sekarang clickable */}
-              <button
-                onClick={() => setShowInventoryModal(true)}
-                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
-              >
-                <StatCard
-                  label="Laptop Ready"
-                  value={String(stats?.laptopReady || 0)}
-                  sub={`${stats?.stockTotal || 0} total unit`}
-                  icon={<LaptopIcon />}
-                  accent="gray"
-                />
-              </button>
-
-              <StatCard
-                label="Transaksi Hari Ini"
-                value={String(stats?.todayTransactions || 0)}
-                sub="transaksi selesai"
-                icon={<TrxIcon />}
-                accent="gray"
-                change={stats?.trxChange}
-              />
-            </>
           ) : (
             <>
-              <StatCard
-                label="Transaksi Hari Ini"
-                value={String(stats?.todayTransactions || 0)}
-                sub="transaksi selesai"
-                icon={<TrxIcon />}
-                accent="gray"
-                change={stats?.trxChange}
-              />
-              {/* UBAH: Laptop Ready sekarang clickable */}
+              {/* Omzet - only if canSeeFinancials */}
+              {canSeeFinancials && (
+                <button
+                  onClick={() => setShowRevenueModal(true)}
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                >
+                  <StatCard
+                    label="Omzet Hari Ini"
+                    value={fmtRupiah(stats?.todayRevenue || 0)}
+                    sub={`${stats?.todayTransactions || 0} transaksi`}
+                    icon={<OmzetIcon />}
+                    accent="gray"
+                    change={stats?.revenueChange}
+                  />
+                </button>
+              )}
+
+              {/* Gross Profit - only if canSeeFinancials */}
+              {canSeeFinancials && (
+                <button
+                  onClick={() => setShowGrossProfitModal(true)}
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                >
+                  <StatCard
+                    label="Gross Profit Hari Ini"
+                    value={fmtRupiah(stats?.todayProfit || 0)}
+                    sub="margin keuntungan"
+                    icon={<ProfitIcon />}
+                    accent="emerald"
+                    change={stats?.profitChange}
+                  />
+                </button>
+              )}
+
+              {/* Laptop Ready - ALWAYS show */}
               <button
                 onClick={() => setShowInventoryModal(true)}
-                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                className="h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95"
               >
                 <StatCard
                   label="Laptop Ready"
-                  value={String(stats?.laptopReady || 0)}
-                  sub={`${stats?.stockTotal || 0} total unit`}
+                  value={`${stats?.laptopReady || 0} tipe`}
+                  sub={`${stats?.stockTotal || 0} unit total`}
                   icon={<LaptopIcon />}
                   accent="gray"
+                />
+              </button>
+
+              {/* Transaksi - ALWAYS show */}
+              <button
+                onClick={() => {/* bisa tambah modal nanti kalau perlu */ }}
+                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+              >
+                <StatCard
+                  label="Transaksi Hari Ini"
+                  value={String(stats?.todayTransactions || 0)}
+                  sub="transaksi selesai"
+                  icon={<TrxIcon />}
+                  accent="gray"
+                  change={stats?.trxChange}
                 />
               </button>
             </>
@@ -673,52 +662,56 @@ export default function Page() {
         </div>
 
         {/* ── Analytics Grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 fade-up" style={{ animationDelay: "0.1s" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 fade-up auto-rows-fr" style={{ animationDelay: "0.1s" }}>
 
           {/* Chart: Trend */}
           {canSeeFinancials ? (
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
-                  Tren Omzet & Profit
-                </h2>
-                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
+            <div className="lg:col-span-2">
+              <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                    <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
+                    Tren Omzet & Profit
+                  </h2>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
+                </div>
+                <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
+                    <span className="w-4 sm:w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
+                  </div>
+                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
+                    <span className="w-4 sm:w-5 inline-block border-t-2 border-dashed border-emerald-500" />Profit
+                  </div>
+                </div>
+                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyRevenue.length > 0 ? (
+                  <div style={{ height: 130 }} className="sm:h-[160px]"><Line data={trendChartData} options={trendOptions} /></div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                  <span className="w-4 sm:w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                  <span className="w-4 sm:w-5 inline-block border-t-2 border-dashed border-emerald-500" />Profit
-                </div>
-              </div>
-              {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyRevenue.length > 0 ? (
-                <div style={{ height: 130 }} className="sm:h-[160px]"><Line data={trendChartData} options={trendOptions} /></div>
-              ) : (
-                <div className="text-center py-8 sm:py-12">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
-                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-                </div>
-              )}
             </div>
           ) : (
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
-                  Transaksi per Hari
-                </h2>
-                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
-              </div>
-              {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyTrxCount.length > 0 ? (
-                <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
-              ) : (
-                <div className="text-center py-8 sm:py-12">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
-                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+            <div className="lg:col-span-2">
+              <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                    <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
+                    Transaksi per Hari
+                  </h2>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
                 </div>
-              )}
+                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyTrxCount.length > 0 ? (
+                  <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -727,43 +720,48 @@ export default function Page() {
             onClick={() => setShowSalesModal(true)}
             className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
           >
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+              {/* UBAH: header punya flex-shrink-0 */}
+              <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
                 <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
                   <span className="text-base sm:text-lg">🏆</span>
                   Top Sales
                 </h2>
                 <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
               </div>
-              {isLoading ? (
-                <div className="space-y-2 sm:space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
-                      <Shimmer className="flex-1 h-2 sm:h-3" />
-                      <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
-                    </div>
-                  ))}
-                </div>
-              ) : stats?.topSales?.length ? (
-                <div className="space-y-1">
-                  {stats.topSales.map((s, i) => (
-                    <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
-                      maxTotal={stats.topSales[0]?.total || 1}
-                      extra={canSeeFinancials && s.profit > 0 ? (
-                        <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">
-                          +{fmtShort(s.profit)}
-                        </span>
-                      ) : undefined}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 sm:py-8">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏆</p>
-                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-                </div>
-              )}
+
+              {/* UBAH: wrapper baru dengan flex-1 untuk grow */}
+              <div className="flex-1 flex flex-col justify-center">
+                {isLoading ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
+                        <Shimmer className="flex-1 h-2 sm:h-3" />
+                        <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                ) : stats?.topSales?.length ? (
+                  <div className="space-y-1">
+                    {stats.topSales.map((s, i) => (
+                      <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
+                        maxTotal={stats.topSales[0]?.total || 1}
+                        extra={canSeeFinancials && s.profit > 0 ? (
+                          <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">
+                            +{fmtShort(s.profit)}
+                          </span>
+                        ) : undefined}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 sm:py-8">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏆</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
+              </div>
             </div>
           </button>
 
@@ -772,7 +770,7 @@ export default function Page() {
             onClick={() => setShowLaptopModal(true)}
             className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
           >
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+            <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
                   <span className="text-base sm:text-lg">💻</span>

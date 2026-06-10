@@ -4,28 +4,34 @@ import { PERMISSIONS, withAuth } from "@/lib/auth";
 
 async function handler(req: NextRequest) {
   try {
+    // ✅ QUERY DARI laptop_units (individual units dengan grade)
+    const { data: units } = await supabase
+      .from("laptop_units")
+      .select("id, grade, laptop_id")
+      .eq("status", "SIAP_JUAL");
+
+    // ✅ QUERY DARI laptops (untuk brand breakdown)
     const { data: laptops } = await supabase
       .from("laptops")
-      .select("*")
+      .select("id, brand, laptop_name, qty")
       .eq("status", "SIAP_JUAL")
       .gt("qty", 0);
 
-    // Group by grade
-    const gradeMap: Record<string, { qty: number; items: any[] }> = {
-      A: { qty: 0, items: [] },
-      B: { qty: 0, items: [] },
-      C: { qty: 0, items: [] },
+    // ✅ GROUP BY GRADE (dari units)
+    const gradeMap: Record<string, number> = {
+      A: 0,
+      B: 0,
+      C: 0,
     };
 
-    laptops?.forEach((item) => {
-      const grade = item.grade || "C";
-      if (gradeMap[grade]) {
-        gradeMap[grade].qty += item.qty || 0;
-        gradeMap[grade].items.push(item);
+    units?.forEach((unit) => {
+      const grade = unit.grade || "C";
+      if (gradeMap[grade] !== undefined) {
+        gradeMap[grade]++;
       }
     });
 
-    // Group by brand
+    // ✅ GROUP BY BRAND
     const brandMap: Record<string, number> = {};
     laptops?.forEach((item) => {
       const brand = item.brand || "Unknown";
@@ -37,23 +43,26 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
 
+    // ✅ TOTAL UNITS & MODELS
+    const totalUnits = units?.length || 0;
+    const totalModels = laptops?.length || 0;
+
     const summary = {
-      total: laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0,
-      totalModels: laptops?.length || 0,
+      total: totalUnits,
+      totalModels,
       byGrade: {
-        A: { qty: gradeMap.A.qty, pct: 0 },
-        B: { qty: gradeMap.B.qty, pct: 0 },
-        C: { qty: gradeMap.C.qty, pct: 0 },
+        A: { qty: gradeMap.A, pct: 0 },
+        B: { qty: gradeMap.B, pct: 0 },
+        C: { qty: gradeMap.C, pct: 0 },
       },
       byBrand: brandBreakdown,
     };
 
-    // Calculate percentages
-    const total = summary.total;
-    if (total > 0) {
-      summary.byGrade.A.pct = Math.round((summary.byGrade.A.qty / total) * 100);
-      summary.byGrade.B.pct = Math.round((summary.byGrade.B.qty / total) * 100);
-      summary.byGrade.C.pct = Math.round((summary.byGrade.C.qty / total) * 100);
+    // ✅ CALCULATE PERCENTAGES
+    if (totalUnits > 0) {
+      summary.byGrade.A.pct = Math.round((gradeMap.A / totalUnits) * 100);
+      summary.byGrade.B.pct = Math.round((gradeMap.B / totalUnits) * 100);
+      summary.byGrade.C.pct = Math.round((gradeMap.C / totalUnits) * 100);
     }
 
     return NextResponse.json({
