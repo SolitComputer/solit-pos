@@ -175,7 +175,7 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
   );
 }
 
-function EmptyState() {
+function EmptyState() { 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center animate-fadeIn">
       <div className="text-7xl mb-4 animate-bounce">📊</div>
