@@ -1,4 +1,3 @@
-// src/app/dashboard/attendance/overtime/page.tsx
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -6,1188 +5,1407 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type OvertimeStatus = "PENDING" | "APPROVED" | "REJECTED" | "ONGOING" | "COMPLETED" | "CANCELLED";
-
 type OvertimeRequest = {
-    id: string;
-    user_id: string;
-    request_date: string;
-    reason: string;
-    requested_start: string;
-    status: OvertimeStatus;
-    approved_by: string | null;
-    approved_at: string | null;
-    scheduled_start: string | null;
-    scheduled_end: string | null;
-    rate_per_hour: number | null;
-    rejection_note: string | null;
-    actual_start: string | null;
-    actual_end: string | null;
-    proof_photo_url: string | null;
-    completed_at: string | null;
-    duration_minutes: number | null;
-    total_pay: number | null;
-    work_description: string | null;
-    created_at: string;
-    user?: { id: string; name: string; role: string; shift: string };
-    approver?: { id: string; name: string; role: string } | null;
+  id: string;
+  user_id: string;
+  request_date: string;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  work_description: string | null;
+  proof_photo_url: string | null;
+  status: "PENDING" | "APPROVED" | "ONGOING" | "COMPLETED" | "REJECTED";
+  rate_per_hour: number | null;
+  total_pay: number | null;
+  auto_completed: boolean;
+  created_at: string;
+  users?: { id: string; name: string; role: string };
 };
 
-type OvertimeRate = { id: string; role: string; rate_per_hour: number };
+type User = { id: string; name: string; role: string };
 
-// ─── Constants ─────────────────────────────────────────────────────────────
-const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
-const DIVISION_HEADS = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"];
-const ALL_ROLES = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-    "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
-    "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
+const MONTH_NAMES = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
 ];
-const ROLE_LABEL: Record<string, string> = {
-    ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",
-    KEPALA_SALES: "Kepala Sales", KEPALA_MARKETING: "Kepala Marketing", KEPALA_TEKNISI: "Kepala Teknisi",
-    CREW_SALES: "Crew Sales", SOTECH: "Sotech", ACCOUNTING: "Accounting",
-    PENGELOLA_BARANG: "Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
-    MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
-};
+const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 
-const STATUS_CONFIG: Record<OvertimeStatus, { label: string; emoji: string; bg: string; color: string; border: string }> = {
-    PENDING: { label: "Menunggu", emoji: "⏳", bg: "bg-amber-50", color: "text-amber-700", border: "border-amber-200" },
-    APPROVED: { label: "Disetujui", emoji: "✅", bg: "bg-emerald-50", color: "text-emerald-700", border: "border-emerald-200" },
-    REJECTED: { label: "Ditolak", emoji: "❌", bg: "bg-red-50", color: "text-red-700", border: "border-red-200" },
-    ONGOING: { label: "Berlangsung", emoji: "🟢", bg: "bg-green-50", color: "text-green-700", border: "border-green-200" },
-    COMPLETED: { label: "Selesai", emoji: "🏁", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
-    CANCELLED: { label: "Dibatalkan", emoji: "🚫", bg: "bg-gray-50", color: "text-gray-500", border: "border-gray-200" },
-};
-
-function isApprover(role?: string): boolean {
-    return !!role && ([...FULL_ACCESS, ...DIVISION_HEADS].includes(role));
+function isAdminRole(role?: string): boolean {
+  return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
 function formatRupiah(n: number): string {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function formatDuration(mins: number): string {
-    const h = Math.floor(mins / 60), m = mins % 60;
-    return h > 0 ? `${h}j ${m}m` : `${m}m`;
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
 }
 
-function toWIBStr(iso: string): string {
-    return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+function toWIBDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 function getWIBToday(): string {
-    return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function initials(name: string): string {
-    return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 }
 
-function getStartStatus(scheduledStart: string | null): {
-    canStart: boolean;
-    label: string;
-    minutesLeft: number;
-} {
-    if (!scheduledStart) return { canStart: true, label: "Mulai", minutesLeft: 0 };
-    const nowMs = Date.now();
-    const scheduledMs = new Date(scheduledStart).getTime();
-    if (nowMs >= scheduledMs) {
-        return { canStart: true, label: "▶ Mulai", minutesLeft: 0 };
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+// ─── StartModal ────────────────────────────────────────────────────────────────
+function StartModal({
+  overtime,
+  onClose,
+  onSaved,
+}: {
+  overtime: OvertimeRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    if (!description.trim()) {
+      setError("Deskripsi pekerjaan wajib diisi");
+      return;
     }
-    const minutesLeft = Math.ceil((scheduledMs - nowMs) / 60000);
-    const hoursLeft = Math.floor(minutesLeft / 60);
-    const minsLeft = minutesLeft % 60;
-    const timeStr = hoursLeft > 0 ? `${hoursLeft}j ${minsLeft}m` : `${minsLeft}m`;
-    return {
-        canStart: false,
-        label: `⏳ ${timeStr} lagi`,
-        minutesLeft,
-    };
-}
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: overtime.id,
+          action: "START",
+          work_description: description,
+        }),
+      });
+      const d = await res.json();
+      if (!d.success) {
+        setError(d.message || "Gagal dimulai");
+        return;
+      }
+      onSaved();
+      onClose();
+    } catch {
+      setError("Gagal");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-// ─── Modal: Request Lembur ────────────────────────────────────────────────────
-function RequestOvertimeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-    const [form, setForm] = useState({
-        request_date: getWIBToday(),
-        reason: "",
-        requested_start: "19:00",
-    });
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    const save = async () => {
-        if (!form.reason.trim()) { setError("Alasan lembur wajib diisi"); return; }
-        setSaving(true); setError("");
-        try {
-            const res = await fetch("/api/attendance/overtime", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
-            });
-            const d = await res.json();
-            if (!d.success) { setError(d.message || "Gagal"); return; }
-            onSaved(); onClose();
-        } catch { setError("Gagal menyimpan"); }
-        finally { setSaving(false); }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-5 flex items-start justify-between">
-                    <div>
-                        <p className="font-bold text-white text-base">⏰ Request Lembur</p>
-                        <p className="text-xs text-white/70 mt-1">Ajukan permintaan lembur ke kepala divisi</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="p-6 space-y-4">
-                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
-
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Tanggal Lembur</label>
-                        <input type="date" value={form.request_date}
-                            onChange={e => setForm(f => ({ ...f, request_date: e.target.value }))}
-                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-400/20" />
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Mulai (perkiraan)</label>
-                        <input type="time" value={form.requested_start}
-                            onChange={e => setForm(f => ({ ...f, requested_start: e.target.value }))}
-                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-400/20" />
-                        <p className="text-[10px] text-gray-400 mt-1">Kepala divisi akan menentukan jam pasti saat approve</p>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Alasan Lembur</label>
-                        <textarea value={form.reason}
-                            onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-                            placeholder="Contoh: Perlu menyelesaikan order mendesak dari pelanggan..."
-                            rows={3}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-400/20 resize-none" />
-                    </div>
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-                        <strong>ℹ️</strong> Request akan dikirim ke kepala divisi dan admin untuk disetujui.
-                        Pastikan request dibuat <strong>sebelum</strong> jam lembur dimulai.
-                    </div>
-                </div>
-                <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-                    <button onClick={save} disabled={saving}
-                        className="flex-1 h-11 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</> : "📤 Kirim Request"}
-                    </button>
-                </div>
-            </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+        <div className="bg-gradient-to-r from-orange-600 to-amber-700 px-6 py-5 flex items-start justify-between">
+          <div>
+            <p className="font-bold text-white text-base">🟢 Mulai Lemburan</p>
+            <p className="text-xs text-white/70 mt-1">{overtime.users?.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
-    );
-}
 
-// ─── Modal: Approve Lembur ────────────────────────────────────────────────────
-function ApproveModal({ overtime, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
-    const defaultStart = overtime.request_date + "T" + overtime.requested_start;
-    const [form, setForm] = useState({
-        scheduled_start: defaultStart,
-        scheduled_end: overtime.request_date + "T22:00",
-    });
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    const approve = async () => {
-        if (!form.scheduled_start || !form.scheduled_end) { setError("Jam mulai dan selesai wajib diisi"); return; }
-        setSaving(true); setError("");
-        try {
-            const res = await fetch("/api/attendance/overtime", {
-                method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    id: overtime.id, action: "APPROVE",
-                    scheduled_start: new Date(form.scheduled_start).toISOString(),
-                    scheduled_end: new Date(form.scheduled_end).toISOString(),
-                }),
-            });
-            const d = await res.json();
-            if (!d.success) { setError(d.message || "Gagal"); return; }
-            onSaved(); onClose();
-        } catch { setError("Gagal"); }
-        finally { setSaving(false); }
-    };
-
-    const reject = async () => {
-        const note = prompt("Alasan penolakan (opsional):");
-        if (note === null) return; // user cancel prompt
-        try {
-            await fetch("/api/attendance/overtime", {
-                method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: overtime.id, action: "REJECT", rejection_note: note }),
-            });
-            onSaved(); onClose();
-        } catch { }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
-                    <div>
-                        <p className="font-bold text-white text-base">✅ Setujui Lembur</p>
-                        <p className="text-xs text-white/70 mt-1">{overtime.user?.name} · {overtime.request_date}</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="p-6 space-y-4">
-                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
-
-                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Alasan dari {overtime.user?.name}:</p>
-                        <p className="text-sm text-gray-700">{overtime.reason}</p>
-                        <p className="text-xs text-gray-400 mt-1">Jam yang diminta: <strong>{overtime.requested_start}</strong></p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Mulai</label>
-                            <input type="datetime-local" value={form.scheduled_start}
-                                onChange={e => setForm(f => ({ ...f, scheduled_start: e.target.value }))}
-                                className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Selesai</label>
-                            <input type="datetime-local" value={form.scheduled_end}
-                                onChange={e => setForm(f => ({ ...f, scheduled_end: e.target.value }))}
-                                className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none" />
-                        </div>
-                    </div>
-                </div>
-                <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={reject} className="h-11 px-5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition">❌ Tolak</button>
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-                    <button onClick={approve} disabled={saving}
-                        className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "✅ Setujui"}
-                    </button>
-                </div>
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+              ⚠️ {error}
             </div>
-        </div>
-    );
-}
+          )}
 
-function CompleteModal({ overtime, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
-    const [photoFile, setPhotoFile] = useState<File | null>(null);
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+              Deskripsi Pekerjaan *
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Contoh: Maintenance sistem database, backup data, update server..."
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-400/20 transition-all resize-none"
+            />
+            <p className="text-[10px] text-gray-400 mt-1.5">
+              Jelaskan apa yang akan dikerjakan selama lemburan
+            </p>
+          </div>
 
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0];
-        if (f) {
-            setPhotoFile(f);
-            setPhotoPreview(URL.createObjectURL(f));
-        }
-    };
-
-    const complete = async () => {
-        setSaving(true); setError("");
-        try {
-            let photoUrl: string | null = null;
-
-            // Upload foto ke Supabase Storage jika ada
-            if (photoFile) {
-                // ✅ Tambah watermark waktu sebelum upload
-                const watermarkedFile = await addWatermarkToFile(photoFile);
-                const ext = photoFile.name.split(".").pop();
-                const fileName = `overtime_${overtime.id}_${Date.now()}.${ext}`;
-                const formData = new FormData();
-                formData.append("file", watermarkedFile);
-                formData.append("filename", fileName);
-
-                const uploadRes = await fetch("/api/attendance/overtime/upload", {
-                    method: "POST",
-                    body: formData,
-                });
-                const uploadData = await uploadRes.json();
-                if (uploadData.success) photoUrl = uploadData.url;
-            }
-
-            const res = await fetch("/api/attendance/overtime", {
-                method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: overtime.id, action: "COMPLETE", proof_photo_url: photoUrl }),
-            });
-            const d = await res.json();
-            if (!d.success) { setError(d.message || "Gagal"); return; }
-            onSaved(); onClose();
-        } catch { setError("Gagal menyimpan"); }
-        finally { setSaving(false); }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 flex items-start justify-between">
-                    <div>
-                        <p className="font-bold text-white text-base">🏁 Selesai Lembur</p>
-                        <p className="text-xs text-white/70 mt-1">Upload bukti foto bahwa lembur sudah selesai</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="p-6 space-y-4">
-                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
-
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm">
-                        <p className="font-bold text-blue-700 mb-1">Info Lembur</p>
-                        <p className="text-blue-600 text-xs">Mulai: <strong>{overtime.scheduled_start ? toWIBStr(overtime.scheduled_start) : "-"}</strong></p>
-                        <p className="text-blue-600 text-xs">Selesai dijadwalkan: <strong>{overtime.scheduled_end ? toWIBStr(overtime.scheduled_end) : "-"}</strong></p>
-                        <p className="text-blue-600 text-xs mt-1">Rate: <strong>{overtime.rate_per_hour ? formatRupiah(overtime.rate_per_hour) + "/jam" : "-"}</strong></p>
-                    </div>
-
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
-                            Foto Bukti <span className="normal-case font-normal text-gray-400">(opsional tapi disarankan)</span>
-                        </label>
-                        {photoPreview ? (
-                            <div className="relative">
-                                <img src={photoPreview} alt="Preview" className="w-full h-40 object-cover rounded-xl border border-gray-200" />
-                                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
-                                    className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition">✕</button>
-                            </div>
-                        ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
-                                <span className="text-3xl mb-1">📸</span>
-                                <span className="text-xs text-gray-500">Tap untuk ambil/pilih foto</span>
-                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
-                            </label>
-                        )}
-                    </div>
-
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
-                        ⏱️ Waktu selesai akan dicatat <strong>saat ini</strong>. Total bayar dihitung otomatis dari jam mulai.
-                    </div>
-                </div>
-                <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-                    <button onClick={complete} disabled={saving}
-                        className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "🏁 Selesai"}
-                    </button>
-                </div>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-xs text-orange-700">
+            <p className="font-semibold mb-1">⏱️ Waktu Lemburan</p>
+            <div className="space-y-1 text-orange-600 text-[11px]">
+              <p>
+                Mulai: <span className="font-bold">{formatTime(overtime.scheduled_start)}</span>
+              </p>
+              <p>
+                Selesai: <span className="font-bold">{formatTime(overtime.scheduled_end)}</span>
+              </p>
             </div>
+          </div>
         </div>
-    );
-}
 
-function RateModal({ rates, onClose, onSaved }: { rates: OvertimeRate[]; onClose: () => void; onSaved: () => void }) {
-    const rateMap = useMemo(() => {
-        const m: Record<string, string> = {};
-        rates.forEach(r => { m[r.role] = r.rate_per_hour.toString(); });
-        return m;
-    }, [rates]);
-
-    const [local, setLocal] = useState<Record<string, string>>(() => ({ ...rateMap }));
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    const save = async () => {
-        setSaving(true); setError("");
-        try {
-            const ops = ALL_ROLES.filter(r => local[r]).map(role =>
-                fetch("/api/attendance/overtime/rates", {
-                    method: "POST", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ role, rate_per_hour: parseInt(local[role] || "0") }),
-                })
-            );
-            await Promise.all(ops);
-            onSaved(); onClose();
-        } catch { setError("Gagal menyimpan"); }
-        finally { setSaving(false); }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden">
-                <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
-                    <div>
-                        <p className="font-bold text-white text-base">💰 Rate Lembur Per Role</p>
-                        <p className="text-xs text-white/70 mt-1">Set rate per jam untuk setiap jabatan</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="overflow-y-auto flex-1 p-5 space-y-2">
-                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl mb-3">⚠️ {error}</div>}
-                    {ALL_ROLES.map(role => (
-                        <div key={role} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                            <span className="text-sm font-bold text-gray-700 flex-1">{ROLE_LABEL[role] ?? role}</span>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-gray-400">Rp</span>
-                                <input type="number" min={0} value={local[role] ?? ""}
-                                    onChange={e => setLocal(p => ({ ...p, [role]: e.target.value }))}
-                                    placeholder="0"
-                                    className="w-28 h-9 border border-gray-200 rounded-lg px-2.5 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/20 font-mono" />
-                                <span className="text-xs text-gray-400">/jam</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-                    <button onClick={save} disabled={saving}
-                        className="flex-1 h-11 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan Semua"}
-                    </button>
-                </div>
-            </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all"
+          >
+            Batal
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !description.trim()}
+            className="flex-1 h-11 bg-gradient-to-r from-orange-600 to-amber-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Menyimpan...
+              </>
+            ) : (
+              "✅ Mulai"
+            )}
+          </button>
         </div>
-    );
+      </div>
+    </div>
+  );
 }
 
-async function addWatermarkToFile(file: File): Promise<File> {
-    return new Promise((resolve) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext("2d")!;
-
-            // Gambar foto asli
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(objectUrl);
-
-            // Format waktu WIB
-            const now = new Date();
-            const wibOffset = 7 * 60 * 60 * 1000;
-            const wib = new Date(now.getTime() + wibOffset);
-            const pad = (n: number) => String(n).padStart(2, "0");
-            const timeStr = `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())} WIB`;
-            const dateStr = wib.toLocaleDateString("id-ID", {
-                day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta",
-            });
-            const label = `${dateStr}  •  ${timeStr}`;
-
-            // Ukuran font adaptif berdasarkan lebar gambar
-            const fontSize = Math.max(20, Math.round(img.width * 0.03));
-            ctx.font = `bold ${fontSize}px -apple-system, Arial, sans-serif`;
-
-            const textW = ctx.measureText(label).width;
-            const padX = fontSize * 0.8;
-            const padY = fontSize * 0.6;
-            const bgH = fontSize + padY * 2;
-            const bgW = textW + padX * 2;
-            const margin = fontSize * 0.6;
-            const x = margin;
-            const y = img.height - margin - bgH;
-
-            // Background pill semi-transparan
-            ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-            ctx.beginPath();
-            const r = bgH / 2;
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + bgW - r, y);
-            ctx.arcTo(x + bgW, y, x + bgW, y + bgH, r);
-            ctx.lineTo(x + bgW, y + r);
-            ctx.arcTo(x + bgW, y + bgH, x + bgW - r, y + bgH, r);
-            ctx.lineTo(x + r, y + bgH);
-            ctx.arcTo(x, y + bgH, x, y + bgH - r, r);
-            ctx.lineTo(x, y + r);
-            ctx.arcTo(x, y, x + r, y, r);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = "rgba(255,255,255,0.95)";
-            ctx.textBaseline = "middle";
-            ctx.fillText(label, x + padX, y + bgH / 2);
-
-            canvas.toBlob((blob) => {
-                if (!blob) { resolve(file); return; }
-                resolve(new File([blob], file.name, { type: file.type }));
-            }, file.type, 0.92);
-        };
-        img.onerror = () => resolve(file);
-        img.src = objectUrl;
-    });
-}
-
-function StartModal({ overtime, onClose, onStarted }: {
-    overtime: OvertimeRequest; onClose: () => void; onStarted: () => void;
+// ─── SetPayModal ────────────────────────────────────────────────────────────────
+function SetPayModal({
+  overtime,
+  onClose,
+  onSaved,
+}: {
+  overtime: OvertimeRequest;
+  onClose: () => void;
+  onSaved: () => void;
 }) {
-    const [workDesc, setWorkDesc] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
+  const calcDurationHours = (): number => {
+    if (!overtime.scheduled_start || !overtime.actual_end) return 0;
+    const start = new Date(overtime.scheduled_start).getTime();
+    const end = new Date(overtime.actual_end).getTime();
+    return Math.max(1, Math.ceil((end - start) / (60 * 60 * 1000)));
+  };
 
-    const submit = async () => {
-        if (!workDesc.trim()) { setError("Uraian pekerjaan wajib diisi"); return; }
-        setSaving(true); setError("");
-        try {
-            const res = await fetch("/api/attendance/overtime", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    id: overtime.id,
-                    action: "START",
-                    work_description: workDesc.trim(),
-                }),
-            });
-            const d = await res.json();
-            if (!d.success) { setError(d.message || "Gagal memulai lembur"); return; }
-            onStarted(); onClose();
-        } catch { setError("Gagal memulai lembur"); }
-        finally { setSaving(false); }
-    };
+  const hours = calcDurationHours();
+  const defaultRate = 100000;
+  const [rate, setRate] = useState(overtime.rate_per_hour || defaultRate);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 flex items-start justify-between">
-                    <div>
-                        <p className="font-bold text-white text-base">▶ Mulai Lembur</p>
-                        <p className="text-xs text-white/70 mt-1">
-                            {overtime.scheduled_start
-                                ? `Jadwal: ${toWIBStr(overtime.scheduled_start)} – ${overtime.scheduled_end ? toWIBStr(overtime.scheduled_end) : "-"} WIB`
-                                : overtime.request_date
-                            }
-                        </p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+  const totalPay = rate * hours;
 
-                <div className="p-6 space-y-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
-                            ⚠️ {error}
-                        </div>
-                    )}
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: overtime.id,
+          action: "SET_PAY",
+          rate_per_hour: Math.round(rate),
+          total_pay: Math.round(totalPay),
+        }),
+      });
+      const d = await res.json();
+      if (!d.success) {
+        setError(d.message || "Gagal");
+        return;
+      }
+      onSaved();
+      onClose();
+    } catch {
+      setError("Gagal");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-                    {/* Info alasan lembur */}
-                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Alasan Lembur</p>
-                        <p className="text-sm text-gray-700">{overtime.reason}</p>
-                    </div>
-
-                    {/* Input uraian pekerjaan */}
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                            Uraian Pekerjaan <span className="text-red-400">*</span>
-                        </label>
-                        <textarea
-                            value={workDesc}
-                            onChange={e => setWorkDesc(e.target.value)}
-                            placeholder="Jelaskan pekerjaan yang akan dikerjakan selama lembur...&#10;Contoh: Menyelesaikan packing 50 unit laptop untuk pesanan batch bulan ini"
-                            rows={4}
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 resize-none"
-                            autoFocus
-                        />
-                        <p className="text-[10px] text-gray-400 mt-1">
-                            Uraian ini akan dicatat sebagai dokumentasi pekerjaan lembur
-                        </p>
-                    </div>
-
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-700">
-                        ⏱️ Waktu mulai akan dicatat <strong>sekarang</strong> setelah kamu klik "Mulai".
-                    </div>
-                </div>
-
-                <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
-                        Batal
-                    </button>
-                    <button
-                        onClick={submit}
-                        disabled={saving || !workDesc.trim()}
-                        className="flex-1 h-11 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {saving
-                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memulai...</>
-                            : "▶ Mulai Lembur"
-                        }
-                    </button>
-                </div>
-            </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+        <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
+          <div>
+            <p className="font-bold text-white text-base">💰 Atur Bayaran</p>
+            <p className="text-xs text-white/70 mt-1">{overtime.users?.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
-    );
+
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs text-emerald-700">
+            <p className="font-semibold mb-2">⏱️ Durasi Lemburan</p>
+            <p className="text-emerald-600">
+              {hours} jam × {formatRupiah(Math.round(rate))}/jam ={" "}
+              <span className="font-bold text-lg text-emerald-700">
+                {formatRupiah(Math.round(totalPay))}
+              </span>
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+              Tarif Per Jam (Rp)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">
+                Rp
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={rate}
+                onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
+                className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-4">
+            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">
+              Total Bayaran
+            </p>
+            <p className="text-3xl font-black text-emerald-700">
+              {formatRupiah(Math.round(totalPay))}
+            </p>
+            <p className="text-[10px] text-emerald-600 mt-2">
+              {hours} jam × {formatRupiah(Math.round(rate))}/jam
+            </p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all"
+          >
+            Batal
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Menyimpan...
+              </>
+            ) : (
+              "✅ Simpan"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function SetPayModal({ overtime, onClose, onSaved }: {
-    overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
+// ─── CompleteModal ────────────────────────────────────────────────────────────────
+function CompleteModal({
+  overtime,
+  onClose,
+  onSaved,
+  isAutoCompleted,
+}: {
+  overtime: OvertimeRequest;
+  onClose: () => void;
+  onSaved: () => void;
+  isAutoCompleted?: boolean;
 }) {
-    const [ratePerHour, setRatePerHour] = useState(
-        overtime.rate_per_hour != null && overtime.rate_per_hour > 0
-            ? overtime.rate_per_hour.toString()
-            : ""
-    );
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
-    const durationMins = overtime.duration_minutes ?? 0;
-    const billedHours = Math.floor(durationMins / 60);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const rate = parseFloat(ratePerHour);
-    const isValid = !isNaN(rate) && rate > 0 && billedHours > 0;
-    const totalPay = isValid ? billedHours * rate : null;
+    if (!file.type.startsWith("image/")) {
+      setError("Hanya file gambar yang diterima");
+      return;
+    }
 
-    const save = async () => {
-        if (!isValid || totalPay === null) { setError("Masukkan rate per jam yang valid"); return; }
-        setSaving(true); setError("");
-        try {
-            const res = await fetch("/api/attendance/overtime", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    id: overtime.id,
-                    action: "SET_PAY",
-                    rate_per_hour: rate,
-                    total_pay: totalPay,
-                }),
-            });
-            const d = await res.json();
-            if (!d.success) { setError(d.message || "Gagal"); return; }
-            onSaved(); onClose();
-        } catch { setError("Gagal menyimpan"); }
-        finally { setSaving(false); }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target?.result as string);
     };
+    reader.readAsDataURL(file);
+    setError("");
+  };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+  const upload = async () => {
+    if (!photoFile) {
+      setError("Pilih foto terlebih dahulu");
+      return;
+    }
 
-                {/* Header */}
-                <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between">
-                    <div>
-                        <p className="font-bold text-white text-base">💰 Set Gaji Lembur</p>
-                        <p className="text-xs text-white/70 mt-1">{overtime.user?.name} · {overtime.request_date}</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+    setUploading(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", photoFile);
 
-                <div className="p-6 space-y-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
-                            ⚠️ {error}
-                        </div>
-                    )}
+      // Upload ke Supabase Storage
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-                    {/* Ringkasan durasi */}
-                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Ringkasan Lembur</p>
-                        <div className="grid grid-cols-2 gap-y-1.5 text-xs">
-                            {overtime.actual_start && (
-                                <>
-                                    <span className="text-gray-400">Mulai aktual</span>
-                                    <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_start)} WIB</span>
-                                </>
-                            )}
-                            {overtime.actual_end && (
-                                <>
-                                    <span className="text-gray-400">Selesai aktual</span>
-                                    <span className="font-bold text-gray-700">{toWIBStr(overtime.actual_end)} WIB</span>
-                                </>
-                            )}
-                            {durationMins > 0 && (
-                                <>
-                                    <span className="text-gray-400">Total durasi</span>
-                                    <span className="font-bold text-gray-700">{formatDuration(durationMins)}</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
+      if (!uploadRes.ok) throw new Error("Upload gagal");
 
-                    {/* Input Rate/Jam saja */}
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                            Rate per Jam (Rp)
-                        </label>
-                        <div className="relative">
-                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
-                            <input
-                                type="number"
-                                min={0}
-                                value={ratePerHour}
-                                onChange={e => setRatePerHour(e.target.value)}
-                                placeholder="Contoh: 25000"
-                                className="w-full h-12 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 font-mono"
-                                autoFocus
-                            />
-                        </div>
-                    </div>
+      const uploadData = await uploadRes.json();
+      const photoUrl = uploadData.url;
 
-                    {/* Preview kalkulasi total */}
-                    <div className={`rounded-xl border px-4 py-3 transition-all ${isValid
-                        ? "bg-emerald-50 border-emerald-200"
-                        : "bg-gray-50 border-gray-100"
-                        }`}>
-                        <p className="text-[10px] font-bold uppercase tracking-wide mb-1 ${isValid ? 'text-emerald-600' : 'text-gray-400'}">
-                            {isValid ? "✓ Total Gaji Lembur" : "Total Gaji Lembur"}
-                        </p>
-                        {isValid && totalPay !== null ? (
-                            <div>
-                                <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
-                                <p className="text-[10px] text-emerald-600 mt-0.5">
-                                    {formatRupiah(rate)}/jam × {billedHours} jam
-                                    {durationMins % 60 > 0 && (
-                                        <span className="text-emerald-500/70 ml-1">
-                                            (total aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-gray-400">
-                                {isValid && totalPay !== null ? (
-                                    <div>
-                                        <p className="text-xl font-black text-emerald-700">{formatRupiah(totalPay)}</p>
-                                        <p className="text-[10px] text-emerald-600 mt-0.5">
-                                            {formatRupiah(rate)}/jam × {billedHours} jam
-                                            {durationMins % 60 > 0 && (
-                                                <span className="text-emerald-500/70 ml-1">
-                                                    (aktual {formatDuration(durationMins)}, sisa {durationMins % 60}m tidak dihitung)
-                                                </span>
-                                            )}
-                                        </p>
-                                    </div>
-                                ) : durationMins > 0 && billedHours === 0 ? (
-                                    // Durasi ada tapi < 1 jam penuh
-                                    <div>
-                                        <p className="text-base font-bold text-amber-600">Tidak terhitung</p>
-                                        <p className="text-[10px] text-amber-500 mt-0.5">
-                                            Durasi {formatDuration(durationMins)} — minimal 1 jam penuh untuk mendapat bayaran
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-gray-400">Isi rate per jam untuk melihat total</p>
-                                )}</p>
-                        )}
-                    </div>
-                </div>
+      // Update overtime record
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: overtime.id,
+          action: "COMPLETE",
+          proof_photo_url: photoUrl,
+        }),
+      });
 
-                <div className="px-6 pb-6 flex gap-3">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
-                        Batal
-                    </button>
-                    <button
-                        onClick={save}
-                        disabled={saving || !isValid}
-                        className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {saving
-                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                            : "💾 Simpan Gaji"
-                        }
-                    </button>
-                </div>
-            </div>
+      const d = await res.json();
+      if (!d.success) {
+        setError(d.message || "Gagal menyimpan");
+        return;
+      }
+
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Gagal upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 flex items-start justify-between">
+          <div>
+            <p className="font-bold text-white text-base">🏁 Selesaikan Lemburan</p>
+            <p className="text-xs text-white/70 mt-1">{overtime.users?.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
-    );
+
+        <div className="px-6 py-5 space-y-4">
+          {isAutoCompleted && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-700">
+              <p className="font-semibold mb-1">⚡ Auto-Complete</p>
+              <p className="text-amber-600">
+                Lemburan ini di-auto complete karena sudah melewati waktu yang dijadwalkan.
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+              ⚠️ {error}
+            </div>
+          )}
+
+          {photoPreview ? (
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                Foto Bukti
+              </p>
+              <img
+                src={photoPreview}
+                alt="Preview"
+                className="w-full h-48 object-cover rounded-xl border border-gray-200"
+              />
+              <button
+                onClick={() => {
+                  setPhotoFile(null);
+                  setPhotoPreview(null);
+                }}
+                className="mt-2 text-xs font-bold text-red-600 hover:text-red-700 underline"
+              >
+                Ganti Foto
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">
+                Upload Foto Bukti
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50 transition">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="photoInput"
+                />
+                <label
+                  htmlFor="photoInput"
+                  className="block cursor-pointer"
+                >
+                  <div className="text-3xl mb-2">📸</div>
+                  <p className="text-sm font-bold text-gray-700">Klik untuk upload foto</p>
+                  <p className="text-xs text-gray-400 mt-1">atau drag file ke sini</p>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all"
+          >
+            Batal
+          </button>
+          <button
+            onClick={upload}
+            disabled={uploading || !photoFile}
+            className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {uploading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Mengunggah...
+              </>
+            ) : (
+              "✅ Selesai"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-
+// ─── Main Component ────────────────────────────────────────────────────────────
 export default function OvertimePage() {
-    const [currentUser, setCurrentUser] = useState<any>(null);
-    const [overtimes, setOvertimes] = useState<OvertimeRequest[]>([]);
-    const [rates, setRates] = useState<OvertimeRate[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [overtimes, setOvertimes] = useState<OvertimeRequest[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("Semua");
+  const [filterUser, setFilterUser] = useState<string>("Semua");
 
-    const [showRequest, setShowRequest] = useState(false);
-    const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
-    const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
-    const [showRates, setShowRates] = useState(false);
-    const [startData, setStartData] = useState<OvertimeRequest | null>(null);
-    const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
+  // ✅ Calendar state
+  const [calendarMonth, setCalendarMonth] = useState<{
+    year: number;
+    month: number;
+  }>({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(),
+  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-    const today = getWIBToday();
+  // Modal state
+  const [startData, setStartData] = useState<OvertimeRequest | null>(null);
+  const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
+  const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
 
-    const canManageRates = isApprover(currentUser?.role);
+  // Fetchers
+  const fetchOvertimes = useCallback(async () => {
+    const r = await fetch("/api/attendance/overtime");
+    const d = await r.json();
+    if (d.success) setOvertimes(d.data || []);
+  }, []);
 
-    const fetchOvertimes = useCallback(async () => {
-        setLoading(true);
-        try {
-            const now = new Date();
-            const y = now.getFullYear(), m = now.getMonth() + 1;
-            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m}`);
-            const d = await r.json();
-            if (d.success) setOvertimes(d.data || []);
-        } catch { } finally { setLoading(false); }
-    }, []);
+  const fetchAllUsers = useCallback(async () => {
+    const r = await fetch("/api/attendance/users");
+    const d = await r.json();
+    if (d.success) setAllUsers(d.data || []);
+  }, []);
 
-    const fetchRates = useCallback(async () => {
-        const r = await fetch("/api/attendance/overtime/rates");
-        const d = await r.json();
-        if (d.success) setRates(d.data || []);
-    }, []);
+  useEffect(() => {
+    getCurrentUserClient().then((u) => setCurrentUser(u));
+  }, []);
 
-    useEffect(() => {
-        getCurrentUserClient().then(u => setCurrentUser(u));
-        fetchOvertimes();
-        fetchRates();
-    }, []);
-
-    const filtered = useMemo(() => {
-        if (filterStatus === "ALL") return overtimes;
-        return overtimes.filter(o => o.status === filterStatus);
-    }, [overtimes, filterStatus]);
-
-    const myPending = overtimes.filter(o =>
-        o.user_id === currentUser?.id && ["PENDING", "APPROVED", "ONGOING"].includes(o.status)
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchOvertimes(), fetchAllUsers()]).finally(() =>
+      setLoading(false)
     );
+  }, []);
 
-    const pendingApprovals = isApprover(currentUser?.role)
-        ? overtimes.filter(o => o.status === "PENDING")
-        : [];
+  // ✅ Auto-complete useEffect
+  useEffect(() => {
+    const checkAutoComplete = setInterval(() => {
+      const now = Date.now();
 
-    const cancel = async (id: string) => {
-        if (!confirm("Batalkan request lembur ini?")) return;
-        await fetch("/api/attendance/overtime", {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, action: "CANCEL" }),
-        });
+      overtimes.forEach((o) => {
+        // Auto-complete jika:
+        // - Status ONGOING
+        // - scheduled_end sudah lewat
+        // - Belum ada actual_end (belum complete)
+        if (
+          o.status === "ONGOING" &&
+          o.scheduled_end &&
+          new Date(o.scheduled_end).getTime() <= now &&
+          !o.actual_end
+        ) {
+          console.log(
+            `[AUTO-COMPLETE] Overtime ${o.id} scheduled_end reached, auto-triggering complete`
+          );
+
+          handleAutoComplete(o);
+        }
+      });
+    }, 30000); // Check setiap 30 detik
+
+    return () => clearInterval(checkAutoComplete);
+  }, [overtimes]);
+
+  // ✅ Auto-complete handler
+  const handleAutoComplete = async (overtime: OvertimeRequest) => {
+    try {
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: overtime.id,
+          action: "COMPLETE",
+          proof_photo_url: null,
+          auto_completed: true,
+        }),
+      });
+
+      const d = await res.json();
+      if (d.success) {
+        console.log("[AUTO-COMPLETE] Success");
         fetchOvertimes();
-    };
+        // Buka modal untuk user upload foto
+        setCompleteData(overtime);
+      }
+    } catch (err) {
+      console.error("[AUTO-COMPLETE] Error:", err);
+    }
+  };
 
-    // Buka StartModal — isi uraian pekerjaan dulu sebelum mulai
-    const openStartModal = (overtime: OvertimeRequest) => {
-        setStartData(overtime);
-    };
+  // Derived
+  const filtered = useMemo(() => {
+    let result = overtimes;
 
-    const rateMap = useMemo(() => {
-        const m: Record<string, number> = {};
-        rates.forEach(r => { m[r.role] = r.rate_per_hour; });
-        return m;
-    }, [rates]);
+    if (filterStatus !== "Semua") {
+      result = result.filter((o) => o.status === filterStatus);
+    }
 
-    return (
-        <DashboardLayout>
-            <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    if (filterUser !== "Semua") {
+      result = result.filter((o) => o.users?.name === filterUser);
+    }
 
-                {/* ── Header ── */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-800">⏰ Lembur</h1>
-                        <p className="text-xs text-gray-400 mt-1">Kelola request dan approval lembur karyawan</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {canManageRates && (
-                            <button onClick={() => setShowRates(true)}
-                                className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition">
-                                💰 Rate Lembur
-                            </button>
-                        )}
-                        <button onClick={() => setShowRequest(true)}
-                            className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 rounded-xl hover:opacity-90 transition shadow-sm">
-                            ➕ Request Lembur
-                        </button>
-                        <button onClick={fetchOvertimes}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            Refresh
-                        </button>
-                    </div>
+    return result;
+  }, [overtimes, filterStatus, filterUser]);
+
+  const uniqueUsers = useMemo(
+    () =>
+      [
+        ...new Set(
+          allUsers.length > 0
+            ? allUsers.map((u) => u.name)
+            : overtimes.map((o) => o.users?.name || "Unknown")
+        ),
+      ].sort(),
+    [allUsers, overtimes]
+  );
+
+  const statuses = useMemo(
+    () => [...new Set(overtimes.map((o) => o.status))],
+    [overtimes]
+  );
+
+  // ✅ Calendar & filter
+  const thisMonthOvertimes = overtimes.filter((o) => {
+    const dateKey = toWIBDateKey(o.request_date);
+    return dateKey.startsWith(
+      `${calendarMonth.year}-${pad2(calendarMonth.month + 1)}`
+    );
+  });
+
+  const byDate = useMemo(() => {
+    const m: Record<string, OvertimeRequest[]> = {};
+    thisMonthOvertimes.forEach((o) => {
+      const k = toWIBDateKey(o.request_date);
+      if (!m[k]) m[k] = [];
+      m[k].push(o);
+    });
+    return m;
+  }, [thisMonthOvertimes]);
+
+  const calDays = useMemo(() => {
+    const fd = new Date(calendarMonth.year, calendarMonth.month, 1).getDay();
+    const dim = new Date(
+      calendarMonth.year,
+      calendarMonth.month + 1,
+      0
+    ).getDate();
+    const c: (number | null)[] = [];
+    for (let i = 0; i < fd; i++) c.push(null);
+    for (let d = 1; d <= dim; d++) c.push(d);
+    return c;
+  }, [calendarMonth.year, calendarMonth.month]);
+
+  const todayKey = getWIBToday();
+
+  const selectedOvertimes = selectedDate
+    ? (byDate[selectedDate] || []).sort((a, b) =>
+        (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID")
+      )
+    : [];
+
+  const statCards = [
+    {
+      label: "Total",
+      value: overtimes.length,
+      icon: "📋",
+      gradient: "from-gray-50 to-gray-100",
+      iconBg: "bg-gray-100",
+    },
+    {
+      label: "Pending",
+      value: overtimes.filter((o) => o.status === "PENDING").length,
+      icon: "⏳",
+      gradient: "from-amber-50 to-orange-100",
+      iconBg: "bg-amber-100",
+    },
+    {
+      label: "Ongoing",
+      value: overtimes.filter((o) => o.status === "ONGOING").length,
+      icon: "🟢",
+      gradient: "from-green-50 to-emerald-100",
+      iconBg: "bg-green-100",
+    },
+    {
+      label: "Completed",
+      value: overtimes.filter((o) => o.status === "COMPLETED").length,
+      icon: "✅",
+      gradient: "from-blue-50 to-indigo-100",
+      iconBg: "bg-blue-100",
+    },
+  ];
+
+  return (
+    <DashboardLayout>
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6 animate-fadeIn">
+        {/* ── Header ── */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
+              <span className="bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                Lemburan Karyawan
+              </span>
+            </h1>
+            <p className="text-xs text-gray-400 mt-1">
+              {overtimes.length} total lemburan
+            </p>
+          </div>
+        </div>
+
+        {/* ── Stat Cards ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {statCards.map((c) => (
+            <div
+              key={c.label}
+              className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:scale-[1.02]`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  {c.label}
+                </p>
+                <div className={`w-8 h-8 rounded-xl ${c.iconBg} flex items-center justify-center shadow-sm`}>
+                  <span className="text-base">{c.icon}</span>
                 </div>
-
-                {/* ── Pending Approvals Banner (khusus approver) ── */}
-                {pendingApprovals.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <span className="text-2xl">🔔</span>
-                            <div>
-                                <p className="font-bold text-amber-800 text-sm">{pendingApprovals.length} request lembur menunggu persetujuan</p>
-                                <p className="text-xs text-amber-600 mt-0.5">Klik untuk review dan approve/tolak</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setFilterStatus("PENDING")}
-                            className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 px-4 py-2 rounded-xl hover:bg-amber-200 transition">
-                            Lihat →
-                        </button>
-                    </div>
+              </div>
+              <p className="text-3xl font-black tracking-tight text-gray-800">
+                {loading ? (
+                  <span className="inline-block w-10 h-8 bg-white/50 rounded-lg animate-pulse" />
+                ) : (
+                  c.value
                 )}
+              </p>
+            </div>
+          ))}
+        </div>
 
-                {/* ── My Active Overtime (karyawan) ── */}
-                {myPending.length > 0 && myPending.some(o => o.user_id === currentUser?.id) && (
-                    <div className="space-y-3">
-                        {myPending.filter(o => ["APPROVED", "ONGOING"].includes(o.status)).map(o => {
-                            const statusCfg = STATUS_CONFIG[o.status];
-                            return (
-                                <div key={o.id} className={`${statusCfg.bg} border ${statusCfg.border} rounded-2xl p-4`}>
-                                    <div className="flex items-center justify-between flex-wrap gap-3">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>
-                                                    {statusCfg.emoji} {statusCfg.label}
-                                                </span>
-                                                <span className="text-xs font-bold text-gray-600">{o.request_date}</span>
-                                            </div>
-                                            <p className="text-sm font-bold text-gray-800">
-                                                {o.scheduled_start ? toWIBStr(o.scheduled_start) : "-"} — {o.scheduled_end ? toWIBStr(o.scheduled_end) : "-"}
-                                            </p>
-                                            {o.rate_per_hour && (
-                                                <p className="text-xs text-gray-500 mt-0.5">{formatRupiah(o.rate_per_hour)}/jam</p>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            {o.status === "APPROVED" && (() => {
-                                                const ss = getStartStatus(o.scheduled_start);
-                                                return (
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <button
-                                                            onClick={() => ss.canStart && openStartModal(o)}
-                                                            disabled={!ss.canStart}
-                                                            className={`text-xs font-bold px-4 py-2 rounded-xl transition border ${ss.canStart
-                                                                ? "text-emerald-700 bg-emerald-100 border-emerald-200 hover:bg-emerald-200 cursor-pointer"
-                                                                : "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed opacity-70"
-                                                                }`}>
-                                                            {ss.label}
-                                                        </button>
-                                                        {!ss.canStart && o.scheduled_start && (
-                                                            <p className="text-[10px] text-gray-400">
-                                                                Mulai pukul {new Date(o.scheduled_start).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })()}
-                                            {o.status === "ONGOING" && (
-                                                <button onClick={() => setCompleteData(o)}
-                                                    className="text-xs font-bold text-blue-700 bg-blue-100 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-200 transition">
-                                                    🏁 Selesai
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+        {/* ════ CALENDAR VIEW ════ */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-gray-800 tracking-tight">
+                📅 {MONTH_NAMES[calendarMonth.month]} {calendarMonth.year}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() =>
+                  setCalendarMonth((m) => ({
+                    ...m,
+                    month: m.month === 0 ? 11 : m.month - 1,
+                    year: m.month === 0 ? m.year - 1 : m.year,
+                  }))
+                }
+                className="w-8 h-8 rounded-lg hover:bg-gray-100 transition"
+              >
+                ◀
+              </button>
+              <button
+                onClick={() =>
+                  setCalendarMonth((m) => ({
+                    ...m,
+                    month: m.month === 11 ? 0 : m.month + 1,
+                    year: m.month === 11 ? m.year + 1 : m.year,
+                  }))
+                }
+                className="w-8 h-8 rounded-lg hover:bg-gray-100 transition"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
 
-                {/* ── Stat Cards ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {[
-                        { label: "Total Bulan Ini", value: overtimes.length, icon: "📋", color: "text-gray-800" },
-                        { label: "Menunggu", value: overtimes.filter(o => o.status === "PENDING").length, icon: "⏳", color: "text-amber-700" },
-                        { label: "Berlangsung", value: overtimes.filter(o => o.status === "ONGOING").length, icon: "🟢", color: "text-green-700" },
-                        { label: "Selesai", value: overtimes.filter(o => o.status === "COMPLETED").length, icon: "🏁", color: "text-blue-700" },
-                    ].map(c => (
-                        <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition">
-                            <div className="flex items-start justify-between mb-2">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{c.label}</p>
-                                <span className="text-lg">{c.icon}</span>
-                            </div>
-                            <p className={`text-2xl font-black ${c.color}`}>{loading ? <span className="w-8 h-6 bg-gray-100 rounded animate-pulse inline-block" /> : c.value}</p>
-                        </div>
-                    ))}
+          <div className="p-6">
+            {/* Day names */}
+            <div className="grid grid-cols-7 gap-2 mb-4">
+              {DAY_NAMES.map((d) => (
+                <div
+                  key={d}
+                  className="text-center text-[10px] font-black text-gray-400 py-2"
+                >
+                  {d}
                 </div>
-
-                {/* ── Filter Status ── */}
-                <div className="flex flex-wrap gap-2">
-                    {["ALL", "PENDING", "APPROVED", "ONGOING", "COMPLETED", "REJECTED", "CANCELLED"].map(s => {
-                        const cfg = s === "ALL" ? null : STATUS_CONFIG[s as OvertimeStatus];
-                        return (
-                            <button key={s} onClick={() => setFilterStatus(s)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${filterStatus === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                                {s === "ALL" ? "Semua" : `${cfg?.emoji} ${cfg?.label}`}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* ── Daftar Overtime ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    {loading ? (
-                        <div className="p-6 space-y-3">{Array(4).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                    ) : filtered.length === 0 ? (
-                        <div className="py-16 text-center">
-                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">⏰</span></div>
-                            <p className="text-sm text-gray-400">Belum ada data lembur</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-gray-100 bg-gray-50/60">
-                                        <th className="px-5 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal</th>
-                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Jadwal</th>
-                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                        <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
-                                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {filtered.map(o => {
-                                        const statusCfg = STATUS_CONFIG[o.status];
-                                        const isOwn = o.user_id === currentUser?.id;
-                                        const canAppr = isApprover(currentUser?.role) && o.status === "PENDING";
-
-                                        return (
-                                            <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
-                                                <td className="px-5 py-4">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
-                                                            {initials(o.user?.name ?? "?")}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-gray-800 text-sm">{o.user?.name ?? "-"}</p>
-                                                            <p className="text-[10px] text-gray-400">{ROLE_LABEL[o.user?.role ?? ""] ?? o.user?.role}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <p className="font-bold text-gray-700 text-sm">{new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</p>
-                                                    <p className="text-[10px] text-gray-400 truncate max-w-[120px]">{o.reason}</p>
-                                                    {o.work_description && (
-                                                        <p className="text-[10px] text-emerald-600 truncate max-w-[120px] mt-0.5" title={o.work_description}>
-                                                            📋 {o.work_description}
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    {o.scheduled_start && o.scheduled_end ? (
-                                                        <div>
-                                                            <p className="font-mono font-bold text-gray-700 text-xs">
-                                                                {o.actual_start ? toWIBStr(o.actual_start) : toWIBStr(o.scheduled_start)}
-                                                                {" – "}
-                                                                {o.actual_end ? toWIBStr(o.actual_end) : toWIBStr(o.scheduled_end)}
-                                                            </p>
-                                                            {o.actual_start && <p className="text-[10px] text-emerald-600">▶ Mulai: {toWIBStr(o.actual_start)}</p>}
-                                                            {o.rate_per_hour && <p className="text-[10px] text-gray-400">{formatRupiah(o.rate_per_hour)}/jam</p>}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[10px] text-gray-300 font-bold">Diminta: {o.requested_start}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-full border ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>
-                                                        {statusCfg.emoji} {statusCfg.label}
-                                                    </span>
-                                                    {o.rejection_note && (
-                                                        <p className="text-[10px] text-red-400 mt-0.5 max-w-[120px] truncate">{o.rejection_note}</p>
-                                                    )}
-                                                    {o.duration_minutes && (
-                                                        <p className="text-[10px] text-gray-400 mt-0.5">{formatDuration(o.duration_minutes)}</p>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-4 text-right">
-                                                    {o.total_pay != null && o.total_pay > 0 ? (
-                                                        <span className="font-black text-gray-800 text-sm">{formatRupiah(o.total_pay)}</span>
-                                                    ) : o.status === "COMPLETED" && isApprover(currentUser?.role) ? (
-                                                        <span className="text-[10px] text-amber-500 font-semibold">Belum diisi</span>
-                                                    ) : (
-                                                        <span className="text-gray-300 text-xs">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                                        {canAppr && (
-                                                            <button onClick={() => setApproveData(o)}
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition whitespace-nowrap">
-                                                                ✅ Review
-                                                            </button>
-                                                        )}
-                                                        {isOwn && o.status === "ONGOING" && (
-                                                            <button onClick={() => setCompleteData(o)}
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition">
-                                                                🏁 Selesai
-                                                            </button>
-                                                        )}
-                                                        {isOwn && o.status === "APPROVED" && (() => {
-                                                            const ss = getStartStatus(o.scheduled_start);
-                                                            return (
-                                                                <div className="flex flex-col items-center gap-0.5">
-                                                                    <button
-                                                                        onClick={() => ss.canStart && openStartModal(o)}
-                                                                        disabled={!ss.canStart}
-                                                                        title={!ss.canStart && o.scheduled_start
-                                                                            ? `Mulai pukul ${new Date(o.scheduled_start).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB`
-                                                                            : "Mulai lembur"
-                                                                        }
-                                                                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition whitespace-nowrap ${ss.canStart
-                                                                            ? "bg-green-50 text-green-600 border-green-200 hover:bg-green-100 cursor-pointer"
-                                                                            : "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed"
-                                                                            }`}>
-                                                                        {ss.label}
-                                                                    </button>
-                                                                    {!ss.canStart && o.scheduled_start && (
-                                                                        <span className="text-[9px] text-gray-400">
-                                                                            {new Date(o.scheduled_start).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                        {(isOwn || isApprover(currentUser?.role)) && ["PENDING", "APPROVED"].includes(o.status) && (
-                                                            <button onClick={() => cancel(o.id)}
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition">
-                                                                🚫
-                                                            </button>
-                                                        )}
-                                                        {o.proof_photo_url && (
-                                                            <a href={o.proof_photo_url} target="_blank" rel="noopener noreferrer"
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition">
-                                                                📷
-                                                            </a>
-                                                        )}
-                                                        {isApprover(currentUser?.role) && o.status === "COMPLETED" && (
-                                                            <button onClick={() => setSetPayData(o)}
-                                                                className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition whitespace-nowrap">
-                                                                💰 Gaji
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Total Lembur Bulan Ini ── */}
-                {overtimes.filter(o => o.status === "COMPLETED" && o.total_pay).length > 0 && (
-                    <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] rounded-2xl px-6 py-4 flex items-center justify-between">
-                        <p className="text-white/70 text-sm font-medium">Total Biaya Lembur Bulan Ini</p>
-                        <p className="text-white font-black text-xl">
-                            {formatRupiah(overtimes.filter(o => o.status === "COMPLETED").reduce((s, o) => s + (o.total_pay ?? 0), 0))}
-                        </p>
-                    </div>
-                )}
+              ))}
             </div>
 
-            {/* ── Modals ── */}
-            {showRequest && <RequestOvertimeModal onClose={() => setShowRequest(false)} onSaved={fetchOvertimes} />}
-            {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={fetchOvertimes} />}
-            {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={fetchOvertimes} />}
-            {showRates && <RateModal rates={rates} onClose={() => setShowRates(false)} onSaved={() => { fetchRates(); setShowRates(false); }} />}
-            {startData && <StartModal overtime={startData} onClose={() => setStartData(null)} onStarted={() => { fetchOvertimes(); setStartData(null); }} />}
-            {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { fetchOvertimes(); setSetPayData(null); }} />}
-            <style jsx global>{`
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.35s ease-out; }
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-2">
+              {calDays.map((day, idx) => {
+                if (!day)
+                  return <div key={`empty-${idx}`} />;
+
+                const dk = `${calendarMonth.year}-${pad2(
+                  calendarMonth.month + 1
+                )}-${pad2(day)}`;
+                const dayOvertimes = byDate[dk] || [];
+                const pending = dayOvertimes.filter(
+                  (o) => o.status === "PENDING"
+                ).length;
+                const approved = dayOvertimes.filter(
+                  (o) => o.status === "APPROVED"
+                ).length;
+                const ongoing = dayOvertimes.filter(
+                  (o) => o.status === "ONGOING"
+                ).length;
+                const completed = dayOvertimes.filter(
+                  (o) => o.status === "COMPLETED"
+                ).length;
+                const total = dayOvertimes.length;
+                const isSel = dk === selectedDate;
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() =>
+                      setSelectedDate(selectedDate === dk ? null : dk)
+                    }
+                    className={`flex flex-col items-start justify-start p-2 rounded-lg min-h-[80px] border-2 transition-all ${
+                      isSel
+                        ? "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-300 ring-2 ring-orange-200 shadow-md"
+                        : total > 0
+                        ? "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                        : "bg-white border-gray-100 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span
+                      className={`text-base font-black mb-2 ${
+                        isSel ? "text-orange-600" : "text-gray-800"
+                      }`}
+                    >
+                      {day}
+                    </span>
+
+                    {total > 0 && (
+                      <div className="space-y-1 w-full">
+                        {pending > 0 && (
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded block">
+                            ⏳ {pending}
+                          </span>
+                        )}
+                        {approved > 0 && (
+                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded block">
+                            ✅ {approved}
+                          </span>
+                        )}
+                        {ongoing > 0 && (
+                          <span className="text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded block">
+                            🟢 {ongoing}
+                          </span>
+                        )}
+                        {completed > 0 && (
+                          <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded block">
+                            🏁 {completed}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Filter ── */}
+        {selectedDate && (
+          <div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-wrap gap-3">
+                <div>
+                  <p className="text-lg font-bold text-gray-800">
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString(
+                      "id-ID",
+                      {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      }
+                    )}
+                  </p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {selectedOvertimes.filter((o) => o.status === "PENDING")
+                      .length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">
+                        ⏳{" "}
+                        {
+                          selectedOvertimes.filter((o) => o.status === "PENDING")
+                            .length
+                        }{" "}
+                        pending
+                      </span>
+                    )}
+                    {selectedOvertimes.filter((o) => o.status === "ONGOING")
+                      .length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 px-3 py-1 rounded-full">
+                        🟢{" "}
+                        {
+                          selectedOvertimes.filter((o) => o.status === "ONGOING")
+                            .length
+                        }{" "}
+                        jalan
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {selectedOvertimes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="text-3xl mb-2">📭</div>
+                  <p className="text-sm text-gray-400">
+                    Tidak ada lemburan di hari ini
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Karyawan
+                        </th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Waktu
+                        </th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Status
+                        </th>
+                        <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Bayaran
+                        </th>
+                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {selectedOvertimes.map((o) => (
+                        <tr
+                          key={o.id}
+                          className="hover:bg-gray-50/60 transition-colors duration-200"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 shadow-md">
+                                {initials(o.users?.name || "??")}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-800 text-sm">
+                                  {o.users?.name}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono font-bold text-gray-800 text-xs">
+                                {formatTime(o.scheduled_start)} -{" "}
+                                {formatTime(o.scheduled_end)}
+                              </span>
+                              {o.actual_end && (
+                                <span className="text-[10px] text-gray-400">
+                                  Selesai: {formatTime(o.actual_end)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${
+                                o.status === "PENDING"
+                                  ? "bg-amber-100 text-amber-700 border-amber-200"
+                                  : o.status === "APPROVED"
+                                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                  : o.status === "ONGOING"
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : o.status === "COMPLETED"
+                                  ? "bg-blue-100 text-blue-700 border-blue-200"
+                                  : "bg-red-100 text-red-700 border-red-200"
+                              }`}
+                            >
+                              {o.status === "PENDING"
+                                ? "⏳ Pending"
+                                : o.status === "APPROVED"
+                                ? "✅ Disetujui"
+                                : o.status === "ONGOING"
+                                ? "🟢 Berjalan"
+                                : o.status === "COMPLETED"
+                                ? "🏁 Selesai"
+                                : "❌ Ditolak"}
+                              {o.auto_completed && (
+                                <span className="text-[8px] ml-1">
+                                  (auto)
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            {o.total_pay ? (
+                              <span className="font-black text-gray-800 text-sm">
+                                {formatRupiah(o.total_pay)}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-300 font-bold">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            {o.status === "APPROVED" && !o.actual_start && (
+                              <button
+                                onClick={() => setStartData(o)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-orange-100 text-orange-600 border border-orange-200 hover:bg-orange-200 transition-all"
+                              >
+                                🟢 Mulai
+                              </button>
+                            )}
+                            {o.status === "ONGOING" &&
+                              !o.actual_end &&
+                              !o.rate_per_hour && (
+                                <button
+                                  onClick={() => setSetPayData(o)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200 transition-all"
+                                >
+                                  💰 Bayar
+                                </button>
+                              )}
+                            {o.status === "ONGOING" &&
+                              !o.actual_end &&
+                              o.rate_per_hour && (
+                                <button
+                                  onClick={() => setCompleteData(o)}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-blue-100 text-blue-600 border border-blue-200 hover:bg-blue-200 transition-all"
+                                >
+                                  🏁 Selesai
+                                </button>
+                              )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── All Overtimes Table ── */}
+        {!selectedDate && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <p className="text-base font-bold text-gray-800 mb-3">
+                Daftar Lemburan
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["Semua", ...statuses].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFilterStatus(s)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      filterStatus === s
+                        ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md scale-105"
+                        : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    {s === "PENDING"
+                      ? "⏳ Pending"
+                      : s === "APPROVED"
+                      ? "✅ Disetujui"
+                      : s === "ONGOING"
+                      ? "🟢 Berjalan"
+                      : s === "COMPLETED"
+                      ? "🏁 Selesai"
+                      : s === "REJECTED"
+                      ? "❌ Ditolak"
+                      : "Semua"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-6 space-y-3">
+                {Array(5)
+                  .fill(0)
+                  .map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 bg-gray-50 rounded-2xl animate-pulse"
+                    />
+                  ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-3xl mb-2">📭</div>
+                <p className="text-sm text-gray-400">Tidak ada lemburan</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Karyawan
+                      </th>
+                      <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Tanggal
+                      </th>
+                      <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Waktu
+                      </th>
+                      <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Status
+                      </th>
+                      <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Bayaran
+                      </th>
+                      <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Aksi
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filtered.map((o) => (
+                      <tr
+                        key={o.id}
+                        className="hover:bg-gray-50/60 transition-colors duration-200"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 shadow-md">
+                              {initials(o.users?.name || "??")}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800 text-sm">
+                                {o.users?.name}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="font-mono font-bold text-gray-800 text-xs">
+                            {new Date(o.request_date).toLocaleDateString(
+                              "id-ID",
+                              { day: "numeric", month: "short", year: "numeric" }
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-xs text-gray-600">
+                            {formatTime(o.scheduled_start)} -{" "}
+                            {formatTime(o.scheduled_end)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${
+                              o.status === "PENDING"
+                                ? "bg-amber-100 text-amber-700 border-amber-200"
+                                : o.status === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                : o.status === "ONGOING"
+                                ? "bg-green-100 text-green-700 border-green-200"
+                                : o.status === "COMPLETED"
+                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                : "bg-red-100 text-red-700 border-red-200"
+                            }`}
+                          >
+                            {o.status === "PENDING"
+                              ? "⏳ Pending"
+                              : o.status === "APPROVED"
+                              ? "✅ Disetujui"
+                              : o.status === "ONGOING"
+                              ? "🟢 Berjalan"
+                              : o.status === "COMPLETED"
+                              ? "🏁 Selesai"
+                              : "❌ Ditolak"}
+                            {o.auto_completed && (
+                              <span className="text-[8px] ml-1">(auto)</span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {o.total_pay ? (
+                            <span className="font-black text-gray-800 text-sm">
+                              {formatRupiah(o.total_pay)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 font-bold">
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {o.status === "APPROVED" && !o.actual_start && (
+                            <button
+                              onClick={() => setStartData(o)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-orange-100 text-orange-600 border border-orange-200 hover:bg-orange-200 transition-all"
+                            >
+                              🟢 Mulai
+                            </button>
+                          )}
+                          {o.status === "ONGOING" &&
+                            !o.actual_end &&
+                            !o.rate_per_hour && (
+                              <button
+                                onClick={() => setSetPayData(o)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200 transition-all"
+                              >
+                                💰 Bayar
+                              </button>
+                            )}
+                          {o.status === "ONGOING" &&
+                            !o.actual_end &&
+                            o.rate_per_hour && (
+                              <button
+                                onClick={() => setCompleteData(o)}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-blue-100 text-blue-600 border border-blue-200 hover:bg-blue-200 transition-all"
+                              >
+                                🏁 Selesai
+                              </button>
+                            )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Modals ── */}
+      {startData && (
+        <StartModal
+          overtime={startData}
+          onClose={() => setStartData(null)}
+          onSaved={() => {
+            fetchOvertimes();
+            setStartData(null);
+          }}
+        />
+      )}
+      {setPayData && (
+        <SetPayModal
+          overtime={setPayData}
+          onClose={() => setSetPayData(null)}
+          onSaved={() => {
+            fetchOvertimes();
+            setSetPayData(null);
+          }}
+        />
+      )}
+      {completeData && (
+        <CompleteModal
+          overtime={completeData}
+          onClose={() => setCompleteData(null)}
+          onSaved={() => {
+            fetchOvertimes();
+            setCompleteData(null);
+          }}
+          isAutoCompleted={completeData.auto_completed}
+        />
+      )}
+
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
       `}</style>
-        </DashboardLayout>
-    );
+    </DashboardLayout>
+  );
 }

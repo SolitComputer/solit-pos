@@ -38,6 +38,18 @@ type ManualAttendance = {
     users?: { id: string; name: string; role: string; shift: string };
 };
 
+type UserAllowances = {
+    id: string;
+    user_id: string;
+    allowance_wife: number;
+    allowance_child: number;
+    deduction_loan: number;
+    deduction_pension: number;
+    updated_at: string;
+};
+
+
+
 type UserSalary = {
     user_id: string;
     salary_type: "FIXED" | "PERCENTAGE";
@@ -527,7 +539,233 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
     );
 }
 
-// ─── Modal: Kelola Cuti ────────────────────────────────────────────────────────
+// ─── Modal: Edit Tunjangan & Potongan ────────────────────────────────────────
+function EditAllowanceModal({
+    userId,
+    userName,
+    currentAllowance,
+    onClose,
+    onSaved,
+}: {
+    userId: string;
+    userName: string;
+    currentAllowance?: UserAllowances;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [form, setForm] = useState({
+        allowance_wife: currentAllowance?.allowance_wife ?? 0,
+        allowance_child: currentAllowance?.allowance_child ?? 0,
+        deduction_loan: currentAllowance?.deduction_loan ?? 0,
+        deduction_pension: currentAllowance?.deduction_pension ?? 0,
+    });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const save = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch("/api/attendance/allowances", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    ...form,
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) {
+                setError(d.message || "Gagal menyimpan");
+                return;
+            }
+            onSaved();
+            onClose();
+        } catch {
+            setError("Gagal menyimpan");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">💜 Tunjangan & Potongan</p>
+                        <p className="text-xs text-white/70 mt-1">{userName}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[70vh]">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
+                    {/* TUNJANGAN SECTION */}
+                    <div>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-4">
+                            ➕ Tunjangan (Disesuaikan % Kehadiran)
+                        </p>
+                        <div className="space-y-3">
+                            {/* Tunjangan Istri */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Tunjangan Istri
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.allowance_wife}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, allowance_wife: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 500000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Contoh: Rp{formatRupiah(form.allowance_wife)} × 85% kehadiran = Rp
+                                    {formatRupiah(Math.round(form.allowance_wife * 0.85))}
+                                </p>
+                            </div>
+
+                            {/* Tunjangan Anak */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Tunjangan Anak
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.allowance_child}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, allowance_child: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 300000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Contoh: Rp{formatRupiah(form.allowance_child)} × 85% kehadiran = Rp
+                                    {formatRupiah(Math.round(form.allowance_child * 0.85))}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* POTONGAN SECTION */}
+                    <div>
+                        <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4">
+                            ➖ Potongan (Langsung Potong, Tidak Disesuaikan %)
+                        </p>
+                        <div className="space-y-3">
+                            {/* Cicilan Kasbon */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Cicilan Kasbon / Pinjaman
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.deduction_loan}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, deduction_loan: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 100000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Dipotong penuh setiap bulan, tidak disesuaikan kehadiran
+                                </p>
+                            </div>
+
+                            {/* Dana Pensiun */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                                    Dana Pensiun / Iuran
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">Rp</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={form.deduction_pension}
+                                        onChange={(e) =>
+                                            setForm((f) => ({ ...f, deduction_pension: parseInt(e.target.value) || 0 }))
+                                        }
+                                        placeholder="Contoh: 50000"
+                                        className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-400/20 font-mono"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Dipotong penuh setiap bulan, tidak disesuaikan kehadiran
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SUMMARY */}
+                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-2xl p-4">
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3">📋 Ringkasan</p>
+                        <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between text-gray-600">
+                                <span>Tunjangan Istri (×%)</span>
+                                <span className="font-bold text-gray-800">{formatRupiah(form.allowance_wife)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                                <span>Tunjangan Anak (×%)</span>
+                                <span className="font-bold text-gray-800">{formatRupiah(form.allowance_child)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                                <span>Cicilan Kasbon</span>
+                                <span className="font-bold text-red-600">-{formatRupiah(form.deduction_loan)}</span>
+                            </div>
+                            <div className="flex justify-between text-gray-600">
+                                <span>Dana Pensiun</span>
+                                <span className="font-bold text-red-600">-{formatRupiah(form.deduction_pension)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+                        Batal
+                    </button>
+                    <button onClick={save} disabled={saving}
+                        className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Menyimpan...
+                            </>
+                        ) : (
+                            "💾 Simpan"
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
     users: UserInfo[]; leaveData: UserLeaveData[]; calYear: number; calMonth: number;
     onClose: () => void; onSaved: () => void;
@@ -1274,6 +1512,13 @@ export default function AttendanceDashboardPage() {
         userId: string; userName: string; currentSalary?: UserSalary;
     } | null>(null);
     const [absenceDetail, setAbsenceDetail] = useState<{ name: string; absences: AbsenceItem[]; offDates: string[] } | null>(null);
+    const [allowances, setAllowances] = useState<UserAllowances[]>([]);
+    const [editAllowanceUser, setEditAllowanceUser] = useState<{
+        userId: string;
+        userName: string;
+        currentAllowance?: UserAllowances;
+    } | null>(null);
+    const [overtimeTotal, setOvertimeTotal] = useState<Record<string, number>>({});
 
     // ── Fetchers ─────────────────────────────────────────────────────────────
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
@@ -1283,6 +1528,28 @@ export default function AttendanceDashboardPage() {
     const fetchAllUsers = useCallback(async () => { const r = await fetch("/api/attendance/users"); const d = await r.json(); if (d.success) setAllUsers(d.data || []); }, []);
     const fetchSalaries = useCallback(async () => { const r = await fetch("/api/attendance/salary"); const d = await r.json(); if (d.success) setSalaries(d.data?.map((s: any) => s) || []); }, []);
     const fetchLeaveData = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setLeaveData(d.data || []); }, []);
+    const fetchAllowances = useCallback(async () => {
+        const r = await fetch("/api/attendance/allowances");
+        const d = await r.json();
+        if (d.success) setAllowances(d.data || []);
+    }, []);
+
+    const fetchOvertimeTotal = useCallback(async (y: number, m: number) => {
+        try {
+            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m + 1}&status=COMPLETED`);
+            const d = await r.json();
+            if (d.success) {
+                const map: Record<string, number> = {};
+                (d.data || []).forEach((o: any) => {
+                    if (!map[o.user_id]) map[o.user_id] = 0;
+                    map[o.user_id] += o.total_pay || 0;
+                });
+                setOvertimeTotal(map);
+            }
+        } catch (err) {
+            console.error("Failed to fetch overtime total:", err);
+        }
+    }, []);
 
     const [salarySlips, setSalarySlips] = useState<any[]>([]);
     const [selectedSlipMonth, setSelectedSlipMonth] = useState<{ year: number; month: number }>({
@@ -1322,6 +1589,14 @@ export default function AttendanceDashboardPage() {
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
 
     useEffect(() => {
+        if (!selectedMonth || !isAdminRole(currentUser?.role)) return;
+        fetchOvertimeTotal(selectedMonth.year, selectedMonth.month);
+        if (isAdminRole(currentUser?.role)) {
+            fetchAllowances();
+        }
+    }, [selectedMonth, currentUser]);
+
+    useEffect(() => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
         setLoading(true); setSelectedDate(null); setFilterUser("Semua");
@@ -1356,6 +1631,11 @@ export default function AttendanceDashboardPage() {
 
     const isDayOffForUser = (name: string, dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); return (dayOffByName[name]?.has(dow) ?? false) || (dateOffByName[name]?.has(dk) ?? false); };
     const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
+    const allowanceMap = useMemo(() => {
+        const m: Record<string, UserAllowances> = {};
+        allowances.forEach(a => (m[a.user_id] = a));
+        return m;
+    }, [allowances]);
 
     // manualMap: user_id_date → record
     const manualMap = useMemo(() => {
@@ -1398,6 +1678,7 @@ export default function AttendanceDashboardPage() {
     const todayKey = getWIBToday();
     const uniqueUsers = useMemo(() => { if (allUsers.length > 0) return allUsers.map(u => u.name).sort(); return [...new Set(mergedAttendances.map(a => a.user_name))].sort(); }, [allUsers, mergedAttendances]);
     const salaryMap = useMemo(() => { const m: Record<string, UserSalary> = {}; salaries.forEach(s => m[s.user_id] = s); return m; }, [salaries]);
+
 
     const userSummary = useMemo(() => {
         type UserStat = {
@@ -1992,146 +2273,405 @@ export default function AttendanceDashboardPage() {
                     )}
 
                 {/* ════ TAB GAJI ════ */}
-                {activeTab === "salary" && isAdminRole(currentUser?.role)
-                    && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                                <div>
-                                    <p className="text-base font-bold text-gray-800">Rekap Gaji — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">Gaji tetap = penuh · Persentase = % kehadiran × gaji pokok</p>
-                                </div>
+                {activeTab === "salary" && isAdminRole(currentUser?.role) && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                            <div>
+                                <p className="text-base font-bold text-gray-800">Rekap Gaji Lengkap — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Gaji tetap = penuh · Persentase = % kehadiran × gaji pokok ·
+                                    <span className="text-emerald-500 font-semibold"> Tunjangan disesuaikan % kehadiran</span> ·
+                                    <span className="text-red-500 font-semibold"> Potongan langsung</span>
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
                                 <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">⚙️ Atur Gaji</button>
                             </div>
-                            {loading ? (
-                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm min-w-[580px]">
-                                        <thead>
-                                            <tr className="border-b border-gray-100 bg-gray-50/60">
-                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:table-cell">Tipe</th>
-                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
-                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kehadiran</th>
-                                                <th className="px-3 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Diterima</th>
-                                                <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {userSummary.map(u => {
-                                                const sal = salaryMap[u.userId];
-                                                // ✅ FIX: Formula = base_salary / totalWorkdays × skor
-                                                // FIXED: tetap dapat penuh (tidak potong berdasarkan persen)
-                                                // PERCENTAGE: dihitung per hari kerja × skor hadir
-                                                const earned = sal
-                                                    ? sal.salary_type === "FIXED"
-                                                        ? sal.base_salary
-                                                        : u.totalWorkdays > 0
-                                                            ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                            : 0
-                                                    : null;
+                        </div>
 
-                                                return (
-                                                    <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                        <td className="px-4 py-4">
-                                                            <div className="flex items-center gap-2.5">
-                                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
-                                                                <div className="min-w-0">
-                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
-                                                                    <span className="text-[10px] text-gray-400">{formatPct(u.pct)}% kehadiran</span>
-                                                                </div>
+                        {loading ? (
+                            <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm min-w-[1200px] border-collapse">
+                                    <thead>
+                                        <tr className="border-2 border-gray-300 bg-gray-50/60 sticky top-0">
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Karyawan</th>
+
+                                            {/* PENGHASILAN SECTION */}
+                                            <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300">
+                                                📈 PENGHASILAN
+                                            </th>
+
+                                            {/* POTONGAN SECTION */}
+                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300">
+                                                📉 POTONGAN
+                                            </th>
+
+                                            {/* TOTAL SECTION */}
+                                            <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50/40 border-2 border-gray-300">
+                                                💰 TOTAL
+                                            </th>
+
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Aksi</th>
+                                        </tr>
+
+                                        {/* Sub-header */}
+                                        <tr className="border-2 border-gray-200 bg-gray-50/40">
+                                            <th className="px-4 py-4 border-2 border-gray-200" />
+
+                                            {/* Penghasilan sub-headers */}
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Gaji Pokok</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Tunjangan Istri (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Tunjangan Anak (×%)</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Lemburan</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Kehadiran %</th>
+
+                                            {/* Potongan sub-headers */}
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Kasbon</th>
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Pensiun</th>
+
+                                            {/* Total sub-headers */}
+                                            <th className="px-3 py-3 text-center text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Gross</th>
+                                            <th className="px-3 py-3 text-right text-[9px] font-bold text-gray-500 border-r-2 border-gray-200">Net</th>
+
+                                            <th className="px-4 py-3 border-2 border-gray-200" />
+                                        </tr>
+                                    </thead>
+
+                                    <tbody className="divide-y divide-gray-300">
+                                        {userSummary.map(u => {
+                                            const sal = salaryMap[u.userId];
+                                            const allow = allowanceMap[u.userId];
+                                            const overtime = overtimeTotal[u.userId] || 0;
+
+                                            // Hitung gaji pokok
+                                            const salaryIncome =
+                                                sal && sal.salary_type === "FIXED"
+                                                    ? sal.base_salary
+                                                    : sal && u.totalWorkdays > 0
+                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                        : 0;
+
+                                            // Tunjangan (disesuaikan % kehadiran)
+                                            const allowanceWife =
+                                                Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
+                                            const allowanceChild =
+                                                Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
+
+                                            // Potongan (langsung)
+                                            const deductionLoan = allow?.deduction_loan || 0;
+                                            const deductionPension = allow?.deduction_pension || 0;
+
+                                            // Total
+                                            const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
+                                            const totalDeduction = deductionLoan + deductionPension;
+                                            const netSalary = grossIncome - totalDeduction;
+
+                                            return (
+                                                <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
+                                                    <td className="px-4 py-4 border-r-2 border-gray-200">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                                                                {initials(u.name)}
                                                             </div>
-                                                        </td>
-                                                        <td className="px-3 py-4 text-center hidden sm:table-cell">
-                                                            {sal
-                                                                ? <span className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1.5 rounded-full border ${sal.salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
-                                                                    {sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 %"}
+                                                            <div className="min-w-0">
+                                                                <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    {sal ? (sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen") : "—"}
                                                                 </span>
-                                                                : <span className="text-[10px] text-gray-300 font-bold">—</span>
-                                                            }
-                                                        </td>
-                                                        <td className="px-3 py-4 text-center">
-                                                            {sal
-                                                                ? <div className="flex flex-col items-center gap-0.5">
-                                                                    <span className="font-mono font-bold text-gray-800 text-xs">{formatRupiah(sal.base_salary)}</span>
-                                                                    <span className={`text-[9px] font-semibold sm:hidden ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
-                                                                        {sal.salary_type === "FIXED" ? "Tetap" : "% Absen"}
-                                                                    </span>
-                                                                </div>
-                                                                : <span className="text-gray-300 text-xs">—</span>
-                                                            }
-                                                        </td>
-                                                        <td className="px-3 py-4 text-center">
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>{formatPct(u.pct)}%</span>
-                                                                <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                                    <div className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
-                                                                </div>
                                                             </div>
-                                                        </td>
-                                                        <td className="px-3 py-4 text-right">
-                                                            {earned !== null ? (
-                                                                <div className="flex flex-col items-end gap-0.5">
-                                                                    <span className="font-black text-gray-800 text-sm">{formatRupiah(earned)}</span>
-                                                                    {/* Kehadiran % */}
-                                                                    <span className={`text-[9px] font-semibold ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-500" : "text-red-500"}`}>
-                                                                        {formatPct(u.pct)}% kehadiran
+                                                        </div>
+                                                    </td>
+
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {sal ? (
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="font-mono font-bold text-gray-800 text-xs">
+                                                                    {formatRupiah(sal.base_salary)}
+                                                                </span>
+                                                                {sal.salary_type === "PERCENTAGE" && (
+                                                                    <span className="text-[8px] text-gray-400">
+                                                                        {formatRupiah(Math.round(sal.base_salary / u.totalWorkdays))}/hari
                                                                     </span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
 
-                                                                    {sal && sal.salary_type === "FIXED" && (
-                                                                        <span className="text-[9px] text-gray-400 mt-0.5">
-                                                                            Jika %: {formatRupiah(Math.round((sal.base_salary / u.totalWorkdays) * u.score))}
-                                                                        </span>
-                                                                    )}
-
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-[10px] text-gray-300 font-bold">Belum diatur</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-4 text-center">
+                                                    {/* Tunjangan Istri */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {allow?.allowance_wife ? (
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="font-mono font-bold text-emerald-700 text-xs">
+                                                                    {formatRupiah(allowanceWife)}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setEditAllowanceUser({
+                                                                        userId: u.userId,
+                                                                        userName: u.name,
+                                                                        currentAllowance: allow,
+                                                                    })}
+                                                                    className="text-[8px] text-blue-500 hover:text-blue-700 font-semibold cursor-pointer"
+                                                                    title="Edit tunjangan"
+                                                                >
+                                                                    {formatRupiah(allow.allowance_wife)}
+                                                                </button>
+                                                            </div>
+                                                        ) : (
                                                             <button
-                                                                onClick={() => setEditSalaryUser({
+                                                                onClick={() => setEditAllowanceUser({
                                                                     userId: u.userId,
                                                                     userName: u.name,
-                                                                    currentSalary: salaryMap[u.userId],
+                                                                    currentAllowance: allow,
                                                                 })}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                className="text-[9px] text-gray-400 hover:text-blue-500 font-semibold cursor-pointer"
                                                             >
-                                                                ✏️ Edit
+                                                                Atur →
                                                             </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr className="border-t-2 border-gray-200 bg-gray-50/50">
-                                                <td colSpan={4} className="px-4 py-4 text-sm font-bold text-gray-600 text-right">
-                                                    Total Gaji Bulan Ini:
-                                                </td>
-                                                <td className="px-3 py-4 text-right">
-                                                    <span className="text-lg font-black text-[#1a1a2e]">
-                                                        {formatRupiah(userSummary.reduce((sum, u) => {
+                                                        )}
+                                                    </td>
+
+                                                    {/* Tunjangan Anak */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {allow?.allowance_child ? (
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="font-mono font-bold text-emerald-700 text-xs">
+                                                                    {formatRupiah(allowanceChild)}
+                                                                </span>
+                                                                <span className="text-[8px] text-gray-400">
+                                                                    {formatRupiah(allow.allowance_child)}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Lemburan */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {overtime > 0 ? (
+                                                            <span className="font-mono font-bold text-orange-600 text-xs">
+                                                                {formatRupiah(overtime)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Kehadiran % */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"
+                                                                }`}>
+                                                                {formatPct(u.pct)}%
+                                                            </span>
+                                                            <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"
+                                                                        }`}
+                                                                    style={{ width: `${Math.min(u.pct, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* POTONGAN */}
+                                                    {/* Kasbon */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {deductionLoan > 0 ? (
+                                                            <span className="font-mono font-bold text-red-600 text-xs">
+                                                                -{formatRupiah(deductionLoan)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Pensiun */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        {deductionPension > 0 ? (
+                                                            <span className="font-mono font-bold text-red-600 text-xs">
+                                                                -{formatRupiah(deductionPension)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* TOTAL */}
+                                                    {/* Gross */}
+                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                        <div className="flex flex-col items-center gap-0.5">
+                                                            <span className="font-black text-blue-600 text-sm">
+                                                                {formatRupiah(grossIncome)}
+                                                            </span>
+                                                            <span className="text-[8px] text-gray-400">bruto</span>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Net (dengan highlight) */}
+                                                    <td className="px-3 py-4 text-right">
+                                                        <div className="inline-flex flex-col items-end gap-0.5 bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-lg px-2 py-1">
+                                                            <span className="font-black text-emerald-700 text-sm">
+                                                                {formatRupiah(netSalary)}
+                                                            </span>
+                                                            <span className="text-[8px] text-emerald-600 font-semibold">bersih</span>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Aksi */}
+                                                    <td className="px-4 py-4 text-center flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => setEditAllowanceUser({
+                                                                userId: u.userId,
+                                                                userName: u.name,
+                                                                currentAllowance: allow,
+                                                            })}
+                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
+                                                            title="Edit tunjangan & potongan"
+                                                        >
+                                                            💜 Tunjangan
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+
+                                    {/* Footer Total */}
+                                    <tfoot>
+                                        <tr className="border-t-2 border-gray-300 bg-gradient-to-r from-gray-50 to-white">
+                                            <td colSpan={2} className="px-4 py-4 text-sm font-black text-gray-700">
+                                                TOTAL BULAN INI
+                                            </td>
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-emerald-600 text-xs block">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => {
                                                             const sal = salaryMap[u.userId];
-                                                            if (!sal) return sum;
-                                                            const earned = sal.salary_type === "FIXED"
-                                                                ? sal.base_salary
-                                                                : u.totalWorkdays > 0
-                                                                    ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                                    : 0;
-                                                            return sum + earned;
-                                                        }, 0))}
-                                                    </span>
-                                                </td>
-                                                <td />
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            )}
+                                                            return (
+                                                                sum +
+                                                                (sal && sal.salary_type === "FIXED"
+                                                                    ? sal.base_salary
+                                                                    : sal && u.totalWorkdays > 0
+                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                                        : 0)
+                                                            );
+                                                        }, 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Gaji Pokok</span>
+                                            </td>
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-emerald-600 text-xs block">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => {
+                                                            const allow = allowanceMap[u.userId];
+                                                            return sum + (Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0);
+                                                        }, 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Tunjangan Istri</span>
+                                            </td>
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-emerald-600 text-xs block">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => {
+                                                            const allow = allowanceMap[u.userId];
+                                                            return sum + (Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0);
+                                                        }, 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Tunjangan Anak</span>
+                                            </td>
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-orange-600 text-xs block">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => sum + (overtimeTotal[u.userId] || 0), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Lemburan</span>
+                                            </td>
+                                            <td colSpan={2} />
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-red-600 text-xs block">
+                                                    -{formatRupiah(
+                                                        userSummary.reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Total Potongan</span>
+                                            </td>
+                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-blue-600 text-xs block">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => {
+                                                            const sal = salaryMap[u.userId];
+                                                            const allow = allowanceMap[u.userId];
+                                                            const overtime = overtimeTotal[u.userId] || 0;
+
+                                                            const salaryIncome =
+                                                                sal && sal.salary_type === "FIXED"
+                                                                    ? sal.base_salary
+                                                                    : sal && u.totalWorkdays > 0
+                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                                        : 0;
+
+                                                            const allowanceWife = Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
+                                                            const allowanceChild = Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
+
+                                                            return sum + salaryIncome + allowanceWife + allowanceChild + overtime;
+                                                        }, 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Gross</span>
+                                            </td>
+                                            <td className="px-3 py-4 text-right">
+                                                <span className="font-mono font-black text-emerald-700 text-sm block bg-gradient-to-br from-emerald-100 to-green-100 px-2 py-1 rounded-lg border border-emerald-200">
+                                                    {formatRupiah(
+                                                        userSummary.reduce((sum, u) => {
+                                                            const sal = salaryMap[u.userId];
+                                                            const allow = allowanceMap[u.userId];
+                                                            const overtime = overtimeTotal[u.userId] || 0;
+
+                                                            const salaryIncome =
+                                                                sal && sal.salary_type === "FIXED"
+                                                                    ? sal.base_salary
+                                                                    : sal && u.totalWorkdays > 0
+                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                                        : 0;
+
+                                                            const allowanceWife = Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
+                                                            const allowanceChild = Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
+                                                            const deductionLoan = allow?.deduction_loan || 0;
+                                                            const deductionPension = allow?.deduction_pension || 0;
+
+                                                            const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
+                                                            const totalDeduction = deductionLoan + deductionPension;
+
+                                                            return sum + (grossIncome - totalDeduction);
+                                                        }, 0)
+                                                    )}
+                                                </span>
+                                            </td>
+                                            <td />
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-4 flex-wrap text-[10px] text-gray-500 font-medium">
+                            <span>💡 <span className="text-emerald-600 font-semibold">Tunjangan × % kehadiran</span> — otomatis disesuaikan</span>
+                            <span>•</span>
+                            <span>💡 <span className="text-red-600 font-semibold">Potongan langsung</span> — tidak dihitung %</span>
+                            <span>•</span>
+                            <span>💡 <span className="text-blue-600 font-semibold">Gross = Total Penghasilan</span> sebelum potongan</span>
                         </div>
-                    )}
+                    </div>
+                )}
 
                 {/* ════ TAB CUTI ════ */}
                 {activeTab === "leave" && isAdminRole(currentUser?.role)
@@ -2449,6 +2989,18 @@ export default function AttendanceDashboardPage() {
                     offDates={absenceDetail.offDates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setAbsenceDetail(null)}
+                />
+            )}
+            {editAllowanceUser && isAdminRole(currentUser?.role) && (
+                <EditAllowanceModal
+                    userId={editAllowanceUser.userId}
+                    userName={editAllowanceUser.userName}
+                    currentAllowance={editAllowanceUser.currentAllowance}
+                    onClose={() => setEditAllowanceUser(null)}
+                    onSaved={() => {
+                        fetchAllowances();
+                        setEditAllowanceUser(null);
+                    }}
                 />
             )}
             <style jsx global>{`
