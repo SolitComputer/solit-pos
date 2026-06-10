@@ -210,13 +210,34 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <p className="text-[10px] text-blue-600 font-semibold mb-1">💰 Harga Jual</p>
               <p className="text-sm font-bold text-blue-900 truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
             </div>
-            {item.other > 0 && (
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 ...">
-                <p className="text-[10px] text-emerald-600 font-semibold mb-1">
-                  📈 Gross Profit
+            {item.other !== undefined && item.other !== null && (
+              <div className={`bg-gradient-to-br 
+    ${item.other > 0
+                  ? "from-emerald-50 to-emerald-100 border-emerald-200"
+                  : item.other < 0
+                    ? "from-red-50 to-red-100 border-red-200"
+                    : "from-gray-50 to-gray-100 border-gray-200"
+                } rounded-lg p-2.5 border`}>
+                <p className={`text-[10px] font-semibold mb-1
+      ${item.other > 0
+                    ? "text-emerald-600"
+                    : item.other < 0
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}>
+                  {item.other > 0 ? "📈" : item.other < 0 ? "📉" : "➖"}
+                  {item.other > 0 ? "Gross Profit" : item.other < 0 ? "Loss" : "Break Even"}
                 </p>
-                <p className="text-sm font-bold text-emerald-900 truncate">
-                  Rp{(item.other || 0).toLocaleString("id-ID")}
+                <p className={`text-sm font-bold truncate
+      ${item.other > 0
+                    ? "text-emerald-900"
+                    : item.other < 0
+                      ? "text-red-900"
+                      : "text-gray-900"
+                  }`}>
+                  {item.other > 0 ? "+" : ""}{item.other
+                    ? `Rp${item.other.toLocaleString("id-ID")}`
+                    : "Rp0"}
                 </p>
               </div>
             )}
