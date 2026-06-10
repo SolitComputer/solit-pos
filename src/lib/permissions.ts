@@ -14,7 +14,10 @@ export type UserRole =
   | "KEPALA_MARKETING"
   | "PROGRAMMER"
   | "SOTECH"
-  | "ASISTEN_CEO";
+  | "ASISTEN_CEO"
+  | "PENYEDIA_BARANG"
+  | "KEPALA_PENYEDIA_BARANG"
+  | "KONTEN";
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
@@ -31,6 +34,9 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
   SOTECH: "/dashboard",
+  PENYEDIA_BARANG: "/dashboard/transactions",
+  KEPALA_PENYEDIA_BARANG: "/dashboard/transactions",
+  KONTEN: "/dashboard",
 };
 
 // ✅ Full access roles — akses ke semua halaman
@@ -42,9 +48,13 @@ const ALL_ROLES: UserRole[] = [
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
 ];
 
 const SALES_ACCESS: UserRole[] = ["KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"];
+
+// ✅ Role yang bisa lihat transaksi (supplier/content tracking)
+const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"];
 
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── Laptop ──────────────────────────────────────────────────────────────
@@ -72,6 +82,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/transactions": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
+    ...TRANSACTION_VIEW,
   ],
 
   // ── Dashboard utama ───────────────────────────────────────────────────────
@@ -106,6 +117,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
+    ...TRANSACTION_VIEW,
   ],
 
   // ── API: Warranty ────────────────────────────────────────────────────────
@@ -149,6 +161,7 @@ export const PERMISSIONS = {
   VIEW_TRANSACTIONS: [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
+    ...TRANSACTION_VIEW,
   ] as UserRole[],
   CREATE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"] as UserRole[],
   EDIT_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],

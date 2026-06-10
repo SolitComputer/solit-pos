@@ -1,64 +1,99 @@
-// src/app/api/attendance/overtime/upload/route.ts
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ success: false }, { status: 401 });
-
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
     if (!file) {
       return NextResponse.json(
-        { success: false, message: "File wajib diupload" },
+        { success: false, message: "File tidak ditemukan" },
         { status: 400 }
       );
     }
 
-    // ✅ AUTO-GENERATE FILENAME jika tidak ada
-    let filename = formData.get("filename") as string;
-    if (!filename) {
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      const ext = file.name.split(".").pop() || "jpg";
-      filename = `overtime-proof-${user.id}-${timestamp}-${random}.${ext}`;
+    // Validasi tipe file
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json(
+        { success: false, message: "Hanya file gambar yang diterima" },
+        { status: 400 }
+      );
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Validasi ukuran file (max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { success: false, message: "Ukuran file terlalu besar (max 5MB)" },
+        { status: 400 }
+      );
+    }
 
-    const { error } = await supabase.storage
-      .from("overtime-proofs")
-      .upload(filename, buffer, {
+    // Generate nama file unik
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const ext = file.name.split(".").pop() || "jpg";
+    const fileName = `overtime-proof-${timestamp}-${random}.${ext}`;
+    const folderPath = `overtime-proofs/${fileName}`;
+
+    console.log("📤 Uploading to Supabase:", {
+      bucket: "documents",
+      path: folderPath,
+      fileSize: file.size,
+      contentType: file.type,
+    });
+
+    // Upload ke Supabase Storage
+    const buffer = await file.arrayBuffer();
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .upload(folderPath, buffer, {
         contentType: file.type,
         upsert: false,
       });
 
     if (error) {
-      console.error("[overtime upload] error:", error);
+      console.error("❌ Supabase upload error:", error);
       return NextResponse.json(
-        { success: false, message: error.message },
+        {
+          success: false,
+          message: `Upload gagal: ${error.message}`,
+          errorCode: error.name,
+        },
         { status: 500 }
       );
     }
 
-    const { data: urlData } = supabase.storage
-      .from("overtime-proofs")
-      .getPublicUrl(filename);
+    console.log("✅ Upload success:", data);
 
-    return NextResponse.json({ success: true, url: urlData.publicUrl });
-  } catch (err: any) {
-    console.error("[overtime upload] catch:", err);
+    // Ambil public URL
+    const { data: publicUrlData } = supabase.storage
+      .from("documents")
+      .getPublicUrl(data.path);
+
+    const url = publicUrlData.publicUrl;
+
+    console.log("🔗 Public URL:", url);
+
+    return NextResponse.json({
+      success: true,
+      url,
+      path: data.path,
+    });
+  } catch (error: any) {
+    console.error("❌ Upload error:", error);
     return NextResponse.json(
-      { success: false, message: err?.message || "Upload gagal" },
+      {
+        success: false,
+        message: error.message || "Gagal upload",
+        error: error.toString(),
+      },
       { status: 500 }
     );
   }
