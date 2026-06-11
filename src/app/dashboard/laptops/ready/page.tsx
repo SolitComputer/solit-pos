@@ -144,8 +144,7 @@ export default function ReadyPage() {
     const [reserveTarget, setReserveTarget] = useState<{ unit: LaptopUnit; type: "RESERVED" | "HELD" } | null>(null);
     const [confirmTarget, setConfirmTarget] = useState<LaptopUnit | null>(null);
 
-    const canCreateTx = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_TRANSACTION) : false;
-    const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+    const canCreateTx = userRole ? hasPermission(userRole, PERMISSIONS.RESERVE_UNIT) : false; const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
     const canSeePrices = userRole ? hasPermission(userRole, ["ADMIN", "ACCOUNTING", "PENGELOLA_BARANG"] as UserRole[]) : false;
 
     const [confirmedUnitIds, setConfirmedUnitIds] = useState<Set<string>>(new Set());
@@ -326,22 +325,20 @@ export default function ReadyPage() {
                                 <button
                                     key={opt.value}
                                     onClick={() => setFilterStatus(opt.value)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                        filterStatus === opt.value
-                                            ? "bg-gray-800 text-white shadow-md transform scale-105"
-                                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                                    }`}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${filterStatus === opt.value
+                                        ? "bg-gray-800 text-white shadow-md transform scale-105"
+                                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                        }`}
                                 >
                                     <span>{opt.label}</span>
-                                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
-                                        filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                                    }`}>
+                                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                                        }`}>
                                         {opt.count}
                                     </span>
                                 </button>
                             ))}
                         </div>
-                        
+
                         {/* Search & Grade filter */}
                         <div className="flex flex-wrap gap-2">
                             <div className="relative flex-1 group">
@@ -356,7 +353,7 @@ export default function ReadyPage() {
                                     className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200"
                                 />
                             </div>
-                            
+
                             <select
                                 value={filterGrade}
                                 onChange={e => setFilterGrade(e.target.value)}
@@ -367,7 +364,7 @@ export default function ReadyPage() {
                                 <option value="B">👍 Grade B</option>
                                 <option value="C">⚠️ Grade C</option>
                             </select>
-                            
+
                             {(search || filterStatus !== "ALL" || filterGrade !== "ALL") && (
                                 <button
                                     onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
@@ -414,11 +411,10 @@ export default function ReadyPage() {
                                             return (
                                                 <tr
                                                     key={unit.id}
-                                                    className={`data-row transition-all duration-200 ${
-                                                        unit.status === "RESERVED" ? "bg-violet-50/30 hover:bg-violet-50/50" :
+                                                    className={`data-row transition-all duration-200 ${unit.status === "RESERVED" ? "bg-violet-50/30 hover:bg-violet-50/50" :
                                                         unit.status === "HELD" ? "bg-orange-50/30 hover:bg-orange-50/50" :
-                                                        "hover:bg-gray-50/70"
-                                                    }`}
+                                                            "hover:bg-gray-50/70"
+                                                        }`}
                                                 >
                                                     <td className="px-4 py-3.5 max-w-[220px]">
                                                         <p className="font-semibold text-gray-800 truncate text-sm group-hover:text-gray-600 transition-colors" title={unit.laptop?.laptop_name}>
@@ -651,11 +647,10 @@ function ReserveModal({
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[94dvh] overflow-hidden animate-slideUp">
 
                 {/* Header dengan warna abu-abu */}
-                <div className={`px-5 py-4 flex-shrink-0 ${
-                    isDP
-                        ? "bg-gray-800 text-white"
-                        : "bg-gray-700 text-white"
-                }`}>
+                <div className={`px-5 py-4 flex-shrink-0 ${isDP
+                    ? "bg-gray-800 text-white"
+                    : "bg-gray-700 text-white"
+                    }`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">
@@ -729,11 +724,10 @@ function ReserveModal({
                     <button type="button" onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200">
                         Batal
                     </button>
-                    <button onClick={handleSubmit} disabled={loading} className={`flex-1 h-11 text-white rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md ${
-                        isDP
-                            ? "bg-gray-800 hover:bg-gray-900"
-                            : "bg-gray-700 hover:bg-gray-800"
-                    }`}>
+                    <button onClick={handleSubmit} disabled={loading} className={`flex-1 h-11 text-white rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md ${isDP
+                        ? "bg-gray-800 hover:bg-gray-900"
+                        : "bg-gray-700 hover:bg-gray-800"
+                        }`}>
                         {loading ? (
                             <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
                         ) : isDP ? "Kunci Unit (DP)" : "Konfirmasi Ambil"}
@@ -849,11 +843,13 @@ function ConfirmPaymentModal({
                     {/* Info rows */}
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
-                            { label: "Status", value: (
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} /> {statusLabel}
-                                </span>
-                            )},
+                            {
+                                label: "Status", value: (
+                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} /> {statusLabel}
+                                    </span>
+                                )
+                            },
                             { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
                             { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 text-right max-w-[55%]">{unit.laptop?.laptop_name || "—"}</span> },

@@ -388,6 +388,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
     {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+    {
       label: "Transaksi",
       items: [
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
@@ -402,6 +409,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         ITEM_LEMBUR,
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
@@ -424,6 +438,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -462,8 +477,8 @@ function NavItem({ item, isActive, onClick }: {
   return (
     <Link href={item.href} onClick={onClick}
       className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
-          ? "bg-[#1a1a2e] text-white shadow-sm"
-          : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+        ? "bg-[#1a1a2e] text-white shadow-sm"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
         }`}>
       <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
