@@ -51,7 +51,12 @@ const ALL_ROLES: UserRole[] = [
 
 const SALES_ACCESS: UserRole[] = ["KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"];
 
+<<<<<<< HEAD
 const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"];
+=======
+// ✅ Role yang bisa lihat transaksi (supplier/content tracking)
+const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
+>>>>>>> origin/branch-moreno
 
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG"],
