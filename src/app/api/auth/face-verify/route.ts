@@ -37,13 +37,13 @@ function parseDevice(ua: string): string {
 function setAttendanceCookies(response: NextResponse, userId: string, expiry: Date) {
   const opts = {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path:     "/",
-    expires:  expiry,
+    path: "/",
+    expires: expiry,
   };
-  response.cookies.set("face_verified",  userId, opts);
-  response.cookies.set("face_attended",  userId, opts);
+  response.cookies.set("face_verified", userId, opts);
+  response.cookies.set("face_attended", userId, opts);
 }
 
 export async function POST(request: Request) {
@@ -55,8 +55,30 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false, message: "Token invalid" }, { status: 401 });
 
+    const nowWIBCheck = new Date(Date.now() + 7 * 3600_000);
+    const todayDowCheck = nowWIBCheck.getUTCDay();
+    const todayDateCheck = nowWIBCheck.toISOString().slice(0, 10);
+
+    const [{ data: weeklyOffCheck }, { data: specificOffCheck }] = await Promise.all([
+      supabaseAdmin.from("user_day_off").select("id")
+        .eq("user_id", user.id).eq("day_of_week", todayDowCheck).maybeSingle(),
+      supabaseAdmin.from("user_date_off").select("id")
+        .eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
+    ]);
+
+    if (weeklyOffCheck || specificOffCheck) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Hari ini adalah hari liburmu — tidak perlu absen 🏖️",
+          isDayOff: true,
+        },
+        { status: 403 }
+      );
+    }
+
     // ✅ Resolusi jadwal dari DB — mendukung user_shift_config + per-hari custom
-    const schedule  = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
+    const schedule = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
     const timeCheck = isAttendanceTimeForSchedule(schedule);
 
     if (!timeCheck.allowed) {
@@ -72,9 +94,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { embedding, attemptCount = 1, latitude, longitude, accuracy } = body;
 
-    const ua     = request.headers.get("user-agent") ?? "";
+    const ua = request.headers.get("user-agent") ?? "";
     const device = parseDevice(ua);
-    const ip     = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
 
     const { data: userFullData } = await supabaseAdmin
       .from("users")
@@ -91,7 +113,7 @@ export async function POST(request: Request) {
     );
 
     // Cek apakah sudah absen hari ini
-    const nowWIB    = new Date(Date.now() + 7 * 3600_000);
+    const nowWIB = new Date(Date.now() + 7 * 3600_000);
     const todayDate = nowWIB.toISOString().slice(0, 10);
 
     const { data: alreadyToday } = await supabaseAdmin
@@ -104,7 +126,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (alreadyToday) {
-      const expiry   = getAttendanceExpiry();
+      const expiry = getAttendanceExpiry();
       const response = NextResponse.json({
         success: true,
         message: "Sudah absen hari ini",
@@ -123,21 +145,21 @@ export async function POST(request: Request) {
     }
 
     const THRESHOLD = 0.45;
-    const distance  = euclideanDistance(embedding, userFullData.face_embedding);
-    const matched   = distance < THRESHOLD;
+    const distance = euclideanDistance(embedding, userFullData.face_embedding);
+    const matched = distance < THRESHOLD;
 
     const insertPayload: Record<string, any> = {
-      user_id:      user.id,
-      status:       matched ? "SUCCESS" : "FAILED",
+      user_id: user.id,
+      status: matched ? "SUCCESS" : "FAILED",
       attempt_count: Number(attemptCount),
       device,
-      ip_address:   ip,
-      shift:        userShift,
-      late_weight:  matched ? weight : null,
+      ip_address: ip,
+      shift: userShift,
+      late_weight: matched ? weight : null,
     };
-    if (latitude  != null) insertPayload.latitude  = latitude;
+    if (latitude != null) insertPayload.latitude = latitude;
     if (longitude != null) insertPayload.longitude = longitude;
-    if (accuracy  != null) insertPayload.accuracy  = accuracy;
+    if (accuracy != null) insertPayload.accuracy = accuracy;
 
     const { error: insertError } = await supabaseAdmin
       .from("face_verifications")
@@ -152,7 +174,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const expiry   = getAttendanceExpiry();
+    const expiry = getAttendanceExpiry();
     const response = NextResponse.json({
       success: true,
       message: "Absen wajah berhasil",
@@ -175,15 +197,15 @@ export async function PUT(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-    const expiry   = getAttendanceExpiry();
+    const expiry = getAttendanceExpiry();
     const response = NextResponse.json({ success: true, message: "Dilanjutkan tanpa absen" });
 
     response.cookies.set("attendance_skipped", user.id, {
       httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
-      path:     "/",
-      expires:  expiry,
+      path: "/",
+      expires: expiry,
     });
 
     return response;

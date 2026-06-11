@@ -1516,16 +1516,8 @@ export default function AttendanceDashboardPage() {
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
         const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`);
-        console.log("[fetchManualRecords] HTTP status:", r.status, r.statusText);
-        const text = await r.text();
-        console.log("[fetchManualRecords] raw response:", text.slice(0, 300));
-        try {
-            const d = JSON.parse(text);
-            console.log("[fetchManualRecords] parsed:", d.success, "count:", d.data?.length ?? 0);
-            if (d.success) setManualRecords(d.data || []);
-        } catch (e) {
-            console.error("[fetchManualRecords] JSON parse failed:", e);
-        }
+        const d = await r.json();
+        if (d.success) setManualRecords(d.data || []);
     }, []);
     const fetchDayOffs = useCallback(async () => { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); }, []);
     const fetchAllDateOffs = useCallback(async () => { const r = await fetch("/api/attendance/date-off"); const d = await r.json(); if (d.success) setAllDateOffs(d.data || []); }, []);
@@ -1676,11 +1668,9 @@ export default function AttendanceDashboardPage() {
     // Merged auto + manual
     const mergedAttendances = useMemo((): Attendance[] => {
         const auto = attendances.map(a => ({ ...a, source: "AUTO" as const }));
-        console.log("[mergedAttendances] auto:", auto.length, "| manualRecords:", manualRecords.length, "| currentUser:", currentUser?.id);
         const manualExtra: Attendance[] = manualRecords
             .filter(mr => {
                 const inAuto = auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date);
-                console.log("[mergedAttendances] mr:", mr.attendance_date, mr.status, "| users:", mr.users?.name ?? "NULL", "| inAuto:", inAuto);
                 return !inAuto;
             })
             .map(mr => ({
@@ -1989,13 +1979,16 @@ export default function AttendanceDashboardPage() {
                                             const mc = dd.filter(a => a.source === "MANUAL").length;
                                             const tot = dd.length;
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
-                                            const isUserDayOff = filterUser !== "Semua" ? isDayOffForUser(filterUser, dk) : false;
+                                            const effectiveFilterUser = !isAdminRole(currentUser?.role) && currentUser?.name
+                                                ? currentUser.name
+                                                : filterUser;
+                                            const isUserDayOff = effectiveFilterUser !== "Semua" ? isDayOffForUser(effectiveFilterUser, dk) : false;
                                             const hasAnyDayOff = filterUser === "Semua" ? getOffUsersForDate(dk).length > 0 : false;
                                             const hasManual = mc > 0;
                                             return (
                                                 <button key={day} onClick={() => setSelectedDate(p => p === dk ? null : dk)}
                                                     className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
-                                                    {isUserDayOff && filterUser !== "Semua" && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
+                                                    {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
                                                     {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-300 animate-pulse" />}
                                                     {hasManual && <span className="hidden sm:block absolute top-2 left-2 w-2 h-2 rounded-full bg-blue-400" />}
                                                     <span className={`text-xs sm:text-base font-black leading-none mb-1 sm:mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
@@ -2050,8 +2043,31 @@ export default function AttendanceDashboardPage() {
                                 </div>
 
                                 {selectedAttendances.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16">
-                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><span className="text-3xl opacity-40">📅</span></div>
+                                    <div className="flex flex-col items-center justify-center py-12 px-6">
+                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                            {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
+                                                ? <span className="text-3xl">🏖️</span>
+                                                : <span className="text-3xl opacity-40">📅</span>
+                                            }
+                                        </div>
+                                        {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
+                                                <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
+                                            </div>
+                                        ) : !isAdminRole(currentUser?.role) ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
+                                                <p className="text-xs text-gray-400">
+                                                    Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
+                                                </p>
+                                                <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                                    📋 Hari Kerja
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
+                                        )}
                                         {/* ── Tabs ── */}
                                         {(() => {
                                             const isAdmin = isAdminRole(currentUser?.role);
