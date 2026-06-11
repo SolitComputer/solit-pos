@@ -536,8 +536,6 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           )}
         </td>
 
-       
-
         {/* Payment Method */}
         <td className="px-3 py-2.5 text-center">
           <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200">
@@ -722,6 +720,8 @@ export default function Page() {
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions];
+    
+    // Apply filters
     if (search.trim()) {
       const term = search.toLowerCase();
       filtered = filtered.filter((item) =>
@@ -731,29 +731,60 @@ export default function Page() {
         item.laptop_name?.toLowerCase().includes(term)
       );
     }
-    if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
-    if (customerType !== "ALL") filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
+    
+    if (status !== "ALL") {
+      filtered = filtered.filter((item) => item.status === status);
+    }
+    
+    if (customerType !== "ALL") {
+      filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
+    }
+    
     if (dateFrom) {
-      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
       filtered = filtered.filter((item) => new Date(item.created_at) >= from);
     }
+    
     if (dateTo) {
-      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
       filtered = filtered.filter((item) => new Date(item.created_at) <= to);
     }
-    if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
-    if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
+    
+    if (paymentMethod !== "ALL") {
+      filtered = filtered.filter((item) => item.payment_method === paymentMethod);
+    }
+    
+    if (sourcePlatform !== "ALL") {
+      filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
+    }
+    
+    // Stable sort: always newest first (created_at desc), then by id for same timestamp
     filtered.sort((a, b) => {
-      const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      return sortOrder === "newest" ? diff : -diff;
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      
+      if (timeB !== timeA) {
+        return sortOrder === "newest" ? timeB - timeA : timeA - timeB;
+      }
+      // Fallback sort by id if timestamps are equal
+      return (b.id || 0) - (a.id || 0);
     });
+    
     return filtered;
   }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  
   const paginatedTransactions = useMemo(() => {
+    if (filteredTransactions.length === 0) return [];
+    
     const start = (currentPage - 1) * itemsPerPage;
-    return filteredTransactions.slice(start, start + itemsPerPage);
+    const end = Math.min(start + itemsPerPage, filteredTransactions.length);
+    
+    // Always slice from the sorted array - don't re-sort here
+    return filteredTransactions.slice(start, end);
   }, [filteredTransactions, currentPage, itemsPerPage]);
 
   useEffect(() => { setCurrentPage(1); }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
@@ -815,12 +846,56 @@ export default function Page() {
 
           {showFilters && (
             <div className="pt-3 border-t border-gray-200 space-y-3">
+              {/* Status Filter */}
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1.5 block">Status</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                   {["ALL", "PAID", "RESERVED", "PENDING", "CANCELLED"].map((s) => (
                     <button key={s} onClick={() => setStatus(s)} className={`h-8 rounded-xl text-xs font-medium border transition ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {s === "ALL" ? "Semua" : s === "RESERVED" ? "DP" : s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date Range Filter */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Rentang Tanggal</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Dari</label>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-400 block mb-1">Sampai</label>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Type Filter */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Tipe Customer</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {["ALL", "UMUM", "RESELLER", "CORPORATE"].map((ct) => (
+                    <button
+                      key={ct}
+                      onClick={() => setCustomerType(ct)}
+                      className={`h-8 rounded-xl text-xs font-medium border transition ${
+                        customerType === ct ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {ct === "ALL" ? "Semua" : ct === "UMUM" ? "Umum" : ct === "RESELLER" ? "Reseller" : "Korporat"}
                     </button>
                   ))}
                 </div>
