@@ -35,6 +35,7 @@ type ManualAttendance = {
     status: "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE";
     notes: string | null;
     created_by: string | null;
+    created_by_name?: string | null;
     users?: { id: string; name: string; role: string; shift: string };
 };
 
@@ -988,6 +989,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         closeAt?: string;
         manualAlreadyExists?: boolean;
         manualStatus?: string;
+        manualCreatedByName?: string | null;
     } | null;
     loading: boolean; onRefresh: () => void;
 }) {
@@ -1037,7 +1039,9 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 "ABSENT": { label: "Tidak Hadir", color: "text-red-700" },
                 "LEAVE": { label: "Cuti", color: "text-cyan-700" },
             };
-            const manualInfo = manualStatusMap[status.manualStatus || "PRESENT"] || { label: "Tercatat", color: "text-gray-700" };
+            const manualInfo = manualStatusMap[status.manualStatus || "PRESENT"]
+                || { label: "Tercatat", color: "text-gray-700" };
+            const adminName = status.manualCreatedByName;
             cfg = {
                 icon: "✏️",
                 gradient: "from-blue-50 to-indigo-50",
@@ -1045,8 +1049,8 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 badge: "bg-blue-100 text-blue-700 border-blue-200",
                 dot: "bg-blue-400",
                 badgeText: "Absen Manual",
-                title: "Sudah Di-absenkan Manual",
-                sub: `Status: ${manualInfo.label} · Diinput oleh admin`,
+                title: "Sudah Di-absenkan oleh Admin",
+                sub: `Status: ${manualInfo.label}${adminName ? ` · Oleh ${adminName}` : " · Diinput oleh admin"}`,
                 showBtn: false,
             };
             break;
@@ -1358,7 +1362,7 @@ type SalarySlip = {
 function SalarySlipCard({ slip, onFinalize, onGenerate }: {
     slip: SalarySlip;
     onFinalize: () => void;
-    onGenerate?: () => void;  // ✅ NEW: trigger re-generate
+    onGenerate?: () => void;
 }) {
     const [finalizing, setFinalizing] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -1370,180 +1374,96 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
             const r = await fetch("/api/attendance/salary-slip", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: slip.user_id,
-                    year: slip.year,
-                    month: slip.month,
-                }),
+                body: JSON.stringify({ user_id: slip.user_id, year: slip.year, month: slip.month }),
             });
             const d = await r.json();
             if (d.success) onFinalize();
-        } finally {
-            setFinalizing(false);
-        }
+        } finally { setFinalizing(false); }
     };
 
-    // ✅ NEW: Re-generate slip dari data absensi terkini
     const handleGenerate = async () => {
-        if (slip.status === "FINALIZED") {
-            if (!confirm("Slip ini sudah difinalisasi. Yakin ingin di-regenerate?")) return;
-        }
+        if (slip.status === "FINALIZED" && !confirm("Slip sudah difinalisasi. Yakin regenerate?")) return;
         setGenerating(true);
         try {
             const r = await fetch("/api/attendance/salary-slip", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: slip.user_id,
-                    year: slip.year,
-                    month: slip.month,
-                }),
+                body: JSON.stringify({ user_id: slip.user_id, year: slip.year, month: slip.month }),
             });
             const d = await r.json();
             if (d.success) onGenerate?.();
-        } finally {
-            setGenerating(false);
-        }
+        } finally { setGenerating(false); }
     };
 
-    const attendancePct = slip.base_salary > 0 && slip.total_income > 0
-        ? Math.round((slip.total_income / slip.base_salary) * 100)
-        : null;
-
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition">
-            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <p className="font-bold text-gray-800">{slip.users?.name || "Unknown"}</p>
-                    <p className="text-xs text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${slip.status === "FINALIZED"
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                        {initials(slip.users?.name || "?")}
+                    </div>
+                    <div>
+                        <p className="font-bold text-gray-800 text-sm leading-tight">{slip.users?.name || "Unknown"}</p>
+                        <p className="text-[10px] text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${slip.status === "FINALIZED"
                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                        : "bg-amber-100 text-amber-700 border-amber-200"
-                        }`}>
-                        {slip.status === "FINALIZED" ? "✅ Finalisasi" : "⏳ Draft"}
+                        : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                        {slip.status === "FINALIZED" ? "✅ Final" : "⏳ Draft"}
                     </span>
-
-                    {/* ✅ NEW: Tombol Generate ulang */}
-                    <button
-                        onClick={handleGenerate}
-                        disabled={generating}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1"
-                    >
-                        {generating ? (
-                            <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" /> Proses...</>
-                        ) : "🔄 Update"}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button onClick={handleGenerate} disabled={generating}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1">
+                        {generating ? <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />Proses...</> : "🔄 Update"}
                     </button>
-
-                    {/* ✅ NEW: Tombol Cetak Slip */}
-                    <a
-                        href={`/receipt/salary-slip/${slip.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
-                    >
+                    <a href={`/receipt/salary-slip/${slip.id}`} target="_blank" rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1">
                         🖨️ Cetak
                     </a>
-
                     {slip.status === "DRAFT" && (
-                        <button
-                            onClick={handleFinalize}
-                            disabled={finalizing}
-                            className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
-                        >
-                            {finalizing ? "..." : "Finalisasi"}
+                        <button onClick={handleFinalize} disabled={finalizing}
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+                            {finalizing ? "..." : "✔ Finalisasi"}
                         </button>
                     )}
                 </div>
             </div>
 
-            <div className="p-6">
-                <div className="grid grid-cols-2 gap-8 mb-6">
-                    {/* Penghasilan */}
-                    <div>
-                        <p className="text-sm font-bold text-gray-800 mb-3">PENGHASILAN</p>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between text-gray-600">
-                                <span>Gaji Pokok</span>
-                                <span className="font-mono">{formatRupiah(slip.base_salary)}</span>
-                            </div>
-                            {slip.allowance_wife > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Istri</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_wife)}</span>
-                                </div>
-                            )}
-                            {slip.allowance_child > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Anak</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_child)}</span>
-                                </div>
-                            )}
-                            {slip.allowance_transport > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Transport</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_transport)}</span>
-                                </div>
-                            )}
-                            {slip.bonus > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Bonus</span>
-                                    <span className="font-mono">{formatRupiah(slip.bonus)}</span>
-                                </div>
-                            )}
-                            {slip.overtime > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Lemburan</span>
-                                    <span className="font-mono">{formatRupiah(slip.overtime)}</span>
-                                </div>
-                            )}
-                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
-                                <span>Total Penghasilan</span>
-                                <span className="font-mono">{formatRupiah(slip.total_income)}</span>
-                            </div>
-                        </div>
+            {/* Body — compact grid */}
+            <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Penghasilan */}
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide mb-1">Penghasilan</p>
+                    <p className="text-xs font-black text-emerald-700 font-mono">{formatRupiah(slip.total_income)}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                        <p className="text-[9px] text-gray-500">Pokok: {formatRupiah(slip.base_salary)}</p>
+                        {slip.overtime > 0 && <p className="text-[9px] text-orange-600">Lembur: +{formatRupiah(slip.overtime)}</p>}
+                        {(slip.allowance_wife > 0 || slip.allowance_child > 0) && (
+                            <p className="text-[9px] text-gray-500">Tunjangan: +{formatRupiah(slip.allowance_wife + slip.allowance_child)}</p>
+                        )}
                     </div>
+                </div>
 
-                    {/* Potongan */}
-                    <div>
-                        <p className="text-sm font-bold text-gray-800 mb-3">POTONGAN</p>
-                        <div className="space-y-2 text-sm">
-                            {slip.deduction_violation > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Pelanggaran</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_violation)}</span>
-                                </div>
-                            )}
-                            {slip.deduction_loan > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Cicilan Pinjaman</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_loan)}</span>
-                                </div>
-                            )}
-                            {slip.deduction_pension > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Dana Pensiun</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_pension)}</span>
-                                </div>
-                            )}
-                            {slip.total_deduction === 0 && (
-                                <p className="text-gray-400 italic">—</p>
-                            )}
-                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
-                                <span>Total Potongan</span>
-                                <span className="font-mono">{formatRupiah(slip.total_deduction)}</span>
-                            </div>
-                        </div>
+                {/* Potongan */}
+                <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                    <p className="text-[9px] font-bold text-red-600 uppercase tracking-wide mb-1">Potongan</p>
+                    <p className="text-xs font-black text-red-600 font-mono">-{formatRupiah(slip.total_deduction)}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                        {slip.deduction_loan > 0 && <p className="text-[9px] text-gray-500">Kasbon: {formatRupiah(slip.deduction_loan)}</p>}
+                        {slip.deduction_pension > 0 && <p className="text-[9px] text-gray-500">Pensiun: {formatRupiah(slip.deduction_pension)}</p>}
+                        {slip.total_deduction === 0 && <p className="text-[9px] text-gray-300">Tidak ada</p>}
                     </div>
                 </div>
 
                 {/* Gaji Bersih */}
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-emerald-700">GAJI BERSIH</p>
-                        <p className="text-2xl font-black text-emerald-700">{formatRupiah(slip.net_salary)}</p>
-                    </div>
+                <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-3 sm:col-span-2">
+                    <p className="text-[9px] font-bold text-white/70 uppercase tracking-wide mb-1">Gaji Bersih</p>
+                    <p className="text-base font-black text-white font-mono">{formatRupiah(slip.net_salary)}</p>
+                    <p className="text-[9px] text-white/60 mt-1">
+                        {slip.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 % Kehadiran"} · {MONTH_NAMES[slip.month - 1]} {slip.year}
+                    </p>
                 </div>
             </div>
         </div>
@@ -1594,7 +1514,11 @@ export default function AttendanceDashboardPage() {
     const [usersLoading, setUsersLoading] = useState(false);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
-    const fetchManualRecords = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setManualRecords(d.data || []); }, []);
+    const fetchManualRecords = useCallback(async (y: number, m: number) => {
+        const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`);
+        const d = await r.json();
+        if (d.success) setManualRecords(d.data || []);
+    }, []);
     const fetchDayOffs = useCallback(async () => { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); }, []);
     const fetchAllDateOffs = useCallback(async () => { const r = await fetch("/api/attendance/date-off"); const d = await r.json(); if (d.success) setAllDateOffs(d.data || []); }, []);
     const fetchAllUsers = useCallback(async () => {
@@ -1632,6 +1556,13 @@ export default function AttendanceDashboardPage() {
     }, []);
 
     const [salarySlips, setSalarySlips] = useState<any[]>([]);
+    const sortedSalarySlips = useMemo(() => {
+        return [...salarySlips].sort((a, b) => {
+            const nameA = a.users?.name ?? "";
+            const nameB = b.users?.name ?? "";
+            return nameA.localeCompare(nameB, "id");
+        });
+    }, [salarySlips]);
     const [selectedSlipMonth, setSelectedSlipMonth] = useState<{ year: number; month: number }>({
         year: new Date().getFullYear(),
         month: new Date().getMonth(),
@@ -1662,8 +1593,11 @@ export default function AttendanceDashboardPage() {
                 reason: d.reason,
                 openAt: d.openAt,
                 closeAt: d.closeAt,
+                manualAlreadyExists: d.manualAlreadyExists ?? false,
+                manualStatus: d.manualStatus ?? null,
+                manualCreatedByName: d.manualCreatedByName ?? null,
             });
-        } catch { /* abaikan, biarkan status sebelumnya */ }
+        } catch { }
         finally { setStatusLoading(false); }
     }, []);
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
@@ -1735,17 +1669,22 @@ export default function AttendanceDashboardPage() {
     const mergedAttendances = useMemo((): Attendance[] => {
         const auto = attendances.map(a => ({ ...a, source: "AUTO" as const }));
         const manualExtra: Attendance[] = manualRecords
-            .filter(mr => !auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date))
+            .filter(mr => {
+                const inAuto = auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date);
+                return !inAuto;
+            })
             .map(mr => ({
                 id: mr.id, user_id: mr.user_id,
-                user_name: mr.users?.name || "Unknown", user_role: mr.users?.role || "", user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
+                user_name: mr.users?.name || (mr.user_id === currentUser?.id ? currentUser?.name : null) || "Unknown",
+                user_role: mr.users?.role || (mr.user_id === currentUser?.id ? currentUser?.role : "") || "",
+                user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
                 date: mr.check_in_time, check_in_time: mr.check_in_time, status: mr.status, method: "MANUAL",
                 latitude: null, longitude: null, accuracy: null, device: "Manual entry", ip_address: "", face_distance: null, created_at: mr.check_in_time,
                 displayStatus: (mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "SKIP") as "PRESENT" | "LATE" | "SKIP",
                 source: "MANUAL" as const,
             }));
         return [...auto, ...manualExtra];
-    }, [attendances, manualRecords]);
+    }, [attendances, manualRecords, currentUser]);
 
     const thisMonthKey = `${calYear}-${pad2(calMonth + 1)}`;
     const thisMonthAtt = mergedAttendances.filter(a => toWIBDateKey(a.check_in_time || a.created_at).startsWith(thisMonthKey));
@@ -1792,10 +1731,10 @@ export default function AttendanceDashboardPage() {
                 a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
 
-        // Pass 2: manual override + simpan record untuk alasan
         const manualByName: Record<string, Record<string, ManualAttendance>> = {};
         manualRecords.forEach(mr => {
-            const name = mr.users?.name;
+
+            const name = mr.users?.name ?? (mr.user_id === currentUser?.id ? currentUser?.name : null);
             if (!name || !mr.attendance_date.startsWith(thisMonthKey)) return;
             if (!manualByName[name]) manualByName[name] = {};
             manualByName[name][mr.attendance_date] = mr;
@@ -1806,6 +1745,7 @@ export default function AttendanceDashboardPage() {
         const names = new Set<string>();
         allUsers.forEach(u => names.add(u.name));
         Object.keys(effByName).forEach(n => names.add(n));
+        Object.keys(manualByName).forEach(n => names.add(n));
 
         const userIdByName: Record<string, string> = {};
 
@@ -1876,7 +1816,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -1892,9 +1832,14 @@ export default function AttendanceDashboardPage() {
         if (!selectedMonth) return;
         setLoading(true);
         const { year, month } = selectedMonth;
-        Promise.all([fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), ...(isAdminRole(currentUser?.role)
-            ? [fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month)] : [])])
-            .finally(() => setLoading(false));
+        const tasks: Promise<any>[] = [
+            fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(),
+            fetchManualRecords(year, month), fetchAllUsers(),
+        ];
+        if (isAdminRole(currentUser?.role)) {
+            tasks.push(fetchSalaries(), fetchLeaveData(year, month));
+        }
+        Promise.all(tasks).finally(() => setLoading(false));
     }, [selectedMonth, currentUser]);
 
     if (!selectedMonth) return (
@@ -2034,13 +1979,16 @@ export default function AttendanceDashboardPage() {
                                             const mc = dd.filter(a => a.source === "MANUAL").length;
                                             const tot = dd.length;
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
-                                            const isUserDayOff = filterUser !== "Semua" ? isDayOffForUser(filterUser, dk) : false;
+                                            const effectiveFilterUser = !isAdminRole(currentUser?.role) && currentUser?.name
+                                                ? currentUser.name
+                                                : filterUser;
+                                            const isUserDayOff = effectiveFilterUser !== "Semua" ? isDayOffForUser(effectiveFilterUser, dk) : false;
                                             const hasAnyDayOff = filterUser === "Semua" ? getOffUsersForDate(dk).length > 0 : false;
                                             const hasManual = mc > 0;
                                             return (
                                                 <button key={day} onClick={() => setSelectedDate(p => p === dk ? null : dk)}
                                                     className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
-                                                    {isUserDayOff && filterUser !== "Semua" && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
+                                                    {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
                                                     {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-300 animate-pulse" />}
                                                     {hasManual && <span className="hidden sm:block absolute top-2 left-2 w-2 h-2 rounded-full bg-blue-400" />}
                                                     <span className={`text-xs sm:text-base font-black leading-none mb-1 sm:mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
@@ -2095,8 +2043,31 @@ export default function AttendanceDashboardPage() {
                                 </div>
 
                                 {selectedAttendances.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16">
-                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4"><span className="text-3xl opacity-40">📅</span></div>
+                                    <div className="flex flex-col items-center justify-center py-12 px-6">
+                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                            {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
+                                                ? <span className="text-3xl">🏖️</span>
+                                                : <span className="text-3xl opacity-40">📅</span>
+                                            }
+                                        </div>
+                                        {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
+                                                <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
+                                            </div>
+                                        ) : !isAdminRole(currentUser?.role) ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
+                                                <p className="text-xs text-gray-400">
+                                                    Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
+                                                </p>
+                                                <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                                    📋 Hari Kerja
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
+                                        )}
                                         {/* ── Tabs ── */}
                                         {(() => {
                                             const isAdmin = isAdminRole(currentUser?.role);
@@ -2210,11 +2181,19 @@ export default function AttendanceDashboardPage() {
                                                                 ) : <span className="text-[10px] text-gray-200 font-bold">—</span>}
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
-                                                                {manualRec?.notes ? (
-                                                                    <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">📝 {manualRec.notes}</p>
-                                                                ) : (
-                                                                    <p className="text-[10px] text-gray-400 truncate max-w-[180px] font-mono">{a.device || "—"}</p>
-                                                                )}
+                                                                <div className="space-y-0.5">
+                                                                    {manualRec?.notes && (
+                                                                        <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">📝 {manualRec.notes}</p>
+                                                                    )}
+                                                                    {manualRec?.created_by_name && (
+                                                                        <p className="text-[10px] text-violet-500 font-bold">
+                                                                            ✏️ oleh {manualRec.created_by_name}
+                                                                        </p>
+                                                                    )}
+                                                                    {!manualRec && (
+                                                                        <p className="text-[10px] text-gray-400 truncate max-w-[180px] font-mono">{a.device || "—"}</p>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             {/* ✅ NEW: Tombol Edit di tabel */}
                                                             {isAdminRole(currentUser?.role)
@@ -3006,52 +2985,37 @@ export default function AttendanceDashboardPage() {
 
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
             {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {/* Month Selector + Generate All */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
-                                <p className="text-base font-bold text-gray-800">Pilih Bulan</p>
-                                <p className="text-xs text-gray-400 mt-1">Lihat & cetak slip gaji bulan tertentu</p>
+                                <p className="text-sm font-bold text-gray-800">Slip Gaji</p>
+                                <p className="text-[11px] text-gray-400 mt-0.5">Generate & cetak slip gaji karyawan</p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
-                                    onClick={() =>
-                                        setSelectedSlipMonth(s => ({
-                                            ...s,
-                                            month: s.month === 0 ? 11 : s.month - 1,
-                                            year: s.month === 0 ? s.year - 1 : s.year,
-                                        }))
-                                    }
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
-                                >
-                                    ◀
-                                </button>
-                                <div className="px-6 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-sm min-w-[140px] text-center">
+                                    onClick={() => setSelectedSlipMonth(s => ({
+                                        month: s.month === 0 ? 11 : s.month - 1,
+                                        year: s.month === 0 ? s.year - 1 : s.year,
+                                    }))}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
+                                >◀</button>
+                                <div className="px-5 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-xs min-w-[130px] text-center">
                                     {MONTH_NAMES[selectedSlipMonth.month]} {selectedSlipMonth.year}
                                 </div>
                                 <button
-                                    onClick={() =>
-                                        setSelectedSlipMonth(s => ({
-                                            ...s,
-                                            month: s.month === 11 ? 0 : s.month + 1,
-                                            year: s.month === 11 ? s.year + 1 : s.year,
-                                        }))
-                                    }
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
-                                >
-                                    ▶
-                                </button>
-                                {/* ✅ NEW: Generate semua slip */}
+                                    onClick={() => setSelectedSlipMonth(s => ({
+                                        month: s.month === 11 ? 0 : s.month + 1,
+                                        year: s.month === 11 ? s.year + 1 : s.year,
+                                    }))}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
+                                >▶</button>
                                 <button
                                     onClick={async () => {
-                                        if (!confirm(`Generate slip gaji ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
+                                        if (!confirm(`Generate slip ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
                                         const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
-                                        if (!usersToGen || usersToGen.length === 0) {
-                                            alert("Tidak ada karyawan. Pastikan data karyawan sudah dimuat.");
-                                            return;
-                                        }
-                                        // Generate satu per satu (bukan parallel — hindari rate limit)
+                                        if (!usersToGen?.length) { alert("Tidak ada karyawan."); return; }
                                         for (const u of usersToGen) {
                                             await fetch("/api/attendance/salary-slip", {
                                                 method: "POST",
@@ -3061,28 +3025,47 @@ export default function AttendanceDashboardPage() {
                                         }
                                         fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                     }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
-                                >
-                                    ⚡ Generate Semua
-                                </button>
+                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-xl hover:bg-blue-100 transition"
+                                >⚡ Generate Semua</button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Slip Gaji List */}
+                    {/* Slip List */}
                     {loading ? (
-                        <div className="space-y-3">
-                            {Array(3).fill(0).map((_, i) => (
-                                <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+                        // ✅ Skeleton loading
+                        <div className="space-y-2">
+                            {Array(4).fill(0).map((_, i) => (
+                                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-gray-200" />
+                                            <div className="space-y-1.5">
+                                                <div className="h-3 w-32 bg-gray-200 rounded" />
+                                                <div className="h-2.5 w-20 bg-gray-100 rounded" />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                                            <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                                            <div className="h-7 w-20 bg-gray-100 rounded-lg" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {Array(4).fill(0).map((_, j) => (
+                                            <div key={j} className="h-12 bg-gray-50 rounded-xl" />
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                    ) : salarySlips.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                                <span className="text-3xl opacity-50">📄</span>
+                    ) : sortedSalarySlips.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                                <span className="text-2xl opacity-50">📄</span>
                             </div>
                             <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji bulan ini</p>
-                            <p className="text-xs text-gray-300 mt-1">Klik "Generate Semua" untuk membuat slip gaji semua karyawan</p>
+                            <p className="text-xs text-gray-300 mt-1 mb-4">Klik tombol di bawah untuk generate slip semua karyawan</p>
                             <button
                                 onClick={async () => {
                                     const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
@@ -3095,14 +3078,12 @@ export default function AttendanceDashboardPage() {
                                     }
                                     fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                 }}
-                                className="mt-4 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition mx-auto"
-                            >
-                                ⚡ Generate Slip Sekarang
-                            </button>
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
+                            >⚡ Generate Slip Sekarang</button>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {salarySlips.map(slip => (
+                        <div className="space-y-2">
+                            {sortedSalarySlips.map(slip => (
                                 <SalarySlipCard
                                     key={slip.id}
                                     slip={slip}
@@ -3128,7 +3109,10 @@ export default function AttendanceDashboardPage() {
                         prefillUserId={manualPrefillUser}
                         editData={editManualData}
                         onClose={() => { setShowManualModal(false); setEditManualData(null); }}
-                        onSaved={refreshAll}
+                        onSaved={() => {
+                            refreshAll();
+                            fetchTodayStatus();
+                        }}
                     />
                 )}
             {showSalaryModal && isAdminRole(currentUser?.role)

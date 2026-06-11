@@ -7,7 +7,7 @@ import * as faceapi from "face-api.js";
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
-  | "out-of-range" | "out-of-time" | "no-camera";
+  | "out-of-range" | "out-of-time" | "no-camera" | "day-off";
 
 const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
@@ -205,6 +205,12 @@ export default function FaceVerifyPage() {
 
         if (statusResult.alreadyAttended) {
           window.location.href = redirectTo;
+          return;
+        }
+
+        if (statusResult.isDayOff || statusResult.isTodayDayOff) {
+          addLog("hari libur terdeteksi — absen tidak wajib", "ok");
+          setStage("day-off");
           return;
         }
 
@@ -457,7 +463,7 @@ export default function FaceVerifyPage() {
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off"].includes(stage)) {
       stopCamera();
     }
   }, [stage]);
@@ -618,6 +624,46 @@ export default function FaceVerifyPage() {
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: 0.3 }}>
               {gpsLoading ? "Mendeteksi lokasi GPS..." : message}
             </div>
+          </div>
+        )}
+
+        {/* Day Off */}
+        {stage === "day-off" && (
+          <div style={{ padding: "8px 0 16px" }}>
+            <div style={{
+              width: "100%",
+              background: "rgba(251,146,60,0.06)",
+              border: "0.5px solid rgba(251,146,60,0.25)",
+              borderRadius: 14,
+              padding: "24px 20px",
+              textAlign: "center",
+              marginBottom: 16,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                background: "rgba(251,146,60,0.1)",
+                border: "0.5px solid rgba(251,146,60,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px", fontSize: 26,
+              }}>
+                🏖️
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                Hari Ini Kamu Libur
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                Absen tidak wajib di hari libur.<br />
+                Kehadiranmu <span style={{ color: "rgba(251,146,60,0.8)", fontWeight: 600 }}>tidak akan dihitung absen</span> hari ini.
+              </div>
+            </div>
+            <button className="btn-main" disabled={skipping} onClick={handleSkipToRedirect}>
+              {skipping ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  Mengalihkan...
+                </span>
+              ) : "Lanjut ke Dashboard →"}
+            </button>
           </div>
         )}
 
@@ -951,7 +997,7 @@ export default function FaceVerifyPage() {
         )}
 
         {/* Terminal log */}
-        {!["loading", "checking", "out-of-time"].includes(stage) && (
+        {!["loading", "checking", "out-of-time", "day-off"].includes(stage) && (
           <div style={{ marginTop: 14, marginBottom: 14 }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, marginBottom: 5 }}>system log</div>
             <div className="t-log">

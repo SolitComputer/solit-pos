@@ -105,18 +105,18 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
 
   "/api/units/reserve": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
-  "/api/units/hold":    [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
+  "/api/units/hold": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
   "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES"],
 
   "/api/users": [...FULL_ACCESS],
-  "/api/attendance/manual":   [...FULL_ACCESS],
-  "/api/attendance/salary":   [...FULL_ACCESS],
-  "/api/attendance/leave":    [...ALL_ROLES],
-  "/api/attendance/day-off":  [...ALL_ROLES],
+  "/api/attendance/manual": [...ALL_ROLES],
+  "/api/attendance/salary": [...ALL_ROLES],
+  "/api/attendance/leave": [...ALL_ROLES],
+  "/api/attendance/day-off": [...ALL_ROLES],
   "/api/attendance/date-off": [...ALL_ROLES],
   "/api/attendance/shift-config": [...FULL_ACCESS],
   "/api/attendance/schedule": [...FULL_ACCESS],
-  "/api/attendance/users":    [...FULL_ACCESS],
+  "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/overtime/rates": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
@@ -127,7 +127,7 @@ export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 
   VIEW_FINANCIALS: [...FULL_ACCESS, "ACCOUNTING"] as UserRole[],
-  VIEW_REPORTS:    [...FULL_ACCESS, "ACCOUNTING"] as UserRole[],
+  VIEW_REPORTS: [...FULL_ACCESS, "ACCOUNTING"] as UserRole[],
 
   VIEW_TRANSACTIONS: [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
@@ -159,7 +159,7 @@ export const PERMISSIONS = {
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   ] as UserRole[],
   CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
-  EDIT_LAPTOP:   [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
+  EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
 
   VIEW_BARCODE: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGELOLA_BARANG",
@@ -171,7 +171,7 @@ export const PERMISSIONS = {
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
   ] as UserRole[],
   CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
-  EDIT_UNITS:   [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
+  EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
 
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",

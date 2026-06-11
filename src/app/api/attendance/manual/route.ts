@@ -8,7 +8,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// ✅ Full access roles — sama dengan FULL_ACCESS di permissions.ts
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 // GET — ambil semua manual attendance bulan tertentu
@@ -26,7 +25,7 @@ export async function GET(request: Request) {
     const lastDay = new Date(Number(year), Number(month), 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
-    // Ambil attendance_manual tanpa JOIN FK
+    // ✅ Tambah created_by ke select
     let q = supabase
       .from("attendance_manual")
       .select("id, user_id, attendance_date, check_in_time, status, notes, created_by, created_at")
@@ -34,7 +33,6 @@ export async function GET(request: Request) {
       .lte("attendance_date", endDate)
       .order("attendance_date", { ascending: false });
 
-    // Non-admin hanya lihat miliknya sendiri
     if (!FULL_ACCESS_ROLES.includes(user.role)) {
       q = q.eq("user_id", user.id);
     }
@@ -50,7 +48,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // Ambil user info untuk semua user_id yang ada
+    // Ambil user info (employees)
     const userIds = [...new Set(manualData.map((r: any) => r.user_id))];
     const { data: usersData } = await supabase
       .from("users")
@@ -60,9 +58,24 @@ export async function GET(request: Request) {
     const usersMap: Record<string, any> = {};
     (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
 
+    // ✅ FIX: Ambil nama admin/creator yang mengabsenkan
+    const creatorIds = [...new Set(
+      manualData.map((r: any) => r.created_by).filter(Boolean)
+    )];
+    let creatorsMap: Record<string, string> = {};
+    if (creatorIds.length > 0) {
+      const { data: creatorsData } = await supabase
+        .from("users")
+        .select("id, name")
+        .in("id", creatorIds);
+      (creatorsData || []).forEach((u: any) => { creatorsMap[u.id] = u.name; });
+    }
+
     const result = manualData.map((r: any) => ({
       ...r,
       users: usersMap[r.user_id] ?? null,
+      // ✅ Nama admin yang mengabsenkan — ditampilkan ke non-admin
+      created_by_name: r.created_by ? (creatorsMap[r.created_by] ?? null) : null,
     }));
 
     return NextResponse.json({ success: true, data: result });
@@ -76,7 +89,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    // ✅ FIX: ADMIN, PROGRAMMER, ASISTEN_CEO boleh input manual
     if (!user || !FULL_ACCESS_ROLES.includes(user.role)) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
@@ -143,7 +155,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
-    // Jika LEAVE → sync ke user_leave_requests
     if (status === "LEAVE") {
       try {
         await handleLeaveSync(user_id, attendance_date, notes ?? null);
@@ -159,7 +170,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Helper: sync LEAVE ke user_leave_requests + update balance
 async function handleLeaveSync(userId: string, leaveDate: string, notes: string | null) {
   const [yearStr, monthStr] = leaveDate.split("-");
   const leaveYear = parseInt(yearStr);
@@ -207,7 +217,6 @@ async function handleLeaveSync(userId: string, leaveDate: string, notes: string 
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    // ✅ FIX: ADMIN, PROGRAMMER, ASISTEN_CEO boleh hapus
     if (!user || !FULL_ACCESS_ROLES.includes(user.role)) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
