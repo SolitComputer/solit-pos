@@ -7,6 +7,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ✅ FIX: Definisi konstanta yang benar
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -22,7 +25,10 @@ export async function GET(request: Request) {
       .select("id, user_id, schedule_date, start_hour, start_minute, late_hour, late_minute, end_hour, end_minute, notes")
       .order("schedule_date", { ascending: true });
 
-    if (user.role !== "ADMIN", "PROGRAMMER", "ASISTEN_CEO") {
+    // ✅ FIX: Sebelumnya `user.role !== "ADMIN", "PROGRAMMER", "ASISTEN_CEO"`
+    // itu adalah comma operator — hanya evaluasi "ASISTEN_CEO" (truthy) → selalu true
+    // Akibatnya semua user dianggap non-admin dan di-filter ke user_id sendiri
+    if (!FULL_ACCESS_ROLES.includes(user.role)) {
       q = q.eq("user_id", user.id);
     } else if (targetUserId) {
       q = q.eq("user_id", targetUserId);
@@ -90,8 +96,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    // ✅ FIX: Konsisten pakai FULL_ACCESS_ROLES, bukan hanya ADMIN
+    if (!user || !FULL_ACCESS_ROLES.includes(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

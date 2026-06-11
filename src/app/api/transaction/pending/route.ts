@@ -1,5 +1,3 @@
-// app/api/transaction/pending/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
@@ -7,7 +5,7 @@ import { withAuth, AuthUser } from "@/lib/auth";
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status"); // "RESERVED" | "HELD" | null (all)
+    const status = searchParams.get("status");
 
     let query = supabase
       .from("transactions")
@@ -23,6 +21,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         unit_id,
         laptop_id,
         deal_price,
+        dp_amount,
         amount,
         payment_method,
         source_platform,
@@ -54,6 +53,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 
 export const GET = withAuth(handler, [
   "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
   "KEPALA_SALES",
   "CREW_SALES",
   "ACCOUNTING",

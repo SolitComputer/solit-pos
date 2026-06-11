@@ -10,13 +10,6 @@ const supabase = createClient(
 
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-/**
- * GET: Fetch salary slip(s) untuk user(s)
- * Query params:
- * - user_id: (optional) untuk fetch user tertentu
- * - year, month: (optional) untuk fetch per bulan
- * - status: (optional) DRAFT, FINALIZED
- */
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -28,12 +21,11 @@ export async function GET(request: Request) {
     const month = searchParams.get("month");
     const status = searchParams.get("status");
 
+    // ✅ FIX: Query salary_slips dulu tanpa JOIN
+    // JOIN via Supabase FK bisa error kalau relasi tidak terdaftar di schema
     let q = supabase
       .from("salary_slips")
-      .select(`
-        *,
-        users:user_id (id, name, role)
-      `)
+      .select("*")
       .order("year", { ascending: false })
       .order("month", { ascending: false });
 
@@ -47,16 +39,42 @@ export async function GET(request: Request) {
     if (month) q = q.eq("month", parseInt(month));
     if (status) q = q.eq("status", status);
 
-    const { data, error } = await q;
-    if (error) {
-      console.error("[salary-slip GET] error:", error);
+    const { data: slips, error: slipsError } = await q;
+
+    if (slipsError) {
+      console.error("[salary-slip GET] slips error:", slipsError);
       return NextResponse.json(
-        { success: false, message: error.message },
+        { success: false, message: slipsError.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    if (!slips || slips.length === 0) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    // ✅ FIX: Fetch user info secara terpisah — lebih aman dari FK join
+    const userIds = [...new Set(slips.map((s: any) => s.user_id))];
+    const { data: usersData, error: usersError } = await supabase
+      .from("users")
+      .select("id, name, role")
+      .in("id", userIds);
+
+    if (usersError) {
+      console.error("[salary-slip GET] users error:", usersError);
+      // Jangan return error — tetap return slips tanpa user info
+    }
+
+    const usersMap: Record<string, any> = {};
+    (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
+
+    // Gabungkan data
+    const result = slips.map((s: any) => ({
+      ...s,
+      users: usersMap[s.user_id] ?? null,
+    }));
+
+    return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
     console.error("[salary-slip GET] exception:", err);
     return NextResponse.json(
@@ -66,15 +84,6 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- * POST: Generate salary slip untuk user tertentu
- * Body:
- * {
- *   user_id: string,
- *   year: number,
- *   month: number (1-12)
- * }
- */
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -95,48 +104,55 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user salary
+    // ✅ Pastikan year dan month adalah integer
+    const yearInt = parseInt(String(year));
+    const monthInt = parseInt(String(month));
+
     const { data: salData, error: salError } = await supabase
       .from("user_salary")
       .select("*")
       .eq("user_id", user_id)
-      .single();
+      .maybeSingle(); // ✅ FIX: pakai maybeSingle() bukan single() — tidak throw error kalau kosong
 
-    if (salError || !salData) {
+    if (salError) {
+      console.error("[salary-slip POST] salary error:", salError);
+      return NextResponse.json(
+        { success: false, message: salError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!salData) {
       return NextResponse.json(
         { success: false, message: "Gaji belum diatur untuk user ini" },
         { status: 400 }
       );
     }
 
-    // Fetch user allowances
     const { data: allowData } = await supabase
       .from("user_allowances")
       .select("*")
       .eq("user_id", user_id)
-      .single();
+      .maybeSingle(); // ✅ FIX: maybeSingle() — allowances mungkin belum ada
 
-    // Fetch attendance data untuk hitung kehadiran bulan ini
-    const dim = new Date(year, month, 0).getDate();
+    const dim = new Date(yearInt, monthInt, 0).getDate();
+    const paddedMonth = String(monthInt).padStart(2, "0");
+
     const { data: allAtt } = await supabase
       .from("face_verifications")
-      .select("*")
+      .select("id, user_id, created_at, status")
       .eq("user_id", user_id)
-      .gte("created_at", `${year}-${String(month).padStart(2, "0")}-01T00:00:00Z`)
-      .lt(
-        "created_at",
-        `${year}-${String(month).padStart(2, "0")}-${String(dim).padStart(2, "0")}T23:59:59Z`
-      );
+      .eq("status", "SUCCESS")
+      .gte("created_at", `${yearInt}-${paddedMonth}-01T00:00:00+07:00`)
+      .lte("created_at", `${yearInt}-${paddedMonth}-${String(dim).padStart(2, "0")}T23:59:59+07:00`);
 
-    // Fetch manual attendance data
     const { data: manAtt } = await supabase
       .from("attendance_manual")
-      .select("*")
+      .select("attendance_date, status, check_in_time")
       .eq("user_id", user_id)
-      .gte("attendance_date", `${year}-${String(month).padStart(2, "0")}-01`)
-      .lt("attendance_date", `${year}-${String(month + 1).padStart(2, "0")}-01`);
+      .gte("attendance_date", `${yearInt}-${paddedMonth}-01`)
+      .lte("attendance_date", `${yearInt}-${paddedMonth}-${String(dim).padStart(2, "0")}`);
 
-    // Hitung total hari kerja bulan ini (exclude weekend + day off)
     const { data: dayOffs } = await supabase
       .from("user_day_off")
       .select("day_of_week")
@@ -147,117 +163,86 @@ export async function POST(request: Request) {
       .select("off_date")
       .eq("user_id", user_id);
 
-    const dayOffSet = new Set(dayOffs?.map(d => d.day_of_week) || []);
-    const dateOffSet = new Set(dateOffs?.map(d => d.off_date) || []);
+    const dayOffSet = new Set((dayOffs || []).map((d: any) => d.day_of_week));
+    const dateOffSet = new Set((dateOffs || []).map((d: any) => d.off_date));
 
+    const pad2 = (n: number) => String(n).padStart(2, "0");
     let totalWorkdays = 0;
     let score = 0;
-    const pad2 = (n: number) => String(n).padStart(2, "0");
 
     for (let d = 1; d <= dim; d++) {
-      const dk = `${year}-${pad2(month)}-${pad2(d)}`;
+      const dk = `${yearInt}-${paddedMonth}-${pad2(d)}`;
       const dow = new Date(dk + "T12:00:00").getDay();
-
-      // Skip weekend + day off
       if (dayOffSet.has(dow) || dateOffSet.has(dk)) continue;
 
       totalWorkdays++;
 
+      // Cek manual attendance dulu (override)
+      const manRecord = (manAtt || []).find((m: any) => m.attendance_date === dk);
+      if (manRecord) {
+        if (manRecord.status === "PRESENT") score += 1;
+        else if (manRecord.status === "LATE") score += 0.5;
+        // ABSENT, SICK, PERMIT, LEAVE = 0
+        continue;
+      }
+
       // Cek auto attendance
-      const hasAuto = allAtt?.some(a => {
-        const attDate = new Date(a.created_at)
-          .toISOString()
-          .slice(0, 10);
-        return attDate === dk;
+      const attRecord = (allAtt || []).find((a: any) => {
+        // Konversi ke WIB date
+        const wibDate = new Date(new Date(a.created_at).getTime() + 7 * 60 * 60 * 1000)
+          .toISOString().slice(0, 10);
+        return wibDate === dk;
       });
 
-      // Cek manual attendance
-      const manRecord = manAtt?.find(m => m.attendance_date === dk);
-
-      if (hasAuto) {
-        // Hitung late atau present
-        const attTime = new Date(allAtt?.find(a =>
-          new Date(a.created_at).toISOString().slice(0, 10) === dk
-        )?.created_at || "");
-
-        const hours = attTime.getUTCHours() + 7; // Convert to WIB
-        const minutes = attTime.getUTCMinutes();
-        const totalMins = hours * 60 + minutes;
-
-        if (totalMins > 8 * 60) {
-          // Terlambat dari jam 08:00
-          score += 0.5;
-        } else {
-          score += 1;
-        }
-      } else if (manRecord) {
-        // Manual entry
-        if (
-          manRecord.status === "PRESENT" ||
-          manRecord.status === "LATE"
-        ) {
-          score += manRecord.status === "PRESENT" ? 1 : 0.5;
-        }
-        // ABSENT, SICK, PERMIT, LEAVE = 0 score
+      if (attRecord) {
+        // ✅ FIX: Cek jam dalam WIB
+        const wibTime = new Date(new Date(attRecord.created_at).getTime() + 7 * 60 * 60 * 1000);
+        const totalMins = wibTime.getUTCHours() * 60 + wibTime.getUTCMinutes();
+        score += totalMins > 8 * 60 ? 0.5 : 1;
       }
-      // Else: tidak hadir = 0
     }
 
-    const attendancePercentage =
-      totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
+    const attendancePercentage = totalWorkdays > 0
+      ? Math.min(100, (score / totalWorkdays) * 100)
+      : 0;
 
-    // Hitung income
     const baseSalary = salData.base_salary || 0;
-    let salaryIncome = 0;
+    const salaryIncome = salData.salary_type === "FIXED"
+      ? baseSalary
+      : totalWorkdays > 0
+        ? Math.round((baseSalary / totalWorkdays) * score)
+        : 0;
 
-    if (salData.salary_type === "FIXED") {
-      salaryIncome = baseSalary;
-    } else {
-      // PERCENTAGE: dihitung per hari kerja
-      salaryIncome =
-        totalWorkdays > 0
-          ? Math.round((baseSalary / totalWorkdays) * score)
-          : 0;
-    }
-
-    // Tunjangan (disesuaikan % kehadiran)
-    const allowanceWife =
-      Math.round((allowData?.allowance_wife || 0) * (attendancePercentage / 100)) || 0;
-    const allowanceChild =
-      Math.round((allowData?.allowance_child || 0) * (attendancePercentage / 100)) || 0;
-
-    // Potongan (langsung potong, tidak × %)
+    const allowanceWife = Math.round((allowData?.allowance_wife || 0) * (attendancePercentage / 100)) || 0;
+    const allowanceChild = Math.round((allowData?.allowance_child || 0) * (attendancePercentage / 100)) || 0;
     const deductionLoan = allowData?.deduction_loan || 0;
     const deductionPension = allowData?.deduction_pension || 0;
 
-    // Fetch overtime data
+    // ✅ FIX: Query overtime dengan filter yang benar
+    // overtime_requests mungkin tidak punya kolom year/month — filter by date range
     const { data: overtimeData } = await supabase
       .from("overtime_requests")
-      .select("total_pay")
+      .select("total_pay, overtime_date")
       .eq("user_id", user_id)
-      .eq("year", year)
-      .eq("month", month)
-      .eq("status", "COMPLETED");
+      .eq("status", "COMPLETED")
+      .gte("overtime_date", `${yearInt}-${paddedMonth}-01`)
+      .lte("overtime_date", `${yearInt}-${paddedMonth}-${String(dim).padStart(2, "0")}`);
 
-    const overtimeTotal = overtimeData?.reduce(
-      (sum, o) => sum + (o.total_pay || 0),
-      0
-    ) || 0;
+    const overtimeTotal = (overtimeData || []).reduce(
+      (sum: number, o: any) => sum + (o.total_pay || 0), 0
+    );
 
-    // Hitung total
-    const totalIncome =
-      salaryIncome + allowanceWife + allowanceChild + overtimeTotal;
+    const totalIncome = salaryIncome + allowanceWife + allowanceChild + overtimeTotal;
     const totalDeduction = deductionLoan + deductionPension;
     const netSalary = totalIncome - totalDeduction;
 
-    // Upsert salary slip
     const { data: slip, error: slipError } = await supabase
       .from("salary_slips")
       .upsert(
         {
           user_id,
-          year,
-          month,
+          year: yearInt,
+          month: monthInt,
           salary_type: salData.salary_type,
           base_salary: baseSalary,
           allowance_wife: allowanceWife,
@@ -299,15 +284,6 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * PATCH: Finalisasi salary slip
- * Body:
- * {
- *   user_id: string,
- *   year: number,
- *   month: number
- * }
- */
 export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -335,8 +311,8 @@ export async function PATCH(request: Request) {
         finalized_at: new Date().toISOString(),
       })
       .eq("user_id", user_id)
-      .eq("year", year)
-      .eq("month", month)
+      .eq("year", parseInt(String(year)))
+      .eq("month", parseInt(String(month)))
       .select()
       .single();
 

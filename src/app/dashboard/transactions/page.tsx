@@ -367,22 +367,22 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               </div>
             )}
             {(() => {
-                const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-                  ? item.serial_numbers
-                  : item.serial_number
-                    ? [item.serial_number]
-                    : [];
-                if (sns.length === 0) return null;
-                return (
-                  <div className="flex flex-row flex-wrap gap-1 mt-1">
-                    {sns.map((sn: string, i: number) => (
-                      <span key={i} className="text-[10px] text-gray-600 font-mono bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                        {sn}
-                      </span>
-                    ))}
-                  </div>
-                );
-              })()}
+              const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+                ? item.serial_numbers
+                : item.serial_number
+                  ? [item.serial_number]
+                  : [];
+              if (sns.length === 0) return null;
+              return (
+                <div className="flex flex-row flex-wrap gap-1 mt-1">
+                  {sns.map((sn: string, i: number) => (
+                    <span key={i} className="text-[10px] text-gray-600 font-mono bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                      {sn}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -395,21 +395,18 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             </p>
           </div>
           {item.other !== undefined && item.other !== null && (
-            <div className={`bg-gradient-to-br rounded-lg p-2.5 border ${
-              item.other > 0
-                ? "from-emerald-50 to-emerald-100 border-emerald-200"
-                : item.other < 0
-                  ? "from-red-50 to-red-100 border-red-200"
-                  : "from-gray-50 to-gray-100 border-gray-200"
-            }`}>
-              <p className={`text-[10px] font-semibold mb-1 ${
-                item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-600"
+            <div className={`bg-gradient-to-br rounded-lg p-2.5 border ${item.other > 0
+              ? "from-emerald-50 to-emerald-100 border-emerald-200"
+              : item.other < 0
+                ? "from-red-50 to-red-100 border-red-200"
+                : "from-gray-50 to-gray-100 border-gray-200"
               }`}>
+              <p className={`text-[10px] font-semibold mb-1 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-600"
+                }`}>
                 {item.other > 0 ? "📈 Profit" : item.other < 0 ? "📉 Loss" : "➖ Break Even"}
               </p>
-              <p className={`text-sm font-bold truncate ${
-                item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"
-              }`}>
+              <p className={`text-sm font-bold truncate ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"
+                }`}>
                 {item.other > 0 ? "+" : ""}
                 {item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
               </p>
@@ -570,6 +567,23 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   );
 }
 
+function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
+  if (item.status !== "PAID") return null;
+ 
+  if (item.notes?.includes("[ORIG:RESERVED]")) return "RESERVED";
+  if (item.notes?.includes("[ORIG:HELD]")) return "HELD";
+
+  if (item.dp_amount && Number(item.dp_amount) > 0) return "RESERVED";
+
+  if (item.paid_at && item.created_at && !item.is_ecommerce) {
+    const diffMs = new Date(item.paid_at).getTime() - new Date(item.created_at).getTime();
+    const diffMinutes = diffMs / (1000 * 60);
+    if (diffMinutes > 5) return "HELD";
+  }
+ 
+  return null;
+}
+
 // ─── TRANSACTION TABLE (Desktop View) ────────────────────────────────────
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored }: any) {
   return (
@@ -612,6 +626,64 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
         ← Geser untuk melihat lebih banyak kolom →
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ item }: { item: any }) {
+  const originalStatus = getOriginalStatus(item);
+
+  if (originalStatus) {
+    // Sudah lunas tapi dulunya DP/Ambil Dulu
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        {/* Badge status asal */}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg font-bold text-[10px] whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+          }`}>
+          {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
+        </span>
+        {/* Badge lunas */}
+        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold text-[10px] whitespace-nowrap bg-green-100 text-green-700 border border-green-200">
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          Lunas
+        </span>
+      </div>
+    );
+  }
+
+  // Status biasa
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+      {STATUS_LABEL[item.status] ?? item.status}
+    </span>
+  );
+}
+
+function StatusBadgeMobile({ item }: { item: any }) {
+  const originalStatus = getOriginalStatus(item);
+
+  if (originalStatus) {
+    return (
+      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+          }`}>
+          {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
+        </span>
+        <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5 whitespace-nowrap">
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          Lunas
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+      {STATUS_LABEL[item.status] ?? item.status}
+    </span>
   );
 }
 
@@ -664,9 +736,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
       <tr className="hover:bg-blue-50/40 transition-colors duration-100 group">
         {/* Status */}
         <td className="px-3 py-2.5">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-            {STATUS_LABEL[item.status] ?? item.status}
-          </span>
+          <StatusBadge item={item} />
         </td>
 
         {/* Nota + Tanggal + Jam */}
@@ -783,9 +853,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <td className="px-3 py-2.5 text-right">
           {item.other !== undefined && item.other !== null ? (
             <div className="space-y-0.5">
-              <span className={`text-[11px] font-bold font-mono ${
-                item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"
-              }`}>
+              <span className={`text-[11px] font-bold font-mono ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"
+                }`}>
                 {item.other > 0 ? "+" : ""}
                 {item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
               </span>
@@ -1089,9 +1158,8 @@ export default function Page() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${
-                hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                }`}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -1116,9 +1184,8 @@ export default function Page() {
                     <button
                       key={s}
                       onClick={() => setStatus(s)}
-                      className={`h-8 rounded-lg text-xs font-semibold border transition ${
-                        status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                      }`}
+                      className={`h-8 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                        }`}
                     >
                       {s === "ALL" ? "Semua" : s === "RESERVED" ? "DP" : STATUS_LABEL[s] ?? s}
                     </button>
@@ -1172,11 +1239,10 @@ export default function Page() {
                         <button
                           key={p as string}
                           onClick={() => setSourcePlatform(p as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${
-                            isActive
-                              ? "bg-gray-800 text-white border-gray-800"
-                              : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                          }`}
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive
+                            ? "bg-gray-800 text-white border-gray-800"
+                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                            }`}
                         >
                           {p === "ALL" ? "Semua" : badge?.text ?? (p as string)}
                         </button>
@@ -1198,11 +1264,10 @@ export default function Page() {
                         <button
                           key={m as string}
                           onClick={() => setPaymentMethod(m as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${
-                            isActive
-                              ? "bg-gray-800 text-white border-gray-800"
-                              : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                          }`}
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive
+                            ? "bg-gray-800 text-white border-gray-800"
+                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                            }`}
                         >
                           {m === "ALL" ? "Semua" : style?.text ?? (m as string)}
                         </button>
