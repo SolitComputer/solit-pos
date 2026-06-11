@@ -35,6 +35,7 @@ type ManualAttendance = {
     status: "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE";
     notes: string | null;
     created_by: string | null;
+    created_by_name?: string | null;
     users?: { id: string; name: string; role: string; shift: string };
 };
 
@@ -988,6 +989,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         closeAt?: string;
         manualAlreadyExists?: boolean;
         manualStatus?: string;
+        manualCreatedByName?: string | null;
     } | null;
     loading: boolean; onRefresh: () => void;
 }) {
@@ -1037,7 +1039,9 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 "ABSENT": { label: "Tidak Hadir", color: "text-red-700" },
                 "LEAVE": { label: "Cuti", color: "text-cyan-700" },
             };
-            const manualInfo = manualStatusMap[status.manualStatus || "PRESENT"] || { label: "Tercatat", color: "text-gray-700" };
+            const manualInfo = manualStatusMap[status.manualStatus || "PRESENT"]
+                || { label: "Tercatat", color: "text-gray-700" };
+            const adminName = status.manualCreatedByName;
             cfg = {
                 icon: "✏️",
                 gradient: "from-blue-50 to-indigo-50",
@@ -1045,8 +1049,8 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 badge: "bg-blue-100 text-blue-700 border-blue-200",
                 dot: "bg-blue-400",
                 badgeText: "Absen Manual",
-                title: "Sudah Di-absenkan Manual",
-                sub: `Status: ${manualInfo.label} · Diinput oleh admin`,
+                title: "Sudah Di-absenkan oleh Admin",
+                sub: `Status: ${manualInfo.label}${adminName ? ` · Oleh ${adminName}` : " · Diinput oleh admin"}`,
                 showBtn: false,
             };
             break;
@@ -1510,7 +1514,19 @@ export default function AttendanceDashboardPage() {
     const [usersLoading, setUsersLoading] = useState(false);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
-    const fetchManualRecords = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setManualRecords(d.data || []); }, []);
+    const fetchManualRecords = useCallback(async (y: number, m: number) => {
+        const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`);
+        console.log("[fetchManualRecords] HTTP status:", r.status, r.statusText);
+        const text = await r.text();
+        console.log("[fetchManualRecords] raw response:", text.slice(0, 300));
+        try {
+            const d = JSON.parse(text);
+            console.log("[fetchManualRecords] parsed:", d.success, "count:", d.data?.length ?? 0);
+            if (d.success) setManualRecords(d.data || []);
+        } catch (e) {
+            console.error("[fetchManualRecords] JSON parse failed:", e);
+        }
+    }, []);
     const fetchDayOffs = useCallback(async () => { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); }, []);
     const fetchAllDateOffs = useCallback(async () => { const r = await fetch("/api/attendance/date-off"); const d = await r.json(); if (d.success) setAllDateOffs(d.data || []); }, []);
     const fetchAllUsers = useCallback(async () => {
@@ -1587,6 +1603,7 @@ export default function AttendanceDashboardPage() {
                 closeAt: d.closeAt,
                 manualAlreadyExists: d.manualAlreadyExists ?? false,
                 manualStatus: d.manualStatus ?? null,
+                manualCreatedByName: d.manualCreatedByName ?? null,
             });
         } catch { }
         finally { setStatusLoading(false); }
@@ -1659,18 +1676,25 @@ export default function AttendanceDashboardPage() {
     // Merged auto + manual
     const mergedAttendances = useMemo((): Attendance[] => {
         const auto = attendances.map(a => ({ ...a, source: "AUTO" as const }));
+        console.log("[mergedAttendances] auto:", auto.length, "| manualRecords:", manualRecords.length, "| currentUser:", currentUser?.id);
         const manualExtra: Attendance[] = manualRecords
-            .filter(mr => !auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date))
+            .filter(mr => {
+                const inAuto = auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date);
+                console.log("[mergedAttendances] mr:", mr.attendance_date, mr.status, "| users:", mr.users?.name ?? "NULL", "| inAuto:", inAuto);
+                return !inAuto;
+            })
             .map(mr => ({
                 id: mr.id, user_id: mr.user_id,
-                user_name: mr.users?.name || "Unknown", user_role: mr.users?.role || "", user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
+                user_name: mr.users?.name || (mr.user_id === currentUser?.id ? currentUser?.name : null) || "Unknown",
+                user_role: mr.users?.role || (mr.user_id === currentUser?.id ? currentUser?.role : "") || "",
+                user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
                 date: mr.check_in_time, check_in_time: mr.check_in_time, status: mr.status, method: "MANUAL",
                 latitude: null, longitude: null, accuracy: null, device: "Manual entry", ip_address: "", face_distance: null, created_at: mr.check_in_time,
                 displayStatus: (mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "SKIP") as "PRESENT" | "LATE" | "SKIP",
                 source: "MANUAL" as const,
             }));
         return [...auto, ...manualExtra];
-    }, [attendances, manualRecords]);
+    }, [attendances, manualRecords, currentUser]);
 
     const thisMonthKey = `${calYear}-${pad2(calMonth + 1)}`;
     const thisMonthAtt = mergedAttendances.filter(a => toWIBDateKey(a.check_in_time || a.created_at).startsWith(thisMonthKey));
@@ -1717,10 +1741,10 @@ export default function AttendanceDashboardPage() {
                 a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
 
-        // Pass 2: manual override + simpan record untuk alasan
         const manualByName: Record<string, Record<string, ManualAttendance>> = {};
         manualRecords.forEach(mr => {
-            const name = mr.users?.name;
+
+            const name = mr.users?.name ?? (mr.user_id === currentUser?.id ? currentUser?.name : null);
             if (!name || !mr.attendance_date.startsWith(thisMonthKey)) return;
             if (!manualByName[name]) manualByName[name] = {};
             manualByName[name][mr.attendance_date] = mr;
@@ -1731,6 +1755,7 @@ export default function AttendanceDashboardPage() {
         const names = new Set<string>();
         allUsers.forEach(u => names.add(u.name));
         Object.keys(effByName).forEach(n => names.add(n));
+        Object.keys(manualByName).forEach(n => names.add(n));
 
         const userIdByName: Record<string, string> = {};
 
@@ -1801,7 +1826,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -1817,9 +1842,14 @@ export default function AttendanceDashboardPage() {
         if (!selectedMonth) return;
         setLoading(true);
         const { year, month } = selectedMonth;
-        Promise.all([fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), ...(isAdminRole(currentUser?.role)
-            ? [fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month)] : [])])
-            .finally(() => setLoading(false));
+        const tasks: Promise<any>[] = [
+            fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(),
+            fetchManualRecords(year, month), fetchAllUsers(),
+        ];
+        if (isAdminRole(currentUser?.role)) {
+            tasks.push(fetchSalaries(), fetchLeaveData(year, month));
+        }
+        Promise.all(tasks).finally(() => setLoading(false));
     }, [selectedMonth, currentUser]);
 
     if (!selectedMonth) return (
@@ -2135,11 +2165,19 @@ export default function AttendanceDashboardPage() {
                                                                 ) : <span className="text-[10px] text-gray-200 font-bold">—</span>}
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
-                                                                {manualRec?.notes ? (
-                                                                    <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">📝 {manualRec.notes}</p>
-                                                                ) : (
-                                                                    <p className="text-[10px] text-gray-400 truncate max-w-[180px] font-mono">{a.device || "—"}</p>
-                                                                )}
+                                                                <div className="space-y-0.5">
+                                                                    {manualRec?.notes && (
+                                                                        <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">📝 {manualRec.notes}</p>
+                                                                    )}
+                                                                    {manualRec?.created_by_name && (
+                                                                        <p className="text-[10px] text-violet-500 font-bold">
+                                                                            ✏️ oleh {manualRec.created_by_name}
+                                                                        </p>
+                                                                    )}
+                                                                    {!manualRec && (
+                                                                        <p className="text-[10px] text-gray-400 truncate max-w-[180px] font-mono">{a.device || "—"}</p>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             {/* ✅ NEW: Tombol Edit di tabel */}
                                                             {isAdminRole(currentUser?.role)

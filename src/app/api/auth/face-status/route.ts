@@ -1,3 +1,4 @@
+// src/app/api/auth/face-status/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule } from "@/lib/auth";
@@ -56,7 +57,9 @@ export async function GET() {
     ] = await Promise.all([
       supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
       supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
-      supabase.from("attendance_manual").select("id, status").eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
+      // ✅ FIX: tambah created_by ke select
+      supabase.from("attendance_manual").select("id, status, created_by")
+        .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
       supabase.from("face_verifications").select("id, created_at")
         .eq("user_id", user.id).eq("status", "SUCCESS")
         .gte("created_at", `${todayDate}T00:00:00+07:00`)
@@ -67,7 +70,7 @@ export async function GET() {
 
     const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
 
-    // ✅ NEW: Check jika ada leave (cuti) hari ini
+    // Check jika ada leave (cuti) hari ini
     const { data: leaveToday } = await supabase
       .from("leave_requests")
       .select("id")
@@ -110,6 +113,19 @@ export async function GET() {
         nowWIB.getUTCDate() + 1, 17, 0, 0
       ));
 
+      // ✅ FIX: Ambil nama admin yang mengabsenkan
+      let createdByName: string | null = null;
+      const createdById = (manualToday as any).created_by;
+      if (createdById) {
+        const { data: creatorData } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", createdById)
+          .maybeSingle();
+        createdByName = creatorData?.name ?? null;
+      }
+
+      const expiry = getMidnightWIB();
       const response = NextResponse.json({
         success: true,
         alreadyAttended: true,
@@ -125,10 +141,9 @@ export async function GET() {
         isExempt: false,
         manualAlreadyExists: true,
         manualStatus: (manualToday as any).status,
+        manualCreatedByName: createdByName,  // ✅ TAMBAH
       });
 
-      // Set cookie untuk tracking
-      const expiry = getMidnightWIB();
       response.cookies.set("face_attended", user.id, {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: expiry,
@@ -140,7 +155,6 @@ export async function GET() {
     const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
     const alreadyAttendedDB = Boolean(todaySuccess);
 
-    // Resolusi jadwal dari DB
     const schedule = await resolveShiftConfigFromDB(user.id, supabase);
     const timeStatus = isAttendanceTimeForSchedule(schedule);
 
