@@ -24,58 +24,69 @@ const ALL_ROLES = [
   // Operational
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
+  // New roles (Supplier & Content)
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
-  ADMIN:            "Admin",
-  PROGRAMMER:       "Programmer",
-  ASISTEN_CEO:      "Asisten CEO",
-  KEPALA_SALES:     "Kepala Sales",
-  KEPALA_MARKETING: "Kepala Marketing",
-  KEPALA_TEKNISI:   "Kepala Teknisi",
-  CREW_SALES:       "Crew Sales",
-  SOTECH:           "Sotech",
-  ACCOUNTING:       "Accounting",
-  PENGELOLA_BARANG: "Pengelola Barang",
-  TEKNISI:          "Teknisi",
-  PENGANTARAN:      "Pengantaran",
-  MARKETING:        "Marketing",
-  KEBERSIHAN:       "Kebersihan",
+  ADMIN:                 "Admin",
+  PROGRAMMER:            "Programmer",
+  ASISTEN_CEO:           "Asisten CEO",
+  KEPALA_SALES:          "Kepala Sales",
+  KEPALA_MARKETING:      "Kepala Marketing",
+  KEPALA_TEKNISI:        "Kepala Teknisi",
+  CREW_SALES:            "Crew Sales",
+  SOTECH:                "Sotech",
+  ACCOUNTING:            "Accounting",
+  PENGELOLA_BARANG:      "Pengelola Barang",
+  TEKNISI:               "Teknisi",
+  PENGANTARAN:           "Pengantaran",
+  MARKETING:             "Marketing",
+  KEBERSIHAN:            "Kebersihan",
+  PENYEDIA_BARANG:       "Penyedia Barang",
+  KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
+  KONTEN:                "Konten",
 };
 
 const ROLE_ICON: Record<string, string> = {
-  ADMIN:            "👑",
-  PROGRAMMER:       "💻",
-  ASISTEN_CEO:      "🤝",
-  KEPALA_SALES:     "📊",
-  KEPALA_MARKETING: "🎯",
-  KEPALA_TEKNISI:   "🔩",
-  CREW_SALES:       "💼",
-  SOTECH:           "🛠️",
-  ACCOUNTING:       "💰",
-  PENGELOLA_BARANG: "📦",
-  TEKNISI:          "🔧",
-  PENGANTARAN:      "🚚",
-  MARKETING:        "📱",
-  KEBERSIHAN:       "🧹",
+  ADMIN:                 "👑",
+  PROGRAMMER:            "💻",
+  ASISTEN_CEO:           "🤝",
+  KEPALA_SALES:          "📊",
+  KEPALA_MARKETING:      "🎯",
+  KEPALA_TEKNISI:        "🔩",
+  CREW_SALES:            "💼",
+  SOTECH:                "🛠️",
+  ACCOUNTING:            "💰",
+  PENGELOLA_BARANG:      "📦",
+  TEKNISI:               "🔧",
+  PENGANTARAN:           "🚚",
+  MARKETING:             "📱",
+  KEBERSIHAN:            "🧹",
+  PENYEDIA_BARANG:       "🏭",
+  KEPALA_PENYEDIA_BARANG: "🏢",
+  KONTEN:                "📝",
 };
 
 // Badge color per role group
 const ROLE_BADGE: Record<string, string> = {
-  ADMIN:            "bg-violet-100 text-violet-700 border-violet-200",
-  PROGRAMMER:       "bg-indigo-100 text-indigo-700 border-indigo-200",
-  ASISTEN_CEO:      "bg-purple-100 text-purple-700 border-purple-200",
-  KEPALA_SALES:     "bg-emerald-100 text-emerald-700 border-emerald-200",
-  KEPALA_MARKETING: "bg-rose-100 text-rose-700 border-rose-200",
-  KEPALA_TEKNISI:   "bg-red-100 text-red-700 border-red-200",
-  CREW_SALES:       "bg-sky-100 text-sky-700 border-sky-200",
-  SOTECH:           "bg-lime-100 text-lime-700 border-lime-200",
-  ACCOUNTING:       "bg-amber-100 text-amber-700 border-amber-200",
-  PENGELOLA_BARANG: "bg-blue-100 text-blue-700 border-blue-200",
-  TEKNISI:          "bg-orange-100 text-orange-700 border-orange-200",
-  PENGANTARAN:      "bg-teal-100 text-teal-700 border-teal-200",
-  MARKETING:        "bg-pink-100 text-pink-700 border-pink-200",
-  KEBERSIHAN:       "bg-cyan-100 text-cyan-700 border-cyan-200",
+  ADMIN:                 "bg-violet-100 text-violet-700 border-violet-200",
+  PROGRAMMER:            "bg-indigo-100 text-indigo-700 border-indigo-200",
+  ASISTEN_CEO:           "bg-purple-100 text-purple-700 border-purple-200",
+  KEPALA_SALES:          "bg-emerald-100 text-emerald-700 border-emerald-200",
+  KEPALA_MARKETING:      "bg-rose-100 text-rose-700 border-rose-200",
+  KEPALA_TEKNISI:        "bg-red-100 text-red-700 border-red-200",
+  CREW_SALES:            "bg-sky-100 text-sky-700 border-sky-200",
+  SOTECH:                "bg-lime-100 text-lime-700 border-lime-200",
+  ACCOUNTING:            "bg-amber-100 text-amber-700 border-amber-200",
+  PENGELOLA_BARANG:      "bg-blue-100 text-blue-700 border-blue-200",
+  TEKNISI:               "bg-orange-100 text-orange-700 border-orange-200",
+  PENGANTARAN:           "bg-teal-100 text-teal-700 border-teal-200",
+  MARKETING:             "bg-pink-100 text-pink-700 border-pink-200",
+  KEBERSIHAN:            "bg-cyan-100 text-cyan-700 border-cyan-200",
+  PENYEDIA_BARANG:       "bg-yellow-100 text-yellow-700 border-yellow-200",
+  KEPALA_PENYEDIA_BARANG: "bg-orange-100 text-orange-700 border-orange-200",
+  KONTEN:                "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
 };
 
 // Full access roles (badge berbeda)
@@ -171,6 +182,12 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
               {/* Group: Operasional */}
               <optgroup label="— Operasional —">
                 {["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => (
+                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+                ))}
+              </optgroup>
+              {/* Group: Supplier & Content */}
+              <optgroup label="— Penyedia & Konten —">
+                {["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => (
                   <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
                 ))}
               </optgroup>
@@ -286,6 +303,11 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
               </optgroup>
               <optgroup label="— Operasional —">
                 {["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => (
+                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="— Penyedia & Konten —">
+                {["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => (
                   <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
                 ))}
               </optgroup>

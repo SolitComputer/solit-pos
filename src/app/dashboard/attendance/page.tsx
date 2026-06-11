@@ -1600,8 +1600,8 @@ export default function AttendanceDashboardPage() {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
         setLoading(true); setSelectedDate(null); setFilterUser("Semua");
-        const tasks: Promise<any>[] = [fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month)];
-        if (isAdminRole(currentUser?.role)) tasks.push(fetchAllUsers(), fetchSalaries(), fetchLeaveData(year, month));
+        const tasks: Promise<any>[] = [fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), fetchAllUsers()];
+        if (isAdminRole(currentUser?.role)) tasks.push(fetchSalaries(), fetchLeaveData(year, month));
         Promise.all(tasks).finally(() => setLoading(false));
         if (isAdminRole(currentUser?.role)) {
             fetchSalarySlips(year, month);
@@ -1716,13 +1716,28 @@ export default function AttendanceDashboardPage() {
                 mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
         });
 
-        // 2) Daftar user = gabungan allUsers + nama yang muncul di absensi
         const names = new Set<string>();
         allUsers.forEach(u => names.add(u.name));
         Object.keys(effByName).forEach(n => names.add(n));
 
         const userIdByName: Record<string, string> = {};
+
         allUsers.forEach(u => { userIdByName[u.name] = u.id; });
+
+        if (allUsers.length === 0) {
+            mergedAttendances.forEach(a => {
+                if (a.user_id && a.user_name && !userIdByName[a.user_name]) {
+                    userIdByName[a.user_name] = a.user_id;
+                }
+            });
+        }
+
+        // Source 3: manualRecords (extra fallback)
+        manualRecords.forEach(mr => {
+            if (mr.user_id && mr.users?.name && !userIdByName[mr.users.name]) {
+                userIdByName[mr.users.name] = mr.user_id;
+            }
+        });
 
         // 3) Enumerasi hari kerja yang SUDAH LEWAT per user → present/late/absent konsisten
         const result: UserStat[] = [];
@@ -1759,10 +1774,16 @@ export default function AttendanceDashboardPage() {
             const totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
             const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
 
+            const resolvedUserId = userIdByName[name] ??
+                Object.entries(manualByName[name] || {})
+                    .map(([_, rec]) => rec.user_id)
+                    .filter(Boolean)[0] ??
+                "";
+
             result.push({
                 name, present, late, score, pastWorkdays, totalWorkdays, pct,
                 remainingDays: totalWorkdays - pastWorkdays,
-                userId: userIdByName[name] ?? "",
+                userId: resolvedUserId,
                 absences, offDates,
             });
         });
@@ -2384,7 +2405,7 @@ export default function AttendanceDashboardPage() {
                                                         </div>
                                                     </td>
 
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {sal ? (
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="font-mono font-bold text-gray-800 text-xs">
@@ -2402,7 +2423,7 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Tunjangan Istri */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {allow?.allowance_wife ? (
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="font-mono font-bold text-emerald-700 text-xs">
@@ -2435,7 +2456,7 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Tunjangan Anak */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {allow?.allowance_child ? (
                                                             <div className="flex flex-col items-center gap-0.5">
                                                                 <span className="font-mono font-bold text-emerald-700 text-xs">
@@ -2451,7 +2472,7 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Lemburan */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {overtime > 0 ? (
                                                             <span className="font-mono font-bold text-orange-600 text-xs">
                                                                 {formatRupiah(overtime)}
@@ -2462,7 +2483,7 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Kehadiran % */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         <div className="flex flex-col items-center gap-1">
                                                             <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"
                                                                 }`}>
@@ -2480,7 +2501,7 @@ export default function AttendanceDashboardPage() {
 
                                                     {/* POTONGAN */}
                                                     {/* Kasbon */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {deductionLoan > 0 ? (
                                                             <span className="font-mono font-bold text-red-600 text-xs">
                                                                 -{formatRupiah(deductionLoan)}
@@ -2491,7 +2512,7 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Pensiun */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         {deductionPension > 0 ? (
                                                             <span className="font-mono font-bold text-red-600 text-xs">
                                                                 -{formatRupiah(deductionPension)}
@@ -2503,7 +2524,7 @@ export default function AttendanceDashboardPage() {
 
                                                     {/* TOTAL */}
                                                     {/* Gross */}
-                                                   <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         <div className="flex flex-col items-center gap-0.5">
                                                             <span className="font-black text-blue-600 text-sm">
                                                                 {formatRupiah(grossIncome)}
@@ -2547,7 +2568,7 @@ export default function AttendanceDashboardPage() {
                                             <td colSpan={2} className="px-4 py-4 text-sm font-black text-gray-700">
                                                 TOTAL BULAN INI
                                             </td>
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
                                                         userSummary.reduce((sum, u) => {
@@ -2565,7 +2586,7 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Gaji Pokok</span>
                                             </td>
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
                                                         userSummary.reduce((sum, u) => {
@@ -2576,7 +2597,7 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Tunjangan Istri</span>
                                             </td>
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
                                                         userSummary.reduce((sum, u) => {
@@ -2587,7 +2608,7 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Tunjangan Anak</span>
                                             </td>
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-orange-600 text-xs block">
                                                     {formatRupiah(
                                                         userSummary.reduce((sum, u) => sum + (overtimeTotal[u.userId] || 0), 0)
@@ -2596,7 +2617,7 @@ export default function AttendanceDashboardPage() {
                                                 <span className="text-[8px] text-gray-400">Lemburan</span>
                                             </td>
                                             <td colSpan={2} />
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
                                                     -{formatRupiah(
                                                         userSummary.reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
@@ -2604,7 +2625,7 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Total Potongan</span>
                                             </td>
-                                           <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-blue-600 text-xs block">
                                                     {formatRupiah(
                                                         userSummary.reduce((sum, u) => {

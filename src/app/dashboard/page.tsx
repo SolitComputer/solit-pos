@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PERMISSIONS, UserRole, hasPermission } from "@/lib/permissions";
+import { RevenueDetailModal } from "@/components/modals/RevenueDetailModal";
+import { InventoryDetailModal } from "@/components/modals/InventoryDetailModal";
+import { SalesDetailModal } from "@/components/modals/SalesDetailModal";
+import { LaptopDetailModal } from "@/components/modals/LaptopDetailModal";
+import { GrossProfitDetailModal } from "@/components/modals/GrossProfitDetailModal";
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -47,8 +53,8 @@ interface Transaction {
 // fmtShort hanya untuk tooltip chart & label kecil — BUKAN untuk stat card utama
 const fmtShort = (n: number): string => {
   if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
-  if (n >= 1_000_000)     return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
-  if (n >= 1_000)         return `Rp ${(n / 1_000).toFixed(0)}Rb`;
+  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
+  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}Rb`;
   return `Rp ${n}`;
 };
 
@@ -122,10 +128,10 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
 }
 
 const ACCENT = {
-  gray:    { bg: "from-gray-50 to-gray-100",       text: "text-gray-700",    bar: "bg-gray-600",    border: "border-gray-200"   },
-  emerald: { bg: "from-emerald-50 to-green-100",   text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
-  amber:   { bg: "from-amber-50 to-yellow-100",    text: "text-amber-700",   bar: "bg-amber-600",   border: "border-amber-200"  },
-  blue:    { bg: "from-blue-50 to-indigo-100",     text: "text-blue-700",    bar: "bg-blue-600",    border: "border-blue-200"   },
+  gray: { bg: "from-gray-50 to-gray-100", text: "text-gray-700", bar: "bg-gray-600", border: "border-gray-200" },
+  emerald: { bg: "from-emerald-50 to-green-100", text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
+  amber: { bg: "from-amber-50 to-yellow-100", text: "text-amber-700", bar: "bg-amber-600", border: "border-amber-200" },
+  blue: { bg: "from-blue-50 to-indigo-100", text: "text-blue-700", bar: "bg-blue-600", border: "border-blue-200" },
 } as const;
 
 // PERBAIKAN: StatCard menerima nilai sudah diformat (string) dari luar
@@ -191,24 +197,24 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
 // ─── Transaction Row ──────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-  PAID:      "bg-emerald-100 text-emerald-700 border-emerald-200",
-  PENDING:   "bg-amber-100 text-amber-700 border-amber-200",
+  PAID: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  PENDING: "bg-amber-100 text-amber-700 border-amber-200",
   CANCELLED: "bg-rose-100 text-rose-600 border-rose-200",
 };
 
 const STATUS_ICON: Record<string, string> = {
-  PAID:      "✅",
-  PENDING:   "⏳",
+  PAID: "✅",
+  PENDING: "⏳",
   CANCELLED: "❌",
 };
 
 function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   item: Transaction; onPhotoClick: (url: string) => void; canSeeFinancials: boolean;
 }) {
-  const profit       = item.other || 0;
+  const profit = item.other || 0;
   // PERBAIKAN: konsisten pakai deal_price || amount, sama dengan halaman transaksi
   const displayAmount = getDealPrice(item);
-  const txDate  = new Date(item.paid_at || item.created_at);
+  const txDate = new Date(item.paid_at || item.created_at);
   const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
@@ -335,14 +341,19 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Page() {
-  const [stats, setStats]             = useState<Stats>();
+  const [stats, setStats] = useState<Stats>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading]     = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [now, setNow]                 = useState("");
-  const [photoModal, setPhotoModal]   = useState<string | null>(null);
-  const [userRole, setUserRole]       = useState<UserRole | null>(null);
+  const [now, setNow] = useState("");
+  const [photoModal, setPhotoModal] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [showSalesModal, setShowSalesModal] = useState(false);
+  const [showLaptopModal, setShowLaptopModal] = useState(false);
+  const [showGrossProfitModal, setShowGrossProfitModal] = useState(false);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
 
@@ -388,9 +399,9 @@ export default function Page() {
   }, [fetchAll]);
 
   // ── Chart data ─────────────────────────────────────────────────────────────
-  const weeklyLabels   = stats?.weeklyTrend?.map((d) => d.label)    ?? [];
-  const weeklyRevenue  = stats?.weeklyTrend?.map((d) => d.revenue)  ?? [];
-  const weeklyProfit   = stats?.weeklyTrend?.map((d) => d.profit)   ?? [];
+  const weeklyLabels = stats?.weeklyTrend?.map((d) => d.label) ?? [];
+  const weeklyRevenue = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
+  const weeklyProfit = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
   const weeklyTrxCount = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
 
   const trendChartData = {
@@ -481,6 +492,11 @@ export default function Page() {
 
   return (
     <DashboardLayout>
+      <RevenueDetailModal isOpen={showRevenueModal} onClose={() => setShowRevenueModal(false)} />
+      <InventoryDetailModal isOpen={showInventoryModal} onClose={() => setShowInventoryModal(false)} />
+      <SalesDetailModal isOpen={showSalesModal} onClose={() => setShowSalesModal(false)} />
+      <LaptopDetailModal isOpen={showLaptopModal} onClose={() => setShowLaptopModal(false)} />
+      <GrossProfitDetailModal isOpen={showGrossProfitModal} onClose={() => setShowGrossProfitModal(false)} />
       <style>{`
         @keyframes fade-up {
           from { opacity: 0; transform: translateY(20px); }
@@ -560,8 +576,8 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Stat Cards Grid ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
+        {/* ── Stat Cards Grid (Always 4 cols) ── */}
+       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up auto-rows-fr" style={{ animationDelay: "0.05s" }}>
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
               <div key={i} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-4 shadow-sm space-y-2">
@@ -570,58 +586,70 @@ export default function Page() {
                 <Shimmer className="w-20 sm:w-24 h-2 sm:h-3" />
               </div>
             ))
-          ) : canSeeFinancials ? (
-            <>
-              {/* PERBAIKAN: pakai fmtRupiah (format penuh) bukan fmtShort */}
-              <StatCard
-                label="Omzet Hari Ini"
-                value={fmtRupiah(stats?.todayRevenue || 0)}
-                sub={`${stats?.todayTransactions || 0} transaksi`}
-                icon={<OmzetIcon />}
-                accent="gray"
-                change={stats?.revenueChange}
-              />
-              <StatCard
-                label="Profit Hari Ini"
-                value={fmtRupiah(stats?.todayProfit || 0)}
-                sub="margin bersih"
-                icon={<ProfitIcon />}
-                accent="emerald"
-                change={stats?.profitChange}
-              />
-              <StatCard
-                label="Laptop Ready"
-                value={String(stats?.laptopReady || 0)}
-                sub={`${stats?.stockTotal || 0} total unit`}
-                icon={<LaptopIcon />}
-                accent="gray"
-              />
-              <StatCard
-                label="Transaksi Hari Ini"
-                value={String(stats?.todayTransactions || 0)}
-                sub="transaksi selesai"
-                icon={<TrxIcon />}
-                accent="gray"
-                change={stats?.trxChange}
-              />
-            </>
           ) : (
             <>
-              <StatCard
-                label="Transaksi Hari Ini"
-                value={String(stats?.todayTransactions || 0)}
-                sub="transaksi selesai"
-                icon={<TrxIcon />}
-                accent="gray"
-                change={stats?.trxChange}
-              />
-              <StatCard
-                label="Laptop Ready"
-                value={String(stats?.laptopReady || 0)}
-                sub={`${stats?.stockTotal || 0} total unit`}
-                icon={<LaptopIcon />}
-                accent="gray"
-              />
+              {/* Omzet - only if canSeeFinancials */}
+              {canSeeFinancials && (
+                <button
+                  onClick={() => setShowRevenueModal(true)}
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                >
+                  <StatCard
+                    label="Omzet Hari Ini"
+                    value={fmtRupiah(stats?.todayRevenue || 0)}
+                    sub={`${stats?.todayTransactions || 0} transaksi`}
+                    icon={<OmzetIcon />}
+                    accent="gray"
+                    change={stats?.revenueChange}
+                  />
+                </button>
+              )}
+
+              {/* Gross Profit - only if canSeeFinancials */}
+              {canSeeFinancials && (
+                <button
+                  onClick={() => setShowGrossProfitModal(true)}
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                >
+                  <StatCard
+                    label="Gross Profit Hari Ini"
+                    value={fmtRupiah(stats?.todayProfit || 0)}
+                    sub="margin keuntungan"
+                    icon={<ProfitIcon />}
+                    accent="emerald"
+                    change={stats?.profitChange}
+                  />
+                </button>
+              )}
+
+              {/* Laptop Ready - ALWAYS show */}
+              <button
+                onClick={() => setShowInventoryModal(true)}
+                className="h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+              >
+                <StatCard
+                  label="Laptop Ready"
+                  value={`${stats?.laptopReady || 0} tipe`}
+                  sub={`${stats?.stockTotal || 0} unit total`}
+                  icon={<LaptopIcon />}
+                  accent="gray"
+                />
+              </button>
+
+              {/* Transaksi - ALWAYS show */}
+              <button
+                onClick={() => {/* bisa tambah modal nanti kalau perlu */ }}
+                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+              >
+                <StatCard
+                  label="Transaksi Hari Ini"
+                  value={String(stats?.todayTransactions || 0)}
+                  sub="transaksi selesai"
+                  icon={<TrxIcon />}
+                  accent="gray"
+                  change={stats?.trxChange}
+                />
+              </button>
             </>
           )}
         </div>
@@ -634,128 +662,147 @@ export default function Page() {
         </div>
 
         {/* ── Analytics Grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 fade-up" style={{ animationDelay: "0.1s" }}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 fade-up auto-rows-fr" style={{ animationDelay: "0.1s" }}>
 
           {/* Chart: Trend */}
           {canSeeFinancials ? (
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
-                  Tren Omzet & Profit
-                </h2>
-                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
+            <div className="lg:col-span-2">
+              <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                    <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
+                    Tren Omzet & Profit
+                  </h2>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
+                </div>
+                <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
+                    <span className="w-4 sm:w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
+                  </div>
+                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
+                    <span className="w-4 sm:w-5 inline-block border-t-2 border-dashed border-emerald-500" />Profit
+                  </div>
+                </div>
+                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyRevenue.length > 0 ? (
+                  <div style={{ height: 130 }} className="sm:h-[160px]"><Line data={trendChartData} options={trendOptions} /></div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
-                <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                  <span className="w-4 sm:w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                  <span className="w-4 sm:w-5 inline-block border-t-2 border-dashed border-emerald-500" />Profit
-                </div>
-              </div>
-              {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyRevenue.length > 0 ? (
-                <div style={{ height: 130 }} className="sm:h-[160px]"><Line data={trendChartData} options={trendOptions} /></div>
-              ) : (
-                <div className="text-center py-8 sm:py-12">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
-                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-                </div>
-              )}
             </div>
           ) : (
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
-                  Transaksi per Hari
-                </h2>
-                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
-              </div>
-              {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyTrxCount.length > 0 ? (
-                <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
-              ) : (
-                <div className="text-center py-8 sm:py-12">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
-                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+            <div className="lg:col-span-2">
+              <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                    <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
+                    Transaksi per Hari
+                  </h2>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
                 </div>
-              )}
+                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyTrxCount.length > 0 ? (
+                  <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Top Sales */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                <span className="text-base sm:text-lg">🏆</span>
-                Top Sales
-              </h2>
-              <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
-            </div>
-            {isLoading ? (
-              <div className="space-y-2 sm:space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
-                    <Shimmer className="flex-1 h-2 sm:h-3" />
-                    <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
+          <button
+            onClick={() => setShowSalesModal(true)}
+            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
+          >
+            <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+              {/* UBAH: header punya flex-shrink-0 */}
+              <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
+                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                  <span className="text-base sm:text-lg">🏆</span>
+                  Top Sales
+                </h2>
+                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
+              </div>
+
+              {/* UBAH: wrapper baru dengan flex-1 untuk grow */}
+              <div className="flex-1 flex flex-col justify-center">
+                {isLoading ? (
+                  <div className="space-y-2 sm:space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
+                        <Shimmer className="flex-1 h-2 sm:h-3" />
+                        <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : stats?.topSales?.length ? (
+                  <div className="space-y-1">
+                    {stats.topSales.map((s, i) => (
+                      <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
+                        maxTotal={stats.topSales[0]?.total || 1}
+                        extra={canSeeFinancials && s.profit > 0 ? (
+                          <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">
+                            +{fmtShort(s.profit)}
+                          </span>
+                        ) : undefined}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 sm:py-8">
+                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏆</p>
+                    <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                  </div>
+                )}
               </div>
-            ) : stats?.topSales?.length ? (
-              <div className="space-y-1">
-                {stats.topSales.map((s, i) => (
-                  <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
-                    maxTotal={stats.topSales[0]?.total || 1}
-                    extra={canSeeFinancials && s.profit > 0 ? (
-                      <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0">
-                        +{fmtShort(s.profit)}
-                      </span>
-                    ) : undefined}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏆</p>
-                <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-              </div>
-            )}
-          </div>
+            </div>
+          </button>
 
           {/* Top Laptop */}
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                <span className="text-base sm:text-lg">💻</span>
-                Laptop Terlaris
-              </h2>
-              <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
+          <button
+            onClick={() => setShowLaptopModal(true)}
+            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
+          >
+            <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
+                  <span className="text-base sm:text-lg">💻</span>
+                  Laptop Terlaris
+                </h2>
+                <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
+              </div>
+              {isLoading ? (
+                <div className="space-y-2 sm:space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
+                      <Shimmer className="flex-1 h-2 sm:h-3" />
+                      <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : stats?.topLaptop?.length ? (
+                <div className="space-y-1">
+                  {stats.topLaptop.map((item, i) => (
+                    <TopListItem key={item.name} rank={i + 1} name={item.name} total={item.total}
+                      maxTotal={stats.topLaptop[0]?.total || 1} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 sm:py-8">
+                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">💻</p>
+                  <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
+                </div>
+              )}
             </div>
-            {isLoading ? (
-              <div className="space-y-2 sm:space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Shimmer className="w-5 h-5 sm:w-6 sm:h-6 rounded-full" />
-                    <Shimmer className="flex-1 h-2 sm:h-3" />
-                    <Shimmer className="w-8 sm:w-10 h-4 sm:h-5 rounded-full" />
-                  </div>
-                ))}
-              </div>
-            ) : stats?.topLaptop?.length ? (
-              <div className="space-y-1">
-                {stats.topLaptop.map((item, i) => (
-                  <TopListItem key={item.name} rank={i + 1} name={item.name} total={item.total}
-                    maxTotal={stats.topLaptop[0]?.total || 1} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">💻</p>
-                <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-              </div>
-            )}
-          </div>
+          </button>
         </div>
 
         {/* ── Bar Chart (only for financials role) ── */}
@@ -829,7 +876,7 @@ export default function Page() {
         </div>
 
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
 

@@ -210,14 +210,39 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <p className="text-[10px] text-blue-600 font-semibold mb-1">💰 Harga Jual</p>
               <p className="text-sm font-bold text-blue-900 truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
             </div>
-            {item.other > 0 && (
-              <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-2.5 border border-amber-200">
-                <p className="text-[10px] text-amber-600 font-semibold mb-1">➕ Biaya Lain</p>
-                <p className="text-sm font-bold text-amber-900 truncate">Rp{(item.other || 0).toLocaleString("id-ID")}</p>
+            {item.other !== undefined && item.other !== null && (
+              <div className={`bg-gradient-to-br 
+    ${item.other > 0
+                  ? "from-emerald-50 to-emerald-100 border-emerald-200"
+                  : item.other < 0
+                    ? "from-red-50 to-red-100 border-red-200"
+                    : "from-gray-50 to-gray-100 border-gray-200"
+                } rounded-lg p-2.5 border`}>
+                <p className={`text-[10px] font-semibold mb-1
+      ${item.other > 0
+                    ? "text-emerald-600"
+                    : item.other < 0
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}>
+                  {item.other > 0 ? "📈" : item.other < 0 ? "📉" : "➖"}
+                  {item.other > 0 ? "Gross Profit" : item.other < 0 ? "Loss" : "Break Even"}
+                </p>
+                <p className={`text-sm font-bold truncate
+      ${item.other > 0
+                    ? "text-emerald-900"
+                    : item.other < 0
+                      ? "text-red-900"
+                      : "text-gray-900"
+                  }`}>
+                  {item.other > 0 ? "+" : ""}{item.other
+                    ? `Rp${item.other.toLocaleString("id-ID")}`
+                    : "Rp0"}
+                </p>
               </div>
             )}
           </div>
-          
+
         </div>
 
         {/* Payment Method */}
@@ -376,7 +401,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
               <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Laptop</th>
               <th className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">SN</th>
               <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Harga</th>
-              <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Lain²</th>
+              <th className="px-3 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Margin</th>
               <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Metode</th>
               <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Sumber</th>
               <th className="px-3 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Aksi</th>
@@ -525,17 +550,23 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           </div>
         </td>
 
-        {/* Other Charges (Lain²) */}
         <td className="px-3 py-2.5 text-right">
-          {item.other > 0 ? (
-            <div className="text-[10px] font-bold text-amber-900 font-mono">
-              Rp{(item.other || 0).toLocaleString("id-ID")}
+          {item.other !== undefined && item.other !== null ? (
+            <div className={`text-[10px] font-bold font-mono ${item.other > 0 ? "text-emerald-700" : item.other < 0 ? "text-red-700" : "text-gray-500"
+              }`}>
+              {item.other > 0 ? "+" : ""}{item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
             </div>
           ) : (
             <span className="text-[10px] text-gray-400">—</span>
           )}
         </td>
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> origin/develop
         {/* Payment Method */}
         <td className="px-3 py-2.5 text-center">
           <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200">
@@ -559,9 +590,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <td className="px-3 py-2.5">
           <div className="flex items-center justify-center gap-1">
             {item.payment_photo && (
-              <button 
-                onClick={() => onPhotoClick(item.payment_photo)} 
-                className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-150" 
+              <button
+                onClick={() => onPhotoClick(item.payment_photo)}
+                className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-150"
                 title="Bukti pembayaran"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -572,8 +603,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               </button>
             )}
             {canEditTransaction && (
-              <a 
-                href={`/payment/${item.invoice_number}`} 
+              <a
+                href={`/payment/${item.invoice_number}`}
                 className="p-1.5 text-gray-600 hover:text-amber-600 hover:bg-amber-100 rounded-lg transition-all duration-150"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -583,8 +614,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               </a>
             )}
             {isPending && canEditTransaction && (
-              <button 
-                onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} 
+              <button
+                onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }}
                 className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-all duration-150"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -593,8 +624,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               </button>
             )}
             {canRestoreTransaction && item.status === "PAID" && (
-              <button 
-                onClick={() => setShowRestoreModal(true)} 
+              <button
+                onClick={() => setShowRestoreModal(true)}
                 className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-100 rounded-lg transition-all duration-150"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -602,8 +633,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 </svg>
               </button>
             )}
-            <a 
-              href={`/receipt/${item.invoice_number}`} 
+            <a
+              href={`/receipt/${item.invoice_number}`}
               className="p-1.5 text-gray-600 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-all duration-150"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

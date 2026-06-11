@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar.tsx - COMPLETE FIX
 "use client";
 
 import Link from "next/link";
@@ -19,156 +20,156 @@ function setCachedUser(user: any) {
   try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(user)); } catch { }
 }
 
-interface MenuItem  { name: string; href: string; icon: React.ReactNode }
+interface MenuItem { name: string; href: string; icon: React.ReactNode }
 interface MenuGroup { label: string; items: MenuItem[] }
 
 const Icons = {
   dashboard: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
   attendance: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2"/>
+      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" />
     </svg>
   ),
   overtime: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="12" cy="12" r="10"/>
-      <polyline points="12 6 12 12 16 14"/>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   ),
   riwayat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
     </svg>
   ),
   laptop: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   garansi: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
   ),
   payment: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="1" y="4" width="22" height="16" rx="2"/>
-      <line x1="1" y1="10" x2="23" y2="10"/>
+      <rect x="1" y="4" width="22" height="16" rx="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
     </svg>
   ),
   scanner: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M4 7V5a1 1 0 011-1h2"/><path d="M20 7V5a1 1 0 00-1-1h-2"/>
-      <path d="M4 17v2a1 1 0 001 1h2"/><path d="M20 17v2a1 1 0 01-1 1h-2"/>
-      <path d="M7 12h10"/>
+      <path d="M4 7V5a1 1 0 011-1h2" /><path d="M20 7V5a1 1 0 00-1-1h-2" />
+      <path d="M4 17v2a1 1 0 001 1h2" /><path d="M20 17v2a1 1 0 01-1 1h-2" />
+      <path d="M7 12h10" />
     </svg>
   ),
   logout: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-      <polyline points="16 17 21 12 16 7"/>
-      <line x1="21" y1="12" x2="9" y2="12"/>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
   log: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
   loginLog: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
-      <polyline points="10 17 15 12 10 7"/>
-      <line x1="15" y1="12" x2="3" y2="12"/>
+      <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
     </svg>
   ),
   reports: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-      <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" />
     </svg>
   ),
   laptopReady: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 12l2 2 4-4"/>
-      <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      <path d="M9 12l2 2 4-4" />
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   laptopMinus: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 9v4m0 4h.01"/>
-      <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      <path d="M12 9v4m0 4h.01" />
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   pendingOrders: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-      <rect x="9" y="3" width="6" height="4" rx="1" ry="1"/>
-      <path d="M9 12h6M9 16h4"/>
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" ry="1" />
+      <path d="M9 12h6M9 16h4" />
     </svg>
   ),
   users: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-      <path d="M16 3.13a4 4 0 010 7.75"/>
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 00-3-3.87" />
+      <path d="M16 3.13a4 4 0 010 7.75" />
     </svg>
   ),
   code: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <polyline points="16 18 22 12 16 6"/>
-      <polyline points="8 6 2 12 8 18"/>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
     </svg>
   ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
-const ITEM_ABSENSI: MenuItem  = { name: "Absensi", href: "/dashboard/attendance",          icon: Icons.attendance };
-const ITEM_LEMBUR:  MenuItem  = { name: "Lembur",  href: "/dashboard/attendance/overtime", icon: Icons.overtime  };
+const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
+const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
-    { name: "Dashboard",        href: "/dashboard",             icon: Icons.dashboard },
+    { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI,
     ITEM_LEMBUR,
-    { name: "Log Aktivitas",    href: "/dashboard/activity-log",icon: Icons.log       },
-    { name: "Log Login",        href: "/dashboard/login-logs",  icon: Icons.loginLog  },
-    { name: "Laporan Keuangan", href: "/dashboard/reports",     icon: Icons.reports   },
-    { name: "Manajemen User",   href: "/dashboard/users",       icon: Icons.users     },
+    { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
+    { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
+    { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+    { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
   ],
 };
 
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
-    { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
+    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+    { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    { name: "Laptop Minus",     href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+    { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
   ],
 };
 
 const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
-    { name: "Buat Payment",      href: "/payment/create",           icon: Icons.payment       },
-    { name: "DP & Ambil Dulu",   href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-    { name: "Riwayat Transaksi", href: "/dashboard/transactions",   icon: Icons.riwayat       },
-    { name: "Scanner",           href: "/scan",                     icon: Icons.scanner       },
+    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+    { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
 
@@ -186,8 +187,8 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
-    { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
+    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+    { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
   ],
 };
@@ -195,29 +196,29 @@ const SALES_INVENTARIS: MenuGroup = {
 const SALES_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
-    { name: "Riwayat",         href: "/dashboard/transactions",  icon: Icons.riwayat       },
-    { name: "Buat Payment",    href: "/payment/create",          icon: Icons.payment       },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders",icon: Icons.pendingOrders },
-    { name: "Scanner",         href: "/scan",                    icon: Icons.scanner       },
+    { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
 
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── Full access ───────────────────────────────────────────────────────────
-  ADMIN:       [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI],
+  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI],
 
   PROGRAMMER: [
     {
       label: "Overview",
       items: [
-        { name: "Dashboard",        href: "/dashboard",             icon: Icons.dashboard },
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         ITEM_LEMBUR,
-        { name: "Log Aktivitas",    href: "/dashboard/activity-log",icon: Icons.log       },
-        { name: "Log Login",        href: "/dashboard/login-logs",  icon: Icons.loginLog  },
-        { name: "Laporan Keuangan", href: "/dashboard/reports",     icon: Icons.reports   },
-        { name: "Manajemen User",   href: "/dashboard/users",       icon: Icons.users     },
+        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
+        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
     ADMIN_INVENTARIS,
@@ -228,13 +229,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard",        href: "/dashboard",             icon: Icons.dashboard },
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         ITEM_LEMBUR,
-        { name: "Log Aktivitas",    href: "/dashboard/activity-log",icon: Icons.log       },
-        { name: "Log Login",        href: "/dashboard/login-logs",  icon: Icons.loginLog  },
-        { name: "Laporan Keuangan", href: "/dashboard/reports",     icon: Icons.reports   },
-        { name: "Manajemen User",   href: "/dashboard/users",       icon: Icons.users     },
+        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
+        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
     ADMIN_INVENTARIS,
@@ -243,9 +244,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   // ── Sales family ──────────────────────────────────────────────────────────
   KEPALA_SALES: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
-  CREW_SALES:   [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
-  PENGANTARAN:  [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
-  SOTECH:       [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  CREW_SALES: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  PENGANTARAN: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  SOTECH: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
 
   // ── Teknisi family ────────────────────────────────────────────────────────
   TEKNISI: [
@@ -256,8 +257,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",  href: "/dashboard/laptops",       icon: Icons.laptop      },
-        { name: "Garansi",      href: "/dashboard/warranty",      icon: Icons.garansi     },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
@@ -276,10 +277,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
-        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus",     href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -291,15 +292,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops",  icon: Icons.laptop  },
-        { name: "Garansi",     href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Riwayat",         href: "/dashboard/transactions",  icon: Icons.riwayat       },
-        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders",icon: Icons.pendingOrders },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
       ],
     },
   ],
@@ -308,16 +309,16 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard",             icon: Icons.dashboard },
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         ITEM_LEMBUR,
-        { name: "Riwayat",   href: "/dashboard/transactions",icon: Icons.riwayat   },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",  href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
@@ -332,7 +333,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -344,14 +345,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         ITEM_ABSENSI,
         ITEM_LEMBUR,
-        { name: "Dashboard", href: "/dashboard",             icon: Icons.dashboard },
-        { name: "Riwayat",   href: "/dashboard/transactions",icon: Icons.riwayat   },
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -362,16 +363,68 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop      },
-        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi     },
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Riwayat",          href: "/dashboard/transactions",icon: Icons.riwayat },
-        { name: "Laporan Keuangan", href: "/dashboard/reports",     icon: Icons.reports },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+      ],
+    },
+  ],
+
+  // ── Supplier (Penyedia Barang) ────────────────────────────────────────────
+  PENYEDIA_BARANG: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+  ],
+
+  KEPALA_PENYEDIA_BARANG: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+  ],
+
+  // ── Content Creator ───────────────────────────────────────────────────────
+  KONTEN: [
+    {
+      label: "Overview",
+      items: [
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
   ],
@@ -379,20 +432,23 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 // ── Role meta (badge label & color) ──────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
-  ADMIN:            { label: "Admin / CEO",      className: "bg-violet-50 text-violet-700"   },
-  KEPALA_SALES:     { label: "Kepala Sales",     className: "bg-emerald-50 text-emerald-700" },
-  CREW_SALES:       { label: "Crew Sales",       className: "bg-sky-50 text-sky-700"         },
-  ACCOUNTING:       { label: "Accounting",       className: "bg-amber-50 text-amber-700"     },
-  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700"       },
-  TEKNISI:          { label: "Teknisi",          className: "bg-orange-50 text-orange-700"   },
-  KEPALA_TEKNISI:   { label: "Kepala Teknisi",   className: "bg-red-50 text-red-700"         },
-  PENGANTARAN:      { label: "Pengantaran",      className: "bg-teal-50 text-teal-700"       },
-  MARKETING:        { label: "Marketing",        className: "bg-pink-50 text-pink-700"       },
-  KEBERSIHAN:       { label: "Kebersihan",       className: "bg-cyan-50 text-cyan-700"       },
-  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700"       },
-  PROGRAMMER:       { label: "Programmer",       className: "bg-indigo-50 text-indigo-700"   },
-  SOTECH:           { label: "Sotech",           className: "bg-lime-50 text-lime-700"       },
-  ASISTEN_CEO:      { label: "Asisten CEO",      className: "bg-purple-50 text-purple-700"   },
+  ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
+  KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
+  CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
+  ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
+  KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
+  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
+  MARKETING: { label: "Marketing", className: "bg-pink-50 text-pink-700" },
+  KEBERSIHAN: { label: "Kebersihan", className: "bg-cyan-50 text-cyan-700" },
+  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700" },
+  PROGRAMMER: { label: "Programmer", className: "bg-indigo-50 text-indigo-700" },
+  SOTECH: { label: "Sotech", className: "bg-lime-50 text-lime-700" },
+  ASISTEN_CEO: { label: "Asisten CEO", className: "bg-purple-50 text-purple-700" },
+  PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
+  KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
+  KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
 };
 
 function getInitials(name: string): string {
@@ -405,11 +461,10 @@ function NavItem({ item, isActive, onClick }: {
 }) {
   return (
     <Link href={item.href} onClick={onClick}
-      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${
-        isActive
+      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
           ? "bg-[#1a1a2e] text-white shadow-sm"
           : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-      }`}>
+        }`}>
       <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
       </span>
@@ -434,7 +489,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}/>
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
             <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
           </div>
@@ -443,7 +498,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
               className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
               aria-label="Tutup sidebar">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           )}
@@ -451,10 +506,10 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
         {loading || !user ? (
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0"/>
+            <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse"/>
-              <div className="h-2.5 w-14 bg-gray-100 rounded animate-pulse"/>
+              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+              <div className="h-2.5 w-14 bg-gray-100 rounded animate-pulse" />
             </div>
           </div>
         ) : (
@@ -474,7 +529,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
         )}
       </div>
 
-      <div className="mx-4 h-px bg-gray-100 flex-shrink-0"/>
+      <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
       {/* ── Nav ── */}
       <nav
@@ -482,9 +537,9 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {loading ? (
           <div className="space-y-1 pt-1">
-            {[1,2,3,4].map(i => (
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
-                style={{ animationDelay: `${i * 40}ms` }}/>
+                style={{ animationDelay: `${i * 40}ms` }} />
             ))}
           </div>
         ) : (
@@ -548,11 +603,11 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
 // ── Sidebar (main export) ─────────────────────────────────────────────────────
 export default function Sidebar() {
-  const pathname  = usePathname();
-  const [user, setUser]       = useState<any>(() => getCachedUser());
+  const pathname = usePathname();
+  const [user, setUser] = useState<any>(() => getCachedUser());
   const [loading, setLoading] = useState(!getCachedUser());
-  const [open, setOpen]       = useState(false);
-  const hasFetched            = useRef(false);
+  const [open, setOpen] = useState(false);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
     if (hasFetched.current) return;
@@ -562,10 +617,10 @@ export default function Sidebar() {
         const res = await fetch("/api/auth/me");
         if (!res.ok) { window.location.href = "/login"; return; }
         const result = await res.json();
-        const fresh  = result.user ?? null;
+        const fresh = result.user ?? null;
         setUser(fresh);
         setCachedUser(fresh);
-      } catch {} finally { setLoading(false); }
+      } catch { } finally { setLoading(false); }
     };
     fetchUser();
   }, []);
@@ -593,9 +648,9 @@ export default function Sidebar() {
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
         aria-label="Buka menu">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
 
@@ -609,12 +664,12 @@ export default function Sidebar() {
       {/* Mobile drawer */}
       <aside
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
-        <SidebarContent {...contentProps} onClose={() => setOpen(false)}/>
+        <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden">
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout}/>
+        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} />
       </aside>
     </>
   );
