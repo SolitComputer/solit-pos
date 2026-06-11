@@ -6,7 +6,16 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const { data, error } = await supabase
       .from("laptops")
-      .select("*")
+      .select(`
+        *,
+        laptop_units (
+          id,
+          serial_number,
+          grade,
+          status,
+          selling_price
+        )
+      `)
       .order("laptop_name", { ascending: true });
 
     if (error) {

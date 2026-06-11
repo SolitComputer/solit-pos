@@ -7,6 +7,27 @@ interface Props {
   params: Promise<{ invoice: string }>;
 }
 
+async function setUnitStatus(sn: string, status: "SIAP_JUAL" | "TERJUAL") {
+  const { error } = await supabase
+    .from("laptop_units")
+    .update({ status })
+    .eq("serial_number", sn);
+  if (error) console.error(`[setUnitStatus] gagal set ${status} untuk SN ${sn}:`, error.message);
+}
+
+async function syncUnitStatuses(oldSNs: string[], newSNs: string[]) {
+  const oldSet = new Set(oldSNs);
+  const newSet = new Set(newSNs);
+
+  const toRelease = oldSNs.filter(sn => sn && !newSet.has(sn)); 
+  const toMark = newSNs.filter(sn => sn && !oldSet.has(sn)); 
+
+  await Promise.all([
+    ...toRelease.map(sn => setUnitStatus(sn, "SIAP_JUAL")),
+    ...toMark.map(sn => setUnitStatus(sn, "TERJUAL")),
+  ]);
+}
+
 async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
@@ -18,19 +39,13 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     if (error) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { success: false, message: String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: String(error) }, { status: 500 });
   }
 }
 
@@ -53,7 +68,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.customer_phone !== undefined) allowedFields.customer_phone = body.customer_phone;
     if (body.company_name !== undefined) allowedFields.company_name = body.company_name;
     if (body.laptop_name !== undefined) allowedFields.laptop_name = body.laptop_name;
+    if (body.laptop_id !== undefined) allowedFields.laptop_id = body.laptop_id;
     if (body.serial_number !== undefined) allowedFields.serial_number = body.serial_number;
+    if (body.unit_id !== undefined) allowedFields.unit_id = body.unit_id;
+    if (body.unit_ids !== undefined) allowedFields.unit_ids = body.unit_ids;
+    if (body.serial_numbers !== undefined) allowedFields.serial_numbers = body.serial_numbers;
     if (body.pickup_method !== undefined) allowedFields.pickup_method = body.pickup_method;
     if (body.pickup_date !== undefined) allowedFields.pickup_date = body.pickup_date;
     if (body.pickup_time !== undefined) allowedFields.pickup_time = body.pickup_time;
@@ -63,20 +82,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.status !== undefined) allowedFields.status = body.status;
     if (body.notes !== undefined) allowedFields.notes = body.notes;
     if (body.customer_type !== undefined) allowedFields.customer_type = body.customer_type;
-    if (body.payment_method_2 !== undefined)
-      allowedFields.payment_method_2 = body.payment_method_2;
-    if (body.amount_method_1 !== undefined)
-      allowedFields.amount_method_1 = Number(body.amount_method_1);
-    if (body.amount_method_2 !== undefined)
-      allowedFields.amount_method_2 = Number(body.amount_method_2);
-    if (body.is_trade_in !== undefined)
-      allowedFields.is_trade_in = Boolean(body.is_trade_in);
-    if (body.trade_in_item !== undefined)
-      allowedFields.trade_in_item = body.trade_in_item;
-    if (body.trade_in_value !== undefined)
-      allowedFields.trade_in_value = Number(body.trade_in_value);
-    if (body.trade_in_cash !== undefined)
-      allowedFields.trade_in_cash = Number(body.trade_in_cash);
+    if (body.payment_method_2 !== undefined) allowedFields.payment_method_2 = body.payment_method_2;
+    if (body.amount_method_1 !== undefined) allowedFields.amount_method_1 = Number(body.amount_method_1);
+    if (body.amount_method_2 !== undefined) allowedFields.amount_method_2 = Number(body.amount_method_2);
+    if (body.is_trade_in !== undefined) allowedFields.is_trade_in = Boolean(body.is_trade_in);
+    if (body.trade_in_item !== undefined) allowedFields.trade_in_item = body.trade_in_item;
+    if (body.trade_in_value !== undefined) allowedFields.trade_in_value = Number(body.trade_in_value);
+    if (body.trade_in_cash !== undefined) allowedFields.trade_in_cash = Number(body.trade_in_cash);
 
     if (body.deal_price !== undefined || body.amount !== undefined) {
       const inventoryPrice = before?.inventory_price ?? 0;
@@ -95,10 +107,23 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     if (error) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
+
+    if (body.serial_numbers !== undefined) {
+      const oldSNs: string[] = Array.isArray(before?.serial_numbers)
+        ? before.serial_numbers.filter(Boolean)
+        : before?.serial_number
+          ? [before.serial_number]
+          : [];
+
+      const newSNs: string[] = Array.isArray(body.serial_numbers)
+        ? body.serial_numbers.filter(Boolean)
+        : body.serial_number
+          ? [body.serial_number]
+          : [];
+
+      await syncUnitStatuses(oldSNs, newSNs);
     }
 
     await logActivity({
@@ -116,10 +141,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("PUT transaction error:", error);
-    return NextResponse.json(
-      { success: false, message: String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: String(error) }, { status: 500 });
   }
 }
 

@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 
-async function handler(req: Request, ctx: any, user: AuthUser) {
+async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
-    const { data, error } = await supabase
+    const { searchParams } = new URL(req.url);
+    const laptopId = searchParams.get("laptop_id");
+
+    let query = supabase
       .from("laptop_units")
       .select(`
         *,
@@ -20,6 +23,13 @@ async function handler(req: Request, ctx: any, user: AuthUser) {
       `)
       .in("status", ["SIAP_JUAL", "RESERVED", "HELD", "PACKING"])
       .order("created_at", { ascending: false });
+
+    // Filter per laptop kalau laptop_id diberikan
+    if (laptopId) {
+      query = query.eq("laptop_id", laptopId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json(
