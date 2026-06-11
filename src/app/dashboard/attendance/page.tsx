@@ -1358,7 +1358,7 @@ type SalarySlip = {
 function SalarySlipCard({ slip, onFinalize, onGenerate }: {
     slip: SalarySlip;
     onFinalize: () => void;
-    onGenerate?: () => void;  // ✅ NEW: trigger re-generate
+    onGenerate?: () => void;
 }) {
     const [finalizing, setFinalizing] = useState(false);
     const [generating, setGenerating] = useState(false);
@@ -1370,180 +1370,96 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
             const r = await fetch("/api/attendance/salary-slip", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: slip.user_id,
-                    year: slip.year,
-                    month: slip.month,
-                }),
+                body: JSON.stringify({ user_id: slip.user_id, year: slip.year, month: slip.month }),
             });
             const d = await r.json();
             if (d.success) onFinalize();
-        } finally {
-            setFinalizing(false);
-        }
+        } finally { setFinalizing(false); }
     };
 
-    // ✅ NEW: Re-generate slip dari data absensi terkini
     const handleGenerate = async () => {
-        if (slip.status === "FINALIZED") {
-            if (!confirm("Slip ini sudah difinalisasi. Yakin ingin di-regenerate?")) return;
-        }
+        if (slip.status === "FINALIZED" && !confirm("Slip sudah difinalisasi. Yakin regenerate?")) return;
         setGenerating(true);
         try {
             const r = await fetch("/api/attendance/salary-slip", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: slip.user_id,
-                    year: slip.year,
-                    month: slip.month,
-                }),
+                body: JSON.stringify({ user_id: slip.user_id, year: slip.year, month: slip.month }),
             });
             const d = await r.json();
             if (d.success) onGenerate?.();
-        } finally {
-            setGenerating(false);
-        }
+        } finally { setGenerating(false); }
     };
 
-    const attendancePct = slip.base_salary > 0 && slip.total_income > 0
-        ? Math.round((slip.total_income / slip.base_salary) * 100)
-        : null;
-
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition">
-            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-                <div>
-                    <p className="font-bold text-gray-800">{slip.users?.name || "Unknown"}</p>
-                    <p className="text-xs text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${slip.status === "FINALIZED"
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                        {initials(slip.users?.name || "?")}
+                    </div>
+                    <div>
+                        <p className="font-bold text-gray-800 text-sm leading-tight">{slip.users?.name || "Unknown"}</p>
+                        <p className="text-[10px] text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${slip.status === "FINALIZED"
                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                        : "bg-amber-100 text-amber-700 border-amber-200"
-                        }`}>
-                        {slip.status === "FINALIZED" ? "✅ Finalisasi" : "⏳ Draft"}
+                        : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                        {slip.status === "FINALIZED" ? "✅ Final" : "⏳ Draft"}
                     </span>
-
-                    {/* ✅ NEW: Tombol Generate ulang */}
-                    <button
-                        onClick={handleGenerate}
-                        disabled={generating}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1"
-                    >
-                        {generating ? (
-                            <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" /> Proses...</>
-                        ) : "🔄 Update"}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button onClick={handleGenerate} disabled={generating}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1">
+                        {generating ? <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />Proses...</> : "🔄 Update"}
                     </button>
-
-                    {/* ✅ NEW: Tombol Cetak Slip */}
-                    <a
-                        href={`/receipt/salary-slip/${slip.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
-                    >
+                    <a href={`/receipt/salary-slip/${slip.id}`} target="_blank" rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1">
                         🖨️ Cetak
                     </a>
-
                     {slip.status === "DRAFT" && (
-                        <button
-                            onClick={handleFinalize}
-                            disabled={finalizing}
-                            className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
-                        >
-                            {finalizing ? "..." : "Finalisasi"}
+                        <button onClick={handleFinalize} disabled={finalizing}
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+                            {finalizing ? "..." : "✔ Finalisasi"}
                         </button>
                     )}
                 </div>
             </div>
 
-            <div className="p-6">
-                <div className="grid grid-cols-2 gap-8 mb-6">
-                    {/* Penghasilan */}
-                    <div>
-                        <p className="text-sm font-bold text-gray-800 mb-3">PENGHASILAN</p>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between text-gray-600">
-                                <span>Gaji Pokok</span>
-                                <span className="font-mono">{formatRupiah(slip.base_salary)}</span>
-                            </div>
-                            {slip.allowance_wife > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Istri</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_wife)}</span>
-                                </div>
-                            )}
-                            {slip.allowance_child > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Anak</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_child)}</span>
-                                </div>
-                            )}
-                            {slip.allowance_transport > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tunjangan Transport</span>
-                                    <span className="font-mono">{formatRupiah(slip.allowance_transport)}</span>
-                                </div>
-                            )}
-                            {slip.bonus > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Bonus</span>
-                                    <span className="font-mono">{formatRupiah(slip.bonus)}</span>
-                                </div>
-                            )}
-                            {slip.overtime > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Lemburan</span>
-                                    <span className="font-mono">{formatRupiah(slip.overtime)}</span>
-                                </div>
-                            )}
-                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
-                                <span>Total Penghasilan</span>
-                                <span className="font-mono">{formatRupiah(slip.total_income)}</span>
-                            </div>
-                        </div>
+            {/* Body — compact grid */}
+            <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Penghasilan */}
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide mb-1">Penghasilan</p>
+                    <p className="text-xs font-black text-emerald-700 font-mono">{formatRupiah(slip.total_income)}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                        <p className="text-[9px] text-gray-500">Pokok: {formatRupiah(slip.base_salary)}</p>
+                        {slip.overtime > 0 && <p className="text-[9px] text-orange-600">Lembur: +{formatRupiah(slip.overtime)}</p>}
+                        {(slip.allowance_wife > 0 || slip.allowance_child > 0) && (
+                            <p className="text-[9px] text-gray-500">Tunjangan: +{formatRupiah(slip.allowance_wife + slip.allowance_child)}</p>
+                        )}
                     </div>
+                </div>
 
-                    {/* Potongan */}
-                    <div>
-                        <p className="text-sm font-bold text-gray-800 mb-3">POTONGAN</p>
-                        <div className="space-y-2 text-sm">
-                            {slip.deduction_violation > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Pelanggaran</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_violation)}</span>
-                                </div>
-                            )}
-                            {slip.deduction_loan > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Cicilan Pinjaman</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_loan)}</span>
-                                </div>
-                            )}
-                            {slip.deduction_pension > 0 && (
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Dana Pensiun</span>
-                                    <span className="font-mono">{formatRupiah(slip.deduction_pension)}</span>
-                                </div>
-                            )}
-                            {slip.total_deduction === 0 && (
-                                <p className="text-gray-400 italic">—</p>
-                            )}
-                            <div className="border-t pt-2 flex justify-between text-gray-800 font-bold">
-                                <span>Total Potongan</span>
-                                <span className="font-mono">{formatRupiah(slip.total_deduction)}</span>
-                            </div>
-                        </div>
+                {/* Potongan */}
+                <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                    <p className="text-[9px] font-bold text-red-600 uppercase tracking-wide mb-1">Potongan</p>
+                    <p className="text-xs font-black text-red-600 font-mono">-{formatRupiah(slip.total_deduction)}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                        {slip.deduction_loan > 0 && <p className="text-[9px] text-gray-500">Kasbon: {formatRupiah(slip.deduction_loan)}</p>}
+                        {slip.deduction_pension > 0 && <p className="text-[9px] text-gray-500">Pensiun: {formatRupiah(slip.deduction_pension)}</p>}
+                        {slip.total_deduction === 0 && <p className="text-[9px] text-gray-300">Tidak ada</p>}
                     </div>
                 </div>
 
                 {/* Gaji Bersih */}
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-emerald-700">GAJI BERSIH</p>
-                        <p className="text-2xl font-black text-emerald-700">{formatRupiah(slip.net_salary)}</p>
-                    </div>
+                <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-3 sm:col-span-2">
+                    <p className="text-[9px] font-bold text-white/70 uppercase tracking-wide mb-1">Gaji Bersih</p>
+                    <p className="text-base font-black text-white font-mono">{formatRupiah(slip.net_salary)}</p>
+                    <p className="text-[9px] text-white/60 mt-1">
+                        {slip.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 % Kehadiran"} · {MONTH_NAMES[slip.month - 1]} {slip.year}
+                    </p>
                 </div>
             </div>
         </div>
@@ -1632,6 +1548,13 @@ export default function AttendanceDashboardPage() {
     }, []);
 
     const [salarySlips, setSalarySlips] = useState<any[]>([]);
+    const sortedSalarySlips = useMemo(() => {
+        return [...salarySlips].sort((a, b) => {
+            const nameA = a.users?.name ?? "";
+            const nameB = b.users?.name ?? "";
+            return nameA.localeCompare(nameB, "id");
+        });
+    }, [salarySlips]);
     const [selectedSlipMonth, setSelectedSlipMonth] = useState<{ year: number; month: number }>({
         year: new Date().getFullYear(),
         month: new Date().getMonth(),
@@ -1662,8 +1585,10 @@ export default function AttendanceDashboardPage() {
                 reason: d.reason,
                 openAt: d.openAt,
                 closeAt: d.closeAt,
+                manualAlreadyExists: d.manualAlreadyExists ?? false,
+                manualStatus: d.manualStatus ?? null,
             });
-        } catch { /* abaikan, biarkan status sebelumnya */ }
+        } catch { }
         finally { setStatusLoading(false); }
     }, []);
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
@@ -3006,52 +2931,37 @@ export default function AttendanceDashboardPage() {
 
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
             {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {/* Month Selector + Generate All */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
-                                <p className="text-base font-bold text-gray-800">Pilih Bulan</p>
-                                <p className="text-xs text-gray-400 mt-1">Lihat & cetak slip gaji bulan tertentu</p>
+                                <p className="text-sm font-bold text-gray-800">Slip Gaji</p>
+                                <p className="text-[11px] text-gray-400 mt-0.5">Generate & cetak slip gaji karyawan</p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
-                                    onClick={() =>
-                                        setSelectedSlipMonth(s => ({
-                                            ...s,
-                                            month: s.month === 0 ? 11 : s.month - 1,
-                                            year: s.month === 0 ? s.year - 1 : s.year,
-                                        }))
-                                    }
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
-                                >
-                                    ◀
-                                </button>
-                                <div className="px-6 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-sm min-w-[140px] text-center">
+                                    onClick={() => setSelectedSlipMonth(s => ({
+                                        month: s.month === 0 ? 11 : s.month - 1,
+                                        year: s.month === 0 ? s.year - 1 : s.year,
+                                    }))}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
+                                >◀</button>
+                                <div className="px-5 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-xs min-w-[130px] text-center">
                                     {MONTH_NAMES[selectedSlipMonth.month]} {selectedSlipMonth.year}
                                 </div>
                                 <button
-                                    onClick={() =>
-                                        setSelectedSlipMonth(s => ({
-                                            ...s,
-                                            month: s.month === 11 ? 0 : s.month + 1,
-                                            year: s.month === 11 ? s.year + 1 : s.year,
-                                        }))
-                                    }
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 hover:bg-gray-200 transition"
-                                >
-                                    ▶
-                                </button>
-                                {/* ✅ NEW: Generate semua slip */}
+                                    onClick={() => setSelectedSlipMonth(s => ({
+                                        month: s.month === 11 ? 0 : s.month + 1,
+                                        year: s.month === 11 ? s.year + 1 : s.year,
+                                    }))}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
+                                >▶</button>
                                 <button
                                     onClick={async () => {
-                                        if (!confirm(`Generate slip gaji ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
+                                        if (!confirm(`Generate slip ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
                                         const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
-                                        if (!usersToGen || usersToGen.length === 0) {
-                                            alert("Tidak ada karyawan. Pastikan data karyawan sudah dimuat.");
-                                            return;
-                                        }
-                                        // Generate satu per satu (bukan parallel — hindari rate limit)
+                                        if (!usersToGen?.length) { alert("Tidak ada karyawan."); return; }
                                         for (const u of usersToGen) {
                                             await fetch("/api/attendance/salary-slip", {
                                                 method: "POST",
@@ -3061,28 +2971,47 @@ export default function AttendanceDashboardPage() {
                                         }
                                         fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                     }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
-                                >
-                                    ⚡ Generate Semua
-                                </button>
+                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-xl hover:bg-blue-100 transition"
+                                >⚡ Generate Semua</button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Slip Gaji List */}
+                    {/* Slip List */}
                     {loading ? (
-                        <div className="space-y-3">
-                            {Array(3).fill(0).map((_, i) => (
-                                <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+                        // ✅ Skeleton loading
+                        <div className="space-y-2">
+                            {Array(4).fill(0).map((_, i) => (
+                                <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-gray-200" />
+                                            <div className="space-y-1.5">
+                                                <div className="h-3 w-32 bg-gray-200 rounded" />
+                                                <div className="h-2.5 w-20 bg-gray-100 rounded" />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                                            <div className="h-7 w-16 bg-gray-100 rounded-lg" />
+                                            <div className="h-7 w-20 bg-gray-100 rounded-lg" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {Array(4).fill(0).map((_, j) => (
+                                            <div key={j} className="h-12 bg-gray-50 rounded-xl" />
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                    ) : salarySlips.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                                <span className="text-3xl opacity-50">📄</span>
+                    ) : sortedSalarySlips.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                                <span className="text-2xl opacity-50">📄</span>
                             </div>
                             <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji bulan ini</p>
-                            <p className="text-xs text-gray-300 mt-1">Klik "Generate Semua" untuk membuat slip gaji semua karyawan</p>
+                            <p className="text-xs text-gray-300 mt-1 mb-4">Klik tombol di bawah untuk generate slip semua karyawan</p>
                             <button
                                 onClick={async () => {
                                     const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
@@ -3095,14 +3024,12 @@ export default function AttendanceDashboardPage() {
                                     }
                                     fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                 }}
-                                className="mt-4 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition mx-auto"
-                            >
-                                ⚡ Generate Slip Sekarang
-                            </button>
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
+                            >⚡ Generate Slip Sekarang</button>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {salarySlips.map(slip => (
+                        <div className="space-y-2">
+                            {sortedSalarySlips.map(slip => (
                                 <SalarySlipCard
                                     key={slip.id}
                                     slip={slip}
@@ -3128,7 +3055,10 @@ export default function AttendanceDashboardPage() {
                         prefillUserId={manualPrefillUser}
                         editData={editManualData}
                         onClose={() => { setShowManualModal(false); setEditManualData(null); }}
-                        onSaved={refreshAll}
+                        onSaved={() => {
+                            refreshAll();
+                            fetchTodayStatus();
+                        }}
                     />
                 )}
             {showSalaryModal && isAdminRole(currentUser?.role)
