@@ -175,7 +175,7 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
   );
 }
 
-function EmptyState() { 
+function EmptyState() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center animate-fadeIn">
       <div className="text-7xl mb-4 animate-bounce">📊</div>
@@ -273,17 +273,20 @@ export default function ReportsPage() {
     ],
   };
 
-  const barData = {
-    labels: trendLabels,
-    datasets: [{
-      label: "Transaksi",
-      data: trendTrx,
-      backgroundColor: "rgba(75,85,99,0.15)",
-      borderRadius: 6,
-      borderSkipped: false as const,
-      hoverBackgroundColor: "rgba(75,85,99,0.3)",
-    }],
-  };
+
+ const barData = {
+  labels: trendLabels,
+  datasets: [{
+    label: "Transaksi",
+    data: trendTrx,
+    backgroundColor: "#3B82F6",
+    borderRadius: 8,
+    borderSkipped: false as const,
+    hoverBackgroundColor: "#2563EB",
+    barPercentage: 0.45,        // 👈 LINE 289 - Bar width
+    categoryPercentage: 0.65,   // 👈 LINE 290 - Spacing
+  }],
+};
 
   const chartOpts = {
     responsive: true,
@@ -307,22 +310,46 @@ export default function ReportsPage() {
     },
   } as const;
 
-  const barOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: "rgba(0,0,0,0.8)",
-        cornerRadius: 8,
-        callbacks: { label: (c: any) => `${c.raw} transaksi` },
+const barOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: "rgba(59, 130, 246, 0.95)",
+      titleColor: "#fff",
+      bodyColor: "#fff",
+      cornerRadius: 8,
+      padding: 10,
+      callbacks: { 
+        label: (c: any) => `${c.raw} transaksi`,
       },
     },
-    scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af", maxRotation: 45 } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 10 }, color: "#9ca3af", stepSize: 1 } },
+  },
+  scales: {
+    x: { 
+      grid: { display: false },
+      ticks: { 
+        font: { size: 10 }, 
+        color: "#9CA3AF",              // Diubah dari #6B7280
+        maxRotation: 0
+      } 
     },
-  } as const;
+    y: { 
+      grid: { 
+        color: "rgba(156, 163, 175, 0.25)",  // Diubah dari rgba(0, 0, 0, 0.06) - 4x lebih terang
+        drawBorder: false,
+        lineWidth: 1.2,                      // ← TAMBAHAN: Garis lebih tegas
+      },
+      ticks: { 
+        font: { size: 10 }, 
+        color: "#9CA3AF",
+        stepSize: 1,
+      },
+      beginAtZero: true,                     // ← TAMBAHAN: Y-axis mulai dari 0
+    },
+  },
+} as const;
 
   const PRESETS = [
     { id: "today", label: "Hari ini", icon: "📅" },
@@ -385,8 +412,8 @@ export default function ReportsPage() {
                     key={p.id}
                     onClick={() => applyPreset(p.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${activePreset === p.id
-                        ? "bg-gray-700 text-white shadow-md transform scale-105"
-                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                      ? "bg-gray-700 text-white shadow-md transform scale-105"
+                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                       }`}
                   >
                     <span>{p.icon}</span>
@@ -520,10 +547,10 @@ export default function ReportsPage() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                  <span className="w-1 h-4 bg-gray-600 rounded-full" />
+                  <span className="w-1 h-4 bg-blue-500 rounded-full" />
                   Jumlah Transaksi
                 </h2>
-                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                   Total: {trend.reduce((sum, t) => sum + t.trxCount, 0)} transaksi
                 </span>
               </div>

@@ -40,9 +40,9 @@ const REPAIR_STATUS: Record<string, { label: string; badge: string; dot: string;
 };
 
 const UNIT_STATUS: Record<string, { label: string; badge: string }> = {
-  SERVICE: { label: "Service", badge: "bg-gray-100 text-gray-700 border-gray-200" },
-  BELUM_SIAP: { label: "Belum Siap", badge: "bg-gray-100 text-gray-700 border-gray-200" },
-  SIAP_JUAL: { label: "Siap Jual", badge: "bg-gray-100 text-gray-700 border-gray-200" },
+  SERVICE: { label: "Service", badge: "bg-red-50 text-red-700 border-red-200" },
+  BELUM_SIAP: { label: "Belum Siap", badge: "bg-red-50 text-red-700 border-red-200" },
+  SIAP_JUAL: { label: "Siap Jual", badge: "bg-red-50 text-red-700 border-red-200" },
 };
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
