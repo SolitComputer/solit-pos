@@ -357,6 +357,7 @@ export default function UsersPage() {
   const [toast, setToast]               = useState<{msg:string;type:"ok"|"err"}|null>(null);
   const [search, setSearch]             = useState("");
   const [filterRole, setFilterRole]     = useState("Semua");
+  const [sortOrder, setSortOrder]       = useState<"asc"|"desc">("asc");
 
   const showToast = (msg: string, type: "ok"|"err") => setToast({ msg, type });
 
@@ -387,12 +388,20 @@ export default function UsersPage() {
   };
 
   const filtered = useMemo(() => {
-    return users.filter(u => {
+    let result = users.filter(u => {
       const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || (u.phone_number ?? "").includes(search);
       const matchRole   = filterRole==="Semua" || u.role===filterRole;
       return matchSearch && matchRole;
     });
-  }, [users, search, filterRole]);
+
+    // Sort by name A-Z atau Z-A
+    result.sort((a, b) => {
+      const comparison = a.name.localeCompare(b.name);
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return result;
+  }, [users, search, filterRole, sortOrder]);
 
   const enrolled    = users.filter(u => u.face_embedding).length;
   const notEnrolled = users.length - enrolled;
@@ -460,9 +469,15 @@ export default function UsersPage() {
         )}
 
         {/* Filter */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3 items-center">
-          <input type="text" placeholder="Cari nama atau nomor WA..." value={search} onChange={e => setSearch(e.target.value)}
-            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition w-full sm:w-56"/>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <div className="flex flex-wrap gap-3 items-center">
+            <input type="text" placeholder="Cari nama atau nomor WA..." value={search} onChange={e => setSearch(e.target.value)}
+              className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition w-full sm:w-56"/>
+            <button onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              className="flex items-center gap-2 px-3 py-2 h-9 rounded-xl text-[10px] font-semibold bg-[#1a1a2e] text-white hover:bg-[#16213e] transition whitespace-nowrap">
+              {sortOrder === "asc" ? "↑ A-Z" : "↓ Z-A"}
+            </button>
+          </div>
           <div className="flex gap-1.5 flex-wrap">
             {["Semua", ...ALL_ROLES].map(r => (
               <button key={r} onClick={() => setFilterRole(r)}
