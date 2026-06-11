@@ -234,6 +234,7 @@ function ModalShell({ onClose, headerColor, title, subtitle, children, footer, w
     );
 }
 
+
 function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, onClose, onSaved }: {
     users: UserInfo[];
     prefillDate: string | null;
@@ -244,21 +245,13 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 }) {
     const isEdit = !!editData;
 
-    // ✅ FIX: Parse check_in_time lebih robust
     const parseTimeFromISO = (iso: string | undefined): string => {
         if (!iso) return "08:00";
-
-        // ISO format: "2026-06-10T09:56:00+07:00" atau "2026-06-10T09:56:00"
         if (iso.includes("T")) {
-            const timePart = iso.split("T")[1]; // "09:56:00+07:00"
-            return timePart.substring(0, 5); // "09:56"
+            const timePart = iso.split("T")[1];
+            return timePart.substring(0, 5);
         }
-
-        // Jika sudah format time: "09:56"
-        if (iso.includes(":")) {
-            return iso.substring(0, 5);
-        }
-
+        if (iso.includes(":")) return iso.substring(0, 5);
         return "08:00";
     };
 
@@ -266,7 +259,6 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState("");
 
-    // ✅ FIX: Initialize form dengan proper values
     const [form, setForm] = useState({
         user_id: editData?.user_id ?? prefillUserId ?? users[0]?.id ?? "",
         attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
@@ -275,8 +267,12 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
         notes: editData?.notes ?? "",
     });
 
-    // ✅ FIX: Update form ketika editData berubah (dependency)
     useEffect(() => {
+        // ✅ DEBUG: log users yang diterima modal
+        console.log("[ManualAttendanceModal] users received:", users.length, users.map(u => u.name));
+        console.log("[ManualAttendanceModal] prefillUserId:", prefillUserId);
+        console.log("[ManualAttendanceModal] editData:", editData?.user_id);
+
         setForm({
             user_id: editData?.user_id ?? prefillUserId ?? users[0]?.id ?? "",
             attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
@@ -287,14 +283,6 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     }, [editData, prefillDate, prefillUserId, users]);
 
     const save = async () => {
-        console.log("[ManualAttendanceModal.save]", {
-            user_id: form.user_id,
-            attendance_date: form.attendance_date,
-            check_in_time: form.check_in_time,
-            status: form.status,
-            notes: form.notes,
-        });
-
         if (!form.user_id || !form.attendance_date || !form.check_in_time) {
             setError("Karyawan, tanggal, dan jam masuk wajib diisi");
             return;
@@ -327,6 +315,20 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 
     const selectedUser = users.find(u => u.id === form.user_id);
 
+    // ✅ GUARD: Tampilkan loading kalau users belum ada dan ini bukan mode edit
+    if (!isEdit && users.length === 0) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+                <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center animate-scaleIn">
+                    <div className="w-12 h-12 border-4 border-gray-200 border-t-[#1a1a2e] rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-sm font-semibold text-gray-600">Memuat daftar karyawan...</p>
+                    <button onClick={onClose} className="mt-4 text-xs text-gray-400 hover:text-gray-600">Batal</button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <ModalShell onClose={onClose}
             headerColor={isEdit ? "bg-gradient-to-r from-blue-600 to-blue-700" : "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]"}
@@ -350,9 +352,15 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                 {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2"><span>⚠️</span>{error}</div>}
 
-                {/* Karyawan — disable di mode edit */}
+                {/* Karyawan */}
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Karyawan</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                        Karyawan
+                        {/* ✅ DEBUG badge — hapus setelah confirmed working */}
+                        <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">
+                            ({users.length} karyawan dimuat)
+                        </span>
+                    </label>
                     {isEdit ? (
                         <div className="flex items-center gap-3 h-11 bg-gray-50 border border-gray-200 rounded-xl px-4">
                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black">{initials(editData?.users?.name || "?")}</div>
@@ -360,9 +368,20 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                             <span className="text-[10px] text-gray-400 ml-auto">{editData?.users?.role?.replace(/_/g, " ")}</span>
                         </div>
                     ) : (
-                        <select value={form.user_id} onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))}
-                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all">
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name} — {u.role.replace(/_/g, " ")}</option>)}
+                        <select
+                            value={form.user_id}
+                            onChange={e => setForm(f => ({ ...f, user_id: e.target.value }))}
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
+                        >
+                            {/* ✅ Placeholder option kalau user_id kosong */}
+                            {!form.user_id && (
+                                <option value="" disabled>— Pilih Karyawan —</option>
+                            )}
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.name} — {u.role.replace(/_/g, " ")}
+                                </option>
+                            ))}
                         </select>
                     )}
                 </div>
@@ -378,7 +397,8 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Jam Masuk (WIB)</label>
-                        <input type="time" value={form.check_in_time} onChange={e => setForm(f => ({ ...f, check_in_time: e.target.value }))}
+                        <input type="time" value={form.check_in_time}
+                            onChange={e => setForm(f => ({ ...f, check_in_time: e.target.value }))}
                             className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all" />
                     </div>
                 </div>
@@ -406,7 +426,8 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                         Catatan <span className="text-gray-300 normal-case font-normal">(opsional)</span>
                     </label>
-                    <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    <input type="text" value={form.notes}
+                        onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="e.g. Koreksi karena sistem error, izin keperluan mendadak..."
                         className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all" />
                 </div>
@@ -1334,8 +1355,13 @@ type SalarySlip = {
     users?: { id: string; name: string; role: string };
 };
 
-function SalarySlipCard({ slip, onFinalize }: { slip: SalarySlip; onFinalize: () => void }) {
+function SalarySlipCard({ slip, onFinalize, onGenerate }: {
+    slip: SalarySlip;
+    onFinalize: () => void;
+    onGenerate?: () => void;  // ✅ NEW: trigger re-generate
+}) {
     const [finalizing, setFinalizing] = useState(false);
+    const [generating, setGenerating] = useState(false);
 
     const handleFinalize = async () => {
         if (!confirm("Finalisasi slip gaji ini? Tidak bisa diubah lagi setelah finalisasi.")) return;
@@ -1357,22 +1383,69 @@ function SalarySlipCard({ slip, onFinalize }: { slip: SalarySlip; onFinalize: ()
         }
     };
 
+    // ✅ NEW: Re-generate slip dari data absensi terkini
+    const handleGenerate = async () => {
+        if (slip.status === "FINALIZED") {
+            if (!confirm("Slip ini sudah difinalisasi. Yakin ingin di-regenerate?")) return;
+        }
+        setGenerating(true);
+        try {
+            const r = await fetch("/api/attendance/salary-slip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: slip.user_id,
+                    year: slip.year,
+                    month: slip.month,
+                }),
+            });
+            const d = await r.json();
+            if (d.success) onGenerate?.();
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const attendancePct = slip.base_salary > 0 && slip.total_income > 0
+        ? Math.round((slip.total_income / slip.base_salary) * 100)
+        : null;
+
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition">
-            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <p className="font-bold text-gray-800">{slip.users?.name || "Unknown"}</p>
                     <p className="text-xs text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${slip.status === "FINALIZED"
-                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                            : "bg-amber-100 text-amber-700 border-amber-200"
-                            }`}
-                    >
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${slip.status === "FINALIZED"
+                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                        : "bg-amber-100 text-amber-700 border-amber-200"
+                        }`}>
                         {slip.status === "FINALIZED" ? "✅ Finalisasi" : "⏳ Draft"}
                     </span>
+
+                    {/* ✅ NEW: Tombol Generate ulang */}
+                    <button
+                        onClick={handleGenerate}
+                        disabled={generating}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-xs font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1"
+                    >
+                        {generating ? (
+                            <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" /> Proses...</>
+                        ) : "🔄 Update"}
+                    </button>
+
+                    {/* ✅ NEW: Tombol Cetak Slip */}
+                    <a
+                        href={`/receipt/salary-slip/${slip.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
+                    >
+                        🖨️ Cetak
+                    </a>
+
                     {slip.status === "DRAFT" && (
                         <button
                             onClick={handleFinalize}
@@ -1499,7 +1572,6 @@ export default function AttendanceDashboardPage() {
     const [showManualModal, setShowManualModal] = useState(false);
     const [showSalaryModal, setShowSalaryModal] = useState(false);
     const [showLeaveModal, setShowLeaveModal] = useState(false);
-    // ✅ NEW: edit modal state
     const [editManualData, setEditManualData] = useState<ManualAttendance | null>(null);
     const [manualPrefillDate, setManualPrefillDate] = useState<string | null>(null);
     const [manualPrefillUser, setManualPrefillUser] = useState<string | undefined>(undefined);
@@ -1519,13 +1591,21 @@ export default function AttendanceDashboardPage() {
         currentAllowance?: UserAllowances;
     } | null>(null);
     const [overtimeTotal, setOvertimeTotal] = useState<Record<string, number>>({});
+    const [usersLoading, setUsersLoading] = useState(false);
 
-    // ── Fetchers ─────────────────────────────────────────────────────────────
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setManualRecords(d.data || []); }, []);
     const fetchDayOffs = useCallback(async () => { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); }, []);
     const fetchAllDateOffs = useCallback(async () => { const r = await fetch("/api/attendance/date-off"); const d = await r.json(); if (d.success) setAllDateOffs(d.data || []); }, []);
-    const fetchAllUsers = useCallback(async () => { const r = await fetch("/api/attendance/users"); const d = await r.json(); if (d.success) setAllUsers(d.data || []); }, []);
+    const fetchAllUsers = useCallback(async () => {
+        const r = await fetch("/api/attendance/users");
+        const d = await r.json();
+        if (d.success) {
+            setAllUsers(d.data || []);
+            return d.data || [];
+        }
+        return [];
+    }, []);
     const fetchSalaries = useCallback(async () => { const r = await fetch("/api/attendance/salary"); const d = await r.json(); if (d.success) setSalaries(d.data?.map((s: any) => s) || []); }, []);
     const fetchLeaveData = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setLeaveData(d.data || []); }, []);
     const fetchAllowances = useCallback(async () => {
@@ -1606,22 +1686,29 @@ export default function AttendanceDashboardPage() {
         if (isAdminRole(currentUser?.role)) {
             fetchSalarySlips(year, month);
         }
-    }, [selectedMonth]); // eslint-disable-line
+    }, [selectedMonth]);
 
-    // ── Helpers open modal ───────────────────────────────────────────────────
-    const openAddManual = useCallback((date?: string, userId?: string) => {
+    const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
         setManualPrefillDate(date ?? selectedDate);
         setManualPrefillUser(userId);
-        if (allUsers.length === 0) fetchAllUsers();
+        if (allUsers.length === 0) {
+            setUsersLoading(true);
+            await fetchAllUsers();
+            setUsersLoading(false);
+        }
         setShowManualModal(true);
     }, [selectedDate, allUsers, fetchAllUsers]);
 
-    const openEditManual = useCallback((record: ManualAttendance) => {
+    const openEditManual = useCallback(async (record: ManualAttendance) => {
         setEditManualData(record);
         setManualPrefillDate(null);
         setManualPrefillUser(undefined);
-        if (allUsers.length === 0) fetchAllUsers();
+        if (allUsers.length === 0) {
+            setUsersLoading(true);
+            await fetchAllUsers();
+            setUsersLoading(false);
+        }
         setShowManualModal(true);
     }, [allUsers, fetchAllUsers]);
 
@@ -1840,8 +1927,13 @@ export default function AttendanceDashboardPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                         {isAdminRole(currentUser?.role)
                             && (<>
-                                <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95">✏️ Absen Manual</button>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 transition-all active:scale-95">📅 Libur Mingguan</button>
+                                <button
+                                    onClick={() => openAddManual()}
+                                    disabled={usersLoading}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                                >
+                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                </button>                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 transition-all active:scale-95">📅 Libur Mingguan</button>
                                 <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">💰 Gaji</button>
                                 <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all active:scale-95">🌴 Cuti</button>
 
@@ -2129,13 +2221,12 @@ export default function AttendanceDashboardPage() {
                                                                 && (
                                                                     <td className="px-4 py-4 text-center">
                                                                         <button
-                                                                            onClick={() => {
+                                                                            onClick={async () => {
                                                                                 if (manualRec) {
-                                                                                    openEditManual(manualRec);
+                                                                                    await openEditManual(manualRec);
                                                                                 } else {
                                                                                     const foundUser = allUsers.find(u => u.name === a.user_name);
                                                                                     const resolvedUserId = foundUser?.id || a.user_id || "";
-
                                                                                     const prefillRecord: ManualAttendance = {
                                                                                         id: "",
                                                                                         user_id: resolvedUserId,
@@ -2146,7 +2237,7 @@ export default function AttendanceDashboardPage() {
                                                                                         created_by: null,
                                                                                         users: { id: resolvedUserId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
                                                                                     };
-                                                                                    openEditManual(prefillRecord);
+                                                                                    await openEditManual(prefillRecord);
                                                                                 }
                                                                             }}
                                                                             className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
@@ -2179,9 +2270,13 @@ export default function AttendanceDashboardPage() {
                                         <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
                                     </p>
                                 </div>
-                                {/* ✅ Tombol tambah absen manual langsung dari ringkasan */}
-                                <button onClick={() => openAddManual()} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all">✏️ Tambah Manual</button>
-                            </div>
+                                <button
+                                    onClick={() => openAddManual()}
+                                    disabled={usersLoading}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                                >
+                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                </button>                            </div>
 
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
@@ -2758,8 +2853,7 @@ export default function AttendanceDashboardPage() {
 
             {/* ════ TAB GAJI SAYA (non-admin) ════ */}
             {activeTab === "my-salary" && !isAdminRole(currentUser?.role) && (
-                <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Header */}
+                <div className="max-w-2xl mx-auto space-y-6 px-4 pb-8">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-2xl shadow-lg">
@@ -2775,6 +2869,7 @@ export default function AttendanceDashboardPage() {
                                             const sal = salaries[0];
                                             const stat = userSummary.find(u => u.userId === currentUser?.id);
                                             if (!stat) return "—";
+                                            // Gaji yang dibayarkan: FIXED = pokok penuh, PERCENTAGE = hitung per hari
                                             const earned = sal.salary_type === "FIXED"
                                                 ? sal.base_salary
                                                 : stat.totalWorkdays > 0
@@ -2789,11 +2884,14 @@ export default function AttendanceDashboardPage() {
                             </div>
                         </div>
 
-                        {/* Breakdown Cards */}
                         {salaries.length > 0 && salaries[0] && (() => {
                             const sal = salaries[0];
                             const stat = userSummary.find(u => u.userId === currentUser?.id);
                             if (!stat) return null;
+
+                            const earnedByPct = stat.totalWorkdays > 0
+                                ? Math.round((sal.base_salary / stat.totalWorkdays) * stat.score)
+                                : 0;
 
                             return (
                                 <div className="space-y-4">
@@ -2811,13 +2909,20 @@ export default function AttendanceDashboardPage() {
                                     {/* Kehadiran */}
                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4">
                                         <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📊 Kehadiran Bulan Ini</p>
-                                        <div className="flex items-baseline gap-2">
+                                        <div className="flex items-baseline gap-2 mb-2">
                                             <p className="text-2xl font-black text-blue-700">{formatPct(stat.pct)}%</p>
                                             <span className="text-sm text-blue-600 font-semibold">
-                                                {stat.score.toFixed(1)} dari {stat.totalWorkdays} hari kerja
+                                                Skor {stat.score.toFixed(1)} dari {stat.totalWorkdays} hari kerja
                                             </span>
                                         </div>
-                                        <div className="mt-3 flex gap-3 flex-wrap">
+                                        {/* Progress bar kehadiran */}
+                                        <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden mb-3">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-700 ${stat.pct >= 90 ? "bg-emerald-500" : stat.pct >= 70 ? "bg-amber-500" : "bg-red-500"}`}
+                                                style={{ width: `${Math.min(stat.pct, 100)}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex gap-3 flex-wrap">
                                             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
                                                 ✅ {stat.present} tepat
                                             </span>
@@ -2830,39 +2935,49 @@ export default function AttendanceDashboardPage() {
                                         </div>
                                     </div>
 
-                                    {/* Perhitungan */}
-                                    {sal.salary_type === "PERCENTAGE" && (
-                                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
-                                            <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Cara Hitung</p>
-                                            <div className="space-y-2 text-sm text-amber-900">
-                                                <p>
-                                                    <span className="font-semibold">{formatRupiah(sal.base_salary)}</span> ÷ {stat.totalWorkdays} hari =
-                                                    <span className="font-semibold"> {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}</span>/hari
-                                                </p>
-                                                <p>
-                                                    {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}/hari × {stat.score.toFixed(1)} score =
-                                                    <span className="font-bold text-lg"> {formatRupiah(Math.round((sal.base_salary / stat.totalWorkdays) * stat.score))}</span>
-                                                </p>
+                                    {/* ✅ FIX: Perhitungan — SELALU tampil untuk semua tipe gaji */}
+                                    <div className={`bg-gradient-to-br rounded-2xl p-4 border ${sal.salary_type === "PERCENTAGE" ? "from-amber-50 to-orange-50 border-amber-200" : "from-gray-50 to-slate-50 border-gray-200"}`}>
+                                        <p className={`text-xs font-bold uppercase tracking-wide mb-3 ${sal.salary_type === "PERCENTAGE" ? "text-amber-700" : "text-gray-500"}`}>
+                                            {sal.salary_type === "PERCENTAGE" ? "📐 Cara Hitung" : "📐 Estimasi Jika Berdasarkan % Kehadiran"}
+                                        </p>
+                                        <div className="space-y-2 text-sm">
+                                            {stat.totalWorkdays > 0 && (
+                                                <div className="flex items-center justify-between text-gray-600">
+                                                    <span>Gaji per hari kerja</span>
+                                                    <span className="font-mono font-bold text-gray-800">
+                                                        {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center justify-between text-gray-600">
+                                                <span>Skor kehadiran</span>
+                                                <span className="font-bold">{stat.score.toFixed(1)} poin</span>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {sal.salary_type === "FIXED" && (
-                                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-4">
-                                            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">ℹ️ Gaji Tetap</p>
-                                            <p className="text-sm text-emerald-900">
-                                                Gaji kamu tetap <span className="font-bold">{formatRupiah(sal.base_salary)}</span> per bulan, tidak tergantung kehadiran.
-                                            </p>
-                                            <div className="mt-3 p-3 bg-white/50 rounded-lg border border-emerald-100">
-                                                <p className="text-xs text-emerald-700 font-semibold">💡 Jika menggunakan % absen:</p>
-                                                <p className="text-sm font-bold text-emerald-900 mt-1">
-                                                    {formatRupiah(Math.round((sal.base_salary / stat.totalWorkdays) * stat.score))}
-                                                </p>
+                                            <div className="h-px bg-gray-200 my-1" />
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-bold text-gray-700">
+                                                    {sal.salary_type === "FIXED" ? "Jika berdasarkan %" : "Gaji diterima"}
+                                                </span>
+                                                <span className={`font-black text-base font-mono ${sal.salary_type === "PERCENTAGE" ? "text-amber-700" : "text-gray-600"}`}>
+                                                    {formatRupiah(earnedByPct)}
+                                                </span>
                                             </div>
+                                            {sal.salary_type === "FIXED" && (
+                                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
+                                                    <p className="text-[11px] text-emerald-700 font-semibold">
+                                                        💡 Kamu pakai <strong>Gaji Tetap</strong> — diterima penuh {formatRupiah(sal.base_salary)} terlepas dari kehadiran.
+                                                    </p>
+                                                    {earnedByPct < sal.base_salary && (
+                                                        <p className="text-[10px] text-emerald-600 mt-1">
+                                                            Selisih vs % absen: +{formatRupiah(sal.base_salary - earnedByPct)}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {/* Note */}
+                                    {/* Catatan */}
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-700">
                                         <p className="font-semibold mb-1">📌 Catatan:</p>
                                         <ul className="space-y-1 text-blue-600">
@@ -2888,17 +3003,18 @@ export default function AttendanceDashboardPage() {
                 </div>
             )}
 
+
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
             {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
                 <div className="space-y-6">
-                    {/* Month Selector */}
+                    {/* Month Selector + Generate All */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-center justify-between gap-4 flex-wrap">
                             <div>
                                 <p className="text-base font-bold text-gray-800">Pilih Bulan</p>
-                                <p className="text-xs text-gray-400 mt-1">Lihat slip gaji bulan tertentu</p>
+                                <p className="text-xs text-gray-400 mt-1">Lihat & cetak slip gaji bulan tertentu</p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     onClick={() =>
                                         setSelectedSlipMonth(s => ({
@@ -2926,6 +3042,29 @@ export default function AttendanceDashboardPage() {
                                 >
                                     ▶
                                 </button>
+                                {/* ✅ NEW: Generate semua slip */}
+                                <button
+                                    onClick={async () => {
+                                        if (!confirm(`Generate slip gaji ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
+                                        const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
+                                        if (!usersToGen || usersToGen.length === 0) {
+                                            alert("Tidak ada karyawan. Pastikan data karyawan sudah dimuat.");
+                                            return;
+                                        }
+                                        // Generate satu per satu (bukan parallel — hindari rate limit)
+                                        for (const u of usersToGen) {
+                                            await fetch("/api/attendance/salary-slip", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ user_id: u.id, year: selectedSlipMonth.year, month: selectedSlipMonth.month + 1 }),
+                                            });
+                                        }
+                                        fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
+                                >
+                                    ⚡ Generate Semua
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2933,11 +3072,9 @@ export default function AttendanceDashboardPage() {
                     {/* Slip Gaji List */}
                     {loading ? (
                         <div className="space-y-3">
-                            {Array(3)
-                                .fill(0)
-                                .map((_, i) => (
-                                    <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
-                                ))}
+                            {Array(3).fill(0).map((_, i) => (
+                                <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+                            ))}
                         </div>
                     ) : salarySlips.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
@@ -2945,12 +3082,33 @@ export default function AttendanceDashboardPage() {
                                 <span className="text-3xl opacity-50">📄</span>
                             </div>
                             <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji bulan ini</p>
-                            <p className="text-xs text-gray-300 mt-1">Slip gaji akan tersedia setelah difinalisasi</p>
+                            <p className="text-xs text-gray-300 mt-1">Klik "Generate Semua" untuk membuat slip gaji semua karyawan</p>
+                            <button
+                                onClick={async () => {
+                                    const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
+                                    for (const u of usersToGen) {
+                                        await fetch("/api/attendance/salary-slip", {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ user_id: u.id, year: selectedSlipMonth.year, month: selectedSlipMonth.month + 1 }),
+                                        });
+                                    }
+                                    fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
+                                }}
+                                className="mt-4 flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition mx-auto"
+                            >
+                                ⚡ Generate Slip Sekarang
+                            </button>
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {salarySlips.map(slip => (
-                                <SalarySlipCard key={slip.id} slip={slip} onFinalize={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)} />
+                                <SalarySlipCard
+                                    key={slip.id}
+                                    slip={slip}
+                                    onFinalize={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
+                                    onGenerate={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
+                                />
                             ))}
                         </div>
                     )}

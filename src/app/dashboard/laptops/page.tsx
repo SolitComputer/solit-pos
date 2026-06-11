@@ -162,7 +162,7 @@ function ConfirmModal({
                         <button
                             onClick={onConfirm}
                             className={`flex-1 h-11 rounded-xl text-sm font-medium text-white transition-all duration-200 shadow-md ${danger ? "bg-gray-700 hover:bg-gray-800" : "bg-gray-600 hover:bg-gray-700"
-                            }`}
+                                }`}
                         >
                             {confirmLabel}
                         </button>
@@ -324,7 +324,10 @@ export default function Page() {
 
     const canEditLaptop = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
     const canCreateLaptop = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
-    const canExport = userRole ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"] as UserRole[]) : false;
+    const canExport = userRole ? hasPermission(userRole, [
+        "ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
+        "MARKETING", "KEPALA_MARKETING"
+    ] as UserRole[]) : false;
     const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
     const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
     const restoredPageRef = useRef<number | null>(null);
@@ -1052,7 +1055,7 @@ export default function Page() {
                                         </tbody>
                                     </table>
                                 </div>
-                                
+
                                 {/* Pagination yang ditingkatkan */}
                                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3">

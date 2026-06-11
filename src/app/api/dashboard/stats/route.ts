@@ -22,18 +22,24 @@ function getLast7DaysWIB(): string {
   return nowWIB.toISOString().split("T")[0];
 }
 
-// ── GET DEAL PRICE ──────────────────────────────────────────────────────────
 function getDealPrice(item: any): number {
   return Number(item.deal_price || item.amount || 0);
 }
 
-// ── GROSS PROFIT (FIXED FORMULA) ────────────────────────────────────────────
-// GROSS PROFIT = deal_price - inventory_price
-// NO FALLBACK to "other" field — selalu pakai formula di atas
 function calcGrossProfit(item: any): number {
   const dealPrice = getDealPrice(item);
   const inventoryPrice = Number(item.inventory_price || 0);
   return dealPrice - inventoryPrice;
+}
+
+function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
+  const [y, m, d] = dateWIB.split("-").map(Number);
+  const startWIB = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  const endWIB   = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  return {
+    start: startWIB.toISOString(),
+    end:   endWIB.toISOString(),
+  };
 }
 
 async function handler(req: NextRequest) {
@@ -42,17 +48,24 @@ async function handler(req: NextRequest) {
     const yesterday = getYesterdayWIB();
     const weekStart = getLast7DaysWIB();
 
+    const todayRange     = wibDateToUTCRange(today);
+    const yesterdayRange = wibDateToUTCRange(yesterday);
+    const weekStartRange = wibDateToUTCRange(weekStart);
+    const weekEndRange   = wibDateToUTCRange(today);
+
     const [
       { data: todayTransactions },
       { data: laptops },
       { data: weeklyTransactions },
       { data: yesterdayTransactions },
     ] = await Promise.all([
+      // ✅ FIX: filter by paid_at (kapan dilunasi), bukan pickup_date
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .eq("pickup_date", today),
+        .gte("paid_at", todayRange.start)
+        .lt("paid_at", todayRange.end),
 
       supabase
         .from("laptops")
@@ -60,28 +73,31 @@ async function handler(req: NextRequest) {
         .eq("status", "SIAP_JUAL")
         .gt("qty", 0),
 
+      // ✅ FIX: weekly juga pakai paid_at
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .gte("pickup_date", weekStart)
-        .lte("pickup_date", today),
+        .gte("paid_at", weekStartRange.start)
+        .lt("paid_at", weekEndRange.end),
 
+      // ✅ FIX: yesterday juga pakai paid_at
       supabase
         .from("transactions")
         .select("*")
         .eq("status", "PAID")
-        .eq("pickup_date", yesterday),
+        .gte("paid_at", yesterdayRange.start)
+        .lt("paid_at", yesterdayRange.end),
     ]);
 
-    // ── TODAY STATS ───────────────────────────────────────────────────────
+    // ── TODAY STATS ──────────────────────────────────────────────────────────
     const todayRevenue =
       todayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     const todayGrossProfit =
       todayTransactions?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
 
-    // ── YESTERDAY STATS ───────────────────────────────────────────────────
+    // ── YESTERDAY STATS ──────────────────────────────────────────────────────
     const yesterdayRevenue =
       yesterdayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
@@ -90,7 +106,7 @@ async function handler(req: NextRequest) {
 
     const yesterdayTrxCount = yesterdayTransactions?.length || 0;
 
-    // ── % CHANGE ──────────────────────────────────────────────────────────
+    // ── % CHANGE ─────────────────────────────────────────────────────────────
     const revenueChange =
       yesterdayRevenue > 0
         ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
@@ -106,11 +122,12 @@ async function handler(req: NextRequest) {
         ? Math.round((((todayTransactions?.length || 0) - yesterdayTrxCount) / yesterdayTrxCount) * 100)
         : null;
 
-    // ── STOCK ─────────────────────────────────────────────────────────────
+    // ── STOCK ─────────────────────────────────────────────────────────────────
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
 
-    // ── WEEKLY TREND ──────────────────────────────────────────────────────
+    // ── WEEKLY TREND ─────────────────────────────────────────────────────────
+    // Grouping by paid_at date (converted to WIB)
     const trendMap: Record<string, { revenue: number; profit: number; trxCount: number }> = {};
 
     for (let i = 6; i >= 0; i--) {
@@ -122,11 +139,14 @@ async function handler(req: NextRequest) {
     }
 
     weeklyTransactions?.forEach((item) => {
-      const dateKey = item.pickup_date as string;
+      if (!item.paid_at) return;
+      // Convert paid_at UTC ke date WIB
+      const paidAtWIB = new Date(new Date(item.paid_at).getTime() + 7 * 60 * 60 * 1000);
+      const dateKey = paidAtWIB.toISOString().split("T")[0];
       if (trendMap[dateKey]) {
-        trendMap[dateKey].revenue   += getDealPrice(item);
-        trendMap[dateKey].profit    += calcGrossProfit(item);
-        trendMap[dateKey].trxCount  += 1;
+        trendMap[dateKey].revenue  += getDealPrice(item);
+        trendMap[dateKey].profit   += calcGrossProfit(item);
+        trendMap[dateKey].trxCount += 1;
       }
     });
 
@@ -139,7 +159,7 @@ async function handler(req: NextRequest) {
       return { date, label, ...data };
     });
 
-    // ── TOP SALES ─────────────────────────────────────────────────────────
+    // ── TOP SALES ─────────────────────────────────────────────────────────────
     const salesMap: Record<string, { total: number; profit: number }> = {};
     todayTransactions?.forEach((item) => {
       const sales = item.sales_name || "Unknown";
@@ -153,7 +173,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // ── TOP SOURCES (WEEKLY) ──────────────────────────────────────────────
+    // ── TOP SOURCES (WEEKLY) ──────────────────────────────────────────────────
     const sourceMap: Record<string, number> = {};
     weeklyTransactions?.forEach((item) => {
       const source = item.source_platform || "Unknown";
@@ -165,7 +185,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    // ── TOP LAPTOP ────────────────────────────────────────────────────────
+    // ── TOP LAPTOP ────────────────────────────────────────────────────────────
     const laptopMap: Record<string, number> = {};
     todayTransactions?.forEach((item) => {
       const laptop = item.laptop_name || "Unknown";
@@ -181,9 +201,9 @@ async function handler(req: NextRequest) {
       success: true,
       data: {
         todayRevenue,
-        todayProfit: todayGrossProfit,          // ← GROSS PROFIT (not other field)
-        todayTransactions: todayTransactions?.length || 0,
-        laptopReady: laptops?.length || 0,
+        todayProfit:        todayGrossProfit,
+        todayTransactions:  todayTransactions?.length || 0,
+        laptopReady:        laptops?.length || 0,
         stockTotal,
         revenueChange,
         profitChange,
