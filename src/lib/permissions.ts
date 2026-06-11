@@ -54,7 +54,7 @@ const ALL_ROLES: UserRole[] = [
 const SALES_ACCESS: UserRole[] = ["KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"];
 
 // ✅ Role yang bisa lihat transaksi (supplier/content tracking)
-const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"];
+const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
 
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── Laptop ──────────────────────────────────────────────────────────────

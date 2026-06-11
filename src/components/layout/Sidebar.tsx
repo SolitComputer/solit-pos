@@ -262,6 +262,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
