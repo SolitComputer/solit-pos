@@ -40,10 +40,10 @@ const GRADE_BADGE: Record<string, string> = {
 
 const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    RESERVED:  { badge: "bg-violet-50 text-violet-700 border-violet-200",   dot: "bg-violet-500",  label: "Dipesan (DP)" },
-    HELD:      { badge: "bg-orange-50 text-orange-700 border-orange-200",   dot: "bg-orange-500",  label: "Diambil Dulu" },
-    SOLD:      { badge: "bg-gray-100 text-gray-500 border-gray-200",        dot: "bg-gray-400",    label: "Terjual" },
-    PACKING:   { badge: "bg-sky-50 text-sky-700 border-sky-200",            dot: "bg-sky-500",     label: "📦 Packing" },
+    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
+    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
+    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+    PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "📦 Packing" },
 };
 
 const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition";
@@ -185,11 +185,11 @@ export default function ReadyPage() {
     }, [units, filterStatus, filterGrade, search]);
 
     const counts = {
-        all:      units.length,
-        siap:     units.filter(u => u.status === "SIAP_JUAL").length,
+        all: units.length,
+        siap: units.filter(u => u.status === "SIAP_JUAL").length,
         reserved: units.filter(u => u.status === "RESERVED").length,
-        held:     units.filter(u => u.status === "HELD").length,
-        packing:  units.filter(u => u.status === "PACKING").length,
+        held: units.filter(u => u.status === "HELD").length,
+        packing: units.filter(u => u.status === "PACKING").length,
     };
 
     return (
@@ -241,21 +241,21 @@ export default function ReadyPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all}      icon="💻" color="text-gray-800"   bg="bg-white"       bar="bg-gray-400" />
-                        <StatCard label="Siap Jual"  value={counts.siap}     icon="✅" color="text-emerald-600" bg="bg-emerald-50"  bar="bg-emerald-500" />
-                        <StatCard label="Dipesan"    value={counts.reserved} icon="🔒" color="text-violet-600"  bg="bg-violet-50"   bar="bg-violet-500" />
-                        <StatCard label="Diambil"    value={counts.held}     icon="📦" color="text-orange-600"  bg="bg-orange-50"   bar="bg-orange-500" />
+                        <StatCard label="Total Unit" value={counts.all} icon="💻" color="text-gray-800" bg="bg-white" bar="bg-gray-400" />
+                        <StatCard label="Siap Jual" value={counts.siap} icon="✅" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
+                        <StatCard label="Dipesan" value={counts.reserved} icon="🔒" color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
+                        <StatCard label="Diambil" value={counts.held} icon="📦" color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                     </div>
 
                     {/* Filter */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
                         <div className="flex flex-wrap gap-2">
                             {[
-                                { value: "ALL",      label: "Semua",        count: counts.all },
-                                { value: "SIAP_JUAL",label: "✅ Siap Jual", count: counts.siap },
-                                { value: "RESERVED", label: "🔒 Dipesan",   count: counts.reserved },
-                                { value: "HELD",     label: "📦 Diambil",   count: counts.held },
-                                { value: "PACKING",  label: "📦 Packing",   count: counts.packing },
+                                { value: "ALL", label: "Semua", count: counts.all },
+                                { value: "SIAP_JUAL", label: "✅ Siap Jual", count: counts.siap },
+                                { value: "RESERVED", label: "🔒 Dipesan", count: counts.reserved },
+                                { value: "HELD", label: "📦 Diambil", count: counts.held },
+                                { value: "PACKING", label: "📦 Packing", count: counts.packing },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-md scale-105" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}>
@@ -301,6 +301,8 @@ export default function ReadyPage() {
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-gray-50 border-b border-gray-100">
+                                            <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-10">No</th>
+                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Serial Number</th>
                                             <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Grade</th>
@@ -311,12 +313,16 @@ export default function ReadyPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {filtered.map(unit => {
+
+                                        {filtered.map((unit, idx) => {
                                             const st = STATUS_CONFIG[unit.status];
                                             const isAvailable = unit.status === "SIAP_JUAL";
                                             const isPending = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
                                             return (
                                                 <tr key={unit.id} className={`data-row ${unit.status === "RESERVED" ? "bg-violet-50/30 hover:bg-violet-50/50" : unit.status === "HELD" ? "bg-orange-50/30 hover:bg-orange-50/50" : "hover:bg-gray-50/70"}`}>
+                                                    <td className="px-4 py-3.5 text-center whitespace-nowrap w-10">
+                                                        <span className="text-xs font-medium text-gray-400">{idx + 1}</span>
+                                                    </td>
                                                     <td className="px-4 py-3.5 max-w-[220px]">
                                                         <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>{unit.laptop?.laptop_name || "—"}</p>
                                                         <div className="flex flex-wrap gap-1 mt-1">
@@ -675,7 +681,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     };
 
     const statusColor = unit.status === "RESERVED" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-orange-50 text-orange-700 border-orange-200";
-    const statusDot   = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
+    const statusDot = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
     const statusLabel = unit.status === "RESERVED" ? "DP" : "Ambil Dulu";
 
     return (
@@ -704,11 +710,11 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
                             { label: "Status", value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
-                            { label: "Invoice",      value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
+                            { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
                             { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
-                            { label: "Laptop",       value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
+                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
                             { label: "Serial Number", value: <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-md text-gray-800">{unit.serial_number || "—"}</code> },
-                            { label: "Harga Jual",   value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
+                            { label: "Harga Jual", value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
                                 <span className="text-xs text-gray-400">{row.label}</span>

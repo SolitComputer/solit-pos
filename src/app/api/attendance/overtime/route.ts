@@ -20,6 +20,7 @@ function canApprove(approverRole: string, targetRole: string): boolean {
   return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
 }
 
+// ─── GET ──────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -68,7 +69,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // ✅ Get user data for all overtime requests
     const userIds = [
       ...new Set([
         ...overtimes.map((o: any) => o.user_id),
@@ -88,7 +88,6 @@ export async function GET(request: Request) {
       usersMap[u.id] = u;
     });
 
-    // ✅ Map with proper 'users' key
     const result = overtimes.map((o: any) => ({
       ...o,
       users: usersMap[o.user_id] ?? null,
@@ -104,14 +103,127 @@ export async function GET(request: Request) {
   }
 }
 
+// ─── POST ─────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const body = await request.json();
-    const { request_date, reason, requested_start } = body;
+    const {
+      request_date,
+      reason,
+      requested_start,
+      // ─── MANUAL fields ───────────────────────────────────────────────────
+      is_manual,
+      target_user_id,
+      actual_start_time, // "HH:MM"
+      actual_end_time,   // "HH:MM"
+      work_description,
+      proof_photo_url,
+      rate_per_hour,
+    } = body;
 
+    // ─── MANUAL INPUT ──────────────────────────────────────────────────────
+    if (is_manual === true) {
+      // Hanya ADMIN, PROGRAMMER, ASISTEN_CEO
+      if (!FULL_ACCESS.includes(user.role)) {
+        return NextResponse.json(
+          { success: false, message: "Tidak berwenang input lembur manual" },
+          { status: 403 }
+        );
+      }
+
+      if (!target_user_id || !request_date || !actual_start_time || !actual_end_time) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "target_user_id, request_date, actual_start_time, actual_end_time wajib",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Build ISO timestamps dengan timezone WIB +07:00
+      const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
+      const actualStart = `${request_date}T${fmt(actual_start_time)}+07:00`;
+      const actualEnd = `${request_date}T${fmt(actual_end_time)}+07:00`;
+
+      // Validasi end > start
+      if (new Date(actualEnd).getTime() <= new Date(actualStart).getTime()) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Jam selesai harus lebih besar dari jam mulai",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Hitung durasi dan bayaran
+      const durationMins = Math.round(
+        (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) /
+          60000
+      );
+      const billedHours = Math.floor(durationMins / 60);
+
+      // Ambil rate dari overtime_rates jika tidak disuplai
+      let finalRate = rate_per_hour ?? 0;
+      if (!finalRate) {
+        const { data: targetUserData } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", target_user_id)
+          .single();
+
+        if (targetUserData?.role) {
+          const { data: rateData } = await supabase
+            .from("overtime_rates")
+            .select("rate_per_hour")
+            .eq("role", targetUserData.role)
+            .maybeSingle();
+          finalRate = rateData?.rate_per_hour ?? 0;
+        }
+      }
+
+      const totalPay = billedHours * finalRate;
+
+      const { data, error } = await supabase
+        .from("overtime_requests")
+        .insert({
+          user_id: target_user_id,
+          request_date,
+          reason: reason?.trim() || "Input manual oleh admin",
+          requested_start: actual_start_time,
+          status: "COMPLETED",
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          scheduled_start: actualStart,
+          scheduled_end: actualEnd,
+          actual_start: actualStart,
+          actual_end: actualEnd,
+          work_description: work_description?.trim() || null,
+          proof_photo_url: proof_photo_url || null,
+          rate_per_hour: Math.round(finalRate),
+          total_pay: Math.round(totalPay),
+          duration_minutes: durationMins,
+          completed_at: new Date().toISOString(),
+          auto_completed: false,
+        })
+        .select()
+        .single();
+
+      if (error)
+        return NextResponse.json(
+          { success: false, message: error.message },
+          { status: 500 }
+        );
+
+      return NextResponse.json({ success: true, data });
+    }
+
+    // ─── NORMAL REQUEST ────────────────────────────────────────────────────
     if (!request_date || !reason || !requested_start) {
       return NextResponse.json(
         {
@@ -166,6 +278,7 @@ export async function POST(request: Request) {
   }
 }
 
+// ─── PATCH ────────────────────────────────────────────────────────────────
 export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -310,7 +423,6 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // ✅ Validasi uraian pekerjaan wajib diisi
       if (!work_description?.trim()) {
         return NextResponse.json(
           {
@@ -321,7 +433,6 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // Validasi waktu: hanya bisa mulai saat sudah >= scheduled_start
       if (overtime.scheduled_start) {
         const nowMs = Date.now();
         const scheduledMs = new Date(overtime.scheduled_start).getTime();
@@ -330,14 +441,13 @@ export async function PATCH(request: Request) {
           return NextResponse.json(
             {
               success: false,
-              message: `Belum waktunya mulai. Lembur dijadwalkan mulai pukul ${new Date(overtime.scheduled_start).toLocaleTimeString(
-                "id-ID",
-                {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "Asia/Jakarta",
-                }
-              )} WIB (${diffMins} menit lagi)`,
+              message: `Belum waktunya mulai. Lembur dijadwalkan mulai pukul ${new Date(
+                overtime.scheduled_start
+              ).toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Jakarta",
+              })} WIB (${diffMins} menit lagi)`,
               notYetTime: true,
               scheduledStart: overtime.scheduled_start,
             },
@@ -370,15 +480,18 @@ export async function PATCH(request: Request) {
     // ─── COMPLETE ─────────────────────────────────────────────────────────
     if (action === "COMPLETE") {
       if (overtime.user_id !== user.id) {
-        console.log("[COMPLETE] Unauthorized: overtime.user_id:", overtime.user_id, "user.id:", user.id);
+        console.log(
+          "[COMPLETE] Unauthorized: overtime.user_id:",
+          overtime.user_id,
+          "user.id:",
+          user.id
+        );
         return NextResponse.json(
           { success: false, message: "Bukan request milikmu" },
           { status: 403 }
         );
       }
 
-      // ✅ PERBAIKI VALIDASI INI
-      // Allow: APPROVED, ONGOING, atau COMPLETED (auto-completed) tanpa bukti foto
       if (
         !["APPROVED", "ONGOING"].includes(overtime.status) &&
         !(overtime.status === "COMPLETED" && !overtime.proof_photo_url)
@@ -393,10 +506,10 @@ export async function PATCH(request: Request) {
       const startReference = overtime.actual_start ?? overtime.scheduled_start;
       const durationMins = startReference
         ? Math.round(
-          (new Date(actualEnd).getTime() -
-            new Date(startReference).getTime()) /
-          60000
-        )
+            (new Date(actualEnd).getTime() -
+              new Date(startReference).getTime()) /
+              60000
+          )
         : 0;
       const ratePerHour = overtime.rate_per_hour ?? 0;
       const billedHours = Math.floor(durationMins / 60);
@@ -412,7 +525,6 @@ export async function PATCH(request: Request) {
         updated_at: new Date().toISOString(),
       };
 
-      // ✅ Add auto_completed flag if provided
       if (auto_completed === true) {
         updates.auto_completed = true;
       }
@@ -440,11 +552,14 @@ export async function PATCH(request: Request) {
           { status: 403 }
         );
       }
-      if (overtime.status !== "ONGOING") {
+
+      // Hanya boleh SET_PAY jika sudah COMPLETED
+      if (overtime.status !== "COMPLETED") {
         return NextResponse.json(
           {
             success: false,
-            message: "Hanya untuk lembur yang sedang berjalan",
+            message:
+              "Bayaran hanya bisa diatur setelah lembur selesai (COMPLETED)",
           },
           { status: 400 }
         );

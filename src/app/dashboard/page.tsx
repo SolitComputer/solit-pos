@@ -146,7 +146,7 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
 }) {
   const a = ACCENT[accent];
   return (
-    <div className="group bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden">
+    <div className="group h-full bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden flex flex-col justify-between">
       <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${a.bar} opacity-0 group-hover:opacity-100 transition-all duration-300`} />
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -577,7 +577,7 @@ export default function Page() {
         </div>
 
         {/* ── Stat Cards Grid (Always 4 cols) ── */}
-       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up auto-rows-fr" style={{ animationDelay: "0.05s" }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
               <div key={i} className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-4 shadow-sm space-y-2">
@@ -592,7 +592,7 @@ export default function Page() {
               {canSeeFinancials && (
                 <button
                   onClick={() => setShowRevenueModal(true)}
-                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95 w-full h-full block"
                 >
                   <StatCard
                     label="Omzet Hari Ini"
@@ -609,7 +609,7 @@ export default function Page() {
               {canSeeFinancials && (
                 <button
                   onClick={() => setShowGrossProfitModal(true)}
-                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                  className="text-left hover:scale-105 transition-transform duration-300 active:scale-95 w-full h-full block"
                 >
                   <StatCard
                     label="Gross Profit Hari Ini"
@@ -625,7 +625,7 @@ export default function Page() {
               {/* Laptop Ready - ALWAYS show */}
               <button
                 onClick={() => setShowInventoryModal(true)}
-                className="h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
               >
                 <StatCard
                   label="Laptop Ready"
@@ -639,7 +639,7 @@ export default function Page() {
               {/* Transaksi - ALWAYS show */}
               <button
                 onClick={() => {/* bisa tambah modal nanti kalau perlu */ }}
-                className="text-left hover:scale-105 transition-transform duration-300 active:scale-95"
+                className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
               >
                 <StatCard
                   label="Transaksi Hari Ini"

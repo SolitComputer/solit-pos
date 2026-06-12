@@ -7,6 +7,14 @@ import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
+interface LaptopUnit {
+    id: string;
+    serial_number: string;
+    grade: string;
+    status: string;
+    selling_price: number;
+}
+
 interface Laptop {
     id: string;
     laptop_name: string;
@@ -23,6 +31,7 @@ interface Laptop {
     ready_to_sell: boolean;
     notes: string;
     created_at: string;
+    laptop_units?: LaptopUnit[];
 }
 
 type ModalMode = "detail" | "create" | "edit" | null;
@@ -311,7 +320,7 @@ export default function Page() {
     const [filterRam, setFilterRam] = useState("ALL");
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
     const [sortBy, setSortBy] = useState("DEFAULT");
-    const [currentPage, setCurrentPage] = useState(1);
+    const [filterSN, setFilterSN] = useState("");
 
     const [modalMode, setModalMode] = useState<ModalMode>(null);
     const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
@@ -320,7 +329,6 @@ export default function Page() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
-    const ITEMS_PER_PAGE = 15;
 
     const canEditLaptop = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP) : false;
     const canCreateLaptop = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
@@ -330,7 +338,7 @@ export default function Page() {
     ] as UserRole[]) : false;
     const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
     const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
-    const restoredPageRef = useRef<number | null>(null);
+
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{
@@ -347,14 +355,6 @@ export default function Page() {
         setConfirmModal({ message: msg, onConfirm });
 
     useEffect(() => { fetchLaptops(); }, []);
-
-    useEffect(() => {
-        const savedPage = sessionStorage.getItem("laptops_page");
-        if (savedPage) {
-            restoredPageRef.current = Number(savedPage);
-            sessionStorage.removeItem("laptops_page");
-        }
-    }, []);
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -379,21 +379,12 @@ export default function Page() {
                 qty: Number(l.qty) || 0,
             }));
             setLaptops(normalized);
-
-            if (restoredPageRef.current !== null) {
-                setCurrentPage(restoredPageRef.current);
-                restoredPageRef.current = null;
-            }
         } catch {
             setLaptops([]);
         } finally {
             setIsLoading(false);
         }
     };
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [search, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
 
     const filteredLaptops = useMemo(() => {
         let list = [...laptops];
@@ -423,6 +414,14 @@ export default function Page() {
             const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
             list = list.filter(x => x.selling_price >= min && x.selling_price < max);
         }
+        if (filterSN.trim()) {
+            const snQ = filterSN.trim().toLowerCase();
+            list = list.filter(x =>
+                x.laptop_units?.some(u =>
+                    u.serial_number.toLowerCase().includes(snQ)
+                )
+            );
+        }
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
             case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
@@ -431,14 +430,7 @@ export default function Page() {
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
-    }, [laptops, search, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
-
-    const totalPages = Math.ceil(filteredLaptops.length / ITEMS_PER_PAGE);
-
-    const paginatedLaptops = useMemo(() => {
-        const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredLaptops.slice(start, start + ITEMS_PER_PAGE);
-    }, [filteredLaptops, currentPage]);
+    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
 
     const uniqueProcessors = useMemo(() => {
         const types = new Set<string>();
@@ -792,8 +784,8 @@ export default function Page() {
                         {/* Filter Bar dengan desain modern */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5 space-y-4">
                             {/* Search dan filter utama */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div className="relative lg:col-span-1 group">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                                <div className="relative group">
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                                     </svg>
@@ -805,8 +797,21 @@ export default function Page() {
                                         onChange={e => setSearch(e.target.value)}
                                     />
                                 </div>
+                                {/* Search SN */}
+                                <div className="relative group">
+                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    <input
+                                        type="text"
+                                        placeholder="Cari Serial Number..."
+                                        className="w-full pl-9 pr-3 h-10 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200"
+                                        value={filterSN}
+                                        onChange={e => setFilterSN(e.target.value)}
+                                    />
+                                </div>
                                 <select
-                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                                    className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 ..."
                                     value={filterStatus}
                                     onChange={e => setFilterStatus(e.target.value)}
                                 >
@@ -828,6 +833,7 @@ export default function Page() {
                                 <button
                                     onClick={() => {
                                         setSearch("");
+                                        setFilterSN("");
                                         setFilterStatus("ALL");
                                         setFilterBrand("ALL");
                                         setFilterProcessor("ALL");
@@ -938,6 +944,7 @@ export default function Page() {
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="bg-gray-50 border-b border-gray-100">
+                                                <Th>No</Th>
                                                 <Th>Nama Laptop</Th>
                                                 <Th>Brand</Th>
                                                 <Th>CPU</Th>
@@ -951,7 +958,7 @@ export default function Page() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {paginatedLaptops.map((item, idx) => {
+                                            {filteredLaptops.map((item, idx) => {
                                                 const s = STATUS_STYLE[item.status];
                                                 return (
                                                     <tr
@@ -959,6 +966,9 @@ export default function Page() {
                                                         className="group cursor-pointer data-row"
                                                         onClick={() => openDetail(item)}
                                                     >
+                                                        <td className="px-4 py-3.5 text-center whitespace-nowrap w-10">
+                                                            <span className="text-xs font-medium text-gray-400">{idx + 1}</span>
+                                                        </td>
                                                         <td className="px-4 py-3.5 max-w-[200px]">
                                                             <span className="block font-semibold text-gray-800 truncate group-hover:text-gray-600 transition-colors" title={item.laptop_name}>
                                                                 {item.laptop_name}
@@ -1022,10 +1032,7 @@ export default function Page() {
                                                                 {canViewUnits && (
                                                                     <Link
                                                                         href={`/dashboard/laptops/${item.id}/units`}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            sessionStorage.setItem("laptops_page", String(currentPage));
-                                                                        }}
+                                                                        onClick={(e) => e.stopPropagation()}
                                                                         className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:shadow-sm transition-all duration-200"
                                                                     >
                                                                         Units
@@ -1056,79 +1063,31 @@ export default function Page() {
                                     </table>
                                 </div>
 
-                                {/* Pagination yang ditingkatkan */}
-                                <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
+                                <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/40">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                                         <p className="text-xs text-gray-500">
                                             Menampilkan{" "}
-                                            <span className="font-semibold text-gray-700">
-                                                {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredLaptops.length)}
-                                            </span>
-                                            {" "}–{" "}
-                                            <span className="font-semibold text-gray-700">
-                                                {Math.min(currentPage * ITEMS_PER_PAGE, filteredLaptops.length)}
-                                            </span>
-                                            {" "}dari{" "}
                                             <span className="font-semibold text-gray-700">{filteredLaptops.length}</span>
                                             {" "}laptop
                                             {laptops.length !== filteredLaptops.length && (
                                                 <span className="text-gray-400 ml-1">(difilter dari {laptops.length})</span>
                                             )}
                                         </p>
-                                        {totalPages > 1 && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                                    disabled={currentPage === 1}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                                    </svg>
-                                                </button>
-                                                {(() => {
-                                                    const pages: (number | "...")[] = [];
-                                                    if (totalPages <= 7) {
-                                                        for (let i = 1; i <= totalPages; i++) pages.push(i);
-                                                    } else {
-                                                        pages.push(1);
-                                                        if (currentPage > 3) pages.push("...");
-                                                        const start = Math.max(2, currentPage - 1);
-                                                        const end = Math.min(totalPages - 1, currentPage + 1);
-                                                        for (let i = start; i <= end; i++) pages.push(i);
-                                                        if (currentPage < totalPages - 2) pages.push("...");
-                                                        pages.push(totalPages);
-                                                    }
-                                                    return pages.map((page, idx) =>
-                                                        page === "..." ? (
-                                                            <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">
-                                                                ···
-                                                            </span>
-                                                        ) : (
-                                                            <button
-                                                                key={page}
-                                                                onClick={() => setCurrentPage(page as number)}
-                                                                className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium transition-all duration-200 ${currentPage === page
-                                                                    ? "bg-gray-700 text-white shadow-md scale-110"
-                                                                    : "text-gray-600 hover:bg-gray-200"
-                                                                    }`}
-                                                            >
-                                                                {page}
-                                                            </button>
-                                                        )
-                                                    );
-                                                })()}
-                                                <button
-                                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                                    disabled={currentPage === totalPages}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                    </svg>
-                                                </button>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
+                                                <p className="text-sm font-bold text-gray-700">
+                                                    {filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0)} unit
+                                                </p>
                                             </div>
-                                        )}
+                                            <div className="w-px h-8 bg-gray-200" />
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Nilai Jual</p>
+                                                <p className="text-sm font-bold text-gray-900">
+                                                    {fmt(filteredLaptops.reduce((s, l) => s + (l.selling_price ?? 0) * (l.qty ?? 0), 0))}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
