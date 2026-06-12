@@ -66,6 +66,7 @@ export async function GET(request: Request) {
       ip_address: item.ip_address,
       face_distance: item.face_distance,
       created_at: item.created_at,
+      late_weight: item.late_weight != null ? Number(item.late_weight) : null,  
     }));
 
     return NextResponse.json({ success: true, data: formattedData });

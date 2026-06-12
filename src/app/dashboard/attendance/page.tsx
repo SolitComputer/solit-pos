@@ -23,6 +23,7 @@ type Attendance = {
     ip_address: string;
     face_distance: number | null;
     created_at: string;
+    late_weight?: number | null;
     displayStatus?: "PRESENT" | "LATE" | "SKIP";
     source?: "AUTO" | "MANUAL";
 };
@@ -146,8 +147,11 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
     if (a.method === "FORCE") return "PRESENT";
     if (a.method === "SKIP" || a.status === "SKIPPED_MANUAL") return "SKIP";
 
-    if ("late_weight" in a && a.late_weight !== null) {
-        return (a.late_weight as number) > 1 ? "LATE" : "PRESENT";
+    if ("late_weight" in a && a.late_weight != null) {
+        const w = a.late_weight as number;
+        if (w >= 1) return "PRESENT";   
+        if (w > 0) return "LATE";     
+        return "SKIP";                  
     }
 
     if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
