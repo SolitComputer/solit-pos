@@ -28,14 +28,24 @@ ChartJS.register(
   BarElement, ArcElement, Filler, Tooltip, Legend
 );
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface WeeklyTrendItem {
-  date: string; label: string; revenue: number; profit: number; trxCount: number;
+  date: string;
+  label: string;
+  revenue: number;
+  profit: number;
+  trxCount: number;
+  laptopSold: number;
 }
 interface Stats {
-  todayRevenue: number; todayProfit: number; todayTransactions: number;
-  laptopReady: number; stockTotal: number;
-  revenueChange: number | null; profitChange: number | null; trxChange: number | null;
+  todayRevenue: number;
+  todayProfit: number;
+  todayTransactions: number;
+  todayLaptopSold: number;
+  laptopReady: number;
+  stockTotal: number;
+  revenueChange: number | null;
+  profitChange: number | null;
+  trxChange: number | null;
   weeklyTrend: WeeklyTrendItem[];
   topSales: { name: string; total: number; profit: number }[];
   topSources: { name: string; total: number }[];
@@ -149,7 +159,7 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
     <div className="group h-full bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden flex flex-col justify-between">
       <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${a.bar} opacity-0 group-hover:opacity-100 transition-all duration-300`} />
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">                                                                                                                                                                 
+        <div className="flex-1 min-w-0">
           <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
           {/* PERBAIKAN: tampilkan nilai apa adanya, tanpa truncate/pembulatan */}
           <p className="font-black mt-1 text-sm sm:text-base tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left break-words">
@@ -403,25 +413,34 @@ export default function Page() {
   const weeklyRevenue = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
   const weeklyProfit = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
   const weeklyTrxCount = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
+  const weeklyLaptopSold = stats?.weeklyTrend?.map((d) => d.laptopSold) ?? [];
 
   const trendChartData = {
     labels: weeklyLabels,
     datasets: [
       {
-        label: "Omzet", data: weeklyRevenue,
+        label: "Omzet",
+        data: weeklyRevenue,
         borderColor: "#4B5563",
         backgroundColor: (ctx: any) => {
           const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
-          gradient.addColorStop(0, "rgba(75,85,99,0.1)");
+          gradient.addColorStop(0, "rgba(75,85,99,0.12)");
           gradient.addColorStop(1, "rgba(75,85,99,0)");
           return gradient;
         },
-        borderWidth: 2.5, fill: true, tension: 0.4, pointRadius: 3,
-        pointHoverRadius: 6, pointBackgroundColor: "#4B5563",
-        pointBorderColor: "#fff", pointBorderWidth: 2,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        pointBackgroundColor: "#4B5563",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        yAxisID: "yRevenue",
       },
       {
-        label: "Profit", data: weeklyProfit,
+        label: "Profit",
+        data: weeklyProfit,
         borderColor: "#10B981",
         backgroundColor: (ctx: any) => {
           const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
@@ -429,13 +448,36 @@ export default function Page() {
           gradient.addColorStop(1, "rgba(16,185,129,0)");
           return gradient;
         },
-        borderWidth: 2, fill: true, tension: 0.4, pointRadius: 2.5,
-        pointHoverRadius: 5, pointBackgroundColor: "#10B981",
-        pointBorderColor: "#fff", pointBorderWidth: 1.5,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        pointBackgroundColor: "#10B981",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 1.5,
         borderDash: [6, 4],
+        yAxisID: "yRevenue",
+      },
+      {
+        label: "Laptop Terjual",
+        data: weeklyLaptopSold,
+        borderColor: "#6366F1",
+        backgroundColor: "rgba(99,102,241,0)",
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: "#6366F1",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        borderDash: [3, 3],
+        yAxisID: "yUnits",
       },
     ],
   };
+
 
   const trxBarData = {
     labels: weeklyLabels,
@@ -457,23 +499,57 @@ export default function Page() {
   } as const;
 
   const trendOptions = {
-    ...chartBaseOptions,
+    responsive: true,
+    maintainAspectRatio: false,
     interaction: { mode: "index" as const, intersect: false },
     plugins: {
       legend: { display: false },
       tooltip: {
         backgroundColor: "rgba(0,0,0,0.85)",
-        titleColor: "#fff", bodyColor: "#e5e7eb",
-        padding: 8, cornerRadius: 8,
-        // tooltip chart tetap pakai fmtShort karena ruang terbatas
-        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}` },
+        titleColor: "#fff",
+        bodyColor: "#e5e7eb",
+        padding: 8,
+        cornerRadius: 8,
+        callbacks: {
+          label: (ctx: any) => {
+            if (ctx.dataset.label === "Laptop Terjual") {
+              return `💻 Terjual: ${ctx.raw} unit`;
+            }
+            return `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}`;
+          },
+        },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 9 }, color: "#9ca3af" } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 9 }, color: "#9ca3af", callback: (v: any) => fmtShort(v) } },
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 9 }, color: "#9ca3af" },
+      },
+      yRevenue: {
+        type: "linear" as const,
+        position: "left" as const,
+        grid: { color: "rgba(0,0,0,.04)" },
+        ticks: {
+          font: { size: 9 },
+          color: "#9ca3af",
+          callback: (v: any) => fmtShort(v),
+        },
+      },
+      yUnits: {
+        type: "linear" as const,
+        position: "right" as const,
+        grid: { drawOnChartArea: false },
+        min: 0,
+        ticks: {
+          font: { size: 9 },
+          color: "#6366F1",
+          stepSize: 1,
+          callback: (v: any) => `${v}`,
+        },
+      },
     },
   };
+
 
   const barOptions = {
     ...chartBaseOptions,
@@ -588,8 +664,8 @@ export default function Page() {
             ))
           ) : (
             <>
-              {/* Omzet - only if canSeeFinancials */}
-              {canSeeFinancials && (
+              {/* Omzet Hari Ini - hanya jika punya akses finansial */}
+              {canSeeFinancials ? (
                 <button
                   onClick={() => setShowRevenueModal(true)}
                   className="text-left hover:scale-105 transition-transform duration-300 active:scale-95 w-full h-full block"
@@ -597,15 +673,30 @@ export default function Page() {
                   <StatCard
                     label="Omzet Hari Ini"
                     value={fmtRupiah(stats?.todayRevenue || 0)}
-                    sub={`${stats?.todayTransactions || 0} transaksi`}
+                    sub={`${stats?.todayTransactions || 0} transaksi selesai`}
                     icon={<OmzetIcon />}
                     accent="gray"
                     change={stats?.revenueChange}
                   />
                 </button>
+              ) : (
+                // Non-finansial: tampilkan jumlah transaksi di posisi pertama
+                <button
+                  onClick={() => {}}
+                  className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
+                >
+                  <StatCard
+                    label="Transaksi Hari Ini"
+                    value={String(stats?.todayTransactions || 0)}
+                    sub={`${stats?.todayLaptopSold || 0} unit terjual`}
+                    icon={<TrxIcon />}
+                    accent="gray"
+                    change={stats?.trxChange}
+                  />
+                </button>
               )}
 
-              {/* Gross Profit - only if canSeeFinancials */}
+              {/* Gross Profit - hanya jika punya akses finansial */}
               {canSeeFinancials && (
                 <button
                   onClick={() => setShowGrossProfitModal(true)}
@@ -622,7 +713,7 @@ export default function Page() {
                 </button>
               )}
 
-              {/* Laptop Ready - ALWAYS show */}
+              {/* Laptop Ready - selalu tampil */}
               <button
                 onClick={() => setShowInventoryModal(true)}
                 className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
@@ -636,15 +727,15 @@ export default function Page() {
                 />
               </button>
 
-              {/* Transaksi - ALWAYS show */}
+              {/* Transaksi Hari Ini - selalu tampil di posisi ke-4 */}
               <button
-                onClick={() => {/* bisa tambah modal nanti kalau perlu */ }}
+                onClick={() => {}}
                 className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
               >
                 <StatCard
                   label="Transaksi Hari Ini"
                   value={String(stats?.todayTransactions || 0)}
-                  sub="transaksi selesai"
+                  sub={`${stats?.todayLaptopSold || 0} unit laptop terjual`}
                   icon={<TrxIcon />}
                   accent="gray"
                   change={stats?.trxChange}
@@ -668,23 +759,42 @@ export default function Page() {
           {canSeeFinancials ? (
             <div className="lg:col-span-2">
               <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className="flex items-center justify-between mb-2 sm:mb-3">
                   <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
                     <span className="w-0.5 h-3 sm:h-4 bg-gray-600 rounded-full" />
-                    Tren Omzet & Profit
+                    Tren 7 Hari Terakhir
                   </h2>
-                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">
+                    7 hari
+                  </span>
                 </div>
-                <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
-                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                    <span className="w-4 sm:w-5 h-0.5 bg-gray-600 inline-block rounded-full" />Omzet
-                  </div>
-                  <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
-                    <span className="w-4 sm:w-5 inline-block border-t-2 border-dashed border-emerald-500" />Profit
-                  </div>
+
+                {/* Legend */}
+                <div className="flex gap-3 sm:gap-4 mb-2 sm:mb-3 flex-wrap">
+                  {[
+                    { color: "bg-gray-600", label: "Omzet", solid: true },
+                    { color: "bg-emerald-500", label: "Profit", solid: false },
+                    { color: "bg-indigo-500", label: "Laptop Terjual", solid: false },
+                  ].map(({ color, label, solid }) => (
+                    <div key={label} className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
+                      <span className={`w-4 sm:w-5 h-0.5 inline-block rounded-full ${color}`}
+                        style={!solid ? { borderTop: "2px dashed", background: "none" } : {}}
+                      />
+                      <span className={label === "Laptop Terjual" ? "text-indigo-500" : ""}>{label}</span>
+                    </div>
+                  ))}
+                  {/* Label axis kanan */}
+                  <span className="ml-auto text-[9px] text-indigo-400 hidden sm:inline">
+                    axis kanan = unit
+                  </span>
                 </div>
-                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyRevenue.length > 0 ? (
-                  <div style={{ height: 130 }} className="sm:h-[160px]"><Line data={trendChartData} options={trendOptions} /></div>
+
+                {isLoading ? (
+                  <Shimmer className="w-full h-28 sm:h-36" />
+                ) : weeklyRevenue.length > 0 ? (
+                  <div style={{ height: 150 }} className="sm:h-[170px]">
+                    <Line data={trendChartData} options={trendOptions} />
+                  </div>
                 ) : (
                   <div className="text-center py-8 sm:py-12">
                     <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
@@ -694,6 +804,7 @@ export default function Page() {
               </div>
             </div>
           ) : (
+            // Non-financial role: tampilkan bar chart transaksi saja (tidak berubah)
             <div className="lg:col-span-2">
               <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -703,8 +814,12 @@ export default function Page() {
                   </h2>
                   <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">7 hari terakhir</span>
                 </div>
-                {isLoading ? <Shimmer className="w-full h-28 sm:h-36" /> : weeklyTrxCount.length > 0 ? (
-                  <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
+                {isLoading ? (
+                  <Shimmer className="w-full h-28 sm:h-36" />
+                ) : weeklyTrxCount.length > 0 ? (
+                  <div style={{ height: 130 }} className="sm:h-[160px]">
+                    <Bar data={trxBarData} options={barOptions} />
+                  </div>
                 ) : (
                   <div className="text-center py-8 sm:py-12">
                     <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
@@ -714,6 +829,7 @@ export default function Page() {
               </div>
             </div>
           )}
+
 
           {/* Top Sales */}
           <button

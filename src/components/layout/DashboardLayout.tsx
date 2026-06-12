@@ -1,12 +1,14 @@
-// src/components/layout/DashboardLayout.tsx
 import Sidebar from "./Sidebar";
+import { usePresence } from "@/hooks/usePresence"; 
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  usePresence();
   return (
+    
     <div className="flex h-screen overflow-hidden bg-[#f5f4f0]">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

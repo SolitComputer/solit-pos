@@ -13,19 +13,45 @@ interface InventoryDetail {
   byBrand: Array<{ name: string; total: number }>;
 }
 
-const GRADE_COLORS = {
-  A: { bg: "from-emerald-500 to-emerald-600", text: "text-emerald-700", bar: "bg-gradient-to-r from-emerald-500 to-emerald-600", lightBg: "bg-emerald-50" },
-  B: { bg: "from-amber-500 to-amber-600", text: "text-amber-700", bar: "bg-gradient-to-r from-amber-500 to-amber-600", lightBg: "bg-amber-50" },
-  C: { bg: "from-gray-500 to-gray-600", text: "text-gray-700", bar: "bg-gradient-to-r from-gray-500 to-gray-600", lightBg: "bg-gray-50" },
-};
+const GRADE_CONFIG = {
+  A: {
+    color: "#10B981",
+    glow: "rgba(16,185,129,0.2)",
+    border: "rgba(16,185,129,0.25)",
+    bg: "rgba(16,185,129,0.12)",
+    bar: "linear-gradient(90deg, #10B981, #34D399)",
+    label: "Kondisi terbaik",
+  },
+  B: {
+    color: "#F59E0B",
+    glow: "rgba(245,158,11,0.2)",
+    border: "rgba(245,158,11,0.25)",
+    bg: "rgba(245,158,11,0.12)",
+    bar: "linear-gradient(90deg, #F59E0B, #FCD34D)",
+    label: "Kondisi baik",
+  },
+  C: {
+    color: "#818CF8",
+    glow: "rgba(99,102,241,0.2)",
+    border: "rgba(99,102,241,0.25)",
+    bg: "rgba(99,102,241,0.12)",
+    bar: "linear-gradient(90deg, #818CF8, #A5B4FC)",
+    label: "Kondisi standar",
+  },
+} as const;
 
 export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [data, setData] = useState<InventoryDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setTimeout(() => setVisible(true), 10);
+    else setVisible(false);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-    
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -38,262 +64,251 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const GradeCard = ({ grade, gradeData }: { grade: "A" | "B" | "C"; gradeData: { qty: number; pct: number } }) => {
-    const colors = GRADE_COLORS[grade];
-    return (
-      <div className={`${colors.lightBg} rounded-xl p-4 transition-all duration-200 hover:shadow-md`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full ${colors.bar} flex items-center justify-center text-white font-bold text-sm shadow-sm`}>
-              {grade}
-            </div>
-            <span className="font-semibold text-gray-800">Grade {grade}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-lg font-bold text-gray-900">{gradeData.qty}</span>
-            <span className="text-sm text-gray-500 ml-1">unit</span>
-          </div>
-        </div>
-        <div className="mt-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-600">Distribusi</span>
-            <span className={`font-semibold ${colors.text}`}>{gradeData.pct}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${colors.bar}`}
-              style={{ width: `${gradeData.pct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const maxBrand = data?.byBrand[0]?.total || 1;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all duration-300"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300"
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+        .idm-overlay { font-family: 'Inter', sans-serif; }
+
+        .idm-card {
+          background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+          border: 1px solid rgba(255,255,255,0.08);
+          backdrop-filter: blur(10px);
+        }
+
+        .idm-row { transition: background 0.2s, transform 0.2s; }
+        .idm-row:hover { background: rgba(255,255,255,0.05); transform: translateX(3px); }
+
+        .idm-scrollbar::-webkit-scrollbar { width: 4px; }
+        .idm-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .idm-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+        .idm-shimmer {
+          background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
+          background-size: 200% 100%;
+          animation: idm-shimmer 1.5s infinite;
+        }
+        @keyframes idm-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        .idm-modal-enter { opacity: 0; transform: scale(0.96) translateY(12px); }
+        .idm-modal-visible {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+          transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+        }
+
+        .idm-stat-glow-blue  { box-shadow: 0 0 30px rgba(99,102,241,0.12),  inset 0 1px 0 rgba(255,255,255,0.06); }
+        .idm-stat-glow-green { box-shadow: 0 0 30px rgba(16,185,129,0.12),  inset 0 1px 0 rgba(255,255,255,0.06); }
+      `}</style>
+
+      <div
+        className="idm-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+        onClick={onClose}
       >
-        {/* Header dengan desain modern */}
-        <div className="relative px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-blue-600 bg-clip-text text-transparent">
-                Detail Inventory
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">Breakdown stok berdasarkan grade dan brand</p>
+        <div
+          className={`relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl overflow-hidden ${visible ? "idm-modal-visible" : "idm-modal-enter"}`}
+          style={{ background: "linear-gradient(160deg, #141820 0%, #0F1117 60%, #111318 100%)", border: "1px solid rgba(255,255,255,0.08)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Drag handle mobile */}
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-10 h-1 rounded-full bg-white/20" />
+          </div>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #818CF8, #6366F1)", boxShadow: "0 0 20px rgba(99,102,241,0.4)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#F1F5F9" }}>Detail Inventory</h2>
+                <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Breakdown stok per grade dan brand</p>
+              </div>
             </div>
-            <button 
-              onClick={onClose} 
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all duration-200"
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.8)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.4)"; }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
-        </div>
 
-        {/* Content dengan scroll area yang halus */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {isLoading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="bg-gray-100 rounded-xl h-24" />
+          {/* Scrollable content */}
+          <div className="idm-scrollbar flex-1 overflow-y-auto">
+            {isLoading ? (
+              <div className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2].map((i) => <div key={i} className="idm-shimmer rounded-xl h-20" />)}
                 </div>
-              ))}
-            </div>
-          ) : data ? (
-            <div className="p-6 space-y-6">
-              
-              {/* Total Summary dengan desain card yang menarik */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium opacity-90">Total Unit</p>
-                      <p className="text-3xl font-bold mt-2">{data.total}</p>
-                    </div>
-                    <svg className="w-10 h-10 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center gap-2 text-xs opacity-90">
-                      <span>📦 Total stok tersedia</span>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                  {[1, 2, 3].map((i) => <div key={i} className="idm-shimmer rounded-xl h-24" />)}
                 </div>
-                
-                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium opacity-90">Total Model</p>
-                      <p className="text-3xl font-bold mt-2">{data.totalModels}</p>
-                    </div>
-                    <svg className="w-10 h-10 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center gap-2 text-xs opacity-90">
-                      <span>🔧 Variasi model unik</span>
-                    </div>
-                  </div>
+                <div className="space-y-2 pt-2">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="idm-shimmer rounded-xl h-14" />)}
                 </div>
               </div>
+            ) : data ? (
+              <div className="p-5 space-y-5">
 
-              {/* Grade Breakdown dengan desain card per grade */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-800">Berdasarkan Grade</h3>
-                  <span className="text-xs text-gray-500">Distribusi stok</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(["A", "B", "C"] as const).map((grade) => (
-                    <GradeCard key={grade} grade={grade} gradeData={data.byGrade[grade]} />
-                  ))}
-                </div>
-              </div>
-
-              {/* Brand Breakdown dengan desain lebih menarik */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-800">Top Brand</h3>
-                  <span className="text-xs text-gray-500">Berdasarkan jumlah unit</span>
-                </div>
-                {data.byBrand.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-xl">
-                    <div className="text-gray-400 text-sm">Belum ada data brand</div>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="idm-card idm-stat-glow-blue rounded-xl p-3.5">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(99,102,241,0.2)" }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    </div>
+                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Total Unit</p>
+                    <p className="text-2xl font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{data.total}</p>
+                    <p className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>stok tersedia</p>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {data.byBrand.map((brand, idx) => {
-                      const maxTotal = data.byBrand[0]?.total || 1;
-                      const pct = Math.round((brand.total / maxTotal) * 100);
-                      const isTopBrand = idx === 0;
-                      
+
+                  <div className="idm-card idm-stat-glow-green rounded-xl p-3.5">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(16,185,129,0.2)" }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Total Model</p>
+                    <p className="text-2xl font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{data.totalModels}</p>
+                    <p className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>variasi unik</p>
+                  </div>
+                </div>
+
+                {/* Grade Breakdown */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Berdasarkan Grade</p>
+                    <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>Distribusi stok</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(["A", "B", "C"] as const).map((grade) => {
+                      const cfg = GRADE_CONFIG[grade];
+                      const gradeData = data.byGrade[grade];
                       return (
-                        <div 
-                          key={brand.name} 
-                          className={`group bg-white rounded-xl p-4 shadow-sm border transition-all duration-200 hover:shadow-md ${
-                            isTopBrand ? 'border-blue-200 bg-gradient-to-r from-blue-50/50 to-white' : 'border-gray-100'
-                          }`}
+                        <div
+                          key={grade}
+                          className="idm-card rounded-xl p-3.5"
+                          style={{ border: `1px solid ${cfg.border}`, boxShadow: `0 0 20px ${cfg.glow}` }}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                isTopBrand ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                #{idx + 1}
-                              </div>
-                              <div>
-                                <p className="font-semibold text-gray-800">{brand.name}</p>
-                                {isTopBrand && (
-                                  <span className="text-[10px] text-blue-600 font-medium">Paling banyak</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-gray-900">{brand.total}</p>
-                              <p className="text-xs text-gray-400">unit</p>
-                            </div>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 text-sm font-black" style={{ background: cfg.bg, color: cfg.color }}>
+                            {grade}
                           </div>
-                          <div className="mt-2">
-                            <div className="flex justify-between text-xs mb-1">
-                              <span className="text-gray-500">Komposisi</span>
-                              <span className="font-medium text-gray-700">{pct}% dari brand tertinggi</span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-700 ${
-                                  isTopBrand 
-                                    ? 'bg-gradient-to-r from-blue-500 to-blue-600' 
-                                    : 'bg-gradient-to-r from-gray-400 to-gray-500'
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
+                          <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Grade {grade}</p>
+                          <p className="text-lg font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{gradeData.qty} <span className="text-xs font-normal" style={{ color: "rgba(255,255,255,0.4)" }}>unit</span></p>
+                          <div className="w-full h-1 rounded-full mt-2 overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${gradeData.pct}%`, background: cfg.bar }} />
                           </div>
+                          <p className="text-[9px] mt-1.5 font-semibold" style={{ color: cfg.color }}>{gradeData.pct}%</p>
+                          <p className="text-[8px] mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>{cfg.label}</p>
                         </div>
                       );
                     })}
                   </div>
-                )}
-              </div>
-
-              {/* Info tambahan */}
-              <div className="pt-4 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Grade A: Kondisi terbaik, Grade B: Kondisi baik, Grade C: Kondisi standar</span>
                 </div>
+
+                {/* Brand Breakdown */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Top Brand</p>
+                    <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>Berdasarkan jumlah unit</p>
+                  </div>
+
+                  {data.byBrand.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.05)" }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5">
+                          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>Belum ada data brand</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {data.byBrand.map((brand, idx) => {
+                        const pct = Math.max(4, Math.round((brand.total / maxBrand) * 100));
+                        const isTop = idx === 0;
+                        return (
+                          <div key={brand.name} className="idm-row idm-card rounded-xl p-3.5 cursor-default">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
+                                  style={isTop
+                                    ? { background: "linear-gradient(135deg, #818CF8, #6366F1)", color: "white", boxShadow: "0 0 12px rgba(99,102,241,0.4)" }
+                                    : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }
+                                  }
+                                >
+                                  #{idx + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold truncate" style={{ color: "#F1F5F9" }}>{brand.name}</p>
+                                  {isTop && (
+                                    <p className="text-[9px] font-semibold" style={{ color: "#818CF8" }}>Paling banyak</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-bold" style={{ color: "#F1F5F9" }}>{brand.total}</p>
+                                <p className="text-[9px]" style={{ color: "rgba(255,255,255,0.35)" }}>unit</p>
+                              </div>
+                            </div>
+                            <div className="w-full h-1 rounded-full mt-2 overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                              <div
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #818CF8, #A5B4FC)" : "linear-gradient(90deg, rgba(255,255,255,0.2), rgba(255,255,255,0.3))" }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer info */}
+                <div className="rounded-xl p-3.5 flex items-start gap-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" className="flex-shrink-0 mt-0.5">
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    Grade A: kondisi terbaik · Grade B: kondisi baik · Grade C: kondisi standar
+                  </p>
+                </div>
+
               </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="text-gray-400 mb-2">⚠️</div>
-              <p className="text-gray-500">Gagal memuat data inventory</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Coba lagi
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>Gagal memuat data</p>
+                <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>Coba tutup dan buka kembali</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* CSS untuk custom scrollbar dan animasi */}
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #c1c1c1;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #a8a8a8;
-        }
-        @keyframes zoom-in-95 {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-in {
-          animation-duration: 0.3s;
-          animation-fill-mode: both;
-        }
-        .zoom-in-95 {
-          animation-name: zoom-in-95;
-        }
-      `}</style>
-    </div>
+    </>
   );
 }

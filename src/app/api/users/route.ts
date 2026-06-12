@@ -3,7 +3,6 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import bcrypt from "bcryptjs";
 
-// ── Full access roles ──────────────────────────────────────────────────────
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
 function isFullAccess(role: string): boolean {
@@ -18,7 +17,6 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
-// ── GET — list semua user ──────────────────────────────────────────────────
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (!isFullAccess(user.role)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
