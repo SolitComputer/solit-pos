@@ -27,10 +27,8 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year =
-      searchParams.get("year") ?? new Date().getFullYear().toString();
-    const month =
-      searchParams.get("month") ?? String(new Date().getMonth() + 1);
+    const year = searchParams.get("year") ?? new Date().getFullYear().toString();
+    const month = searchParams.get("month") ?? String(new Date().getMonth() + 1);
     const status = searchParams.get("status");
 
     const paddedMonth = String(month).padStart(2, "0");
@@ -38,10 +36,47 @@ export async function GET(request: Request) {
     const lastDay = new Date(Number(year), Number(month), 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
+    // ✅ SERVER-SIDE AUTO-COMPLETE: setiap GET, cek & selesaikan overtime yang melewati scheduled_end
+    const now = new Date().toISOString();
+    const { data: expiredOvertimes } = await supabase
+      .from("overtime_requests")
+      .select("id, user_id, actual_start, scheduled_end, rate_per_hour")
+      .eq("status", "ONGOING")
+      .not("scheduled_end", "is", null)
+      .lt("scheduled_end", now); // scheduled_end < now
+
+    if (expiredOvertimes && expiredOvertimes.length > 0) {
+      for (const expired of expiredOvertimes) {
+        // actual_end = scheduled_end (bukan waktu sekarang!)
+        const actualEnd = expired.scheduled_end;
+        const startMs = new Date(expired.actual_start).getTime();
+        const endMs = new Date(actualEnd).getTime();
+        const durationMins = Math.round((endMs - startMs) / 60000);
+        const billedHours = Math.floor(durationMins / 60);
+        const ratePerHour = expired.rate_per_hour ?? 0;
+        const calculatedPay = billedHours * ratePerHour;
+
+        await supabase
+          .from("overtime_requests")
+          .update({
+            status: "COMPLETED",
+            actual_end: actualEnd,       // ✅ = scheduled_end, BUKAN now
+            completed_at: actualEnd,     // ✅ sama
+            duration_minutes: durationMins,
+            total_pay: calculatedPay,
+            auto_completed: true,
+            updated_at: now,
+          })
+          .eq("id", expired.id);
+
+        console.log(`[SERVER AUTO-COMPLETE] ${expired.id} → actual_end: ${actualEnd}`);
+      }
+    }
+
+    // ... lanjut query biasa seperti semula
     let q = supabase
       .from("overtime_requests")
-      .select(
-        `
+      .select(`
         id, user_id, request_date, reason, requested_start,
         status, approved_by, approved_at,
         scheduled_start, scheduled_end, actual_start, rate_per_hour,
@@ -49,8 +84,7 @@ export async function GET(request: Request) {
         completed_at, duration_minutes, total_pay,
         work_description, auto_completed,
         created_at, updated_at
-      `
-      )
+      `)
       .gte("request_date", startDate)
       .lte("request_date", endDate)
       .order("created_at", { ascending: false });
@@ -76,9 +110,7 @@ export async function GET(request: Request) {
     const userIds = [
       ...new Set([
         ...overtimes.map((o: any) => o.user_id),
-        ...overtimes
-          .filter((o: any) => o.approved_by)
-          .map((o: any) => o.approved_by),
+        ...overtimes.filter((o: any) => o.approved_by).map((o: any) => o.approved_by),
       ]),
     ].filter(Boolean);
 
@@ -88,9 +120,7 @@ export async function GET(request: Request) {
       .in("id", userIds);
 
     const usersMap: Record<string, any> = {};
-    (usersData || []).forEach((u: any) => {
-      usersMap[u.id] = u;
-    });
+    (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
 
     const result = overtimes.map((o: any) => ({
       ...o,
@@ -459,53 +489,61 @@ export async function PATCH(request: Request) {
     // ─── COMPLETE ─────────────────────────────────────────────────────────
     if (action === "COMPLETE") {
       if (overtime.user_id !== user.id) {
-        console.log(
-          "[COMPLETE] Unauthorized: overtime.user_id:",
-          overtime.user_id,
-          "user.id:",
-          user.id
-        );
         return NextResponse.json(
           { success: false, message: "Bukan request milikmu" },
           { status: 403 }
         );
       }
 
-      // Boleh complete jika ONGOING, atau COMPLETED tapi belum ada foto bukti
-      if (
-        !["APPROVED", "ONGOING"].includes(overtime.status) &&
-        !(overtime.status === "COMPLETED" && !overtime.proof_photo_url)
-      ) {
+      // ✅ Kasus 1: Upload foto untuk overtime yang sudah COMPLETED (auto_completed)
+      // Hanya update proof_photo_url, JANGAN sentuh actual_end atau total_pay
+      if (overtime.status === "COMPLETED" && !overtime.proof_photo_url) {
+        const { data, error } = await supabase
+          .from("overtime_requests")
+          .update({
+            proof_photo_url: proof_photo_url ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .select()
+          .single();
+
+        if (error)
+          return NextResponse.json(
+            { success: false, message: error.message },
+            { status: 500 }
+          );
+        return NextResponse.json({ success: true, data });
+      }
+
+      // ✅ Kasus 2: Selesaikan overtime yang sedang ONGOING
+      if (!["APPROVED", "ONGOING"].includes(overtime.status)) {
         return NextResponse.json(
           { success: false, message: "Status tidak valid untuk complete" },
           { status: 400 }
         );
       }
 
-      const actualEnd = new Date().toISOString();
-
-      // ✅ actual_start sekarang pasti = scheduled_start (dari saat APPROVE)
       const startReference = overtime.actual_start;
-
       if (!startReference) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "actual_start tidak ditemukan. Request mungkin belum disetujui.",
-          },
+          { success: false, message: "actual_start tidak ditemukan." },
           { status: 400 }
         );
       }
+
+      // ✅ actual_end = scheduled_end jika auto_completed, bukan new Date()
+      // Ini mencegah "selesai jam 16:00" padahal dijadwalkan 15:00
+      const actualEnd = auto_completed === true
+        ? (overtime.scheduled_end ?? new Date().toISOString()) // gunakan jadwal akhir
+        : new Date().toISOString(); // manual finish oleh karyawan = waktu klik
 
       const startMs = new Date(startReference).getTime();
       const endMs = new Date(actualEnd).getTime();
 
       if (endMs <= startMs) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "Waktu selesai tidak valid",
-          },
+          { success: false, message: "Waktu selesai tidak valid" },
           { status: 400 }
         );
       }
@@ -515,19 +553,11 @@ export async function PATCH(request: Request) {
       const billedHours = Math.floor(durationMins / 60);
       const calculatedPay = billedHours * ratePerHour;
 
-      console.log(
-        `[COMPLETE] ${overtime.user_id}:`,
-        `Start: ${startReference}`,
-        `End: ${actualEnd}`,
-        `Duration: ${durationMins}min (${billedHours}h)`,
-        `Pay: Rp${calculatedPay}`
-      );
-
       const updates: any = {
-        actual_end: actualEnd,
+        actual_end: actualEnd,           // ✅ bukan selalu new Date()
         status: "COMPLETED",
         proof_photo_url: proof_photo_url ?? null,
-        completed_at: actualEnd,
+        completed_at: actualEnd,         // ✅ konsisten dengan actual_end
         duration_minutes: durationMins,
         total_pay: calculatedPay,
         updated_at: new Date().toISOString(),
@@ -632,12 +662,161 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
+    // ─── UPDATE ───────────────────────────────────────────────────────────
+    if (action === "UPDATE") {
+      // Hanya FULL_ACCESS yang boleh update
+      if (!FULL_ACCESS.includes(user.role)) {
+        return NextResponse.json(
+          { success: false, message: "Tidak berwenang mengubah data lembur" },
+          { status: 403 }
+        );
+      }
+
+      const {
+        request_date: newDate,
+        scheduled_start: newSchedStart,
+        scheduled_end: newSchedEnd,
+        actual_start: newActualStart,
+        actual_end: newActualEnd,
+        reason: newReason,
+        work_description: newWorkDesc,
+        proof_photo_url: newProofUrl,
+        rate_per_hour: newRate,
+        status: newStatus,
+      } = body;
+
+      // Hitung ulang durasi & bayaran jika ada perubahan waktu atau rate
+      const resolvedStart = newActualStart ?? overtime.actual_start;
+      const resolvedEnd = newActualEnd ?? overtime.actual_end;
+      const resolvedRate = newRate ?? overtime.rate_per_hour ?? 0;
+
+      let durationMins: number | undefined;
+      let totalPay: number | undefined;
+
+      if (resolvedStart && resolvedEnd) {
+        const startMs = new Date(resolvedStart).getTime();
+        const endMs = new Date(resolvedEnd).getTime();
+        if (endMs > startMs) {
+          durationMins = Math.round((endMs - startMs) / 60000);
+          const billedHours = Math.floor(durationMins / 60);
+          totalPay = billedHours * resolvedRate;
+        }
+      }
+
+      // Hanya set field yang dikirim (hindari null overwrite yang tidak perlu)
+      const updatePayload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (newDate !== undefined) updatePayload.request_date = newDate;
+      if (newSchedStart !== undefined) updatePayload.scheduled_start = newSchedStart;
+      if (newSchedEnd !== undefined) updatePayload.scheduled_end = newSchedEnd;
+      if (newActualStart !== undefined) updatePayload.actual_start = newActualStart;
+      if (newActualEnd !== undefined) updatePayload.actual_end = newActualEnd;
+      if (newReason !== undefined) updatePayload.reason = newReason;
+      if (newWorkDesc !== undefined) updatePayload.work_description = newWorkDesc;
+      if (newProofUrl !== undefined) updatePayload.proof_photo_url = newProofUrl;
+      if (newRate !== undefined) updatePayload.rate_per_hour = Math.round(newRate);
+      if (newStatus !== undefined) updatePayload.status = newStatus;
+      if (durationMins !== undefined) updatePayload.duration_minutes = durationMins;
+      if (totalPay !== undefined) updatePayload.total_pay = Math.round(totalPay);
+
+      const { data, error } = await supabase
+        .from("overtime_requests")
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error)
+        return NextResponse.json(
+          { success: false, message: error.message },
+          { status: 500 }
+        );
+      return NextResponse.json({ success: true, data });
+    }
+
+
+
     return NextResponse.json(
       { success: false, message: `Action tidak dikenal: ${action}` },
       { status: 400 }
     );
   } catch (err: any) {
     console.error("[PATCH Error]", err);
+    return NextResponse.json(
+      { success: false, message: err?.message },
+      { status: 500 }
+    );
+  }
+}
+
+
+// ─── DELETE ───────────────────────────────────────────────────────────────
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user)
+      return NextResponse.json({ success: false }, { status: 401 });
+
+    // Hanya FULL_ACCESS yang boleh delete
+    if (!FULL_ACCESS.includes(user.role)) {
+      return NextResponse.json(
+        { success: false, message: "Tidak berwenang menghapus data lembur" },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "id wajib disertakan" },
+        { status: 400 }
+      );
+    }
+
+    // Cek dulu data-nya ada
+    const { data: existing, error: findError } = await supabase
+      .from("overtime_requests")
+      .select("id, proof_photo_url")
+      .eq("id", id)
+      .single();
+
+    if (findError || !existing) {
+      return NextResponse.json(
+        { success: false, message: "Data lembur tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Hapus foto dari storage jika ada
+    if (existing.proof_photo_url) {
+      // Ekstrak path relatif dari full URL
+      // URL format: https://xxx.supabase.co/storage/v1/object/public/documents/overtime-proofs/xxx.jpg
+      const urlParts = existing.proof_photo_url.split("/documents/");
+      if (urlParts.length > 1) {
+        const storagePath = urlParts[1];
+        await supabase.storage.from("documents").remove([storagePath]);
+        console.log(`[DELETE] Removed storage file: ${storagePath}`);
+      }
+    }
+
+    const { error } = await supabase
+      .from("overtime_requests")
+      .delete()
+      .eq("id", id);
+
+    if (error)
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 500 }
+      );
+
+    console.log(`[DELETE] Overtime ${id} deleted by ${user.id}`);
+    return NextResponse.json({ success: true, message: "Data lembur berhasil dihapus" });
+  } catch (err: any) {
+    console.error("[DELETE Error]", err);
     return NextResponse.json(
       { success: false, message: err?.message },
       { status: 500 }

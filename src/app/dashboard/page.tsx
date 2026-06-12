@@ -8,6 +8,7 @@ import { InventoryDetailModal } from "@/components/modals/InventoryDetailModal";
 import { SalesDetailModal } from "@/components/modals/SalesDetailModal";
 import { LaptopDetailModal } from "@/components/modals/LaptopDetailModal";
 import { GrossProfitDetailModal } from "@/components/modals/GrossProfitDetailModal";
+import { TransactionDetailModal } from "@/components/modals/TransactionDetailModal";
 
 import {
   Chart as ChartJS,
@@ -59,8 +60,6 @@ interface Transaction {
   paid_at?: string; created_at: string;
 }
 
-
-// fmtShort hanya untuk tooltip chart & label kecil — BUKAN untuk stat card utama
 const fmtShort = (n: number): string => {
   if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
@@ -71,7 +70,6 @@ const fmtShort = (n: number): string => {
 const fmtRupiah = (n: number): string =>
   "Rp " + (n || 0).toLocaleString("id-ID");
 
-// PERBAIKAN: getDealPrice konsisten dengan halaman transaksi
 const getDealPrice = (item: Transaction): number =>
   Number(item.deal_price || item.amount || 0);
 
@@ -144,8 +142,6 @@ const ACCENT = {
   blue: { bg: "from-blue-50 to-indigo-100", text: "text-blue-700", bar: "bg-blue-600", border: "border-blue-200" },
 } as const;
 
-// PERBAIKAN: StatCard menerima nilai sudah diformat (string) dari luar
-// sehingga format penuh Rupiah bisa dikontrol di satu tempat
 function StatCard({ label, value, sub, icon, accent = "gray", change }: {
   label: string;
   value: string;
@@ -161,7 +157,6 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
-          {/* PERBAIKAN: tampilkan nilai apa adanya, tanpa truncate/pembulatan */}
           <p className="font-black mt-1 text-sm sm:text-base tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left break-words">
             {value}
           </p>
@@ -222,7 +217,6 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   item: Transaction; onPhotoClick: (url: string) => void; canSeeFinancials: boolean;
 }) {
   const profit = item.other || 0;
-  // PERBAIKAN: konsisten pakai deal_price || amount, sama dengan halaman transaksi
   const displayAmount = getDealPrice(item);
   const txDate = new Date(item.paid_at || item.created_at);
   const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
@@ -268,7 +262,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           )}
         </div>
 
-        {/* Amount — PERBAIKAN: tampilkan angka penuh, bukan disingkat */}
+        {/* Amount */}
         <div className="flex-shrink-0 text-right">
           <p className="text-xs sm:text-sm font-bold text-gray-800">
             Rp {displayAmount.toLocaleString("id-ID")}
@@ -364,6 +358,7 @@ export default function Page() {
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showLaptopModal, setShowLaptopModal] = useState(false);
   const [showGrossProfitModal, setShowGrossProfitModal] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
 
@@ -478,7 +473,6 @@ export default function Page() {
     ],
   };
 
-
   const trxBarData = {
     labels: weeklyLabels,
     datasets: [{
@@ -550,7 +544,6 @@ export default function Page() {
     },
   };
 
-
   const barOptions = {
     ...chartBaseOptions,
     plugins: {
@@ -573,6 +566,11 @@ export default function Page() {
       <SalesDetailModal isOpen={showSalesModal} onClose={() => setShowSalesModal(false)} />
       <LaptopDetailModal isOpen={showLaptopModal} onClose={() => setShowLaptopModal(false)} />
       <GrossProfitDetailModal isOpen={showGrossProfitModal} onClose={() => setShowGrossProfitModal(false)} />
+      <TransactionDetailModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        canSeeFinancials={canSeeFinancials}
+      />
       <style>{`
         @keyframes fade-up {
           from { opacity: 0; transform: translateY(20px); }
@@ -652,7 +650,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Stat Cards Grid (Always 4 cols) ── */}
+        {/* ── Stat Cards Grid ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
@@ -664,7 +662,7 @@ export default function Page() {
             ))
           ) : (
             <>
-              {/* Omzet Hari Ini - hanya jika punya akses finansial */}
+              {/* Card 1: Omzet (finansial) atau Transaksi (non-finansial) */}
               {canSeeFinancials ? (
                 <button
                   onClick={() => setShowRevenueModal(true)}
@@ -680,9 +678,9 @@ export default function Page() {
                   />
                 </button>
               ) : (
-                // Non-finansial: tampilkan jumlah transaksi di posisi pertama
+                // Non-finansial: card transaksi di posisi 1, bisa diklik buka modal
                 <button
-                  onClick={() => {}}
+                  onClick={() => setShowTransactionModal(true)}
                   className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
                 >
                   <StatCard
@@ -696,7 +694,7 @@ export default function Page() {
                 </button>
               )}
 
-              {/* Gross Profit - hanya jika punya akses finansial */}
+              {/* Card 2: Gross Profit (finansial only) */}
               {canSeeFinancials && (
                 <button
                   onClick={() => setShowGrossProfitModal(true)}
@@ -713,7 +711,7 @@ export default function Page() {
                 </button>
               )}
 
-              {/* Laptop Ready - selalu tampil */}
+              {/* Card 3: Laptop Ready — selalu tampil */}
               <button
                 onClick={() => setShowInventoryModal(true)}
                 className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
@@ -727,9 +725,9 @@ export default function Page() {
                 />
               </button>
 
-              {/* Transaksi Hari Ini - selalu tampil di posisi ke-4 */}
+              {/* Card 4: Transaksi Hari Ini — selalu tampil, buka TransactionDetailModal */}
               <button
-                onClick={() => {}}
+                onClick={() => setShowTransactionModal(true)}
                 className="w-full h-full text-left hover:scale-105 transition-transform duration-300 active:scale-95 block"
               >
                 <StatCard
@@ -755,7 +753,7 @@ export default function Page() {
         {/* ── Analytics Grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 fade-up auto-rows-fr" style={{ animationDelay: "0.1s" }}>
 
-          {/* Chart: Trend */}
+          {/* Chart: Trend (finansial) atau Bar transaksi (non-finansial) */}
           {canSeeFinancials ? (
             <div className="lg:col-span-2">
               <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
@@ -783,7 +781,6 @@ export default function Page() {
                       <span className={label === "Laptop Terjual" ? "text-indigo-500" : ""}>{label}</span>
                     </div>
                   ))}
-                  {/* Label axis kanan */}
                   <span className="ml-auto text-[9px] text-indigo-400 hidden sm:inline">
                     axis kanan = unit
                   </span>
@@ -804,7 +801,6 @@ export default function Page() {
               </div>
             </div>
           ) : (
-            // Non-financial role: tampilkan bar chart transaksi saja (tidak berubah)
             <div className="lg:col-span-2">
               <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -830,14 +826,12 @@ export default function Page() {
             </div>
           )}
 
-
           {/* Top Sales */}
           <button
             onClick={() => setShowSalesModal(true)}
             className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
           >
             <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-              {/* UBAH: header punya flex-shrink-0 */}
               <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
                 <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
                   <span className="text-base sm:text-lg">🏆</span>
@@ -845,8 +839,6 @@ export default function Page() {
                 </h2>
                 <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
               </div>
-
-              {/* UBAH: wrapper baru dengan flex-1 untuk grow */}
               <div className="flex-1 flex flex-col justify-center">
                 {isLoading ? (
                   <div className="space-y-2 sm:space-y-3">
@@ -921,7 +913,7 @@ export default function Page() {
           </button>
         </div>
 
-        {/* ── Bar Chart (only for financials role) ── */}
+        {/* ── Bar Chart (finansial only) ── */}
         {canSeeFinancials && (
           <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5 fade-up" style={{ animationDelay: "0.13s" }}>
             <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -992,7 +984,7 @@ export default function Page() {
         </div>
 
       </div>
-    </DashboardLayout >
+    </DashboardLayout>
   );
 }
 
