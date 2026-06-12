@@ -1527,7 +1527,14 @@ export default function AttendanceDashboardPage() {
         }
         return [];
     }, []);
-    const fetchSalaries = useCallback(async () => { const r = await fetch("/api/attendance/salary"); const d = await r.json(); if (d.success) setSalaries(d.data?.map((s: any) => s) || []); }, []);
+    const fetchSalaries = useCallback(async () => {
+        const r = await fetch("/api/attendance/salary");
+        const d = await r.json();
+        if (d.success) {
+            console.log("[fetchSalaries] Data:", d.data);
+            setSalaries(d.data?.map((s: any) => s) || []);
+        }
+    }, []);
     const fetchLeaveData = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setLeaveData(d.data || []); }, []);
     const fetchAllowances = useCallback(async () => {
         const r = await fetch("/api/attendance/allowances");
@@ -1613,12 +1620,10 @@ export default function AttendanceDashboardPage() {
     useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); fetchTodayStatus(); }, []);
 
     useEffect(() => {
-        if (!selectedMonth || !isAdminRole(currentUser?.role)) return;
+        if (!selectedMonth) return;
         fetchOvertimeTotal(selectedMonth.year, selectedMonth.month);
-        if (isAdminRole(currentUser?.role)) {
-            fetchAllowances();
-        }
-    }, [selectedMonth, currentUser]);
+        fetchAllowances();
+    }, [selectedMonth, fetchOvertimeTotal, fetchAllowances]);
 
     useEffect(() => {
         if (isAdminRole(currentUser?.role)) {
@@ -1629,14 +1634,24 @@ export default function AttendanceDashboardPage() {
     useEffect(() => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
-        setLoading(true); setSelectedDate(null); setFilterUser("Semua");
-        const tasks: Promise<any>[] = [fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(), fetchManualRecords(year, month), fetchAllUsers()];
-        if (isAdminRole(currentUser?.role)) tasks.push(fetchSalaries(), fetchLeaveData(year, month));
+        setLoading(true);
+        const tasks: Promise<any>[] = [
+            fetchAttendance(),
+            fetchDayOffs(),
+            fetchAllDateOffs(),
+            fetchManualRecords(year, month),
+            fetchAllUsers(),
+            fetchSalaries(),  // ✅ Untuk SEMUA users
+            fetchAllowances()  // ✅ Untuk SEMUA users
+        ];
+        if (isAdminRole(currentUser?.role)) {
+            tasks.push(fetchLeaveData(year, month));
+        }
         Promise.all(tasks).finally(() => setLoading(false));
         if (isAdminRole(currentUser?.role)) {
             fetchSalarySlips(year, month);
         }
-    }, [selectedMonth]);
+    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser?.role]);
 
     useEffect(() => {
         if (isAdminRole(currentUser?.role)) {
@@ -1667,6 +1682,37 @@ export default function AttendanceDashboardPage() {
         }
         setShowManualModal(true);
     }, [allUsers, fetchAllUsers]);
+
+    // ✅ FIXED: Tambahkan refreshAll yang hilang
+    const refreshAll = useCallback(async () => {
+        if (!selectedMonth) return;
+        const { year, month } = selectedMonth;
+        setLoading(true);
+        const tasks: Promise<any>[] = [
+            fetchAttendance(),
+            fetchDayOffs(),
+            fetchAllDateOffs(),
+            fetchManualRecords(year, month),
+            fetchAllUsers(),
+            fetchSalaries(),
+            fetchAllowances(),
+        ];
+        if (isAdminRole(currentUser?.role)) {
+            tasks.push(fetchLeaveData(year, month));
+        }
+        Promise.all(tasks).finally(() => setLoading(false));
+    }, [
+        selectedMonth,
+        currentUser?.role,
+        fetchAttendance,
+        fetchDayOffs,
+        fetchAllDateOffs,
+        fetchManualRecords,
+        fetchAllUsers,
+        fetchSalaries,
+        fetchAllowances,
+        fetchLeaveData,
+    ]);
 
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
@@ -1850,20 +1896,6 @@ export default function AttendanceDashboardPage() {
         )
         : [];
 
-    const refreshAll = useCallback(() => {
-        if (!selectedMonth) return;
-        setLoading(true);
-        const { year, month } = selectedMonth;
-        const tasks: Promise<any>[] = [
-            fetchAttendance(), fetchDayOffs(), fetchAllDateOffs(),
-            fetchManualRecords(year, month), fetchAllUsers(),
-        ];
-        if (isAdminRole(currentUser?.role)) {
-            tasks.push(fetchSalaries(), fetchLeaveData(year, month));
-        }
-        Promise.all(tasks).finally(() => setLoading(false));
-    }, [selectedMonth, currentUser]);
-
     // ✅ NEW FUNCTION: Generate slip gaji dari data rekapan yang sudah di-calculate
     const generateSlipFromRecapan = useCallback(async (userStat: typeof userSummary[0]) => {
         try {
@@ -1979,19 +2011,15 @@ export default function AttendanceDashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {isAdminRole(currentUser?.role)
-                            && (<>
-                                <button
-                                    onClick={() => openAddManual()}
-                                    disabled={usersLoading}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
-                                >
-                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
-                                </button>                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-100 transition-all active:scale-95">📅 Libur Mingguan</button>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">💰 Gaji</button>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all active:scale-95">🌴 Cuti</button>
-
-                            </>)}
+                        {isAdminRole(currentUser?.role) && (
+                            <button
+                                onClick={() => openAddManual()}
+                                disabled={usersLoading}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                            >
+                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                            </button>
+                        )}
                         <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
                         </button>
@@ -2021,24 +2049,39 @@ export default function AttendanceDashboardPage() {
                     ))}
                 </div>
 
-                {isAdminRole(currentUser?.role)
-                    && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
-                            {([
-                                { id: "calendar", label: "📅 Kalender" },
-                                { id: "summary", label: "📊 Ringkasan" },
-                                { id: "salary", label: "💰 Rekap Gaji" },
-                                { id: "salary-slip", label: "📄 Slip Gaji" },
-                                { id: "salary-history", label: "📋 Riwayat Gaji" },
-                                { id: "leave", label: "🌴 Cuti" }
-                            ] as const).map(t => (
-                                <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
+                    {isAdminRole(currentUser?.role) ? (
+                        ([
+                            { id: "calendar", label: "📅 Kalender" },
+                            { id: "summary", label: "📊 Ringkasan" },
+                            { id: "salary", label: "💰 Rekap Gaji" },
+                            { id: "salary-slip", label: "📄 Slip Gaji" },
+                            { id: "salary-history", label: "📋 Riwayat Gaji" },
+                            { id: "leave", label: "🌴 Cuti" },
+                        ] as const).map(t => (
+                            <button key={t.id} onClick={() => setActiveTab(t.id)}
+                                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
+                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                    }`}>
+                                {t.label}
+                            </button>
+                        ))
+                    ) : (
+                        ([
+                            { id: "calendar", label: "📅 Kalender" },
+                            { id: "my-salary", label: "💰 Gaji Saya" },
+                        ] as const).map(t => (
+                            <button key={t.id} onClick={() => setActiveTab(t.id)}
+                                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 ${activeTab === t.id
+                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                    }`}>
+                                {t.label}
+                            </button>
+                        ))
                     )}
+                </div>
 
                 {/* ── Filter ── */}
                 {isAdminRole(currentUser?.role)
@@ -2055,7 +2098,7 @@ export default function AttendanceDashboardPage() {
                     )}
 
                 {/* ════ TAB KALENDER ════ */}
-                {(activeTab === "calendar" || !isAdminRole(currentUser?.role)) && (
+                {activeTab === "calendar" && (
                     <>
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300">
                             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
@@ -2178,48 +2221,6 @@ export default function AttendanceDashboardPage() {
                                         ) : (
                                             <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
                                         )}
-                                        {/* ── Tabs ── */}
-                                        {(() => {
-                                            const isAdmin = isAdminRole(currentUser?.role);
-                                            const tabs: Array<{ id: "calendar" | "summary" | "salary" | "leave" | "my-salary"; label: string }> = [
-                                                { id: "calendar", label: "📅 Kalender" },
-                                                { id: "summary", label: "📊 Ringkasan" },
-                                            ];
-                                            if (isAdmin) {
-                                                tabs.push({ id: "salary", label: "💰 Rekap Gaji" });
-                                                tabs.push({ id: "leave", label: "🌴 Cuti" });
-                                            } else {
-                                                tabs.push({ id: "my-salary", label: "💰 Gaji Saya" });
-                                            }
-
-                                            return (
-                                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1">
-                                                    {tabs.map(t => (
-                                                        <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-                                                            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
-                                                            {t.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })()}
-                                        {isAdminRole(currentUser?.role)
-                                            && (
-                                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
-                                                    {([
-                                                        { id: "calendar", label: "📅 Kalender" },
-                                                        { id: "summary", label: "📊 Ringkasan" },
-                                                        { id: "salary", label: "💰 Rekap Gaji" },
-                                                        { id: "salary-slip", label: "📄 Slip Gaji" },
-                                                        { id: "leave", label: "🌴 Cuti" }
-                                                    ] as const).map(t => (
-                                                        <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                                            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
-                                                            {t.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -2383,146 +2384,158 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {/* ════ TAB RINGKASAN ════ */}
-                {activeTab === "summary" && isAdminRole(currentUser?.role)
-                    && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
-                                <div>
-                                    <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
-                                    <p className="text-[10px] text-gray-400 mt-1">
-                                        Tepat=1.0 · Terlambat=0.5 · Tidak Hadir=0 ·
-                                        <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => openAddManual()}
-                                    disabled={usersLoading}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
-                                >
-                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
-                                </button>                            </div>
-
-                            {loading ? (
-                                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b border-gray-100 bg-gray-50/60">
-                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
-                                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {userSummary.map((u, i) => {
-                                                // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
-                                                const absent = u.absences.length;
-                                                const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
-                                                const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
-                                                return (
-                                                    <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                        <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
-                                                        <td className="px-4 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
-                                                                <div>
-                                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
-                                                                    {salaryMap[u.userId] && (
-                                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${salaryMap[u.userId].salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                                                            {salaryMap[u.userId].salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
-                                                        <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                        <td className="px-4 py-4 text-center">
-                                                            {absent > 0 ? (
-                                                                <button
-                                                                    onClick={() => setAbsenceDetail({ name: u.name, absences: u.absences, offDates: u.offDates })}
-                                                                    className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200 hover:bg-red-200 hover:scale-105 transition-all cursor-pointer"
-                                                                    title={`Lihat detail ketidakhadiran ${u.name}`}>
-                                                                    {absent}
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-gray-200 text-sm font-black">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-4 text-center"><span className="text-sm font-black text-gray-700">{u.score.toFixed(1)}</span></td>
-                                                        <td className="px-4 py-4 text-center">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className="text-sm font-bold text-gray-500">{u.pastWorkdays}h</span>
-                                                                <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4 text-center">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className="text-sm font-bold text-blue-500">{u.remainingDays}h</span>
-                                                                <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
-                                                            </div>
-                                                        </td>                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
-                                                                    <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
-                                                                </div>
-                                                                <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-4 text-center flex items-center gap-1.5 justify-center flex-wrap">
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
-                                                                    const success = await generateSlipFromRecapan(u);
-                                                                    if (success) {
-                                                                        fetchSalarySlips(calYear, calMonth);
-                                                                        alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
-                                                                    }
-                                                                }}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
-                                                                title={`Generate slip gaji ${u.name}`}>
-                                                                📄 Slip
-                                                            </button>
-                                                            <button onClick={() => openAddManual(undefined, u.userId)}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
-                                                                title={`Tambah absen manual untuk ${u.name}`}>
-                                                                ➕ Absen
-                                                            </button>
-                                                        </td>
-
-                                                        <td className="px-4 py-4 text-center">
-                                                            <button onClick={() => {
-                                                                if (allUsers.length === 0) fetchAllUsers();
-                                                                setShiftModalUserId(u.userId);
-                                                                setShowShiftModal(true);
-                                                            }} className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
-                                                                title={`Atur jadwal shift ${u.name}`}>
-                                                                ⏰ Shift
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                                {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
-                                    <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
-                                ))}
-                                <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
+                {activeTab === "summary" && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                            <div>
+                                <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                <p className="text-[10px] text-gray-400 mt-1">
+                                    Tepat=1.0 · Terlambat=0.5 · Tidak Hadir=0 ·
+                                    <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
+                                </p>
                             </div>
+                            <button
+                                onClick={() => openAddManual()}
+                                disabled={usersLoading}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                            >
+                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                            </button>                            </div>
+
+                        {loading ? (
+                            <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 bg-gray-50/60">
+                                            <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
+                                            <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
+                                            {isAdminRole(currentUser?.role) && (
+                                                <>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
+                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Shift</th>
+                                                </>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {(isAdminRole(currentUser?.role)
+                                            ? userSummary
+                                            : userSummary.filter(u => u.userId === currentUser?.id)
+                                        ).map((u, i) => {
+                                            // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
+                                            const absent = u.absences.length;
+                                            const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
+                                            const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
+                                            return (
+                                                <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                    <td className="px-6 py-4 text-[11px] text-gray-400 font-black">{i + 1}</td>
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(u.name)}</div>
+                                                            <div>
+                                                                <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                                {salaryMap[u.userId] && (
+                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${salaryMap[u.userId].salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                                                        {salaryMap[u.userId].salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
+                                                    <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {absent > 0 ? (
+                                                            <button
+                                                                onClick={() => setAbsenceDetail({ name: u.name, absences: u.absences, offDates: u.offDates })}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200 hover:bg-red-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail ketidakhadiran ${u.name}`}>
+                                                                {absent}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center"><span className="text-sm font-black text-gray-700">{u.score.toFixed(1)}</span></td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-sm font-bold text-gray-500">{u.pastWorkdays}h</span>
+                                                            <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-sm font-bold text-blue-500">{u.remainingDays}h</span>
+                                                            <span className="text-[9px] text-gray-300">dari {u.totalWorkdays}</span>
+                                                        </div>
+                                                    </td>                                                        <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                                <div className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-700`} style={{ width: `${Math.min(u.pct, 100)}%` }} />
+                                                            </div>
+                                                            <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
+                                                        </div>
+                                                    </td>
+                                                    {isAdminRole(currentUser?.role) && (
+                                                        <>
+                                                            <td className="px-4 py-4 text-center">
+                                                                <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                            const success = await generateSlipFromRecapan(u);
+                                                                            if (success) {
+                                                                                fetchSalarySlips(calYear, calMonth);
+                                                                                alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
+                                                                            }
+                                                                        }}
+                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                        title={`Generate slip gaji ${u.name}`}>
+                                                                        📄 Slip
+                                                                    </button>
+                                                                    <button onClick={() => openAddManual(undefined, u.userId)}
+                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
+                                                                        title={`Tambah absen manual untuk ${u.name}`}>
+                                                                        ➕ Absen
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-4 text-center">
+                                                                <button onClick={() => {
+                                                                    if (allUsers.length === 0) fetchAllUsers();
+                                                                    setShiftModalUserId(u.userId);
+                                                                    setShowShiftModal(true);
+                                                                }} className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
+                                                                    title={`Atur jadwal shift ${u.name}`}>
+                                                                    ⏰ Shift
+                                                                </button>
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
+                                <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
+                            ))}
+                            <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
                         </div>
-                    )}
+                    </div>
+                )}
 
                 {/* ════ TAB GAJI ════ */}
                 {activeTab === "salary" && isAdminRole(currentUser?.role) && (

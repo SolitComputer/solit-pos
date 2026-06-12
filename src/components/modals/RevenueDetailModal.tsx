@@ -26,7 +26,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
   useEffect(() => {
     if (!isOpen) return;
-    
+
     const fetch_ = async () => {
       setIsLoading(true);
       try {
@@ -48,7 +48,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100">
           <div>
@@ -72,12 +72,13 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
             </div>
           ) : data ? (
             <div className="p-5 sm:p-6 space-y-6">
-              
+
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200">
                   <p className="text-[10px] text-gray-600 font-semibold uppercase tracking-wider">Hari Ini</p>
                   <p className="font-bold text-sm text-gray-900 mt-1">{fmtShort(data.today.revenue)}</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5 font-mono">{fmtRupiah(data.today.revenue)}</p>
                   <p className="text-[9px] text-gray-500 mt-0.5">{data.today.count} transaksi</p>
                 </div>
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-3 border border-emerald-200">
@@ -97,11 +98,10 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
-                    className={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
-                      activeTab === tab
+                    className={`px-4 py-2 text-sm font-semibold border-b-2 transition ${activeTab === tab
                         ? "border-gray-900 text-gray-900"
                         : "border-transparent text-gray-600 hover:text-gray-900"
-                    }`}
+                      }`}
                   >
                     {tab === "daily" ? "Harian" : tab === "weekly" ? "Mingguan" : "Bulanan"}
                   </button>

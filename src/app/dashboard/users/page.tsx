@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
+import { getCurrentUserClient } from "@/lib/auth-client";
 
 interface User {
   id: string;
@@ -13,7 +15,7 @@ interface User {
   password_set: boolean;
   face_enrolled_at: string | null;
   face_embedding: boolean;
-  force_logout_at: string | null; // ✅ NEW
+  force_logout_at: string | null;
 }
 
 const ALL_ROLES = [
@@ -67,22 +69,14 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3200);
-    return () => clearTimeout(t);
-  }, [onClose]);
+  useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${type === "ok"
-        ? "bg-gray-100 text-gray-700 border border-gray-200"
-        : "bg-red-50 text-red-700 border border-red-200"
-      }`}>
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${
+      type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
+    }`}>
       {type === "ok"
-        ? <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-        </div>
-        : <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </div>
+        ? <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg></div>
+        : <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>
       }
       {msg}
     </div>
@@ -144,56 +138,33 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
             <select value={role} onChange={e => setRole(e.target.value)}
               className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">
-                {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Management —">
-                {["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Operasional —">
-                {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Penyedia & Konten —">
-                {["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
+              <optgroup label="— Akses Penuh —">{["ADMIN","PROGRAMMER","ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Management —">{["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Operasional —">{["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
             </select>
-            {FULL_ACCESS_ROLES.has(role) && (
-              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1">
-                <span>⚠️</span> Role ini memiliki akses penuh ke semua fitur
-              </p>
-            )}
+            {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift Kerja</label>
             <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
+              {(["PAGI","SORE"] as const).map(s => (
                 <button key={s} type="button" onClick={() => setShift(s)}
                   className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                   {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">
-              {shift === "PAGI" ? "07.30 – 12.00 WIB" : "14.00 – 18.00 WIB"}
-            </p>
+            <p className="text-[10px] text-gray-400 mt-1">{shift === "PAGI" ? "07.30 – 12.00 WIB" : "14.00 – 18.00 WIB"}</p>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
             <p className="text-[11px] text-amber-700 font-medium">ℹ️ Cara kerja</p>
-            <p className="text-[10px] text-amber-600 mt-1">Setelah akun dibuat, user login pertama kali dengan nomor WA ini. Sistem akan meminta mereka membuat password sendiri sebelum bisa masuk.</p>
+            <p className="text-[10px] text-amber-600 mt-1">Setelah akun dibuat, user login pertama kali dengan nomor WA ini. Sistem akan meminta mereka membuat password sendiri.</p>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
+          <button onClick={save} disabled={saving} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
             {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Membuat...</> : "✅ Buat Akun"}
           </button>
         </div>
@@ -230,10 +201,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
         <div className="bg-[#1a1a2e] px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="font-bold text-white text-sm">Edit User</p>
-            <p className="text-xs text-slate-400 mt-0.5">{user.name}</p>
-          </div>
+          <div><p className="font-bold text-white text-sm">Edit User</p><p className="text-xs text-slate-400 mt-0.5">{user.name}</p></div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/20 transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -242,49 +210,26 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-xl">{error}</div>}
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nama</label>
-            <input value={name} onChange={e => setName(e.target.value)}
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nomor WhatsApp</label>
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789"
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
+            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition" />
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)}
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">
-                {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Management —">
-                {["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Operasional —">
-                {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-              <optgroup label="— Penyedia & Konten —">
-                {["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
+            <select value={role} onChange={e => setRole(e.target.value)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
+              <optgroup label="— Akses Penuh —">{["ADMIN","PROGRAMMER","ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Management —">{["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Operasional —">{["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
             </select>
-            {FULL_ACCESS_ROLES.has(role) && (
-              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1">
-                <span>⚠️</span> Role ini memiliki akses penuh ke semua fitur
-              </p>
-            )}
+            {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift</label>
             <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
+              {(["PAGI","SORE"] as const).map(s => (
                 <button key={s} type="button" onClick={() => setShift(s)}
                   className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                   {s === "PAGI" ? "🌅" : "🌆"} {s}
@@ -295,8 +240,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         </div>
         <div className="px-5 pb-5 flex gap-3">
           <button onClick={onClose} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
+          <button onClick={save} disabled={saving} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
             {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
           </button>
         </div>
@@ -305,38 +249,18 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
   );
 }
 
-// ── ✅ NEW: ConfirmLogoutModal ─────────────────────────────────────────────────
-function ConfirmLogoutModal({
-  user,
-  onClose,
-  onConfirm,
-  loading,
-}: {
-  user: User;
-  onClose: () => void;
-  onConfirm: () => void;
-  loading: boolean;
+// ── ConfirmLogoutModal ─────────────────────────────────────────────────────────
+function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-scaleIn">
-        {/* Icon */}
-        <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">🚪</span>
-        </div>
-
-        <h3 className="font-bold text-gray-800 text-center text-base mb-1">
-          Paksa Logout {user.name}?
-        </h3>
-        <p className="text-sm text-gray-500 text-center mb-1">
-          Session aktif user ini akan diakhiri.
-        </p>
-        <p className="text-[11px] text-gray-400 text-center mb-5">
-          User akan di-redirect ke halaman login saat membuka/reload halaman.
-        </p>
-
-        {/* User info */}
+        <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-4"><span className="text-2xl">🚪</span></div>
+        <h3 className="font-bold text-gray-800 text-center text-base mb-1">Paksa Logout {user.name}?</h3>
+        <p className="text-sm text-gray-500 text-center mb-1">Session aktif user ini akan diakhiri.</p>
+        <p className="text-[11px] text-gray-400 text-center mb-5">User akan di-redirect ke halaman login saat membuka/reload halaman.</p>
         <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${FULL_ACCESS_ROLES.has(user.role) ? "bg-violet-600" : "bg-[#1a1a2e]"}`}>
             {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
@@ -346,18 +270,10 @@ function ConfirmLogoutModal({
             <p className="text-[11px] text-gray-400">{ROLE_LABEL[user.role] ?? user.role} · {user.shift}</p>
           </div>
         </div>
-
         <div className="flex gap-3">
-          <button onClick={onClose} disabled={loading}
-            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
-            Batal
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading
-              ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Proses...</>
-              : "🚪 Ya, Logout"
-            }
+          <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
+          <button onClick={onConfirm} disabled={loading} className="flex-1 h-10 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Proses...</> : "🚪 Ya, Logout"}
           </button>
         </div>
       </div>
@@ -377,12 +293,18 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("Semua");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-
-  // ✅ NEW: Force logout state
   const [confirmLogoutUser, setConfirmLogoutUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
+
+  // Cek role untuk render OnlineUsersPanel
+  useEffect(() => {
+    getCurrentUserClient().then(u => {
+      setIsAdmin(!!u && FULL_ACCESS_ROLES.has(u.role));
+    });
+  }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -405,68 +327,47 @@ export default function UsersPage() {
       });
       const data = await res.json();
       if (data.success) { showToast(`Wajah ${user.name} berhasil direset`, "ok"); fetchUsers(); }
-      else { showToast(data.message ?? "Gagal reset", "err"); }
+      else showToast(data.message ?? "Gagal reset", "err");
     } catch { showToast("Terjadi kesalahan", "err"); }
     finally { setResetting(null); setConfirmReset(null); }
   };
 
-  // ✅ NEW: Force logout handler
   const handleForceLogout = async () => {
     if (!confirmLogoutUser) return;
     setLoggingOut(true);
     try {
       const res = await fetch("/api/users", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: confirmLogoutUser.id,
-          _forceLogout: true,
-        }),
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: confirmLogoutUser.id, _forceLogout: true }),
       });
       const data = await res.json();
-      if (data.success) {
-        showToast(`✅ ${confirmLogoutUser.name} berhasil di-logout`, "ok");
-        fetchUsers(); // Refresh untuk update UI (tanda force_logout_at)
-      } else {
-        showToast(data.message ?? "Gagal logout user", "err");
-      }
+      if (data.success) { showToast(`✅ ${confirmLogoutUser.name} berhasil di-logout`, "ok"); fetchUsers(); }
+      else showToast(data.message ?? "Gagal logout user", "err");
     } catch { showToast("Terjadi kesalahan", "err"); }
-    finally {
-      setLoggingOut(false);
-      setConfirmLogoutUser(null);
-    }
+    finally { setLoggingOut(false); setConfirmLogoutUser(null); }
   };
 
   const filtered = useMemo(() => {
     let result = users.filter(u => {
-      const matchSearch = !search
-        || u.name.toLowerCase().includes(search.toLowerCase())
-        || (u.phone_number ?? "").includes(search);
-      const matchRole = filterRole === "Semua" || u.role === filterRole;
-      return matchSearch && matchRole;
+      const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || (u.phone_number ?? "").includes(search);
+      return matchSearch && (filterRole === "Semua" || u.role === filterRole);
     });
-
     result.sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name);
-      return sortOrder === "asc" ? comparison : -comparison;
+      const c = a.name.localeCompare(b.name);
+      return sortOrder === "asc" ? c : -c;
     });
-
     return result;
   }, [users, search, filterRole, sortOrder]);
 
-  const enrolled = users.filter(u => u.face_embedding).length;
-  const pwNotSet = users.filter(u => !u.password_set).length;
+  const enrolled   = users.filter(u => u.face_embedding).length;
+  const pwNotSet   = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
-
-  // ✅ Hitung user yang force_logout_at lebih baru dari sekarang
-  // (artinya baru saja di-force-logout, belum login ulang)
-  const forcedLogoutCount = users.filter(u => u.force_logout_at !== null).length;
 
   return (
     <DashboardLayout>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Confirm Reset Wajah Modal */}
+      {/* Modals */}
       {confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmReset(null)} />
@@ -484,32 +385,13 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+      {confirmLogoutUser && <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />}
+      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />}
+      {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />}
 
-      {/* ✅ NEW: Confirm Force Logout Modal */}
-      {confirmLogoutUser && (
-        <ConfirmLogoutModal
-          user={confirmLogoutUser}
-          onClose={() => setConfirmLogoutUser(null)}
-          onConfirm={handleForceLogout}
-          loading={loggingOut}
-        />
-      )}
+      {/* ── Page wrapper: max-w-7xl untuk muat 2 kolom ── */}
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
-      {showCreate && (
-        <CreateUserModal
-          onClose={() => setShowCreate(false)}
-          onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }}
-        />
-      )}
-      {editUser && (
-        <EditUserModal
-          user={editUser}
-          onClose={() => setEditUser(null)}
-          onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }}
-        />
-      )}
-
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -527,13 +409,10 @@ export default function UsersPage() {
         {!loading && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total User", value: users.length, icon: "👥", color: "text-gray-800" },
-              { label: "Akses Penuh", value: fullAccess, icon: "🔑", color: "text-violet-700" },
-              { label: "Wajah Terdaftar", value: enrolled, icon: "😊", color: "text-emerald-700" },
-              {
-                label: "Belum Set PW", value: pwNotSet, icon: "⚠️",
-                color: pwNotSet > 0 ? "text-amber-700" : "text-gray-500"
-              },
+              { label: "Total User",      value: users.length, icon: "👥", color: "text-gray-800" },
+              { label: "Akses Penuh",     value: fullAccess,   icon: "🔑", color: "text-violet-700" },
+              { label: "Wajah Terdaftar", value: enrolled,     icon: "😊", color: "text-emerald-700" },
+              { label: "Belum Set PW",    value: pwNotSet,     icon: "⚠️", color: pwNotSet > 0 ? "text-amber-700" : "text-gray-500" },
             ].map(c => (
               <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 <div className="flex items-start justify-between">
@@ -546,179 +425,187 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* Filter */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-          <div className="flex flex-wrap gap-3 items-center">
-            <input type="text" placeholder="Cari nama atau nomor WA..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition w-full sm:w-56" />
-            <button onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="flex items-center gap-2 px-3 py-2 h-9 rounded-xl text-[10px] font-semibold bg-[#1a1a2e] text-white hover:bg-[#16213e] transition whitespace-nowrap">
-              {sortOrder === "asc" ? "↑ A-Z" : "↓ Z-A"}
-            </button>
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {["Semua", ...ALL_ROLES].map(r => (
-              <button key={r} onClick={() => setFilterRole(r)}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition ${filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                {r === "Semua" ? "Semua" : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ─────────────────────────────────────────────────────────────────────
+            LAYOUT 2 KOLOM
+            Kiri  : filter + daftar user (flex-1, scrollable dalam card)
+            Kanan : online panel + info (w-72, sticky → tidak ikut scroll)
+        ──────────────────────────────────────────────────────────────────── */}
+        <div className="flex gap-5 items-start">
 
-        {/* ✅ NEW: Info auto-logout */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
-          <span className="text-base mt-0.5">ℹ️</span>
-          <div>
-            <p className="text-xs font-semibold text-blue-700">Auto-logout jam 03:00 WIB</p>
-            <p className="text-[11px] text-blue-600 mt-0.5">
-              Semua session akan otomatis diakhiri setiap pukul 03:00 WIB.
-              Admin juga bisa paksa logout user tertentu dengan tombol 🚪 di baris karyawan.
-            </p>
-          </div>
-        </div>
+          {/* ── Kolom Kiri ── */}
+          <div className="flex-1 min-w-0 space-y-3">
 
-        {/* User list */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="divide-y divide-gray-100">
-              {Array(6).fill(0).map((_, i) => (
-                <div key={i} className="p-4 flex items-center gap-3 animate-pulse">
-                  <div className="w-10 h-10 rounded-xl bg-gray-200" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-gray-200 rounded w-28" />
-                    <div className="h-3 bg-gray-200 rounded w-40" />
-                  </div>
+            {/* Filter bar */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Cari nama atau nomor WA..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="flex-1 h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition min-w-0"
+                />
+                <button
+                  onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
+                  className="h-9 px-3 rounded-xl text-[10px] font-semibold bg-[#1a1a2e] text-white hover:bg-[#16213e] transition whitespace-nowrap flex-shrink-0"
+                >
+                  {sortOrder === "asc" ? "↑ A-Z" : "↓ Z-A"}
+                </button>
+              </div>
+              {/* Role filter pills — scrollable horizontal di mobile */}
+              <div className="flex gap-1.5 flex-wrap max-h-20 overflow-y-auto">
+                {["Semua", ...ALL_ROLES].map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setFilterRole(r)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${
+                      filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Daftar user — max-height + overflow-y → internal scroll, bukan halaman */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {/* Sub-header: jumlah + legend */}
+              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+                <p className="text-[11px] font-semibold text-gray-500">
+                  {filtered.length === users.length
+                    ? `${users.length} karyawan`
+                    : `${filtered.length} dari ${users.length} karyawan`}
+                </p>
+                <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                  <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500" />Wajah terdaftar</span>
+                  <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" />Akses penuh</span>
                 </div>
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="text-4xl mb-2">👥</div>
-              <p className="text-gray-500 text-sm">Tidak ada user ditemukan</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {filtered.map(user => (
-                <div key={user.id} className="p-4 hover:bg-gray-50/50 transition">
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm ${FULL_ACCESS_ROLES.has(user.role)
-                          ? "bg-gradient-to-br from-violet-600 to-purple-700"
-                          : user.face_embedding ? "bg-[#1a1a2e]" : "bg-gray-400"
-                        }`}>
-                        {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
-                      </div>
-                      {user.face_embedding && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-white flex items-center justify-center">
-                          <div className="w-2 h-2 rounded-full bg-green-500" />
-                        </div>
-                      )}
-                    </div>
+              </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-gray-800">{user.name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${ROLE_BADGE[user.role] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                          {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
-                        </span>
-                        {FULL_ACCESS_ROLES.has(user.role) && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-violet-50 text-violet-600 border border-violet-200">
-                            🔑 Akses Penuh
-                          </span>
-                        )}
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${user.shift === "PAGI"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200"
+              {loading ? (
+                <div className="divide-y divide-gray-100">
+                  {Array(6).fill(0).map((_, i) => (
+                    <div key={i} className="p-4 flex items-center gap-3 animate-pulse">
+                      <div className="w-10 h-10 rounded-xl bg-gray-200" />
+                      <div className="flex-1 space-y-2"><div className="h-3 bg-gray-200 rounded w-28" /><div className="h-3 bg-gray-100 rounded w-40" /></div>
+                    </div>
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-14">
+                  <div className="text-4xl mb-2">👥</div>
+                  <p className="text-gray-400 text-sm">Tidak ada user ditemukan</p>
+                </div>
+              ) : (
+                // ✅ overflow-y-auto + max-h → daftar scroll sendiri, bukan halaman
+                <div className="divide-y divide-gray-100 overflow-y-auto max-h-[calc(100vh-340px)]">
+                  {filtered.map(user => (
+                    <div key={user.id} className="px-4 py-3 hover:bg-gray-50/50 transition">
+                      <div className="flex items-center gap-3">
+
+                        {/* Avatar */}
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
+                            FULL_ACCESS_ROLES.has(user.role) ? "bg-gradient-to-br from-violet-600 to-purple-700"
+                            : user.face_embedding ? "bg-[#1a1a2e]" : "bg-gray-400"
                           }`}>
-                          {user.shift === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
-                        </span>
-                        {!user.password_set && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold">
-                            🔑 Belum set PW
-                          </span>
-                        )}
-                        {/* ✅ NEW: Badge jika user sedang force-logout */}
-                        {user.force_logout_at && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold"
-                            title={`Di-logout paksa pada ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}>
-                            🚪 Logged out
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.09 9.81a19.79 19.79 0 01-3.07-8.67A2 2 0 012 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                        </svg>
-                        <p className="text-[11px] text-gray-400">
-                          {user.phone_number ?? <span className="text-orange-400 italic">Nomor belum diset</span>}
-                        </p>
-                      </div>
-                    </div>
+                            {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+                          </div>
+                          {user.face_embedding && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-white flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            </div>
+                          )}
+                        </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                      {/* Edit */}
-                      <button onClick={() => setEditUser(user)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
-                        title="Edit user">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-800 truncate">{user.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${ROLE_BADGE[user.role] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                              {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${
+                              user.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}>
+                              {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
+                            </span>
+                            {!user.password_set && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold flex-shrink-0">🔑 Belum PW</span>
+                            )}
+                            {user.force_logout_at && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold flex-shrink-0"
+                                title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}>
+                                🚪 Out
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                            {user.phone_number ?? <span className="text-orange-400 italic">Nomor belum diset</span>}
+                          </p>
+                        </div>
 
-                      {/* Reset wajah */}
-                      {user.face_embedding && (
-                        <button onClick={() => setConfirmReset(user)}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition"
-                          title="Reset wajah">
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                          </svg>
-                        </button>
-                      )}
-
-                      {/* ✅ NEW: Force logout button */}
-                      <button
-                        onClick={() => setConfirmLogoutUser(user)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition"
-                        title={`Paksa logout ${user.name}`}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                      </button>
-
-                      {/* Status badge */}
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-semibold ml-1 ${user.face_embedding
-                          ? "bg-gray-100 text-gray-700 border-gray-200"
-                          : "bg-gray-100 text-gray-400 border-gray-200"
-                        }`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${user.face_embedding ? "bg-green-500" : "bg-gray-400"}`} />
-                        {user.face_embedding ? "Wajah ✓" : "Belum"}
+                        {/* Actions */}
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button onClick={() => setEditUser(user)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition" title="Edit">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                          {user.face_embedding && (
+                            <button onClick={() => setConfirmReset(user)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition" title="Reset wajah">
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                            </button>
+                          )}
+                          <button onClick={() => setConfirmLogoutUser(user)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition" title={`Paksa logout ${user.name}`}>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+          </div>
+
+          {/* ── Kolom Kanan: sticky, hanya muncul di lg+ ── */}
+          {isAdmin && (
+            <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
+
+              {/* Info auto-logout */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
+                <div>
+                  <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
+                  <p className="text-[11px] text-blue-600 mt-0.5 leading-relaxed">
+                    Session diakhiri otomatis setiap 03:00 WIB. Gunakan tombol 🚪 untuk paksa logout manual.
+                  </p>
+                </div>
+              </div>
+              {/* Panel online */}
+              <OnlineUsersPanel />
+
             </div>
           )}
         </div>
 
-        {!loading && users.length > 0 && (
-          <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
-            <span>{filtered.length} dari {users.length} user</span>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500" />Wajah terdaftar</span>
-              <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-gray-400" />Belum daftar</span>
-              <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" />Akses penuh</span>
+        {/* Mobile: Panel online + info di bawah daftar (layar < lg) */}
+        {isAdmin && (
+          <div className="lg:hidden space-y-3">
+            <OnlineUsersPanel />
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+              <span className="text-sm flex-shrink-0">ℹ️</span>
+              <div>
+                <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
+                <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatis setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
+              </div>
             </div>
           </div>
         )}
+
       </div>
 
       <style jsx>{`

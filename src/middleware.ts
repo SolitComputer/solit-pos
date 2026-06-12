@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -8,11 +7,11 @@ import {
   UserRole,
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-
+ 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
-
+ 
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -20,31 +19,31 @@ const FACE_API_WHITELIST = [
   "/api/auth/me",
   "/api/auth/logout",
   "/api/auth/login",
+  "/api/presence", // ✅ NEW: presence heartbeat route
 ];
-
+ 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
-
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
-
+ 
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
 }
-
+ 
 const SYSTEM_OPEN_HOUR = 6;
 const SYSTEM_CLOSE_HOUR = 22;
-
+ 
 function isWithinSystemHours(): boolean {
   const nowUTC = new Date();
   const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
   const hour = nowWIB.getUTCHours();
   return hour >= SYSTEM_OPEN_HOUR && hour < SYSTEM_CLOSE_HOUR;
 }
-
+ 
 function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
-  const faceAttended = request.cookies.get("face_attended")?.value;
-  const faceVerified = request.cookies.get("face_verified")?.value;
+  const faceAttended    = request.cookies.get("face_attended")?.value;
+  const faceVerified    = request.cookies.get("face_verified")?.value;
   const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-  const dayOffToday = request.cookies.get("day_off_today")?.value;
+  const dayOffToday     = request.cookies.get("day_off_today")?.value;
   return (
     faceAttended === userId ||
     faceVerified === userId ||
@@ -52,8 +51,8 @@ function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
     dayOffToday === userId
   );
 }
-
-// ─── Cookie helper ────────────────────────────────────────────────────────────
+ 
+// ─── Cookie helper ─────────────────────────────────────────────────────────────
 const SESSION_COOKIES = [
   "token",
   "face_attended",
@@ -61,7 +60,7 @@ const SESSION_COOKIES = [
   "attendance_skipped",
   "day_off_today",
 ];
-
+ 
 function clearSessionAndRedirect(url: URL): NextResponse {
   const response = NextResponse.redirect(url);
   for (const name of SESSION_COOKIES) {
@@ -75,44 +74,27 @@ function clearSessionAndRedirect(url: URL): NextResponse {
   }
   return response;
 }
-
-// ─── Auto-logout 03:00 WIB ────────────────────────────────────────────────────
-// Hitung Unix timestamp (seconds) untuk jam 03:00 WIB hari ini (atau kemarin
-// jika sekarang masih sebelum 03:00 WIB).
-// Token yang dibuat SEBELUM threshold ini dianggap expired.
+ 
+// ─── Auto-logout 03:00 WIB threshold ──────────────────────────────────────────
 function getAutoLogoutThreshold(): number {
   const nowUTC = Date.now();
-  // Waktu sekarang dalam WIB (UTC+7)
   const nowWIB = new Date(nowUTC + 7 * 3600_000);
   const wibHour = nowWIB.getUTCHours();
-
-  // Tanggal WIB (tahun, bulan, hari)
   const y = nowWIB.getUTCFullYear();
   const mo = nowWIB.getUTCMonth();
   const d = nowWIB.getUTCDate();
-
-  let thresholdUTC: number;
-
-  if (wibHour >= 3) {
-    // Sudah lewat jam 03:00 WIB hari ini
-    // Threshold = hari ini jam 03:00 WIB = hari ini jam 03:00 - 7 jam (UTC) = jam 20:00 UTC kemarin
-    // Cara mudah: midnight UTC hari ini dalam WIB adalah Date.UTC(y, mo, d, 0,0,0) - 7h
-    // Jam 03:00 WIB = Date.UTC(y, mo, d, -4, 0, 0) = Date.UTC(y, mo, d-1, 20, 0, 0)
-    thresholdUTC = Date.UTC(y, mo, d, -4, 0, 0); // negatif jam → JS otomatis wrap ke hari sebelumnya jam 20:00 UTC
-  } else {
-    // Masih sebelum jam 03:00 WIB hari ini
-    // Threshold = kemarin jam 03:00 WIB = kemarin UTC jam 20:00
-    thresholdUTC = Date.UTC(y, mo, d - 1, -4, 0, 0);
-  }
-
-  return Math.floor(thresholdUTC / 1000); // seconds
+  // 03:00 WIB = 20:00 UTC hari sebelumnya = Date.UTC(y,mo,d,-4,0,0)
+  const thresholdUTC = wibHour >= 3
+    ? Date.UTC(y, mo, d, -4, 0, 0)
+    : Date.UTC(y, mo, d - 1, -4, 0, 0);
+  return Math.floor(thresholdUTC / 1000);
 }
-
+ 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
-
-  // ── Public routes ──────────────────────────────────────────────────────────
+ 
+  // ── Public routes ────────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
@@ -129,97 +111,81 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.next();
   }
-
+ 
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-
+ 
   if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
-
+ 
   if (pathname.startsWith("/face-verify")) {
     if (!token) return NextResponse.redirect(new URL("/login", request.url));
     return NextResponse.next();
   }
-
+ 
   if (PUBLIC_API_ROUTES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
-
+ 
   if (FACE_API_WHITELIST.some(p => pathname.startsWith(p))) {
     if (!token) return NextResponse.json({ success: false }, { status: 401 });
     return NextResponse.next();
   }
-
+ 
   if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
-  // ── Verifikasi JWT ─────────────────────────────────────────────────────────
+ 
+  // ── Verifikasi JWT ───────────────────────────────────────────────────────────
   const user = await verifyToken(token);
   if (!user) {
-    const loginUrl = new URL("/login", request.url);
-    return clearSessionAndRedirect(loginUrl);
+    return clearSessionAndRedirect(new URL("/login", request.url));
   }
-
-  // ─── ✅ Check 1: Auto-logout jam 03:00 WIB ──────────────────────────────────
-  // JWT payload mengandung `iat` (issued at) dalam detik Unix.
-  // Jika token dibuat sebelum threshold 03:00 WIB hari ini → paksa logout.
-  // Hanya cek untuk page routes (bukan API) agar tidak boros resource.
+ 
+  // ── Hanya check auto-logout & force-logout untuk page routes ────────────────
   const isPageRoute = !pathname.startsWith("/api/");
+ 
   if (isPageRoute) {
-    const tokenPayload = user as any;
-    const issuedAt: number = tokenPayload.iat ?? 0;
+    // Check 1: Auto-logout jam 03:00 WIB
+    const issuedAt: number = (user as any).iat ?? 0;
     const autoLogoutThreshold = getAutoLogoutThreshold();
-
     if (issuedAt > 0 && issuedAt < autoLogoutThreshold) {
-      // Token dibuat sebelum jam 03:00 WIB hari ini → expired
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("reason", "session_expired");
       return clearSessionAndRedirect(loginUrl);
     }
-  }
-
-  // ─── ✅ Check 2: Admin force-logout ─────────────────────────────────────────
-  // Hanya cek untuk page routes agar tidak membebani setiap API call.
-  // Jika admin set force_logout_at > token.iat → paksa logout user.
-  if (isPageRoute) {
+ 
+    // Check 2: Admin force-logout
     try {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        // Edge-compatible: gunakan fetch bawaan (tidak perlu node-fetch)
         { auth: { persistSession: false } }
       );
-
       const { data: userRecord } = await supabase
         .from("users")
         .select("force_logout_at")
         .eq("id", (user as any).id)
         .maybeSingle();
-
+ 
       if (userRecord?.force_logout_at) {
-        const forceLogoutAtSec =
-          new Date(userRecord.force_logout_at).getTime() / 1000;
-        const issuedAt: number = (user as any).iat ?? 0;
-
+        const forceLogoutAtSec = new Date(userRecord.force_logout_at).getTime() / 1000;
         if (issuedAt < forceLogoutAtSec) {
-          // Token dibuat sebelum admin set force logout → paksa logout
           const loginUrl = new URL("/login", request.url);
           loginUrl.searchParams.set("reason", "force_logout");
           return clearSessionAndRedirect(loginUrl);
         }
       }
     } catch {
-      // DB error → jangan block user, lanjut saja
-      // (lebih baik user bisa akses daripada sistem mati karena DB timeout)
+      // DB error → lanjut saja (fail-open)
     }
   }
-
-  // ── Attendance check ───────────────────────────────────────────────────────
+ 
+  // ── Attendance check ─────────────────────────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
     const hasAttended = hasAttendanceBypass(request, user.id);
@@ -229,12 +195,12 @@ export async function middleware(request: NextRequest) {
       );
     }
   }
-
-  // ── Route permission check ─────────────────────────────────────────────────
+ 
+  // ── Route permission check ───────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
-
+ 
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     if (!allowed.includes(user.role as UserRole)) {
@@ -243,15 +209,15 @@ export async function middleware(request: NextRequest) {
       );
     }
   }
-
-  // ── Pass headers ke downstream ─────────────────────────────────────────────
+ 
+  // ── Pass headers ke downstream ───────────────────────────────────────────────
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);
   response.headers.set("x-user-name", user.name);
   return response;
 }
-
+ 
 export const config = {
   matcher: [
     "/dashboard/:path*",
@@ -269,5 +235,6 @@ export const config = {
     "/api/reports/:path*",
     "/dashboard/warranty/:path*",
     "/api/attendance/:path*",
+    "/api/presence", // ✅ NEW
   ],
 };
