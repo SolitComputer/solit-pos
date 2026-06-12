@@ -1121,6 +1121,402 @@ function ManualOvertimeModal({
   );
 }
 
+// ── EditOvertimeModal ────────────────────────────────────────────────────────
+function EditOvertimeModal({
+  overtime, onClose, onSaved,
+}: {
+  overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
+}) {
+  // Helpers: ISO timestamp → "HH:MM"
+  const toTimeStr = (iso: string | null | undefined): string => {
+    if (!iso) return "";
+    if (iso.includes(":") && !iso.includes("T")) return iso.substring(0, 5);
+    return new Date(iso).toLocaleTimeString("id-ID", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta", hour12: false,
+    });
+  };
+
+  // ✅ Pakai actual jika ada, fallback ke scheduled — admin edit 1 pasang jam saja
+  const [requestDate, setRequestDate] = useState(overtime.request_date?.slice(0, 10) ?? "");
+  const [startTime, setStartTime] = useState(
+    toTimeStr(overtime.actual_start ?? overtime.scheduled_start)
+  );
+  const [endTime, setEndTime] = useState(
+    toTimeStr(overtime.actual_end ?? overtime.scheduled_end)
+  );
+  const [reason, setReason] = useState(overtime.reason ?? "");
+  const [workDesc, setWorkDesc] = useState(overtime.work_description ?? "");
+  const [rate, setRate] = useState<number>(overtime.rate_per_hour ?? 0);
+  const [status, setStatus] = useState(overtime.status);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(overtime.proof_photo_url ?? null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Preview durasi & bayaran secara live
+  const previewDuration = useMemo(() => {
+    if (!startTime || !endTime) return null;
+    const startMs = new Date(`1970-01-01T${startTime}:00`).getTime();
+    const endMs = new Date(`1970-01-01T${endTime}:00`).getTime();
+    if (endMs <= startMs) return null;
+    return Math.floor((endMs - startMs) / (60 * 60 * 1000));
+  }, [startTime, endTime]);
+
+  const previewPay = previewDuration !== null && rate > 0 ? previewDuration * rate : null;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setError("Hanya file gambar yang diterima"); return; }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageDataUrl = event.target?.result as string;
+      setIsProcessing(true);
+      addWatermarkToImage(imageDataUrl, (blob, preview) => {
+        setPhotoPreview(preview);
+        setIsProcessing(false);
+        setPhotoFile(new File([blob], file.name, { type: "image/jpeg" }));
+      });
+      setError("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
+
+  const save = async () => {
+    if (!requestDate) { setError("Tanggal wajib diisi"); return; }
+    if (!startTime || !endTime) { setError("Jam mulai dan selesai wajib diisi"); return; }
+    const startMs = new Date(`1970-01-01T${startTime}:00`).getTime();
+    const endMs = new Date(`1970-01-01T${endTime}:00`).getTime();
+    if (endMs <= startMs) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
+
+    setSaving(true); setError("");
+    try {
+      let proofUrl: string | undefined = undefined;
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append("file", photoFile);
+        const uploadRes = await fetch("/api/attendance/overtime/upload", {
+          method: "POST", body: formData,
+        });
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.message || "Upload foto gagal");
+        }
+        const { url } = await uploadRes.json();
+        proofUrl = url;
+      }
+
+      // ✅ Kirim scheduled & actual sekaligus — admin edit 1 pasang jam yang sama
+      const isoStart = `${requestDate}T${fmt(startTime)}+07:00`;
+      const isoEnd = `${requestDate}T${fmt(endTime)}+07:00`;
+
+      const payload: Record<string, any> = {
+        id: overtime.id,
+        action: "UPDATE",
+        request_date: requestDate,
+        scheduled_start: isoStart,
+        scheduled_end: isoEnd,
+        actual_start: isoStart,
+        actual_end: isoEnd,
+        reason: reason.trim(),
+        work_description: workDesc.trim(),
+        rate_per_hour: Math.round(rate),
+        status,
+      };
+      if (proofUrl) payload.proof_photo_url = proofUrl;
+
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+      onSaved(); onClose();
+    } catch (err: any) { setError(err.message || "Gagal"); }
+    finally { setSaving(false); }
+  };
+
+  const STATUS_OPTIONS: OvertimeRequest["status"][] = [
+    "PENDING", "APPROVED", "ONGOING", "COMPLETED", "REJECTED", "CANCELLED",
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+    >
+      <div
+        className="w-full sm:max-w-lg bg-white rounded-t-[2rem] sm:rounded-2xl shadow-2xl overflow-hidden"
+        style={{ animation: "modalUp 0.32s cubic-bezier(0.22,1,0.36,1)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ModalHeader
+          icon="✏️"
+          title="Edit Lembur"
+          subtitle={overtime.users?.name ?? "Karyawan"}
+          onClose={onClose}
+        />
+        <div className="px-6 py-5 space-y-4 max-h-[78vh] overflow-y-auto">
+          {error && <ErrorBanner msg={error} />}
+
+          {/* Tanggal */}
+          <div>
+            <label className={labelCls}>
+              Tanggal <span className="text-red-400 normal-case">*</span>
+            </label>
+            <input
+              type="date"
+              value={requestDate}
+              onChange={(e) => setRequestDate(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+
+          {/* ✅ 1 section jam saja — simple! */}
+          <div>
+            <label className={labelCls}>
+              Jam Lembur <span className="text-red-400 normal-case">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Mulai</p>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Selesai</p>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preview durasi & bayaran */}
+          {previewDuration !== null && (
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span>⏱️</span>
+                <span className="text-sm text-gray-600">
+                  Durasi: <span className="font-black text-gray-900">{previewDuration} jam</span>
+                </span>
+              </div>
+              {previewPay !== null && (
+                <span className="text-sm font-black text-emerald-600">{formatRupiah(previewPay)}</span>
+              )}
+            </div>
+          )}
+
+          {/* Alasan */}
+          <div>
+            <label className={labelCls}>Alasan</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Alasan lembur..."
+              className={inputCls}
+            />
+          </div>
+
+          {/* Rincian Pekerjaan */}
+          <div>
+            <label className={labelCls}>Rincian Pekerjaan</label>
+            <textarea
+              value={workDesc}
+              onChange={(e) => setWorkDesc(e.target.value)}
+              rows={3}
+              placeholder="Rincian pekerjaan..."
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none placeholder:text-gray-300"
+            />
+          </div>
+
+          {/* Tarif Per Jam */}
+          <div>
+            <label className={labelCls}>Tarif Per Jam (Rp)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">Rp</span>
+              <input
+                type="number"
+                min={0}
+                value={rate}
+                onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
+                className="w-full h-11 border border-gray-200 rounded-xl pl-11 pr-4 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className={labelCls}>Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as OvertimeRequest["status"])}
+              className={inputCls + " cursor-pointer"}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_CONFIG[s]?.label ?? s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Foto Bukti */}
+          <div>
+            <label className={labelCls}>
+              Foto Bukti{" "}
+              <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+            </label>
+            {isProcessing && (
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3 mb-3">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                <p className="text-xs font-semibold text-gray-500">Menambahkan watermark...</p>
+              </div>
+            )}
+            {photoPreview ? (
+              <div>
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  className="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-md mb-3"
+                />
+                <button
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                  className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  ↺ Hapus Foto
+                </button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="editPhotoInput"
+                  disabled={isProcessing}
+                />
+                <label htmlFor="editPhotoInput" className="block cursor-pointer">
+                  <div className="text-3xl mb-2 opacity-60">📸</div>
+                  <p className="text-sm font-bold text-gray-600">Klik untuk upload foto</p>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · maks 5MB</p>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+        <ModalFooter>
+          <button onClick={onClose} className={secondaryBtn}>Batal</button>
+          <button
+            onClick={save}
+            disabled={saving || isProcessing || !requestDate || !startTime || !endTime}
+            className={primaryBtn}
+          >
+            {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
+          </button>
+        </ModalFooter>
+      </div>
+    </div>
+  );
+}
+
+// ── DeleteConfirmModal ───────────────────────────────────────────────────────
+function DeleteConfirmModal({
+  overtime, onClose, onDeleted,
+}: {
+  overtime: OvertimeRequest; onClose: () => void; onDeleted: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDelete = async () => {
+    setDeleting(true); setError("");
+    try {
+      const res = await fetch(`/api/attendance/overtime?id=${overtime.id}`, {
+        method: "DELETE",
+      });
+      const d = await res.json();
+      if (!d.success) { setError(d.message || "Gagal menghapus"); return; }
+      onDeleted(); onClose();
+    } catch (err: any) { setError(err.message || "Gagal menghapus"); }
+    finally { setDeleting(false); }
+  };
+
+  return (
+    <ModalWrapper onClose={onClose}>
+      <ModalHeader icon="🗑️" title="Hapus Lembur" subtitle={overtime.users?.name} onClose={onClose} />
+      <div className="px-6 py-5 space-y-4">
+        {error && <ErrorBanner msg={error} />}
+
+        {/* Info data yang akan dihapus */}
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-2">
+          <p className="text-xs font-black text-red-700 uppercase tracking-wider mb-2">Data yang akan dihapus</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Karyawan</span>
+              <span className="font-bold text-gray-800">{overtime.users?.name ?? "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Tanggal</span>
+              <span className="font-bold text-gray-800">
+                {new Date(overtime.request_date).toLocaleDateString("id-ID", {
+                  day: "numeric", month: "long", year: "numeric",
+                })}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Waktu</span>
+              <span className="font-bold font-mono text-gray-800">
+                {formatTime(overtime.scheduled_start)} – {formatTime(overtime.scheduled_end)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Status</span>
+              <StatusBadge status={overtime.status} />
+            </div>
+            {overtime.total_pay != null && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total Bayaran</span>
+                <span className="font-bold text-gray-800">{formatRupiah(overtime.total_pay)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+          <span className="text-base flex-shrink-0">⚠️</span>
+          <p className="text-xs text-amber-700 font-medium leading-relaxed">
+            Tindakan ini <strong>tidak dapat dibatalkan</strong>. Data lembur dan foto bukti akan dihapus permanen.
+          </p>
+        </div>
+      </div>
+      <ModalFooter>
+        <button onClick={onClose} className={secondaryBtn}>Batal</button>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="flex-1 h-11 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {deleting ? <Spinner /> : "🗑️ Hapus Permanen"}
+        </button>
+      </ModalFooter>
+    </ModalWrapper>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ── OvertimePage ──────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1141,6 +1537,8 @@ export default function OvertimePage() {
   const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
   const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
   const [proofPhotoData, setProofPhotoData] = useState<OvertimeRequest | null>(null);
+  const [editData, setEditData] = useState<OvertimeRequest | null>(null);
+  const [deleteData, setDeleteData] = useState<OvertimeRequest | null>(null);
   const autoCompletingIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -1225,7 +1623,6 @@ export default function OvertimePage() {
     autoCompletingIds.current.add(overtime.id);
 
     try {
-      console.log(`[AUTO-COMPLETE] Processing...`);
       const res = await fetch("/api/attendance/overtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1233,18 +1630,17 @@ export default function OvertimePage() {
           id: overtime.id,
           action: "COMPLETE",
           proof_photo_url: null,
-          auto_completed: true,
+          auto_completed: true,   // ✅ server akan pakai scheduled_end sebagai actual_end
         }),
       });
 
       const d = await res.json();
-
       if (d.success) {
-        console.log(`✅ Success:`, d.data);
         await fetchOvertimes();
+        // ✅ Tampilkan modal upload foto (status sudah COMPLETED dari server)
         setCompleteData({
           ...overtime,
-          status: "COMPLETED",
+          ...d.data,              // ✅ gunakan data terbaru dari server
           auto_completed: true,
         });
         setTimeout(() => {
@@ -1352,6 +1748,24 @@ export default function OvertimePage() {
         >
           📸 Upload
         </button>
+      )}
+
+      {/* ── Tombol Edit & Delete — hanya FULL_ACCESS ── */}
+      {isAdminRole(currentUser?.role) && (
+        <>
+          <button
+            onClick={() => setEditData(o)}
+            className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all active:scale-95 whitespace-nowrap border border-gray-200"
+          >
+            ✏️ Edit
+          </button>
+          <button
+            onClick={() => setDeleteData(o)}
+            className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-all active:scale-95 whitespace-nowrap border border-red-100"
+          >
+            🗑️
+          </button>
+        </>
       )}
     </div>
   );
@@ -1756,7 +2170,20 @@ export default function OvertimePage() {
           onClose={() => setProofPhotoData(null)}
         />
       )}
-
+      {editData && (
+        <EditOvertimeModal
+          overtime={editData}
+          onClose={() => setEditData(null)}
+          onSaved={() => { fetchOvertimes(); setEditData(null); }}
+        />
+      )}
+      {deleteData && (
+        <DeleteConfirmModal
+          overtime={deleteData}
+          onClose={() => setDeleteData(null)}
+          onDeleted={() => { fetchOvertimes(); setDeleteData(null); }}
+        />
+      )}
       <style jsx global>{`
         @keyframes modalUp {
           from { opacity: 0; transform: translateY(20px) scale(0.97); }
