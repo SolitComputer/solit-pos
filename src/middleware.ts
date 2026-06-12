@@ -7,6 +7,7 @@ import {
   ROLE_DEFAULT_REDIRECT,
   UserRole,
 } from "@/lib/auth";
+import { createClient } from "@supabase/supabase-js";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
@@ -29,11 +30,7 @@ function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
 }
 
-// ── Jam operasional sistem (broader range) ────────────────────────────────────
-// Middleware tidak punya akses DB, jadi kita gunakan range lebih luas:
-// Jika sekarang antara jam 06:00 dan 22:00 WIB → mungkin ada yang harus absen
-// Validasi akurat dilakukan oleh face-status API (yang bisa query DB)
-const SYSTEM_OPEN_HOUR = 6;   // Jam mulai sistem bisa redirect ke face-verify
+const SYSTEM_OPEN_HOUR = 6;
 const SYSTEM_CLOSE_HOUR = 22;
 
 function isWithinSystemHours(): boolean {
@@ -56,10 +53,66 @@ function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
   );
 }
 
+// ─── Cookie helper ────────────────────────────────────────────────────────────
+const SESSION_COOKIES = [
+  "token",
+  "face_attended",
+  "face_verified",
+  "attendance_skipped",
+  "day_off_today",
+];
+
+function clearSessionAndRedirect(url: URL): NextResponse {
+  const response = NextResponse.redirect(url);
+  for (const name of SESSION_COOKIES) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  }
+  return response;
+}
+
+// ─── Auto-logout 03:00 WIB ────────────────────────────────────────────────────
+// Hitung Unix timestamp (seconds) untuk jam 03:00 WIB hari ini (atau kemarin
+// jika sekarang masih sebelum 03:00 WIB).
+// Token yang dibuat SEBELUM threshold ini dianggap expired.
+function getAutoLogoutThreshold(): number {
+  const nowUTC = Date.now();
+  // Waktu sekarang dalam WIB (UTC+7)
+  const nowWIB = new Date(nowUTC + 7 * 3600_000);
+  const wibHour = nowWIB.getUTCHours();
+
+  // Tanggal WIB (tahun, bulan, hari)
+  const y = nowWIB.getUTCFullYear();
+  const mo = nowWIB.getUTCMonth();
+  const d = nowWIB.getUTCDate();
+
+  let thresholdUTC: number;
+
+  if (wibHour >= 3) {
+    // Sudah lewat jam 03:00 WIB hari ini
+    // Threshold = hari ini jam 03:00 WIB = hari ini jam 03:00 - 7 jam (UTC) = jam 20:00 UTC kemarin
+    // Cara mudah: midnight UTC hari ini dalam WIB adalah Date.UTC(y, mo, d, 0,0,0) - 7h
+    // Jam 03:00 WIB = Date.UTC(y, mo, d, -4, 0, 0) = Date.UTC(y, mo, d-1, 20, 0, 0)
+    thresholdUTC = Date.UTC(y, mo, d, -4, 0, 0); // negatif jam → JS otomatis wrap ke hari sebelumnya jam 20:00 UTC
+  } else {
+    // Masih sebelum jam 03:00 WIB hari ini
+    // Threshold = kemarin jam 03:00 WIB = kemarin UTC jam 20:00
+    thresholdUTC = Date.UTC(y, mo, d - 1, -4, 0, 0);
+  }
+
+  return Math.floor(thresholdUTC / 1000); // seconds
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
+  // ── Public routes ──────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
@@ -105,17 +158,71 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // ── Verifikasi JWT ─────────────────────────────────────────────────────────
   const user = await verifyToken(token);
   if (!user) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    response.cookies.delete("token");
-    return response;
+    const loginUrl = new URL("/login", request.url);
+    return clearSessionAndRedirect(loginUrl);
   }
 
+  // ─── ✅ Check 1: Auto-logout jam 03:00 WIB ──────────────────────────────────
+  // JWT payload mengandung `iat` (issued at) dalam detik Unix.
+  // Jika token dibuat sebelum threshold 03:00 WIB hari ini → paksa logout.
+  // Hanya cek untuk page routes (bukan API) agar tidak boros resource.
+  const isPageRoute = !pathname.startsWith("/api/");
+  if (isPageRoute) {
+    const tokenPayload = user as any;
+    const issuedAt: number = tokenPayload.iat ?? 0;
+    const autoLogoutThreshold = getAutoLogoutThreshold();
+
+    if (issuedAt > 0 && issuedAt < autoLogoutThreshold) {
+      // Token dibuat sebelum jam 03:00 WIB hari ini → expired
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("reason", "session_expired");
+      return clearSessionAndRedirect(loginUrl);
+    }
+  }
+
+  // ─── ✅ Check 2: Admin force-logout ─────────────────────────────────────────
+  // Hanya cek untuk page routes agar tidak membebani setiap API call.
+  // Jika admin set force_logout_at > token.iat → paksa logout user.
+  if (isPageRoute) {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        // Edge-compatible: gunakan fetch bawaan (tidak perlu node-fetch)
+        { auth: { persistSession: false } }
+      );
+
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("force_logout_at")
+        .eq("id", (user as any).id)
+        .maybeSingle();
+
+      if (userRecord?.force_logout_at) {
+        const forceLogoutAtSec =
+          new Date(userRecord.force_logout_at).getTime() / 1000;
+        const issuedAt: number = (user as any).iat ?? 0;
+
+        if (issuedAt < forceLogoutAtSec) {
+          // Token dibuat sebelum admin set force logout → paksa logout
+          const loginUrl = new URL("/login", request.url);
+          loginUrl.searchParams.set("reason", "force_logout");
+          return clearSessionAndRedirect(loginUrl);
+        }
+      }
+    } catch {
+      // DB error → jangan block user, lanjut saja
+      // (lebih baik user bisa akses daripada sistem mati karena DB timeout)
+    }
+  }
+
+  // ── Attendance check ───────────────────────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
     const hasAttended = hasAttendanceBypass(request, user.id);
-    // ✅ FIX: jangan redirect role exempt → memutus loop face-verify ⇄ dashboard
     if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
@@ -137,6 +244,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // ── Pass headers ke downstream ─────────────────────────────────────────────
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);

@@ -1,10 +1,9 @@
-// src/app/api/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import bcrypt from "bcryptjs";
 
-// ── Full access roles (ADMIN, PROGRAMMER, ASISTEN_CEO) ──────────────────
+// ── Full access roles ──────────────────────────────────────────────────────
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
 function isFullAccess(role: string): boolean {
@@ -14,8 +13,8 @@ function isFullAccess(role: string): boolean {
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("62")) return digits;
-  if (digits.startsWith("0"))  return "62" + digits.slice(1);
-  if (digits.startsWith("8"))  return "62" + digits;
+  if (digits.startsWith("0")) return "62" + digits.slice(1);
+  if (digits.startsWith("8")) return "62" + digits;
   return digits;
 }
 
@@ -27,7 +26,9 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("id, name, phone_number, email, role, shift, password_set, face_enrolled_at, face_embedding, created_at")
+    .select(
+      "id, name, phone_number, email, role, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
+    )
     .order("role")
     .order("name");
 
@@ -37,16 +38,17 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const users = (data ?? []).map((u: any) => ({
     ...u,
-    // Normalisasi nilai null dari DB agar konsisten di client
     shift: u.shift ?? "PAGI",
     password_set: u.password_set ?? false,
     face_embedding: u.face_embedding !== null && u.face_embedding !== undefined,
+    // ✅ Include force_logout_at untuk UI tahu apakah user ini sedang "force-logged-out"
+    force_logout_at: u.force_logout_at ?? null,
   }));
 
   return NextResponse.json({ success: true, users });
 }
 
-// ── POST — admin/programmer/asisten_ceo buat user baru ────────────────────
+// ── POST — buat user baru ──────────────────────────────────────────────────
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (!isFullAccess(user.role)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
@@ -86,9 +88,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       phone_number: normalizedPhone,
       role,
       shift,
-      password:     tempPassword,
+      password: tempPassword,
       password_set: false,
-      created_by:   user.id,
+      created_by: user.id,
     })
     .select("id, name, phone_number, role, shift, password_set")
     .single();
@@ -100,7 +102,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, user: newUser });
 }
 
-// ── PUT — admin/programmer/asisten_ceo update user ────────────────────────
+// ── PUT — update user (edit, reset password, force logout) ────────────────
 async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   if (!isFullAccess(currentUser.role)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
@@ -113,13 +115,42 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
   }
 
-  const { id, name, phone_number, role, shift, _resetPassword } = body;
+  const { id, name, phone_number, role, shift, _resetPassword, _forceLogout } = body;
 
   if (!id) {
     return NextResponse.json({ success: false, message: "ID user wajib" }, { status: 400 });
   }
 
-  // ── Handle reset password ──────────────────────────────────────────────
+  // ── ✅ NEW: Handle force logout ────────────────────────────────────────────
+  if (_forceLogout === true) {
+    if (id === currentUser.id) {
+      return NextResponse.json(
+        { success: false, message: "Gunakan logout biasa untuk akun sendiri" },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ force_logout_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      console.error("[force-logout] DB error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    console.log(
+      `[force-logout] Admin ${currentUser.name} force-logout user ${id}`
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Session user berhasil di-logout. Akan diaplikasikan saat user reload halaman.",
+    });
+  }
+
+  // ── Handle reset password ──────────────────────────────────────────────────
   if (_resetPassword === true) {
     const tempPassword = await bcrypt.hash(`reset_${Date.now()}`, 10);
     const { error } = await supabaseAdmin
@@ -133,19 +164,21 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     return NextResponse.json({ success: true, message: "Password berhasil direset" });
   }
 
-  // ── Handle regular update ──────────────────────────────────────────────
+  // ── Handle regular update ──────────────────────────────────────────────────
   const updates: Record<string, any> = {};
 
-  // Hanya update field yang dikirim (tidak override dengan undefined)
-  if (name  !== undefined && name  !== null) updates.name  = name;
-  if (role  !== undefined && role  !== null) updates.role  = role;
+  if (name !== undefined && name !== null) updates.name = name;
+  if (role !== undefined && role !== null) updates.role = role;
   if (shift !== undefined && shift !== null) updates.shift = shift;
   if (phone_number !== undefined && phone_number !== null && phone_number !== "") {
     updates.phone_number = normalizePhone(String(phone_number));
   }
 
   if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ success: false, message: "Tidak ada field yang diupdate" }, { status: 400 });
+    return NextResponse.json(
+      { success: false, message: "Tidak ada field yang diupdate" },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabaseAdmin
@@ -162,7 +195,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   return NextResponse.json({ success: true, user: data });
 }
 
-// ── DELETE — admin/programmer/asisten_ceo hapus user ──────────────────────
+// ── DELETE — hapus user ────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   if (!isFullAccess(currentUser.role)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });

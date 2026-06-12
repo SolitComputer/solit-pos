@@ -1,4 +1,3 @@
-// src/app/api/attendance/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
@@ -11,7 +10,6 @@ const supabase = createClient(
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  // ✅ Admin & full access → return semua user aktif
   if (FULL_ACCESS_ROLES.has(user.role)) {
     const { data, error } = await supabase
       .from("users")
@@ -27,8 +25,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data: data || [] });
   }
 
-  // ✅ FIX: Non-admin → return data diri sendiri sebagai array 1 element
-  // Sebelumnya kemungkinan return 403 → allUsers = [] → nama tidak resolve di kalender
   const { data, error } = await supabase
     .from("users")
     .select("id, name, role, shift")

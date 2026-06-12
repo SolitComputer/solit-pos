@@ -1,5 +1,3 @@
-// src/app/api/attendance/allowances/route.ts
-// ✅ FIXED: Validasi ke auth.users bukan public.users
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
