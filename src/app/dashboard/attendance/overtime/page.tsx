@@ -180,8 +180,8 @@ function ModalHeader({
           onClick={onClose}
           disabled={disableClose}
           className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${disableClose
-              ? "text-gray-200 cursor-not-allowed"
-              : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+            ? "text-gray-200 cursor-not-allowed"
+            : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
             }`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -813,8 +813,9 @@ function ManualOvertimeModal({
   const [requestDate, setRequestDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
-  const [description, setDescription] = useState("");
-  const [reason, setReason] = useState("");
+  const [reasonType, setReasonType] = useState("");
+  const [reasonCustom, setReasonCustom] = useState("");
+  const [workDescription, setWorkDescription] = useState(""); const [reason, setReason] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -856,8 +857,9 @@ function ManualOvertimeModal({
     const startMs = new Date(`1970-01-01T${startTime}:00`).getTime();
     const endMs = new Date(`1970-01-01T${endTime}:00`).getTime();
     if (endMs <= startMs) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
-    if (!description.trim()) { setError("Deskripsi pekerjaan wajib diisi"); return; }
-    setSubmitting(true); setError("");
+    if (!reasonType) { setError("Pilih alasan lembur"); return; }
+    if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan lembur kamu"); return; }
+    if (!workDescription.trim()) { setError("Rincian pekerjaan wajib diisi"); return; } setSubmitting(true); setError("");
     try {
       let photoUrl: string | null = null;
       if (photoFile) {
@@ -882,8 +884,8 @@ function ManualOvertimeModal({
           request_date: requestDate,
           actual_start_time: startTime,
           actual_end_time: endTime,
-          work_description: description.trim(),
-          reason: reason.trim() || "Input manual oleh admin",
+          work_description: workDescription.trim(),
+          reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
           proof_photo_url: photoUrl,
         }),
       });
@@ -979,30 +981,80 @@ function ManualOvertimeModal({
               </p>
             </div>
           )}
+          {/* Alasan Lembur — pill options */}
           <div>
             <label className={labelCls}>
-              Deskripsi Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span>
+              Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
+            </label>
+            <div className="space-y-2">
+              {REASON_OPTIONS.map((opt) => {
+                const isSelected = reasonType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setReasonType(opt.value);
+                      if (opt.value !== "Lainnya") setReasonCustom("");
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99]
+            ${isSelected
+                        ? "bg-gray-900 border-gray-900 shadow-sm"
+                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    <span className="text-lg flex-shrink-0">{opt.icon}</span>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>
+                        {opt.value}
+                      </p>
+                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>
+                        {opt.desc}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Lainnya — custom input */}
+          {reasonType === "Lainnya" && (
+            <div>
+              <label className={labelCls}>
+                Jelaskan Alasan <span className="text-red-400 normal-case tracking-normal">*</span>
+              </label>
+              <input
+                type="text"
+                value={reasonCustom}
+                onChange={(e) => setReasonCustom(e.target.value)}
+                placeholder="Tuliskan alasan spesifik..."
+                className={inputCls}
+                autoFocus
+              />
+            </div>
+          )}
+
+          {/* Rincian Pekerjaan */}
+          <div>
+            <label className={labelCls}>
+              Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span>
             </label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Apa yang dikerjakan selama lembur?"
+              value={workDescription}
+              onChange={(e) => setWorkDescription(e.target.value)}
+              placeholder="Jelaskan pekerjaan yang dikerjakan saat lembur..."
               rows={3}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none placeholder:text-gray-300"
             />
-          </div>
-          <div>
-            <label className={labelCls}>
-              Catatan{" "}
-              <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
-            </label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Misal: lembur tidak sempat diinput sebelumnya"
-              className={inputCls}
-            />
+            <p className="text-[10px] text-gray-400 mt-1.5 font-medium">
+              Contoh: Menyelesaikan desain konten Shopee promo weekend, input stok laptop baru, dll.
+            </p>
           </div>
           <div>
             <label className={labelCls}>
@@ -1058,7 +1110,9 @@ function ManualOvertimeModal({
               !requestDate ||
               !startTime ||
               !endTime ||
-              !description.trim() ||
+              !reasonType ||
+              (reasonType === "Lainnya" && !reasonCustom.trim()) ||
+              !workDescription.trim() ||
               isProcessing
             }
             className={primaryBtn}
@@ -1213,7 +1267,7 @@ export default function OvertimePage() {
 
   // ── renderActions — tombol Mulai DIHAPUS ───────────────────────────────────
   const renderActions = (o: OvertimeRequest) => (
-    <div className="flex justify-center gap-1.5 flex-wrap"> 
+    <div className="flex justify-center gap-1.5 flex-wrap">
       {/* Admin: Setujui jika PENDING */}
       {isAdminRole(currentUser?.role) && o.status === "PENDING" && (
         <button
