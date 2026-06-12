@@ -870,11 +870,10 @@ function CompleteModal({
           {/* ✅ Tombol X di-disable jika auto-completed */}
           <button
             onClick={handleClose}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0 ml-2 ${
-              isAutoCompleted
-                ? "text-gray-200 cursor-not-allowed"
-                : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            }`}
+            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0 ml-2 ${isAutoCompleted
+              ? "text-gray-200 cursor-not-allowed"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              }`}
             title={isAutoCompleted ? "Upload foto dulu sebelum menutup" : "Tutup"}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1456,8 +1455,8 @@ export default function OvertimePage() {
 
   const selectedOvertimes = selectedDate
     ? (byDate[selectedDate] || []).sort((a, b) =>
-        (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID")
-      )
+      (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID")
+    )
     : [];
 
   const statCards = [
@@ -1674,28 +1673,25 @@ export default function OvertimePage() {
                     <button
                       key={day}
                       onClick={() => setSelectedDate(selectedDate === dk ? null : dk)}
-                      className={`group flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl min-h-[85px] sm:min-h-[105px] border-2 transition-all duration-300 ${
-                        isSel
-                          ? "bg-gray-900 border-gray-800 ring-2 ring-gray-700 shadow-lg text-white"
-                          : total > 0
+                      className={`group flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl min-h-[85px] sm:min-h-[105px] border-2 transition-all duration-300 ${isSel
+                        ? "bg-gray-900 border-gray-800 ring-2 ring-gray-700 shadow-lg text-white"
+                        : total > 0
                           ? "bg-gradient-to-br from-gray-50 to-white border-gray-200 hover:border-gray-300 hover:shadow-md hover:scale-[1.02]"
                           : "bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50 hover:shadow-sm"
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`text-xl sm:text-2xl font-black mb-2 transition-colors ${
-                          isSel ? "text-white" : "text-gray-800 group-hover:text-gray-900"
-                        }`}
+                        className={`text-xl sm:text-2xl font-black mb-2 transition-colors ${isSel ? "text-white" : "text-gray-800 group-hover:text-gray-900"
+                          }`}
                       >
                         {day}
                       </span>
                       {total > 0 && (
                         <div
-                          className={`text-[10px] sm:text-xs font-bold rounded-full px-2.5 py-1 ${
-                            isSel
-                              ? "bg-white/20 text-white"
-                              : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
-                          }`}
+                          className={`text-[10px] sm:text-xs font-bold rounded-full px-2.5 py-1 ${isSel
+                            ? "bg-white/20 text-white"
+                            : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"
+                            }`}
                         >
                           {total} lemburan
                         </div>
@@ -1751,16 +1747,15 @@ export default function OvertimePage() {
                   <table className="w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/80">
-                        {["Karyawan", "Waktu", "Status", "Bayaran", "Aksi"].map((h) => (
+                        {["Karyawan", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map((h) => (
                           <th
                             key={h}
-                            className={`px-4 sm:px-6 py-4 font-bold text-gray-600 uppercase tracking-wider text-[10px] sm:text-xs ${
-                              h === "Bayaran"
-                                ? "text-right"
-                                : h === "Aksi"
+                            className={`px-4 sm:px-6 py-4 font-bold text-gray-600 uppercase tracking-wider text-[10px] sm:text-xs ${h === "Bayaran"
+                              ? "text-right"
+                              : h === "Aksi"
                                 ? "text-center"
                                 : "text-left"
-                            }`}
+                              }`}
                           >
                             {h}
                           </th>
@@ -1792,6 +1787,16 @@ export default function OvertimePage() {
                             <span className="font-mono font-bold text-gray-700">
                               {formatTime(o.scheduled_start)} –{" "}
                               {formatTime(o.scheduled_end)}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-4 py-4 text-xs">
+                            <span className="text-gray-600 line-clamp-2 max-w-xs">
+                              {o.reason || "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-4 py-4 text-xs">
+                            <span className="text-gray-600 line-clamp-2 max-w-xs">
+                              {o.work_description || "—"}
                             </span>
                           </td>
                           <td className="px-3 sm:px-4 py-4">
@@ -1828,25 +1833,24 @@ export default function OvertimePage() {
                     <button
                       key={s}
                       onClick={() => setFilterStatus(s)}
-                      className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 ${
-                        filterStatus === s
-                          ? "bg-gray-800 text-white shadow-md scale-[1.02]"
-                          : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
-                      }`}
+                      className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 ${filterStatus === s
+                        ? "bg-gray-800 text-white shadow-md scale-[1.02]"
+                        : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm"
+                        }`}
                     >
                       {s === "PENDING"
                         ? "⏳ Pending"
                         : s === "APPROVED"
-                        ? "✅ Disetujui"
-                        : s === "ONGOING"
-                        ? "🟢 Berjalan"
-                        : s === "COMPLETED"
-                        ? "🏁 Selesai"
-                        : s === "REJECTED"
-                        ? "❌ Ditolak"
-                        : s === "CANCELLED"
-                        ? "🚫 Dibatalkan"
-                        : "Semua"}
+                          ? "✅ Disetujui"
+                          : s === "ONGOING"
+                            ? "🟢 Berjalan"
+                            : s === "COMPLETED"
+                              ? "🏁 Selesai"
+                              : s === "REJECTED"
+                                ? "❌ Ditolak"
+                                : s === "CANCELLED"
+                                  ? "🚫 Dibatalkan"
+                                  : "Semua"}
                     </button>
                   ))}
                 </div>
@@ -1870,17 +1874,16 @@ export default function OvertimePage() {
                   <table className="w-full text-xs sm:text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/80">
-                        {["Karyawan", "Tanggal", "Waktu", "Status", "Bayaran", "Aksi"].map(
+                        {["Karyawan", "Tanggal", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map(
                           (h) => (
                             <th
                               key={h}
-                              className={`px-4 sm:px-6 py-4 font-bold text-gray-600 uppercase tracking-wider text-[10px] sm:text-xs ${
-                                h === "Bayaran"
-                                  ? "text-right"
-                                  : h === "Aksi"
+                              className={`px-4 sm:px-6 py-4 font-bold text-gray-600 uppercase tracking-wider text-[10px] sm:text-xs ${h === "Bayaran"
+                                ? "text-right"
+                                : h === "Aksi"
                                   ? "text-center"
                                   : "text-left"
-                              }`}
+                                }`}
                             >
                               {h}
                             </th>
@@ -1922,6 +1925,16 @@ export default function OvertimePage() {
                             <span className="text-gray-600 font-medium">
                               {formatTime(o.scheduled_start)} –{" "}
                               {formatTime(o.scheduled_end)}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-4 py-4 text-xs">
+                            <span className="text-gray-600 line-clamp-2 max-w-xs">
+                              {o.reason || "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-4 py-4 text-xs">
+                            <span className="text-gray-600 line-clamp-2 max-w-xs">
+                              {o.work_description || "—"}
                             </span>
                           </td>
                           <td className="px-3 sm:px-4 py-4">
