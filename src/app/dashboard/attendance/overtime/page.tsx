@@ -793,7 +793,7 @@ function CompleteModal({
       </div>
       <ModalFooter>
         {!isAutoCompleted && (
-          <button onClick={onClose} className={secondaryBtn}>Batal</button>
+          <button onClick={onClose} className={secondaryBtn}>batal</button>
         )}
         <button onClick={upload} disabled={uploading || isProcessing} className={primaryBtn}>
           {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : "🏁 Selesai"}
