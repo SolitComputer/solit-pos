@@ -149,7 +149,7 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
     <div className="group h-full bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-3 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden flex flex-col justify-between">
       <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${a.bar} opacity-0 group-hover:opacity-100 transition-all duration-300`} />
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0">                                                                                                                                                                 
           <p className="text-[9px] sm:text-[10px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
           {/* PERBAIKAN: tampilkan nilai apa adanya, tanpa truncate/pembulatan */}
           <p className="font-black mt-1 text-sm sm:text-base tracking-tight text-gray-900 group-hover:scale-105 transition-transform origin-left break-words">
