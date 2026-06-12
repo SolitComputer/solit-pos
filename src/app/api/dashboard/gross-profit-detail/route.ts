@@ -1,3 +1,4 @@
+// src/app/api/dashboard/gross-profit-detail/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth } from "@/lib/auth";
@@ -19,36 +20,58 @@ function calcGrossProfit(item: any): number {
   return dealPrice - inventoryPrice;
 }
 
+// WIB day → rentang UTC (sama persis dengan stats/route.ts)
+function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
+  const [y, m, d] = dateWIB.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  const end = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+// paid_at (UTC) → tanggal WIB "YYYY-MM-DD" untuk grouping
+function paidAtToWIBDate(paidAt: string): string {
+  return new Date(new Date(paidAt).getTime() + 7 * 60 * 60 * 1000)
+    .toISOString().split("T")[0];
+}
+
 async function handler(req: NextRequest) {
   try {
     const WIB = 7 * 60 * 60 * 1000;
     const today = getTodayWIB();
-    
+
     const nowWIB = new Date(Date.now() + WIB);
-    const monthStart = new Date(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), 1)
-      .toISOString().split("T")[0];
+    const monthStartWIB = `${nowWIB.getUTCFullYear()}-${String(nowWIB.getUTCMonth() + 1).padStart(2, "0")}-01`;
 
     const dayStart = new Date(nowWIB);
     dayStart.setUTCDate(dayStart.getUTCDate() - 29);
-    const dayStartStr = dayStart.toISOString().split("T")[0];
+    const dayStartWIB = dayStart.toISOString().split("T")[0];
+
+    // Semua rentang berbasis paid_at (kapan dibayar), konsisten dengan dashboard card
+    const todayRange = wibDateToUTCRange(today);
+    const monthRange = { start: wibDateToUTCRange(monthStartWIB).start, end: wibDateToUTCRange(today).end };
+    const dailyRange = { start: wibDateToUTCRange(dayStartWIB).start, end: wibDateToUTCRange(today).end };
 
     const [
       { data: todayTrx },
       { data: monthTrx },
       { data: dailyTrx },
     ] = await Promise.all([
-      supabase.from("transactions").select("*").eq("status", "PAID").eq("pickup_date", today),
-      supabase.from("transactions").select("*").eq("status", "PAID").gte("pickup_date", monthStart).lte("pickup_date", today),
-      supabase.from("transactions").select("*").eq("status", "PAID").gte("pickup_date", dayStartStr).lte("pickup_date", today),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", monthRange.start).lt("paid_at", monthRange.end),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", dailyRange.start).lt("paid_at", dailyRange.end),
     ]);
 
     // ── Daily Breakdown ────────────────────────────────────────────────────
     const dailyMap: Record<string, { gross_profit: number; revenue: number; count: number; margin_pct: number }> = {};
     dailyTrx?.forEach((item) => {
-      const date = item.pickup_date as string;
+      if (!item.paid_at) return;
+      const date = paidAtToWIBDate(item.paid_at);
       const dealPrice = getDealPrice(item);
       const grossProfit = calcGrossProfit(item);
-      
+
       if (!dailyMap[date]) dailyMap[date] = { gross_profit: 0, revenue: 0, count: 0, margin_pct: 0 };
       dailyMap[date].gross_profit += grossProfit;
       dailyMap[date].revenue += dealPrice;
@@ -77,11 +100,12 @@ async function handler(req: NextRequest) {
 
     // ── Weekly Breakdown ───────────────────────────────────────────────────
     const weeklyMap: Record<string, { gross_profit: number; revenue: number; count: number; margin_pct: number }> = {};
-    
+
     dailyTrx?.forEach((item) => {
-      const [y, m, d] = (item.pickup_date as string).split("-").map(Number);
+      if (!item.paid_at) return;
+      const [y, m, d] = paidAtToWIBDate(item.paid_at).split("-").map(Number);
       const date = new Date(y, m - 1, d);
-      
+
       const dayOfWeek = date.getDay();
       const weekStart = new Date(date);
       weekStart.setDate(weekStart.getDate() - dayOfWeek);
