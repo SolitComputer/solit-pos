@@ -55,7 +55,7 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     SIAP_JUAL: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500", label: "Siap Jual" },
     BELUM_SIAP: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-yellow-400", label: "Belum Siap" },
     SERVICE: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-blue-500", label: "Service" },
-    SOLD: { badge: "bg-gray-200 text-gray-500 border-gray-300", dot: "bg-gray-400", label: "Sold" },
+    SOLD: { badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", label: "Sold" },
 };
 
 const Shimmer = ({
@@ -658,39 +658,7 @@ export default function Page() {
                 }
             });
         });
-
-        const dataStart = 2;
-        const dataEnd = filteredLaptops.length + 1;
-        const totalRow = ws.addRow({
-            no: "",
-            product: `TOTAL  (${filteredLaptops.length} laptop)`,
-            cpu: "",
-            ram: "",
-            storage: "",
-            stock: { formula: `SUM(F${dataStart}:F${dataEnd})` },
-            price_store: { formula: `SUM(G${dataStart}:G${dataEnd})` },
-        });
-
-        totalRow.height = 26;
-        totalRow.eachCell((cell, colNum) => {
-            const key = ws.getColumn(colNum).key as string;
-
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.totalBg } };
-            cell.font = { bold: true, size: 10, name: "Arial", color: { argb: COLOR.totalFg } };
-            cell.border = {
-                top: { style: "medium", color: { argb: "FF93C5FD" } },
-                left: { style: "hair", color: { argb: COLOR.borderColor } },
-                bottom: { style: "medium", color: { argb: "FF93C5FD" } },
-                right: { style: "hair", color: { argb: COLOR.borderColor } },
-            };
-
-            if (key === "price_store") {
-                cell.numFmt = '"Rp "#,##0';
-                cell.alignment = { horizontal: "center", vertical: "middle" };
-            } else {
-                cell.alignment = { horizontal: "center", vertical: "middle" };
-            }
-        });
+        
 
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], {

@@ -51,103 +51,202 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="fixed inset-0 z-50 bg-gradient-to-br from-black/70 to-black/50 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300 animate-in fade-in"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
         
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100">
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Detail Top Sales</h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Performa penjual dan breakdown harian</p>
+        {/* Header with gradient accent - Same as LaptopDetail */}
+        <div className="relative bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 px-6 py-5">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-2xl" />
+          <div className="flex items-center justify-between relative z-10">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-1 h-6 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full" />
+                <h2 className="text-xl font-bold text-white">Detail Top Sales</h2>
+              </div>
+              <p className="text-sm text-gray-300">Performa penjual dan breakdown harian</p>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-white hover:bg-white/10 rounded-xl p-2 transition-all duration-200"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Content with custom scrollbar */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50">
           {isLoading ? (
             <div className="p-6 space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-gray-100 rounded-lg h-20 animate-pulse" />
+                <div key={i} className="bg-white rounded-xl shadow-sm p-4 animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-xl" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : data ? (
-            <div className="p-5 sm:p-6 space-y-6">
+            <div className="p-6 space-y-6">
               
-              {/* Summary Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200">
-                  <p className="text-[10px] text-gray-600 font-semibold uppercase tracking-wider">Hari Ini</p>
-                  <p className="font-bold text-sm text-gray-900 mt-1">{data.today.count}</p>
-                  <p className="text-[9px] text-gray-500 mt-0.5">transaksi</p>
+              {/* Summary Stats with modern cards - Color adjusted for sales */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-xs font-semibold text-white/90 uppercase tracking-wider">Hari Ini</p>
+                    </div>
+                    <p className="font-bold text-3xl text-white mt-1">{data.today.count}</p>
+                    <p className="text-xs text-white/80 mt-1">transaksi</p>
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <p className="text-[10px] text-white/70">Revenue: {fmtShort(data.today.revenue)}</p>
+                      <p className="text-[10px] text-green-300">Profit: +{fmtShort(data.today.profit)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-3 border border-emerald-200">
-                  <p className="text-[10px] text-emerald-700 font-semibold uppercase tracking-wider">Bulan Ini</p>
-                  <p className="font-bold text-sm text-emerald-900 mt-1">{data.monthly.count}</p>
-                  <p className="text-[9px] text-emerald-700 mt-0.5">transaksi</p>
+                
+                <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <p className="text-xs font-semibold text-white/90 uppercase tracking-wider">Bulan Ini</p>
+                    </div>
+                    <p className="font-bold text-3xl text-white mt-1">{data.monthly.count}</p>
+                    <p className="text-xs text-white/80 mt-1">transaksi</p>
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <p className="text-[10px] text-white/70">Revenue: {fmtShort(data.monthly.revenue)}</p>
+                      <p className="text-[10px] text-green-300">Profit: +{fmtShort(data.monthly.profit)}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Sales List */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-gray-900">Top Sales (30 Hari)</h3>
+              {/* Sales List with modern styling */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Top Performers (30 Hari)
+                  </h3>
+                  <span className="text-xs text-gray-400">{data.salesPerformance.length} sales</span>
+                </div>
+                
                 {data.salesPerformance.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-8">Belum ada data</p>
+                  <div className="text-center py-12 bg-white rounded-2xl">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <p className="text-sm text-gray-500">Belum ada data</p>
+                  </div>
                 ) : (
                   data.salesPerformance.map((sales, idx) => (
-                    <div key={sales.name} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={sales.name} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
                       
-                      {/* Sales Header */}
+                      {/* Sales Header with rank badge */}
                       <button
                         onClick={() => setExpandedSales(expandedSales === sales.name ? null : sales.name)}
-                        className="w-full bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 hover:to-gray-50 p-3 sm:p-4 flex items-center justify-between gap-3 transition"
+                        className="w-full p-4 flex items-center justify-between gap-3 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all duration-200"
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {/* Rank Badge with sales colors */}
+                          <div className={`
+                            w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm
+                            ${idx === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-lg' : 
+                              idx === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-600' : 
+                              idx === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' : 
+                              'bg-gradient-to-br from-emerald-200 to-emerald-300 text-emerald-700'}
+                          `}>
                             {idx + 1}
                           </div>
-                          <div className="flex-1 min-w-0">
+                          
+                          <div className="flex-1 min-w-0 text-left">
                             <p className="font-semibold text-gray-900 text-sm truncate">{sales.name}</p>
-                            <p className="text-xs text-gray-500">{sales.total} transaksi</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">{sales.total} transaksi</span>
+                              <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                              <span className="text-xs font-medium text-emerald-600">{fmtShort(sales.revenue)}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-sm text-gray-900">{fmtShort(sales.revenue)}</p>
-                          <p className="text-xs text-emerald-600">+{fmtShort(sales.profit)}</p>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="hidden sm:block text-right">
+                            <p className="text-xs text-gray-400">profit</p>
+                            <p className="text-sm font-bold text-emerald-600">+{fmtShort(sales.profit)}</p>
+                          </div>
+                          <svg
+                            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedSales === sales.name ? "rotate-180" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
                         </div>
-                        <svg
-                          className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${expandedSales === sales.name ? "rotate-180" : ""}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
                       </button>
 
-                      {/* Expanded Daily Breakdown */}
+                      {/* Expanded Daily Breakdown with timeline style */}
                       {expandedSales === sales.name && (
-                        <div className="border-t border-gray-200 bg-gray-50 p-3 sm:p-4 space-y-2">
-                          {sales.dailyBreakdown.length === 0 ? (
-                            <p className="text-xs text-gray-500 text-center py-4">Belum ada data</p>
-                          ) : (
-                            sales.dailyBreakdown.map((day) => (
-                              <div key={day.date} className="bg-white rounded-lg p-2.5 flex items-center justify-between gap-3">
-                                <div>
-                                  <p className="text-xs font-medium text-gray-700">{day.label}</p>
-                                  <p className="text-[10px] text-gray-500 mt-0.5">{day.total} transaksi</p>
+                        <div className="border-t border-gray-100 bg-gradient-to-b from-gray-50 to-white p-4">
+                          <p className="text-xs font-semibold text-gray-500 mb-3 flex items-center gap-2">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Daily Performance
+                          </p>
+                          <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            {sales.dailyBreakdown.length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center py-6">Belum ada data harian</p>
+                            ) : (
+                              sales.dailyBreakdown.map((day, i) => (
+                                <div key={day.date} className="group bg-white rounded-lg p-3 hover:shadow-sm transition-all duration-200">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">
+                                        {i + 1}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-700">{day.label}</p>
+                                        <p className="text-xs text-gray-400">{day.total} transaksi</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-bold text-gray-900">{fmtRupiah(day.revenue)}</p>
+                                      <p className="text-xs text-emerald-600">+{fmtRupiah(day.profit)}</p>
+                                      <div className="w-full h-1 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                                        <div 
+                                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
+                                          style={{ width: `${(day.revenue / sales.revenue) * 100}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-right">
-                                  <p className="text-xs font-bold text-gray-900">{fmtRupiah(day.revenue)}</p>
-                                  <p className="text-[10px] text-emerald-600">+{fmtRupiah(day.profit)}</p>
-                                </div>
-                              </div>
-                            ))
-                          )}
+                              ))
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -156,10 +255,76 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
               </div>
             </div>
           ) : (
-            <div className="p-6 text-center text-gray-500">Gagal memuat data</div>
+            <div className="flex flex-col items-center justify-center py-16 px-6">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-gray-600 font-medium">Gagal memuat data</p>
+              <p className="text-sm text-gray-400 mt-1">Silakan coba lagi nanti</p>
+            </div>
           )}
+        </div>
+
+        {/* Footer with subtle gradient */}
+        <div className="bg-gradient-to-r from-gray-50 to-white border-t border-gray-200 px-6 py-3">
+          <p className="text-xs text-gray-400 text-center">
+            Data diperbarui secara real-time • {new Date().toLocaleDateString('id-ID')}
+          </p>
         </div>
       </div>
     </div>
   );
 }
+
+// Add this to your global CSS or component styles
+const styles = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slide-in-from-bottom-4 {
+    from {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-in {
+    animation-duration: 0.3s;
+    animation-fill-mode: both;
+  }
+  
+  .fade-in {
+    animation-name: fade-in;
+  }
+  
+  .slide-in-from-bottom-4 {
+    animation-name: slide-in-from-bottom-4;
+  }
+`;

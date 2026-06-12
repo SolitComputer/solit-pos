@@ -74,3 +74,53 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, message: "Server error" }, { status: 500 });
   }
 }
+
+// ✅ NEW: DELETE endpoint untuk hapus face verification records
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !isFullAccess(user.role)) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "ID wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Verifikasi ownership — pastikan user bisa hapus record ini
+    const { data: record, error: checkError } = await supabase
+      .from("face_verifications")
+      .select("id, user_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (checkError || !record) {
+      return NextResponse.json(
+        { success: false, message: "Record tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Hapus record
+    const { error } = await supabase
+      .from("face_verifications")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("[attendance DELETE] error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("[attendance DELETE] Exception:", err);
+    return NextResponse.json({ success: false, message: err?.message ?? "Unknown error" }, { status: 500 });
+  }
+}

@@ -145,11 +145,15 @@ function isLate(t: string, shift: "PAGI" | "SORE" = "PAGI"): boolean {
 function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
     if (a.method === "FORCE") return "PRESENT";
     if (a.method === "SKIP" || a.status === "SKIPPED_MANUAL") return "SKIP";
+
+    if ("late_weight" in a && a.late_weight !== null) {
+        return (a.late_weight as number) > 1 ? "LATE" : "PRESENT";
+    }
+
     if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
     return "PRESENT";
 }
 
-// Hitung total hari kerja seluruh bulan (untuk referensi)
 function countWorkingDays(year: number, month: number, dayOffDows: Set<number>, offDates: Set<string>): number {
     const dim = new Date(year, month + 1, 0).getDate();
     let c = 0;
@@ -248,12 +252,21 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 
     const parseTimeFromISO = (iso: string | undefined): string => {
         if (!iso) return "08:00";
-        if (iso.includes("T")) {
-            const timePart = iso.split("T")[1];
-            return timePart.substring(0, 5);
+        try {
+            const date = new Date(iso);
+            if (isNaN(date.getTime())) return "08:00";
+
+            const timeString = date.toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Jakarta"
+            });
+
+            return timeString.substring(0, 5);
+        } catch (e) {
+            console.error("❌ parseTimeFromISO error:", e);
+            return "08:00";
         }
-        if (iso.includes(":")) return iso.substring(0, 5);
-        return "08:00";
     };
 
     const [saving, setSaving] = useState(false);
@@ -1381,20 +1394,6 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
         } finally { setFinalizing(false); }
     };
 
-    const handleGenerate = async () => {
-        if (slip.status === "FINALIZED" && !confirm("Slip sudah difinalisasi. Yakin regenerate?")) return;
-        setGenerating(true);
-        try {
-            const r = await fetch("/api/attendance/salary-slip", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: slip.user_id, year: slip.year, month: slip.month }),
-            });
-            const d = await r.json();
-            if (d.success) onGenerate?.();
-        } finally { setGenerating(false); }
-    };
-
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden">
             {/* Header row */}
@@ -1414,10 +1413,6 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
                     </span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <button onClick={handleGenerate} disabled={generating}
-                        className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold rounded-lg hover:bg-blue-100 transition disabled:opacity-50 flex items-center gap-1">
-                        {generating ? <><div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />Proses...</> : "🔄 Update"}
-                    </button>
                     <a href={`/receipt/salary-slip/${slip.id}`} target="_blank" rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1">
                         🖨️ Cetak
@@ -1485,8 +1480,7 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "salary-slip" | "leave" | "my-salary">("calendar");
-
+    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "salary-slip" | "salary-history" | "leave" | "my-salary">("calendar");
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
@@ -1512,6 +1506,9 @@ export default function AttendanceDashboardPage() {
     } | null>(null);
     const [overtimeTotal, setOvertimeTotal] = useState<Record<string, number>>({});
     const [usersLoading, setUsersLoading] = useState(false);
+    const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -1578,6 +1575,19 @@ export default function AttendanceDashboardPage() {
         }
     }, []);
 
+    const fetchSalaryHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        try {
+            const r = await fetch("/api/attendance/salary?history=true");
+            const d = await r.json();
+            if (d.success) setSalaryHistory(d.history || []);
+        } catch (err) {
+            console.error("Failed to fetch salary history:", err);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, []);
+
     const fetchTodayStatus = useCallback(async () => {
         setStatusLoading(true);
         try {
@@ -1611,6 +1621,12 @@ export default function AttendanceDashboardPage() {
     }, [selectedMonth, currentUser]);
 
     useEffect(() => {
+        if (isAdminRole(currentUser?.role)) {
+            fetchSalaryHistory();
+        }
+    }, [isAdminRole, currentUser, fetchSalaryHistory]);
+
+    useEffect(() => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
         setLoading(true); setSelectedDate(null); setFilterUser("Semua");
@@ -1621,6 +1637,12 @@ export default function AttendanceDashboardPage() {
             fetchSalarySlips(year, month);
         }
     }, [selectedMonth]);
+
+    useEffect(() => {
+        if (isAdminRole(currentUser?.role)) {
+            fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
+        }
+    }, [selectedSlipMonth, isAdminRole, currentUser, fetchSalarySlips]);
 
     const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
@@ -1842,6 +1864,93 @@ export default function AttendanceDashboardPage() {
         Promise.all(tasks).finally(() => setLoading(false));
     }, [selectedMonth, currentUser]);
 
+    // ✅ NEW FUNCTION: Generate slip gaji dari data rekapan yang sudah di-calculate
+    const generateSlipFromRecapan = useCallback(async (userStat: typeof userSummary[0]) => {
+        try {
+            const sal = salaryMap[userStat.userId];
+            const allow = allowanceMap[userStat.userId];
+            const overtimeAmount = overtimeTotal[userStat.userId] || 0;
+
+            // Hitung gaji pokok
+            const salaryIncome =
+                sal && sal.salary_type === "FIXED"
+                    ? sal.base_salary
+                    : sal && userStat.totalWorkdays > 0
+                        ? Math.round((sal.base_salary / userStat.totalWorkdays) * userStat.score)
+                        : 0;
+
+            // Tunjangan (disesuaikan % kehadiran)
+            const allowanceWife =
+                Math.round((allow?.allowance_wife || 0) * (userStat.pct / 100)) || 0;
+            const allowanceChild =
+                Math.round((allow?.allowance_child || 0) * (userStat.pct / 100)) || 0;
+
+            // Potongan (langsung)
+            const deductionLoan = allow?.deduction_loan || 0;
+            const deductionPension = allow?.deduction_pension || 0;
+
+            // Total
+            const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
+            const totalDeduction = deductionLoan + deductionPension;
+            const netSalary = grossIncome - totalDeduction;
+
+            console.log(`[generateSlipFromRecapan] Generate slip untuk ${userStat.name}:`, {
+                salaryIncome,
+                allowanceWife,
+                allowanceChild,
+                grossIncome,
+                totalDeduction,
+                netSalary,
+            });
+
+            // POST ke API dengan data pre-calculated
+            const res = await fetch("/api/attendance/salary-slip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userStat.userId,
+                    year: calYear,
+                    month: calMonth + 1,
+                    // ✅ Kirim data pre-calculated dari rekapan
+                    salary_type: sal?.salary_type || "FIXED",
+                    base_salary: sal?.base_salary || 0,
+                    salary_income: salaryIncome,
+                    allowance_wife: allowanceWife,
+                    allowance_child: allowanceChild,
+                    overtime: overtimeAmount,
+                    total_income: grossIncome,
+                    deduction_loan: deductionLoan,
+                    deduction_pension: deductionPension,
+                    total_deduction: totalDeduction,
+                    net_salary: netSalary,
+                }),
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                alert(`Gagal generate slip ${userStat.name}: ${data.message}`);
+                return false;
+            }
+
+            return true;
+        } catch (err) {
+            console.error("[generateSlipFromRecapan] error:", err);
+            alert("Gagal generate slip. Lihat console untuk detail.");
+            return false;
+        }
+    }, [salaryMap, allowanceMap, overtimeTotal, calYear, calMonth]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden && selectedMonth) {
+                console.log("🔄 Refresh data...");
+                refreshAll();
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [selectedMonth, refreshAll]);
+
     if (!selectedMonth) return (
         <DashboardLayout>
             <MonthSelector onSelect={(y, m) => setSelectedMonth({ year: y, month: m })} />
@@ -1920,6 +2029,7 @@ export default function AttendanceDashboardPage() {
                                 { id: "summary", label: "📊 Ringkasan" },
                                 { id: "salary", label: "💰 Rekap Gaji" },
                                 { id: "salary-slip", label: "📄 Slip Gaji" },
+                                { id: "salary-history", label: "📋 Riwayat Gaji" },
                                 { id: "leave", label: "🌴 Cuti" }
                             ] as const).map(t => (
                                 <button key={t.id} onClick={() => setActiveTab(t.id)}
@@ -2199,30 +2309,65 @@ export default function AttendanceDashboardPage() {
                                                             {isAdminRole(currentUser?.role)
                                                                 && (
                                                                     <td className="px-4 py-4 text-center">
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                if (manualRec) {
-                                                                                    await openEditManual(manualRec);
-                                                                                } else {
-                                                                                    const foundUser = allUsers.find(u => u.name === a.user_name);
-                                                                                    const resolvedUserId = foundUser?.id || a.user_id || "";
-                                                                                    const prefillRecord: ManualAttendance = {
-                                                                                        id: "",
-                                                                                        user_id: resolvedUserId,
-                                                                                        attendance_date: dateKey,
-                                                                                        check_in_time: a.check_in_time || a.created_at,
-                                                                                        status: (a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "PRESENT") as any,
-                                                                                        notes: null,
-                                                                                        created_by: null,
-                                                                                        users: { id: resolvedUserId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
-                                                                                    };
-                                                                                    await openEditManual(prefillRecord);
-                                                                                }
-                                                                            }}
-                                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
-                                                                            title="Edit absen">
-                                                                            ✏️ Edit
-                                                                        </button>
+                                                                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                            {a.source === "MANUAL" ? (
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        if (manualRec) await openEditManual(manualRec);
+                                                                                    }}
+                                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
+                                                                                    title="Edit manual attendance">
+                                                                                    ✏️ Edit
+                                                                                </button>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            if (!confirm("Hapus absen wajah ini? Akan dihapus dari sistem.")) return;
+                                                                                            try {
+                                                                                                const res = await fetch(`/api/attendance?id=${a.id}`, {
+                                                                                                    method: "DELETE"
+                                                                                                });
+                                                                                                const d = await res.json();
+                                                                                                if (!d.success) {
+                                                                                                    alert(d.message || "Gagal menghapus");
+                                                                                                    return;
+                                                                                                }
+                                                                                                refreshAll(); // Refresh data
+                                                                                            } catch (err) {
+                                                                                                console.error("Delete error:", err);
+                                                                                                alert("Gagal menghapus absen");
+                                                                                            }
+                                                                                        }}
+                                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:text-red-700 transition-all duration-200"
+                                                                                        title="Hapus absen wajah ini">
+                                                                                        🗑️ Hapus
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            const foundUser = allUsers.find(u => u.name === a.user_name);
+                                                                                            const resolvedUserId = foundUser?.id || a.user_id || "";
+                                                                                            const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
+                                                                                            const prefillRecord: ManualAttendance = {
+                                                                                                id: "",
+                                                                                                user_id: resolvedUserId,
+                                                                                                attendance_date: dateKey,
+                                                                                                check_in_time: a.check_in_time || a.created_at,
+                                                                                                status: (a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "PRESENT") as any,
+                                                                                                notes: null,
+                                                                                                created_by: null,
+                                                                                                users: { id: resolvedUserId, name: a.user_name, role: a.user_role, shift: a.user_shift || "PAGI" },
+                                                                                            };
+                                                                                            await openEditManual(prefillRecord);
+                                                                                        }}
+                                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
+                                                                                        title="Convert ke manual entry">
+                                                                                        ✏️ Edit
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
                                                                     </td>
                                                                 )}
                                                         </tr>
@@ -2272,7 +2417,7 @@ export default function AttendanceDashboardPage() {
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
-                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
@@ -2331,10 +2476,22 @@ export default function AttendanceDashboardPage() {
                                                                 <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                             </div>
                                                         </td>
-                                                        {/* ✅ Tombol tambah absen manual per baris karyawan */}
-                                                        <td className="px-4 py-4 text-center">
+                                                        <td className="px-4 py-4 text-center flex items-center gap-1.5 justify-center flex-wrap">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                    const success = await generateSlipFromRecapan(u);
+                                                                    if (success) {
+                                                                        fetchSalarySlips(calYear, calMonth);
+                                                                        alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                title={`Generate slip gaji ${u.name}`}>
+                                                                📄 Slip
+                                                            </button>
                                                             <button onClick={() => openAddManual(undefined, u.userId)}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
                                                                 title={`Tambah absen manual untuk ${u.name}`}>
                                                                 ➕ Absen
                                                             </button>
@@ -2618,18 +2775,37 @@ export default function AttendanceDashboardPage() {
                                                     </td>
 
                                                     {/* Aksi */}
-                                                    <td className="px-4 py-4 text-center flex items-center justify-center gap-1">
-                                                        <button
-                                                            onClick={() => setEditAllowanceUser({
-                                                                userId: u.userId,
-                                                                userName: u.name,
-                                                                currentAllowance: allow,
-                                                            })}
-                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
-                                                            title="Edit tunjangan & potongan"
-                                                        >
-                                                            💜 Tunjangan
-                                                        </button>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                            {/* ✅ NEW: Tombol Generate Slip dari rekapan gaji */}
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                    const success = await generateSlipFromRecapan(u);
+                                                                    if (success) {
+                                                                        // Refresh list slip gaji
+                                                                        fetchSalarySlips(calYear, calMonth);
+                                                                        alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
+                                                                    }
+                                                                }}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                title={`Generate slip gaji ${u.name} dari rekapan bulan ini`}
+                                                            >
+                                                                📄 Slip
+                                                            </button>
+                                                            {/* Tombol Edit Tunjangan */}
+                                                            <button
+                                                                onClick={() => setEditAllowanceUser({
+                                                                    userId: u.userId,
+                                                                    userName: u.name,
+                                                                    currentAllowance: allow,
+                                                                })}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
+                                                                title="Edit tunjangan & potongan"
+                                                            >
+                                                                💜 Tunjangan
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -2830,6 +3006,140 @@ export default function AttendanceDashboardPage() {
                     )}
             </div>
 
+            {/* ════ TAB RIWAYAT GAJI (admin only) ════ */}
+            {activeTab === "salary-history" && isAdminRole(currentUser?.role) && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div>
+                                <p className="text-base font-bold text-gray-800">📋 Riwayat Perubahan Gaji</p>
+                                <p className="text-[10px] text-gray-400 mt-1">Tracking semua perubahan gaji per karyawan</p>
+                            </div>
+                            <button
+                                onClick={fetchSalaryHistory}
+                                className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition"
+                            >
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    {historyLoading ? (
+                        <div className="p-6 space-y-3">
+                            {Array(4).fill(0).map((_, i) => (
+                                <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />
+                            ))}
+                        </div>
+                    ) : salaryHistory.length === 0 ? (
+                        <div className="py-16 text-center px-4">
+                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl opacity-40">📋</span>
+                            </div>
+                            <p className="text-sm text-gray-400 font-medium">Belum ada riwayat perubahan gaji</p>
+                            <p className="text-xs text-gray-300 mt-1">Semua perubahan gaji akan tampil di sini</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-gray-100 bg-gray-50/60">
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Lama</th>
+                                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">→</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Baru</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipe</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Diubah Oleh</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal</th>
+                                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Catatan</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {salaryHistory.map((hist: any) => {
+                                        const oldSal = hist.old_base_salary || 0;
+                                        const newSal = hist.new_base_salary || 0;
+                                        const diff = newSal - oldSal;
+                                        const diffText = diff > 0
+                                            ? `+${formatRupiah(diff)}`
+                                            : diff < 0
+                                                ? `-${formatRupiah(Math.abs(diff))}`
+                                                : "—";
+
+                                        return (
+                                            <tr key={hist.id} className="hover:bg-gray-50/60 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                                                            {initials(hist.user?.name || "?")}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-gray-800">{hist.user?.name || "Unknown"}</p>
+                                                            <p className="text-[10px] text-gray-400">{hist.user?.role?.replace(/_/g, " ")}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-mono font-bold text-red-600 text-xs">
+                                                            {hist.old_base_salary ? formatRupiah(hist.old_base_salary) : "—"}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">{hist.old_salary_type || "—"}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4 text-center text-gray-300 font-bold">→</td>
+                                                <td className="px-4 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-mono font-bold text-emerald-600 text-xs">
+                                                            {formatRupiah(hist.new_base_salary)}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">{hist.new_salary_type}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <span className={`inline-flex items-center text-[10px] font-bold px-2.5 py-1 rounded-full border ${hist.new_salary_type === "FIXED"
+                                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                                        : "bg-amber-100 text-amber-700 border-amber-200"
+                                                        }`}>
+                                                        {hist.new_salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <p className="text-sm font-semibold text-gray-700">Admin</p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">{hist.changed_by?.slice(0, 8)}</p>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    <p className="text-sm font-mono text-gray-700">
+                                                        {new Date(hist.changed_at).toLocaleDateString("id-ID", {
+                                                            day: "2-digit",
+                                                            month: "2-digit",
+                                                            year: "numeric",
+                                                        })}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400">
+                                                        {new Date(hist.changed_at).toLocaleTimeString("id-ID", {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                        })}
+                                                    </p>
+                                                </td>
+                                                <td className="px-4 py-4">
+                                                    {hist.notes ? (
+                                                        <p className="text-sm text-blue-600 font-medium max-w-[200px] truncate">
+                                                            {hist.notes}
+                                                        </p>
+                                                    ) : (
+                                                        <span className="text-gray-300 text-sm">—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ════ TAB GAJI SAYA (non-admin) ════ */}
             {activeTab === "my-salary" && !isAdminRole(currentUser?.role) && (
                 <div className="max-w-2xl mx-auto space-y-6 px-4 pb-8">
@@ -2986,12 +3296,14 @@ export default function AttendanceDashboardPage() {
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
             {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
                 <div className="space-y-4">
-                    {/* Month Selector + Generate All */}
+                    {/* Month Selector */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
                                 <p className="text-sm font-bold text-gray-800">Slip Gaji</p>
-                                <p className="text-[11px] text-gray-400 mt-0.5">Generate & cetak slip gaji karyawan</p>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                    ✅ Data dari rekapan gaji (tab Rekap Gaji) · Gunakan tombol <strong>📄 Slip</strong> untuk generate
+                                </p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
@@ -3011,22 +3323,6 @@ export default function AttendanceDashboardPage() {
                                     }))}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
                                 >▶</button>
-                                <button
-                                    onClick={async () => {
-                                        if (!confirm(`Generate slip ${MONTH_NAMES[selectedSlipMonth.month]} ${selectedSlipMonth.year} untuk semua karyawan?`)) return;
-                                        const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
-                                        if (!usersToGen?.length) { alert("Tidak ada karyawan."); return; }
-                                        for (const u of usersToGen) {
-                                            await fetch("/api/attendance/salary-slip", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({ user_id: u.id, year: selectedSlipMonth.year, month: selectedSlipMonth.month + 1 }),
-                                            });
-                                        }
-                                        fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
-                                    }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-2 rounded-xl hover:bg-blue-100 transition"
-                                >⚡ Generate Semua</button>
                             </div>
                         </div>
                     </div>
@@ -3088,7 +3384,6 @@ export default function AttendanceDashboardPage() {
                                     key={slip.id}
                                     slip={slip}
                                     onFinalize={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
-                                    onGenerate={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
                                 />
                             ))}
                         </div>
