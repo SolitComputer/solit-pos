@@ -1127,7 +1127,6 @@ function EditOvertimeModal({
 }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
-  // Helpers: ISO timestamp → "HH:MM"
   const toTimeStr = (iso: string | null | undefined): string => {
     if (!iso) return "";
     if (iso.includes(":") && !iso.includes("T")) return iso.substring(0, 5);
@@ -1136,17 +1135,17 @@ function EditOvertimeModal({
     });
   };
 
-  // ✅ Pakai actual jika ada, fallback ke scheduled — admin edit 1 pasang jam saja
+  // ── Cari apakah reason yang tersimpan cocok dengan salah satu opsi
+  const savedReason = overtime.reason ?? "";
+  const knownOptions = REASON_OPTIONS.map((o) => o.value) as string[];
+  const isKnownReason = knownOptions.includes(savedReason);
+
   const [requestDate, setRequestDate] = useState(overtime.request_date?.slice(0, 10) ?? "");
-  const [startTime, setStartTime] = useState(
-    toTimeStr(overtime.actual_start ?? overtime.scheduled_start)
-  );
-  const [endTime, setEndTime] = useState(
-    toTimeStr(overtime.actual_end ?? overtime.scheduled_end)
-  );
-  const [reason, setReason] = useState(overtime.reason ?? "");
+  const [startTime, setStartTime] = useState(toTimeStr(overtime.actual_start ?? overtime.scheduled_start));
+  const [endTime, setEndTime] = useState(toTimeStr(overtime.actual_end ?? overtime.scheduled_end));
+  const [reasonType, setReasonType] = useState(isKnownReason ? savedReason : "Lainnya");
+  const [reasonCustom, setReasonCustom] = useState(isKnownReason ? "" : savedReason);
   const [workDesc, setWorkDesc] = useState(overtime.work_description ?? "");
-  const [rate, setRate] = useState<number>(overtime.rate_per_hour ?? 0);
   const [status, setStatus] = useState(overtime.status);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(overtime.proof_photo_url ?? null);
@@ -1154,7 +1153,9 @@ function EditOvertimeModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Preview durasi & bayaran secara live
+  const isLainnya = reasonType === "Lainnya";
+  const finalReason = isLainnya ? reasonCustom.trim() : reasonType;
+
   const previewDuration = useMemo(() => {
     if (!startTime || !endTime) return null;
     const startMs = new Date(`1970-01-01T${startTime}:00`).getTime();
@@ -1162,8 +1163,6 @@ function EditOvertimeModal({
     if (endMs <= startMs) return null;
     return Math.floor((endMs - startMs) / (60 * 60 * 1000));
   }, [startTime, endTime]);
-
-  const previewPay = previewDuration !== null && rate > 0 ? previewDuration * rate : null;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1188,6 +1187,8 @@ function EditOvertimeModal({
   const save = async () => {
     if (!requestDate) { setError("Tanggal wajib diisi"); return; }
     if (!startTime || !endTime) { setError("Jam mulai dan selesai wajib diisi"); return; }
+    if (!reasonType) { setError("Pilih alasan lembur"); return; }
+    if (isLainnya && !reasonCustom.trim()) { setError("Jelaskan alasan lembur"); return; }
     const startMs = new Date(`1970-01-01T${startTime}:00`).getTime();
     const endMs = new Date(`1970-01-01T${endTime}:00`).getTime();
     if (endMs <= startMs) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
@@ -1209,7 +1210,6 @@ function EditOvertimeModal({
         proofUrl = url;
       }
 
-      // ✅ Kirim scheduled & actual sekaligus — admin edit 1 pasang jam yang sama
       const isoStart = `${requestDate}T${fmt(startTime)}+07:00`;
       const isoEnd = `${requestDate}T${fmt(endTime)}+07:00`;
 
@@ -1221,9 +1221,8 @@ function EditOvertimeModal({
         scheduled_end: isoEnd,
         actual_start: isoStart,
         actual_end: isoEnd,
-        reason: reason.trim(),
+        reason: finalReason,
         work_description: workDesc.trim(),
-        rate_per_hour: Math.round(rate),
         status,
       };
       if (proofUrl) payload.proof_photo_url = proofUrl;
@@ -1276,7 +1275,7 @@ function EditOvertimeModal({
             />
           </div>
 
-          {/* ✅ 1 section jam saja — simple! */}
+          {/* Jam Lembur */}
           <div>
             <label className={labelCls}>
               Jam Lembur <span className="text-red-400 normal-case">*</span>
@@ -1303,32 +1302,74 @@ function EditOvertimeModal({
             </div>
           </div>
 
-          {/* Preview durasi & bayaran */}
+          {/* Preview durasi */}
           {previewDuration !== null && (
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span>⏱️</span>
-                <span className="text-sm text-gray-600">
-                  Durasi: <span className="font-black text-gray-900">{previewDuration} jam</span>
-                </span>
-              </div>
-              {previewPay !== null && (
-                <span className="text-sm font-black text-emerald-600">{formatRupiah(previewPay)}</span>
-              )}
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+              <span>⏱️</span>
+              <span className="text-sm text-gray-600">
+                Durasi: <span className="font-black text-gray-900">{previewDuration} jam</span>
+              </span>
             </div>
           )}
 
-          {/* Alasan */}
+          {/* Alasan — pill options */}
           <div>
-            <label className={labelCls}>Alasan</label>
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Alasan lembur..."
-              className={inputCls}
-            />
+            <label className={labelCls}>
+              Alasan Lembur <span className="text-red-400 normal-case">*</span>
+            </label>
+            <div className="space-y-2">
+              {REASON_OPTIONS.map((opt) => {
+                const isSelected = reasonType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setReasonType(opt.value);
+                      if (opt.value !== "Lainnya") setReasonCustom("");
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99]
+                      ${isSelected
+                        ? "bg-gray-900 border-gray-900 shadow-sm"
+                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    <span className="text-lg flex-shrink-0">{opt.icon}</span>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>
+                        {opt.value}
+                      </p>
+                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>
+                        {opt.desc}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Input custom jika pilih Lainnya */}
+          {isLainnya && (
+            <div>
+              <label className={labelCls}>
+                Jelaskan Alasan <span className="text-red-400 normal-case">*</span>
+              </label>
+              <input
+                type="text"
+                value={reasonCustom}
+                onChange={(e) => setReasonCustom(e.target.value)}
+                placeholder="Tuliskan alasan spesifik..."
+                className={inputCls}
+                autoFocus
+              />
+            </div>
+          )}
 
           {/* Rincian Pekerjaan */}
           <div>
@@ -1337,24 +1378,9 @@ function EditOvertimeModal({
               value={workDesc}
               onChange={(e) => setWorkDesc(e.target.value)}
               rows={3}
-              placeholder="Rincian pekerjaan..."
+              placeholder="Jelaskan pekerjaan yang dikerjakan saat lembur..."
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none placeholder:text-gray-300"
             />
-          </div>
-
-          {/* Tarif Per Jam */}
-          <div>
-            <label className={labelCls}>Tarif Per Jam (Rp)</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">Rp</span>
-              <input
-                type="number"
-                min={0}
-                value={rate}
-                onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
-                className="w-full h-11 border border-gray-200 rounded-xl pl-11 pr-4 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
-              />
-            </div>
           </div>
 
           {/* Status */}
@@ -1422,7 +1448,10 @@ function EditOvertimeModal({
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
           <button
             onClick={save}
-            disabled={saving || isProcessing || !requestDate || !startTime || !endTime}
+            disabled={
+              saving || isProcessing || !requestDate || !startTime || !endTime ||
+              !reasonType || (isLainnya && !reasonCustom.trim())
+            }
             className={primaryBtn}
           >
             {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
