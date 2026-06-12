@@ -175,7 +175,7 @@ export async function POST(request: Request) {
       // Hitung durasi dan bayaran
       const durationMins = Math.round(
         (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) /
-          60000
+        60000
       );
       const billedHours = Math.floor(durationMins / 60);
 
@@ -411,7 +411,7 @@ export async function PATCH(request: Request) {
           scheduled_start,
           scheduled_end,
           rate_per_hour: finalRate,
-          actual_start: new Date().toISOString(),
+          actual_start: scheduled_start,  // ✅ BENAR! = jadwal mulai
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -483,17 +483,45 @@ export async function PATCH(request: Request) {
       }
 
       const actualEnd = new Date().toISOString();
-      const startReference = overtime.actual_start ?? overtime.scheduled_start;
-      const durationMins = startReference
-        ? Math.round(
-            (new Date(actualEnd).getTime() -
-              new Date(startReference).getTime()) /
-              60000
-          )
-        : 0;
+
+      // ✅ actual_start sekarang pasti = scheduled_start (dari saat APPROVE)
+      const startReference = overtime.actual_start;
+
+      if (!startReference) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "actual_start tidak ditemukan. Request mungkin belum disetujui.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const startMs = new Date(startReference).getTime();
+      const endMs = new Date(actualEnd).getTime();
+
+      if (endMs <= startMs) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Waktu selesai tidak valid",
+          },
+          { status: 400 }
+        );
+      }
+
+      const durationMins = Math.round((endMs - startMs) / 60000);
       const ratePerHour = overtime.rate_per_hour ?? 0;
       const billedHours = Math.floor(durationMins / 60);
       const calculatedPay = billedHours * ratePerHour;
+
+      console.log(
+        `[COMPLETE] ${overtime.user_id}:`,
+        `Start: ${startReference}`,
+        `End: ${actualEnd}`,
+        `Duration: ${durationMins}min (${billedHours}h)`,
+        `Pay: Rp${calculatedPay}`
+      );
 
       const updates: any = {
         actual_end: actualEnd,

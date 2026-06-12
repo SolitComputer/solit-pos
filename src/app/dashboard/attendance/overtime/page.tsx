@@ -815,7 +815,7 @@ function ManualOvertimeModal({
   const [endTime, setEndTime] = useState("17:00");
   const [reasonType, setReasonType] = useState("");
   const [reasonCustom, setReasonCustom] = useState("");
-  const [workDescription, setWorkDescription] = useState(""); const [reason, setReason] = useState("");
+  const [workDescription, setWorkDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -859,7 +859,8 @@ function ManualOvertimeModal({
     if (endMs <= startMs) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
     if (!reasonType) { setError("Pilih alasan lembur"); return; }
     if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan lembur kamu"); return; }
-    if (!workDescription.trim()) { setError("Rincian pekerjaan wajib diisi"); return; } setSubmitting(true); setError("");
+    if (!workDescription.trim()) { setError("Rincian pekerjaan wajib diisi"); return; }
+    setSubmitting(true); setError("");
     try {
       let photoUrl: string | null = null;
       if (photoFile) {
@@ -981,7 +982,6 @@ function ManualOvertimeModal({
               </p>
             </div>
           )}
-          {/* Alasan Lembur — pill options */}
           <div>
             <label className={labelCls}>
               Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
@@ -1022,8 +1022,6 @@ function ManualOvertimeModal({
               })}
             </div>
           </div>
-
-          {/* Lainnya — custom input */}
           {reasonType === "Lainnya" && (
             <div>
               <label className={labelCls}>
@@ -1039,8 +1037,6 @@ function ManualOvertimeModal({
               />
             </div>
           )}
-
-          {/* Rincian Pekerjaan */}
           <div>
             <label className={labelCls}>
               Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span>
@@ -1141,7 +1137,6 @@ export default function OvertimePage() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  // ✅ startData dihapus — tidak ada lagi tombol Mulai
   const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
   const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
   const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
@@ -1173,30 +1168,64 @@ export default function OvertimePage() {
     ]).finally(() => setLoading(false));
   }, [fetchOvertimes, fetchAllUsers, currentUser?.role]);
 
-  // ── Auto-complete interval ─────────────────────────────────────────────────
+  // ✅ AUTO-COMPLETE INTERVAL dengan timezone handling robust
   useEffect(() => {
     if (!currentUser) return;
+
+    const parseTimestamp = (iso: string | null): number => {
+      if (!iso) return 0;
+      try {
+        const d = new Date(iso);
+        const time = d.getTime();
+        if (!isNaN(time)) return time;
+        return 0;
+      } catch (e) {
+        console.warn("[PARSE] Failed:", iso);
+        return 0;
+      }
+    };
+
     const checkAutoComplete = setInterval(() => {
       const now = Date.now();
+      console.log(`[CHECK] Time: ${new Date(now).toISOString()}`);
+
       overtimes.forEach((o) => {
         const isMyOvertime = o.user_id === currentUser.id;
         const isOngoing = o.status === "ONGOING";
-        const isTimeUp = o.scheduled_end && new Date(o.scheduled_end).getTime() <= now;
         const notYetCompleted = !o.actual_end;
         const notAlreadyProcessing = !autoCompletingIds.current.has(o.id);
-        if (isMyOvertime && isOngoing && isTimeUp && notYetCompleted && notAlreadyProcessing) {
+
+        if (!isMyOvertime || !isOngoing || !notAlreadyProcessing) return;
+
+        const scheduledEndTime = parseTimestamp(o.scheduled_end);
+        if (scheduledEndTime === 0) {
+          console.warn(`[CHECK] Parse failed: ${o.scheduled_end}`);
+          return;
+        }
+
+        const isTimeUp = scheduledEndTime <= now;
+        console.log(
+          `[CHECK] ${o.users?.name}:`,
+          `End: ${new Date(scheduledEndTime).toISOString()}`,
+          `TimeUp: ${isTimeUp}`
+        );
+
+        if (isTimeUp && notYetCompleted && notAlreadyProcessing) {
+          console.log(`✅ [AUTO-COMPLETE] Triggered for ${o.users?.name}`);
           handleAutoComplete(o);
         }
       });
-    }, 15000);
+    }, 5000);
+
     return () => clearInterval(checkAutoComplete);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overtimes, currentUser]);
 
   const handleAutoComplete = async (overtime: OvertimeRequest) => {
     if (autoCompletingIds.current.has(overtime.id)) return;
     autoCompletingIds.current.add(overtime.id);
+
     try {
+      console.log(`[AUTO-COMPLETE] Processing...`);
       const res = await fetch("/api/attendance/overtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1207,10 +1236,23 @@ export default function OvertimePage() {
           auto_completed: true,
         }),
       });
+
       const d = await res.json();
+
       if (d.success) {
+        console.log(`✅ Success:`, d.data);
         await fetchOvertimes();
-        setCompleteData({ ...overtime, status: "COMPLETED", auto_completed: true });
+        setCompleteData({
+          ...overtime,
+          status: "COMPLETED",
+          auto_completed: true,
+        });
+        setTimeout(() => {
+          autoCompletingIds.current.delete(overtime.id);
+        }, 5000);
+      } else {
+        console.error(`❌ Failed:`, d.message);
+        autoCompletingIds.current.delete(overtime.id);
       }
     } catch (err) {
       console.error("[AUTO-COMPLETE] Error:", err);
@@ -1265,10 +1307,8 @@ export default function OvertimePage() {
     { label: "Selesai", value: overtimes.filter((o) => o.status === "COMPLETED").length, icon: "🏁", accent: "from-blue-500 to-blue-700" },
   ];
 
-  // ── renderActions — tombol Mulai DIHAPUS ───────────────────────────────────
   const renderActions = (o: OvertimeRequest) => (
     <div className="flex justify-center gap-1.5 flex-wrap">
-      {/* Admin: Setujui jika PENDING */}
       {isAdminRole(currentUser?.role) && o.status === "PENDING" && (
         <button
           onClick={() => setApproveData(o)}
@@ -1277,7 +1317,6 @@ export default function OvertimePage() {
           ✅ Setujui
         </button>
       )}
-      {/* Admin: Lihat foto bukti jika COMPLETED */}
       {canApproveRole(currentUser?.role) && o.status === "COMPLETED" && o.proof_photo_url && (
         <button
           onClick={() => setProofPhotoData(o)}
@@ -1286,7 +1325,6 @@ export default function OvertimePage() {
           👁️ Lihat
         </button>
       )}
-      {/* Admin: Set/edit bayaran jika COMPLETED */}
       {canSetPay(currentUser?.role) && o.status === "COMPLETED" && (
         <button
           onClick={() => setSetPayData(o)}
@@ -1295,7 +1333,6 @@ export default function OvertimePage() {
           💰 {o.rate_per_hour ? "Edit" : "Set Bayar"}
         </button>
       )}
-      {/* Karyawan: Selesai jika ONGOING (tombol Mulai sudah dihapus) */}
       {!canApproveRole(currentUser?.role) &&
         currentUser?.id === o.user_id &&
         o.status === "ONGOING" &&
@@ -1308,7 +1345,6 @@ export default function OvertimePage() {
             🏁 Selesai
           </button>
         )}
-      {/* Karyawan: Upload foto bukti jika COMPLETED tapi belum ada foto */}
       {currentUser?.id === o.user_id && o.status === "COMPLETED" && !o.proof_photo_url && (
         <button
           onClick={() => setCompleteData({ ...o, auto_completed: true })}
@@ -1396,7 +1432,7 @@ export default function OvertimePage() {
             ))}
           </div>
 
-          {/* ══ CALENDAR ══ */}
+          {/* ══ CALENDAR & TABLE ══ */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -1699,7 +1735,6 @@ export default function OvertimePage() {
           onSaved={() => { fetchOvertimes(); setApproveData(null); }}
         />
       )}
-      {/* ✅ StartModal dihapus sepenuhnya */}
       {setPayData && (
         <SetPayModal
           overtime={setPayData}
