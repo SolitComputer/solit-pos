@@ -1,3 +1,5 @@
+"use client";
+
 import Sidebar from "./Sidebar";
 import { usePresence } from "@/hooks/usePresence"; 
 
