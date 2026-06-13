@@ -1478,12 +1478,12 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                 {/* Tombol aksi */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <a
-                        href={`/receipt/salary-slip/${slip.id}`}
+                        href={`/api/attendance/salary-slip/${slip.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
                     >
-                        🖨️ Cetak
+                        📄 PDF
                     </a>
 
                     {slip.status === "DRAFT" && (
@@ -1549,7 +1549,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
