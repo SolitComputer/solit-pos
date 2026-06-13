@@ -8,6 +8,13 @@ export {
   ROUTE_PERMISSIONS,
   PERMISSIONS,
   hasPermission,
+  isDivisionHead,
+  getSubordinateRoles,
+  getManageableRoles,
+  canManageAttendance,
+  canManageTargetRole,
+  canApproveOvertime,
+  DIVISION_MAP,
 } from "@/lib/permissions";
 
 export interface AuthUser {

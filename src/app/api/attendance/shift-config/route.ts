@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, isFullAccess } from "@/lib/auth";
+import { getCurrentUser, isDivisionHead } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { getAttendanceScope } from "@/lib/attendanceScope";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Default config per shift — fallback jika tidak ada custom config
 const SHIFT_DEFAULTS = {
   PAGI: { open_hour: 7, open_minute: 30, late_hour: 8, late_minute: 0, close_hour: 12, close_minute: 0 },
   SORE: { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0 },
 } as const;
 
-// GET — ambil config semua user (admin) atau milik sendiri
+// GET — config (admin: semua | kepala: bawahannya | user: dirinya)
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -22,8 +22,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get("user_id");
 
-    // Jika admin request config satu user
-    if (isFullAccess(user.role) && targetUserId) {
+    const scope = await getAttendanceScope(supabase, user);
+    const canManage = scope.all || isDivisionHead(user.role);
+
+    // Pengelola minta config 1 user spesifik
+    if (canManage && targetUserId) {
+      // Kepala divisi cuma boleh lihat config bawahannya
+      if (!scope.all && !scope.manageableIds.includes(targetUserId)) {
+        return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+      }
       const { data, error } = await supabase
         .from("user_shift_config")
         .select("*")
@@ -34,22 +41,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-    // Jika admin tanpa targetUserId → ambil semua, join dengan users
-    if (user.role === "ADMIN") {
-      // Ambil semua users + config mereka
-      const { data: allUsers } = await supabase
+    // Pengelola tanpa target → daftar gabungan (admin: semua, kepala: bawahannya)
+    if (canManage) {
+      let usersQuery = supabase
         .from("users")
         .select("id, name, role, shift")
         .order("name");
 
-      const { data: allConfigs } = await supabase
-        .from("user_shift_config")
-        .select("*");
+      if (!scope.all) {
+        usersQuery = usersQuery.in("id", scope.manageableIds);
+      }
+
+      const { data: scopedUsers } = await usersQuery;
+      const { data: allConfigs } = await supabase.from("user_shift_config").select("*");
 
       const configMap: Record<string, any> = {};
       (allConfigs || []).forEach((c: any) => { configMap[c.user_id] = c; });
 
-      const combined = (allUsers || []).map((u: any) => {
+      const combined = (scopedUsers || []).map((u: any) => {
         const config = configMap[u.id];
         const defaults = SHIFT_DEFAULTS[u.shift as keyof typeof SHIFT_DEFAULTS] ?? SHIFT_DEFAULTS.PAGI;
         return {
@@ -71,7 +80,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: combined });
     }
 
-    // Non-admin: hanya bisa lihat miliknya sendiri
+    // User biasa → config dirinya sendiri
     const { data: userData } = await supabase
       .from("users")
       .select("shift")
@@ -106,18 +115,15 @@ export async function GET(request: Request) {
   }
 }
 
-// POST — upsert config untuk satu user (admin only)
+// POST — upsert config (admin: siapa saja | kepala: bawahannya)
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || !isFullAccess(user.role)) {
-      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
-    }
+    if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
     const {
-      user_id,
-      shift,
+      user_id, shift,
       open_hour, open_minute = 0,
       late_hour, late_minute = 0,
       close_hour, close_minute = 0,
@@ -127,7 +133,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "user_id wajib" }, { status: 400 });
     }
 
-    // Validasi logika waktu: open <= late <= close
+    // Izin: full access → semua | kepala divisi → hanya bawahannya
+    const scope = await getAttendanceScope(supabase, user);
+    const allowed = scope.all || scope.manageableIds.includes(user_id);
+    if (!allowed) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+    }
+
+    // Validasi logika waktu: open < late < close
     const openTotal = open_hour * 60 + open_minute;
     const lateTotal = late_hour * 60 + late_minute;
     const closeTotal = close_hour * 60 + close_minute;
@@ -139,7 +152,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Jam telat harus sebelum jam tutup" }, { status: 400 });
     }
 
-    // Upsert config
     const { data, error } = await supabase
       .from("user_shift_config")
       .upsert(
@@ -159,7 +171,6 @@ export async function POST(request: Request) {
 
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-    // Sync shift ke tabel users juga
     if (shift) {
       await supabase.from("users").update({ shift }).eq("id", user_id);
     }
@@ -170,19 +181,23 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE — hapus custom config (kembali ke default shift)
+// DELETE — reset config ke default (admin: siapa saja | kepala: bawahannya)
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || !isFullAccess(user.role)) {
-      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
-    }
+    if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
     const user_id = searchParams.get("user_id");
 
     if (!user_id) {
       return NextResponse.json({ success: false, message: "user_id wajib" }, { status: 400 });
+    }
+
+    const scope = await getAttendanceScope(supabase, user);
+    const allowed = scope.all || scope.manageableIds.includes(user_id);
+    if (!allowed) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { error } = await supabase

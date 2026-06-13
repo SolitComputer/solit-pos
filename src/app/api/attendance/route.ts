@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { getAttendanceScope } from "@/lib/attendanceScope";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"];
-function canViewAllAttendance(role: string): boolean {
-  return isFullAccess(role) || SALARY_ACCESS_ROLES.includes(role);
-}
 
 export async function GET(request: Request) {
   try {
@@ -18,6 +14,8 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
+
+    const scope = await getAttendanceScope(supabase, user);
 
     let query = supabase
       .from("face_verifications")
@@ -33,8 +31,8 @@ export async function GET(request: Request) {
       .in("status", ["SUCCESS"])
       .order("created_at", { ascending: true });
 
-    if (!canViewAllAttendance(user.role)) {   
-      query = query.eq("user_id", user.id);
+    if (!scope.all) {
+      query = query.in("user_id", scope.visibleIds);
     }
 
     const { data, error } = await query;
@@ -81,7 +79,7 @@ export async function GET(request: Request) {
   }
 }
 
-// ✅ NEW: DELETE endpoint untuk hapus face verification records
+// DELETE — tetap full-access only (hapus record wajah)
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -93,13 +91,9 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, message: "ID wajib diisi" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "ID wajib diisi" }, { status: 400 });
     }
 
-    // ✅ Verifikasi ownership — pastikan user bisa hapus record ini
     const { data: record, error: checkError } = await supabase
       .from("face_verifications")
       .select("id, user_id")
@@ -107,13 +101,9 @@ export async function DELETE(request: Request) {
       .maybeSingle();
 
     if (checkError || !record) {
-      return NextResponse.json(
-        { success: false, message: "Record tidak ditemukan" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: "Record tidak ditemukan" }, { status: 404 });
     }
 
-    // Hapus record
     const { error } = await supabase
       .from("face_verifications")
       .delete()

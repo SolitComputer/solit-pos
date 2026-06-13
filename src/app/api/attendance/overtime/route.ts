@@ -1,7 +1,7 @@
-// src/app/api/attendance/overtime/route.ts
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { isDivisionHead, getSubordinateRoles } from "@/lib/permissions";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +15,6 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
 };
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-// ✅ Role yang boleh melihat data bayaran lembur (rate_per_hour & total_pay)
 const PAY_VIEW_ROLES = [
   "KEPALA_SALES",
   "KEPALA_MARKETING",
@@ -33,7 +32,6 @@ function canApprove(approverRole: string, targetRole: string): boolean {
   return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
 }
 
-// ─── GET ──────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -154,10 +152,10 @@ export async function GET(request: Request) {
     const finalResult = canSeePay
       ? result
       : result.map(({ rate_per_hour, total_pay, ...rest }: any) => ({
-          ...rest,
-          rate_per_hour: null,
-          total_pay: null,
-        }));
+        ...rest,
+        rate_per_hour: null,
+        total_pay: null,
+      }));
 
     return NextResponse.json({ success: true, data: finalResult });
   } catch (err: any) {

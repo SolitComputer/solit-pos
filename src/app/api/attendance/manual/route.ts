@@ -1,7 +1,7 @@
-// src/app/api/attendance/manual/route.ts
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { getAttendanceScope } from "@/lib/attendanceScope"; // ✅ NEW
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +10,6 @@ const supabase = createClient(
 
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-// GET — ambil semua manual attendance bulan tertentu
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -25,7 +24,6 @@ export async function GET(request: Request) {
     const lastDay = new Date(Number(year), Number(month), 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
-    // ✅ Tambah created_by ke select
     let q = supabase
       .from("attendance_manual")
       .select("id, user_id, attendance_date, check_in_time, status, notes, created_by, created_at")
@@ -33,8 +31,9 @@ export async function GET(request: Request) {
       .lte("attendance_date", endDate)
       .order("attendance_date", { ascending: false });
 
-    if (!FULL_ACCESS_ROLES.includes(user.role)) {
-      q = q.eq("user_id", user.id);
+    const scope = await getAttendanceScope(supabase, user);
+    if (!scope.all) {
+      q = q.in("user_id", scope.visibleIds);
     }
 
     const { data: manualData, error: manualError } = await q;
@@ -58,7 +57,7 @@ export async function GET(request: Request) {
     const usersMap: Record<string, any> = {};
     (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
 
-    // ✅ FIX: Ambil nama admin/creator yang mengabsenkan
+    // Ambil nama admin/creator yang mengabsenkan
     const creatorIds = [...new Set(
       manualData.map((r: any) => r.created_by).filter(Boolean)
     )];
@@ -74,7 +73,6 @@ export async function GET(request: Request) {
     const result = manualData.map((r: any) => ({
       ...r,
       users: usersMap[r.user_id] ?? null,
-      // ✅ Nama admin yang mengabsenkan — ditampilkan ke non-admin
       created_by_name: r.created_by ? (creatorsMap[r.created_by] ?? null) : null,
     }));
 

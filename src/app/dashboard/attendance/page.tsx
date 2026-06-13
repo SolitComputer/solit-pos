@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
+import { canManageAttendance } from "@/lib/permissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Attendance = {
@@ -2130,7 +2131,6 @@ export default function AttendanceDashboardPage() {
         setShowManualModal(true);
     }, [allUsers, fetchAllUsers]);
 
-    // ✅ FIXED: Tambahkan refreshAll yang hilang
     const refreshAll = useCallback(async () => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
@@ -2181,7 +2181,35 @@ export default function AttendanceDashboardPage() {
         if (dateWorkByName[name]?.has(dk)) return false;
         const dow = new Date(dk + "T12:00:00").getDay();
         return (dayOffByName[name]?.has(dow) ?? false) || (dateOffByName[name]?.has(dk) ?? false);
-    }; const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
+    };
+    const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
+    // Nama → role (untuk label di daftar libur). allUsers sudah ter-scope per role dari backend.
+    const roleByName = useMemo(() => {
+        const m: Record<string, string> = {};
+        allUsers.forEach(u => { m[u.name] = u.role; });
+        return m;
+    }, [allUsers]);
+
+    const getOffDetailForDate = (dk: string): { name: string; role: string; reason: string }[] => {
+        const dow = new Date(dk + "T12:00:00").getDay();
+        const allowed = new Set(allUsers.map(u => u.name));
+        const seen = new Set<string>();
+        const result: { name: string; role: string; reason: string }[] = [];
+
+        const add = (name: string | null | undefined, reason: string) => {
+            if (!name || seen.has(name)) return;
+            if (allUsers.length > 0 && !allowed.has(name)) return;
+            if (dateWorkByName[name]?.has(dk)) return;
+            seen.add(name);
+            result.push({ name, role: roleByName[name] ?? "", reason });
+        };
+
+        Object.entries(dayOffByName).forEach(([name, dows]) => { if (dows.has(dow)) add(name, "Libur Mingguan"); });
+        Object.entries(dateOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur / Tukar"); });
+        leaveData.forEach(ld => { if (ld.requests.some(r => r.leave_date === dk)) add(ld.user.name, "Cuti"); });
+
+        return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
+    };
     const allowanceMap = useMemo(() => {
         const m: Record<string, UserAllowances> = {};
         allowances.forEach(a => (m[a.user_id] = a));
@@ -2360,6 +2388,8 @@ export default function AttendanceDashboardPage() {
         )
         : [];
 
+    const selectedOffDetail = selectedDate ? getOffDetailForDate(selectedDate) : [];
+
     // ✅ NEW FUNCTION: Generate slip gaji dari data rekapan yang sudah di-calculate
     const generateSlipFromRecapan = useCallback(async (userStat: typeof userSummary[0]) => {
         try {
@@ -2447,6 +2477,10 @@ export default function AttendanceDashboardPage() {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [selectedMonth, refreshAll]);
 
+    const isAdmin = isAdminRole(currentUser?.role);
+    const canManage = canManageAttendance(currentUser?.role);
+    const canSalary = canViewSalary(currentUser?.role);
+
     if (!selectedMonth) return (
         <DashboardLayout>
             <MonthSelector onSelect={(y, m) => setSelectedMonth({ year: y, month: m })} />
@@ -2466,8 +2500,7 @@ export default function AttendanceDashboardPage() {
                         </button>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
-                                <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{isAdminRole(currentUser?.role)
-                                    ? "Laporan Absensi" : "Absensi Saya"}</span>
+                                <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{canManage ? "Laporan Absensi" : "Absensi Saya"}</span>
                                 <span className="text-gray-300">—</span>
                                 <span className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] bg-clip-text text-transparent">{MONTH_NAMES[calMonth]} {calYear}</span>
                             </h1>
@@ -2475,29 +2508,25 @@ export default function AttendanceDashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {isAdminRole(currentUser?.role) && (
+                        {isAdmin && (
+                            <button
+                                onClick={() => openAddManual()}
+                                disabled={usersLoading}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                            >
+                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                            </button>
+                        )}
+                        {canManage && (
                             <>
                                 <button
-                                    onClick={() => openAddManual()}
-                                    disabled={usersLoading}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
-                                >
-                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (allUsers.length === 0) fetchAllUsers();
-                                        setShowDayOffModal(true);
-                                    }}
+                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
                                     📅 Libur Mingguan
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if (allUsers.length === 0) fetchAllUsers();
-                                        setShowSwapModal(true);
-                                    }}
+                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSwapModal(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
                                 >
                                     🔄 Tukar Libur
@@ -2539,7 +2568,7 @@ export default function AttendanceDashboardPage() {
                         const tabList: { id: typeof activeTab; label: string }[] = [
                             { id: "calendar", label: "📅 Kalender" },
                         ];
-                        if (isAdminRole(role)) tabList.push({ id: "summary", label: "📊 Ringkasan" });
+                        if (canManage) tabList.push({ id: "summary", label: "📊 Ringkasan" });
                         if (canViewSalary(role)) {
                             tabList.push({ id: "salary", label: "💰 Rekap Gaji" });
                             tabList.push({ id: "salary-slip", label: "📄 Slip Gaji" });
@@ -2562,18 +2591,17 @@ export default function AttendanceDashboardPage() {
                 </div>
 
                 {/* ── Filter ── */}
-                {isAdminRole(currentUser?.role)
-                    && activeTab === "calendar" && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">🎯 Filter Karyawan</p>
-                            <div className="flex flex-wrap gap-2">
-                                <button onClick={() => setFilterUser("Semua")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>Semua</button>
-                                {uniqueUsers.map(n => (
-                                    <button key={n} onClick={() => setFilterUser(n)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>{n}</button>
-                                ))}
-                            </div>
+                {canManage && activeTab === "calendar" && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">🎯 Filter Karyawan</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setFilterUser("Semua")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>Semua</button>
+                            {uniqueUsers.map(n => (
+                                <button key={n} onClick={() => setFilterUser(n)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>{n}</button>
+                            ))}
                         </div>
-                    )}
+                    </div>
+                )}
 
                 {/* ════ TAB KALENDER ════ */}
                 {activeTab === "calendar" && (
@@ -2610,9 +2638,7 @@ export default function AttendanceDashboardPage() {
                                             const mc = dd.filter(a => a.source === "MANUAL").length;
                                             const tot = dd.length;
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
-                                            const effectiveFilterUser = !isAdminRole(currentUser?.role) && currentUser?.name
-                                                ? currentUser.name
-                                                : filterUser;
+                                            const effectiveFilterUser = !canManage && currentUser?.name ? currentUser.name : filterUser;
                                             const isUserDayOff = effectiveFilterUser !== "Semua" ? isDayOffForUser(effectiveFilterUser, dk) : false;
                                             const hasAnyDayOff = filterUser === "Semua" ? getOffUsersForDate(dk).length > 0 : false;
                                             const hasManual = mc > 0;
@@ -2657,7 +2683,7 @@ export default function AttendanceDashboardPage() {
                                             {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full">✅ {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
                                             {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">⏰ {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full">✏️ {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
-                                            {getOffUsersForDate(selectedDate).length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 {getOffUsersForDate(selectedDate).length} libur</span>}
+                                            {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 {selectedOffDetail.length} libur</span>}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -2673,6 +2699,30 @@ export default function AttendanceDashboardPage() {
                                     </div>
                                 </div>
 
+                                {canManage && selectedOffDetail.length > 0 && (
+                                    <div className="px-6 pt-4 pb-3 border-b border-gray-50 bg-red-50/20">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
+                                            🔴 Libur / Tidak Masuk ({selectedOffDetail.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedOffDetail.map(o => (
+                                                <div key={o.name} className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl pl-1.5 pr-3 py-1.5 shadow-sm">
+                                                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">
+                                                        {initials(o.name)}
+                                                    </div>
+                                                    <div className="leading-tight">
+                                                        <p className="text-[11px] font-bold text-gray-700">{o.name}</p>
+                                                        <p className="text-[9px] text-red-500 font-semibold">
+                                                            {o.reason}{o.role ? ` · ${o.role.replace(/_/g, " ")}` : ""}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+
                                 {selectedAttendances.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-12 px-6">
                                         <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
@@ -2681,7 +2731,7 @@ export default function AttendanceDashboardPage() {
                                                 : <span className="text-3xl opacity-40">📅</span>
                                             }
                                         </div>
-                                        {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
+                                        {!canManage && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
                                             <div className="text-center">
                                                 <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
                                                 <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
@@ -2722,11 +2772,7 @@ export default function AttendanceDashboardPage() {
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
                                                     return (
-                                                        <tr key={a.id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" && (
-                                                            <span className="inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border bg-blue-100 text-blue-700 border-blue-200">
-                                                                ✏️ Manual
-                                                            </span>
-                                                        )}`}>
+                                                        <tr key={a.id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/40" : ""}`}>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 shadow-md ${a.displayStatus === "PRESENT" ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gradient-to-br from-amber-500 to-orange-500"}`}>{initials(a.user_name)}</div>
@@ -2895,18 +2941,20 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
-                                            {isAdminRole(currentUser?.role) && (
-                                                <>
-                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
-                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Shift</th>
-                                                </>
+                                            {isAdmin && (
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
+                                            )}
+                                            {canManage && (
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Shift</th>
                                             )}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {(isAdminRole(currentUser?.role)
+                                        {(isAdmin
                                             ? userSummary
-                                            : userSummary.filter(u => u.userId === currentUser?.id)
+                                            : canManage
+                                                ? userSummary.filter(u => allUsers.some(au => au.id === u.userId))
+                                                : userSummary.filter(u => u.userId === currentUser?.id)
                                         ).map((u, i) => {
                                             // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
                                             const absent = u.absences.length;
@@ -2962,41 +3010,39 @@ export default function AttendanceDashboardPage() {
                                                             <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
-                                                    {isAdminRole(currentUser?.role) && (
-                                                        <>
-                                                            <td className="px-4 py-4 text-center">
-                                                                <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
-                                                                            const success = await generateSlipFromRecapan(u);
-                                                                            if (success) {
-                                                                                fetchSalarySlips(calYear, calMonth);
-                                                                                alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
-                                                                            }
-                                                                        }}
-                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
-                                                                        title={`Generate slip gaji ${u.name}`}>
-                                                                        📄 Slip
-                                                                    </button>
-                                                                    <button onClick={() => openAddManual(undefined, u.userId)}
-                                                                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
-                                                                        title={`Tambah absen manual untuk ${u.name}`}>
-                                                                        ➕ Absen
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-4 py-4 text-center">
-                                                                <button onClick={() => {
-                                                                    if (allUsers.length === 0) fetchAllUsers();
-                                                                    setShiftModalUserId(u.userId);
-                                                                    setShowShiftModal(true);
-                                                                }} className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
+                                                    {isAdmin && (
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                        const success = await generateSlipFromRecapan(u);
+                                                                        if (success) { fetchSalarySlips(calYear, calMonth); alert(`✅ Slip gaji ${u.name} berhasil di-generate!`); }
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                    title={`Generate slip gaji ${u.name}`}>
+                                                                    📄 Slip
+                                                                </button>
+                                                                <button onClick={() => openAddManual(undefined, u.userId)}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
+                                                                    title={`Tambah absen manual untuk ${u.name}`}>
+                                                                    ➕ Absen
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                    {canManage && (
+                                                        <td className="px-4 py-4 text-center">
+                                                            {(isAdmin || u.userId !== currentUser?.id) ? (
+                                                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShiftModalUserId(u.userId); setShowShiftModal(true); }}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
                                                                     title={`Atur jadwal shift ${u.name}`}>
                                                                     ⏰ Shift
                                                                 </button>
-                                                            </td>
-                                                        </>
+                                                            ) : (
+                                                                <span className="text-gray-200 text-sm font-black">—</span>
+                                                            )}
+                                                        </td>
                                                     )}
                                                 </tr>
                                             );
@@ -3819,11 +3865,14 @@ export default function AttendanceDashboardPage() {
                 </div>
             )}
 
-            {/* ── Modals ── */}
-            {showDayOffModal && isAdminRole(currentUser?.role)
-                && (
-                    <DayOffModal users={allUsers} dayOffs={dayOffs} onClose={() => setShowDayOffModal(false)} onSaved={() => { fetchDayOffs(); setShowDayOffModal(false); }} />
-                )}
+            {showDayOffModal && canManage && (
+                <DayOffModal
+                    users={isAdmin ? allUsers : allUsers.filter(u => u.id !== currentUser?.id)}
+                    dayOffs={dayOffs}
+                    onClose={() => setShowDayOffModal(false)}
+                    onSaved={() => { fetchDayOffs(); setShowDayOffModal(false); }}
+                />
+            )}
             {showManualModal && isAdminRole(currentUser?.role)
                 && (
                     <ManualAttendanceModal
@@ -3889,9 +3938,9 @@ export default function AttendanceDashboardPage() {
                     }}
                 />
             )}
-            {showSwapModal && isAdminRole(currentUser?.role) && (
+            {showSwapModal && canManage && (
                 <SwapDayOffModal
-                    users={allUsers}
+                    users={isAdmin ? allUsers : allUsers.filter(u => u.id !== currentUser?.id)}
                     dayOffs={dayOffs}
                     allDateOffs={allDateOffs}
                     allDateWorks={allDateWorks}

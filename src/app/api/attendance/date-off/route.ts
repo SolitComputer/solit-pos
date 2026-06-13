@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { isFullAccess, isDivisionHead, getSubordinateRoles, isSubordinate } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -16,16 +17,21 @@ export async function GET(request: Request) {
     const year = searchParams.get("year");
     const month = searchParams.get("month");
 
-    const isAdmin = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(user.role);
+    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
 
     let q = supabase
       .from("user_date_off")
-      .select("id, user_id, off_date, note, created_at")  // ← note bukan notes
+      .select("id, user_id, off_date, note, created_at")
       .order("off_date", { ascending: true });
 
-    if (!isAdmin) {
+    if (!canManage) {
+      // Karyawan biasa: hanya miliknya
       q = q.eq("user_id", user.id);
+    } else if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+      // Kepala divisi: hanya tampilkan data milik anggota divisinya
+      // Kita filter di aplikasi setelah join users
     }
+    // Full access: tidak filter — ambil semua
 
     if (year && month) {
       const paddedMonth = String(month).padStart(2, "0");
@@ -42,7 +48,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // ── Step 2: ambil user info secara terpisah ────────────────────────────
+    // Ambil user info
     const userIds = [...new Set(dateOffData.map((d: any) => d.user_id))];
     const { data: usersData } = await supabase
       .from("users")
@@ -52,13 +58,20 @@ export async function GET(request: Request) {
     const usersMap: Record<string, { id: string; name: string; role: string }> = {};
     (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
 
-    // ── Step 3: gabungkan ──────────────────────────────────────────────────
-    const data = dateOffData.map((d: any) => ({
+    let combined = dateOffData.map((d: any) => ({
       ...d,
       users: usersMap[d.user_id] || null,
     }));
 
-    return NextResponse.json({ success: true, data });
+    // Untuk kepala divisi non-full-access: filter hanya anggota divisinya
+    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+      const subordinateRoles = getSubordinateRoles(user.role);
+      combined = combined.filter((d: any) =>
+        d.users && subordinateRoles.includes(d.users.role)
+      );
+    }
+
+    return NextResponse.json({ success: true, data: combined });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
   }
@@ -67,8 +80,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    // Hanya full access atau kepala divisi yang bisa set libur untuk orang lain
+    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    if (!canManage) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -82,12 +101,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Format tanggal: YYYY-MM-DD" }, { status: 400 });
     }
 
+    // Kepala divisi: validasi target user adalah bawahannya
+    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+      const { data: targetUser, error: targetErr } = await supabase
+        .from("users")
+        .select("id, role")
+        .eq("id", user_id)
+        .single();
+
+      if (targetErr || !targetUser) {
+        return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
+      }
+
+      if (!isSubordinate(user.role, targetUser.role)) {
+        return NextResponse.json(
+          { success: false, message: "User bukan anggota divisi kamu" },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from("user_date_off")
       .upsert({
         user_id,
         off_date,
-        notes: notes || null,
+        note: notes || null,
         created_by: user.id,
       }, { onConflict: "user_id,off_date" })
       .select()
@@ -103,8 +142,13 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    if (!canManage) {
+      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -113,6 +157,22 @@ export async function DELETE(request: Request) {
 
     if (!user_id || !off_date) {
       return NextResponse.json({ success: false, message: "user_id dan off_date wajib" }, { status: 400 });
+    }
+
+    // Kepala divisi: validasi target user adalah bawahannya
+    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+      const { data: targetUser } = await supabase
+        .from("users")
+        .select("id, role")
+        .eq("id", user_id)
+        .single();
+
+      if (!targetUser || !isSubordinate(user.role, targetUser.role)) {
+        return NextResponse.json(
+          { success: false, message: "User bukan anggota divisi kamu" },
+          { status: 403 }
+        );
+      }
     }
 
     const { error } = await supabase

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, isFullAccess } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { getAttendanceScope } from "@/lib/attendanceScope";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,8 +11,8 @@ const supabase = createClient(
 export async function POST(request: Request) {
     try {
         const user = await getCurrentUser();
-        if (!user || !isFullAccess(user.role)) {
-            return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+        if (!user) {
+            return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
         const body = await request.json();
@@ -29,6 +30,13 @@ export async function POST(request: Request) {
                 { success: false, message: "Tanggal libur dan tanggal masuk tidak boleh sama" },
                 { status: 400 }
             );
+        }
+
+        // Izin: full access → semua | kepala divisi → hanya bawahannya
+        const scope = await getAttendanceScope(supabase, user);
+        const allowed = scope.all || scope.manageableIds.includes(user_id);
+        if (!allowed) {
+            return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
         }
 
         const [offResult, workResult] = await Promise.all([
@@ -62,7 +70,6 @@ export async function POST(request: Request) {
         }
         if (workResult.error) {
             console.error("[swap-dayoff] workResult error:", JSON.stringify(workResult.error));
-            // rollback...
             return NextResponse.json({
                 success: false,
                 message: workResult.error.message,
@@ -83,8 +90,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
     try {
         const user = await getCurrentUser();
-        if (!user || !isFullAccess(user.role)) {
-            return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+        if (!user) {
+            return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
         const { searchParams } = new URL(request.url);
@@ -97,6 +104,12 @@ export async function DELETE(request: Request) {
                 { success: false, message: "user_id, off_date, work_date wajib diisi" },
                 { status: 400 }
             );
+        }
+
+        const scope = await getAttendanceScope(supabase, user);
+        const allowed = scope.all || scope.manageableIds.includes(user_id);
+        if (!allowed) {
+            return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
         }
 
         await Promise.all([

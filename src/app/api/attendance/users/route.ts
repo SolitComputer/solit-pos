@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { getAttendanceScope } from "@/lib/attendanceScope";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
-
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  if (FULL_ACCESS_ROLES.has(user.role)) {
+  const scope = await getAttendanceScope(supabase, user);
+
+  // ADMIN / PROGRAMMER / ASISTEN_CEO → semua user aktif
+  if (scope.all) {
     const { data, error } = await supabase
       .from("users")
       .select("id, name, role, shift")
@@ -18,22 +20,23 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("[attendance/users GET] admin error:", error);
+      console.error("[attendance/users GET] full-access error:", error);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
-
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, data: data ?? [] });
   }
 
+  // Kepala divisi → dirinya + bawahannya | user biasa → dirinya saja
   const { data, error } = await supabase
     .from("users")
     .select("id, name, role, shift")
-    .eq("id", user.id)
-    .single();
+    .in("id", scope.visibleIds)
+    .eq("is_active", true)
+    .order("name", { ascending: true });
 
   if (error) {
-    console.error("[attendance/users GET] non-admin error:", error);
-    // Fallback dari token kalau query DB gagal
+    console.error("[attendance/users GET] scoped error:", error);
+    // Fallback dari token kalau query gagal
     return NextResponse.json({
       success: true,
       data: [{
@@ -45,10 +48,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     });
   }
 
-  return NextResponse.json({
-    success: true,
-    data: data ? [data] : [],
-  });
+  return NextResponse.json({ success: true, data: data ?? [] });
 }
 
 export const GET = withAuth(getHandler);
