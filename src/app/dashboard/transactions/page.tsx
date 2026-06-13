@@ -414,10 +414,11 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
           <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
             <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.laptop_name || "—"}</p>
-            {(item.cpu || item.ram) && (
+            {(item.cpu || item.ram || item.storage) && (
               <div className="flex flex-wrap gap-1.5">
                 {item.cpu && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">⚙️ {item.cpu}</span>}
                 {item.ram && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">💾 {item.ram}</span>}
+                {item.storage && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">🗄️ {item.storage}</span>}
               </div>
             )}
             {(() => {
@@ -838,7 +839,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             <div className="text-[10px] font-bold text-gray-900 leading-tight line-clamp-1">
               {item.laptop_name || "—"}
             </div>
-            {(item.cpu || item.ram) && (
+            {(item.cpu || item.ram || item.storage) && (
               <div className="flex items-center gap-1 flex-wrap">
                 {item.cpu && (
                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">
@@ -848,6 +849,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 {item.ram && (
                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">
                     {item.ram}
+                  </span>
+                )}
+                {item.storage && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">
+                    {item.storage}
                   </span>
                 )}
               </div>
