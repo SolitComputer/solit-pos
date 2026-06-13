@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import { getCurrentUser } from "@/lib/auth";
 import SalarySlipPrintClient from "./SalarySlipPrintClient";
 
 const supabase = createClient(
@@ -12,16 +13,20 @@ const MONTH_NAMES = [
     "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
+const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+
 type PageProps = {
-    params: Promise<{
-        slipId: string;
-    }>;
+    params: Promise<{ slipId: string }>;
 };
 
-export default async function SalarySlipPage({
-    params,
-}: PageProps) {
+export default async function SalarySlipPage({ params }: PageProps) {
     const { slipId } = await params;
+
+    // ✅ Auth guard — wajib login
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+        redirect("/login");
+    }
 
     // Fetch slip
     const { data: slip, error } = await supabase
@@ -34,6 +39,17 @@ export default async function SalarySlipPage({
         notFound();
     }
 
+    // ✅ Permission guard — hanya admin atau pemilik slip
+    const isAdmin = ADMIN_ROLES.includes(currentUser.role);
+    if (!isAdmin && slip.user_id !== currentUser.id) {
+        redirect("/dashboard/attendance");
+    }
+
+    // ✅ Non-admin hanya bisa lihat slip yang sudah dikirim (sent_at tidak null)
+    if (!isAdmin && !slip.sent_at) {
+        redirect("/dashboard/attendance");
+    }
+
     // Fetch user info
     const { data: userData } = await supabase
         .from("users")
@@ -41,11 +57,8 @@ export default async function SalarySlipPage({
         .eq("id", slip.user_id)
         .single();
 
-    // Ambil label periode
     const monthLabel = MONTH_NAMES[slip.month - 1];
     const year = slip.year;
-
-    // Hitung hari pertama dan terakhir bulan
     const firstDay = `1 ${monthLabel} ${year}`;
     const lastDayNum = new Date(year, slip.month, 0).getDate();
     const lastDay = `${lastDayNum} ${monthLabel} ${year}`;
@@ -53,7 +66,13 @@ export default async function SalarySlipPage({
     return (
         <SalarySlipPrintClient
             slip={slip}
-            user={userData ?? { id: slip.user_id, name: "Unknown", role: "-", phone_number: null, shift: "PAGI" }}
+            user={userData ?? {
+                id: slip.user_id,
+                name: "Unknown",
+                role: "-",
+                phone_number: null,
+                shift: "PAGI",
+            }}
             periodLabel={`${firstDay} - ${lastDay}`}
             monthYear={`${monthLabel} ${year}`}
         />

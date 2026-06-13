@@ -114,7 +114,7 @@ const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 function isAdminRole(role?: string): boolean {
     return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
-const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG"] as const;
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as const;
 function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
 }

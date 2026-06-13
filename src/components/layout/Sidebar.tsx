@@ -325,6 +325,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
