@@ -1,19 +1,16 @@
+// C:\solit-pos\src\app\api\transaction\route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
-import { createClient } from "@supabase/supabase-js";
-import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { withAuth, AuthUser } from "@/lib/auth";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status") || "ALL";
+    const url = new URL(req.url);
+    const search = url.searchParams.get("search") ?? "";
+    const status = url.searchParams.get("status") ?? "ALL";
 
+    // ── 1. Fetch transactions ──────────────────────────────────────
     let query = supabase
       .from("transactions")
       .select("*")
@@ -23,73 +20,86 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    if (search.trim()) {
+      query = query.or(
+        `invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,laptop_name.ilike.%${search}%`
+      );
+    }
+
+    const { data: transactions, error } = await query;
 
     if (error) {
-      console.error("Transaction query error:", error.message);
       return NextResponse.json(
         { success: false, message: error.message },
         { status: 400 }
       );
     }
 
-    const transactions = data ?? [];
+    if (!transactions || transactions.length === 0) {
+      return NextResponse.json({ success: true, data: [] });
+    }
 
-    const laptopIds = [...new Set(
-      transactions
-        .map((t: any) => t.laptop_id)
-        .filter(Boolean)
-    )] as string[];
+    // ── 2. Kumpulkan semua unit ID yang perlu di-fetch ─────────────
+    const allUnitIds = new Set<string>();
 
-    let laptopMap: Record<string, any> = {};
+    for (const trx of transactions) {
+      // Single unit (transaksi lama)
+      if (trx.unit_id) allUnitIds.add(trx.unit_id);
 
-    if (laptopIds.length > 0) {
-      const { data: laptops, error: laptopError } = await supabaseAdmin
-        .from("laptops")
-        .select("id, cpu, ram, storage, display, brand, gpu")
-        .in("id", laptopIds);
-
-      if (laptopError) {
-        console.error("Laptop specs error:", laptopError.message);
-      } else if (laptops) {
-        laptopMap = Object.fromEntries(
-          laptops.map((l: any) => [l.id, l])
-        );
+      // Multi unit (transaksi baru — unit_ids adalah array uuid)
+      if (Array.isArray(trx.unit_ids)) {
+        for (const uid of trx.unit_ids) {
+          if (uid) allUnitIds.add(uid);
+        }
       }
     }
 
-    const mapped = transactions.map((item: any) => {
-      const specs = item.laptop_id ? laptopMap[item.laptop_id] : null;
+    // ── 3. Batch fetch semua units sekaligus (bukan N+1) ──────────
+    let unitMap = new Map<string, number>(); // id → purchase_price
+
+    if (allUnitIds.size > 0) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", Array.from(allUnitIds));
+
+      for (const unit of units ?? []) {
+        unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+      }
+    }
+
+    // ── 4. Recalculate margin live untuk setiap transaksi ─────────
+    const enriched = transactions.map((trx: any) => {
+      const dealPrice = Number(trx.deal_price ?? trx.amount ?? 0);
+
+      // Kumpulkan semua purchase_price yang relevan
+      let totalPurchasePrice = 0;
+
+      // Prioritas: unit_ids (multi-unit) dulu
+      if (Array.isArray(trx.unit_ids) && trx.unit_ids.length > 0) {
+        for (const uid of trx.unit_ids) {
+          totalPurchasePrice += unitMap.get(uid) ?? 0;
+        }
+      } else if (trx.unit_id) {
+        // Fallback ke single unit_id
+        totalPurchasePrice = unitMap.get(trx.unit_id) ?? 0;
+      }
+
+      // Kalau purchase_price masih 0 → margin 0 (bukan bug, memang belum diisi)
+      const margin = totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
+
       return {
-        ...item,
-        cpu:     specs?.cpu     ?? null,
-        ram:     specs?.ram     ?? null,
-        storage: specs?.storage ?? null,
-        display: specs?.display ?? null,
-        brand:   specs?.brand   ?? null,
-        gpu:     specs?.gpu     ?? null,
+        ...trx,
+        other: margin,                          // override field margin
+        purchase_price_current: totalPurchasePrice, // expose untuk debug
       };
     });
 
-    // ── Step 5: Filter pencarian ──────────────────────────────────────────
-    const filtered = search.trim()
-      ? mapped.filter((item: any) => {
-          const kw = search.toLowerCase();
-          return (
-            item.customer_name?.toLowerCase().includes(kw) ||
-            item.invoice_number?.toLowerCase().includes(kw) ||
-            item.customer_phone?.toLowerCase().includes(kw) ||
-            item.laptop_name?.toLowerCase().includes(kw)
-          );
-        })
-      : mapped;
-
-    return NextResponse.json({ success: true, data: filtered });
-
+    return NextResponse.json({ success: true, data: enriched });
   } catch (err) {
-    console.error("Handler error:", err);
+    console.error("[GET /api/transaction]", err);
     return NextResponse.json({ success: false }, { status: 500 });
   }
 }
 
-export const GET = withAuth(handler, PERMISSIONS.VIEW_TRANSACTIONS);
+export const GET = withAuth(handler);

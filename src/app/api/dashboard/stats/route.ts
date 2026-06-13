@@ -27,10 +27,19 @@ function getDealPrice(item: any): number {
   return Number(item.deal_price || item.amount || 0);
 }
 
-function calcGrossProfit(item: any): number {
+function calcMarginFromMap(item: any, unitMap: Map<string, number>): number {
   const dealPrice = getDealPrice(item);
-  const inventoryPrice = Number(item.inventory_price || 0);
-  return dealPrice - inventoryPrice;
+  let totalPurchasePrice = 0;
+
+  if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+    for (const uid of item.unit_ids) {
+      totalPurchasePrice += unitMap.get(uid) ?? 0;
+    }
+  } else if (item.unit_id) {
+    totalPurchasePrice = unitMap.get(item.unit_id) ?? 0;
+  }
+
+  return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
 }
 
 function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
@@ -57,51 +66,59 @@ async function handler(req: NextRequest) {
       { data: weeklyTransactions },
       { data: yesterdayTransactions },
     ] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .gte("paid_at", todayRange.start)
-        .lt("paid_at", todayRange.end),
-
-      supabase
-        .from("laptops")
-        .select("*")
-        .eq("status", "SIAP_JUAL")
-        .gt("qty", 0),
-
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .gte("paid_at", weekStartRange.start)
-        .lt("paid_at", weekEndRange.end),
-
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .gte("paid_at", yesterdayRange.start)
-        .lt("paid_at", yesterdayRange.end),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end),
+      supabase.from("laptops").select("*").eq("status", "SIAP_JUAL").gt("qty", 0),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", weekStartRange.start).lt("paid_at", weekEndRange.end),
+      supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", yesterdayRange.start).lt("paid_at", yesterdayRange.end),
     ]);
 
-    // ── TODAY STATS ──────────────────────────────────────────────────────────
+    // ── BATCH FETCH purchase_price dari laptop_units ──────────────────────
+    const allTransactions = [
+      ...(todayTransactions ?? []),
+      ...(weeklyTransactions ?? []),
+      ...(yesterdayTransactions ?? []),
+    ];
+
+    const allUnitIds = new Set<string>();
+    for (const trx of allTransactions) {
+      if (trx.unit_id) allUnitIds.add(trx.unit_id);
+      if (Array.isArray(trx.unit_ids)) {
+        for (const uid of trx.unit_ids) { if (uid) allUnitIds.add(uid); }
+      }
+    }
+
+    const unitMap = new Map<string, number>();
+    if (allUnitIds.size > 0) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", Array.from(allUnitIds));
+      for (const unit of units ?? []) {
+        unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    // ── TODAY STATS ──────────────────────────────────────────────────────
     const todayRevenue =
       todayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     const todayGrossProfit =
-      todayTransactions?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
+      todayTransactions?.reduce((acc, item) => acc + calcMarginFromMap(item, unitMap), 0) || 0;
 
-    // ── YESTERDAY STATS ──────────────────────────────────────────────────────
+    // ── YESTERDAY STATS ──────────────────────────────────────────────────
     const yesterdayRevenue =
       yesterdayTransactions?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     const yesterdayGrossProfit =
-      yesterdayTransactions?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
+      yesterdayTransactions?.reduce((acc, item) => acc + calcMarginFromMap(item, unitMap), 0) || 0;
 
     const yesterdayTrxCount = yesterdayTransactions?.length || 0;
 
-    // ── % CHANGE ─────────────────────────────────────────────────────────────
+    // ── % CHANGE ─────────────────────────────────────────────────────────
     const revenueChange =
       yesterdayRevenue > 0
         ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
@@ -117,16 +134,13 @@ async function handler(req: NextRequest) {
         ? Math.round((((todayTransactions?.length || 0) - yesterdayTrxCount) / yesterdayTrxCount) * 100)
         : null;
 
-    // ── STOCK ─────────────────────────────────────────────────────────────────
+    // ── STOCK ─────────────────────────────────────────────────────────────
     const stockTotal =
       laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
 
-    // ── WEEKLY TREND ─────────────────────────────────────────────────────────
+    // ── WEEKLY TREND ─────────────────────────────────────────────────────
     const trendMap: Record<string, {
-      revenue: number;
-      profit: number;
-      trxCount: number;
-      laptopSold: number; // ✅ NEW: jumlah laptop terjual per hari
+      revenue: number; profit: number; trxCount: number; laptopSold: number;
     }> = {};
 
     for (let i = 6; i >= 0; i--) {
@@ -143,10 +157,8 @@ async function handler(req: NextRequest) {
       const dateKey = paidAtWIB.toISOString().split("T")[0];
       if (trendMap[dateKey]) {
         trendMap[dateKey].revenue    += getDealPrice(item);
-        trendMap[dateKey].profit     += calcGrossProfit(item);
+        trendMap[dateKey].profit     += calcMarginFromMap(item, unitMap); // ← pakai unitMap
         trendMap[dateKey].trxCount   += 1;
-        // ✅ Hitung jumlah laptop terjual dari quantity di transaksi
-        // Jika ada kolom qty gunakan, fallback ke 1 per transaksi
         trendMap[dateKey].laptopSold += Number(item.qty || item.quantity || 1);
       }
     });
@@ -154,19 +166,18 @@ async function handler(req: NextRequest) {
     const weeklyTrend = Object.entries(trendMap).map(([date, data]) => {
       const [y, m, d] = date.split("-").map(Number);
       const label = new Date(y, m - 1, d).toLocaleDateString("id-ID", {
-        weekday: "short",
-        day: "numeric",
+        weekday: "short", day: "numeric",
       });
       return { date, label, ...data };
     });
 
-    // ── TOP SALES ─────────────────────────────────────────────────────────────
+    // ── TOP SALES ─────────────────────────────────────────────────────────
     const salesMap: Record<string, { total: number; profit: number }> = {};
     todayTransactions?.forEach((item) => {
       const sales = item.sales_name || "Unknown";
       if (!salesMap[sales]) salesMap[sales] = { total: 0, profit: 0 };
       salesMap[sales].total  += 1;
-      salesMap[sales].profit += calcGrossProfit(item);
+      salesMap[sales].profit += calcMarginFromMap(item, unitMap); // ← pakai unitMap
     });
 
     const topSales = Object.entries(salesMap)
@@ -174,7 +185,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // ── TOP SOURCES ───────────────────────────────────────────────────────────
+    // ── TOP SOURCES ───────────────────────────────────────────────────────
     const sourceMap: Record<string, number> = {};
     weeklyTransactions?.forEach((item) => {
       const source = item.source_platform || "Unknown";
@@ -186,7 +197,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    // ── TOP LAPTOP ────────────────────────────────────────────────────────────
+    // ── TOP LAPTOP ────────────────────────────────────────────────────────
     const laptopMap: Record<string, number> = {};
     todayTransactions?.forEach((item) => {
       const laptop = item.laptop_name || "Unknown";
@@ -198,7 +209,7 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // ── TOTAL LAPTOP TERJUAL HARI INI ─────────────────────────────────────────
+    // ── TOTAL LAPTOP TERJUAL HARI INI ─────────────────────────────────────
     const todayLaptopSold =
       todayTransactions?.reduce(
         (acc, item) => acc + Number(item.qty || item.quantity || 1), 0
@@ -208,15 +219,15 @@ async function handler(req: NextRequest) {
       success: true,
       data: {
         todayRevenue,
-        todayProfit:        todayGrossProfit,
-        todayTransactions:  todayTransactions?.length || 0,
-        todayLaptopSold,    // ✅ NEW
-        laptopReady:        laptops?.length || 0,
+        todayProfit:       todayGrossProfit,
+        todayTransactions: todayTransactions?.length || 0,
+        todayLaptopSold,
+        laptopReady:       laptops?.length || 0,
         stockTotal,
         revenueChange,
         profitChange,
         trxChange,
-        weeklyTrend,        // ✅ sekarang includes laptopSold per hari
+        weeklyTrend,
         topSales,
         topSources,
         topLaptop,
