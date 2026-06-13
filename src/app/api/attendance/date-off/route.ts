@@ -13,23 +13,25 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year  = searchParams.get("year");
+    const year = searchParams.get("year");
     const month = searchParams.get("month");
+
+    const isAdmin = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(user.role);
 
     let q = supabase
       .from("user_date_off")
-      .select("id, user_id, off_date, notes, created_at")
+      .select("id, user_id, off_date, note, created_at")  // ← note bukan notes
       .order("off_date", { ascending: true });
 
-    if (user.role !== "ADMIN", "PROGRAMMER", "ASISTEN_CEO") {
+    if (!isAdmin) {
       q = q.eq("user_id", user.id);
     }
 
     if (year && month) {
       const paddedMonth = String(month).padStart(2, "0");
-      const from     = `${year}-${paddedMonth}-01`;
-      const lastDay  = new Date(Number(year), Number(month), 0).getDate();
-      const to       = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+      const from = `${year}-${paddedMonth}-01`;
+      const lastDay = new Date(Number(year), Number(month), 0).getDate();
+      const to = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
       q = q.gte("off_date", from).lte("off_date", to);
     }
 
@@ -106,7 +108,7 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const user_id  = searchParams.get("user_id");
+    const user_id = searchParams.get("user_id");
     const off_date = searchParams.get("off_date");
 
     if (!user_id || !off_date) {
