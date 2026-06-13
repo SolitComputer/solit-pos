@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+// ✅ Tambah sent_at dan sent_by ke type
 type Slip = {
   id: string;
   user_id: string;
@@ -21,6 +22,8 @@ type Slip = {
   total_deduction: number;
   net_salary: number;
   status: "DRAFT" | "FINALIZED";
+  sent_at: string | null;   // ← baru
+  sent_by: string | null;   // ← baru
   notes: string | null;
 };
 
@@ -57,10 +60,8 @@ function roleLabel(role: string): string {
 
 function formatPhone(phone: string | null): string {
   if (!phone) return "-";
-  // Format: 0895-xxxx-xxxx
   const d = phone.replace(/\D/g, "");
   const local = d.startsWith("62") ? "0" + d.slice(2) : d;
-  // Format dengan tanda hubung setiap 4 digit
   const chunks = local.match(/.{1,4}/g) ?? [local];
   return chunks.join("-");
 }
@@ -76,7 +77,6 @@ export default function SalarySlipPrintClient({
   periodLabel: string;
   monthYear: string;
 }) {
-  // Auto-trigger print dialog
   useEffect(() => {
     const timer = setTimeout(() => {
       window.print();
@@ -91,9 +91,17 @@ export default function SalarySlipPrintClient({
     year: "numeric",
   });
 
+  // ✅ Format tanggal kirim untuk ditampilkan di slip
+  const sentLabel = slip.sent_at
+    ? new Date(slip.sent_at).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
   return (
     <>
-      {/* Print styles — hanya aktif saat print */}
       <style>{`
         @page {
           size: A4;
@@ -109,7 +117,7 @@ export default function SalarySlipPrintClient({
         }
       `}</style>
 
-      {/* Tombol aksi — hilang saat print */}
+      {/* Tombol aksi */}
       <div className="no-print fixed top-4 right-4 flex gap-2 z-50">
         <button
           onClick={() => window.print()}
@@ -139,8 +147,13 @@ export default function SalarySlipPrintClient({
         }}
       >
         {/* ── HEADER ── */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: "8mm", borderBottom: "2px solid #111", paddingBottom: "6mm" }}>
-          {/* Logo */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          marginBottom: "8mm",
+          borderBottom: "2px solid #111",
+          paddingBottom: "6mm",
+        }}>
           <div style={{ marginRight: "6mm", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -148,22 +161,41 @@ export default function SalarySlipPrintClient({
               alt="Solit Computer"
               style={{ width: "18mm", height: "18mm", objectFit: "contain" }}
               onError={(e) => {
-                // Fallback kalau logo tidak ada
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           </div>
-          {/* Title */}
           <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontSize: "15pt", fontWeight: "bold", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            <div style={{
+              fontSize: "15pt",
+              fontWeight: "bold",
+              letterSpacing: "0.5px",
+              textTransform: "uppercase",
+            }}>
               SLIP GAJI KARYAWAN SOLIT COMPUTER
             </div>
             <div style={{ fontSize: "10pt", marginTop: "2mm", color: "#333" }}>
               PERIODE {periodLabel.toUpperCase()}
             </div>
+            {/* ✅ Badge status slip */}
             {slip.status === "DRAFT" && (
-              <div style={{ fontSize: "8pt", color: "#e11d48", marginTop: "1mm", fontWeight: "bold" }}>
+              <div style={{
+                fontSize: "8pt",
+                color: "#e11d48",
+                marginTop: "1mm",
+                fontWeight: "bold",
+              }}>
                 ⚠️ DRAFT — BELUM DIFINALISASI
+              </div>
+            )}
+            {slip.sent_at && (
+              <div style={{
+                fontSize: "8pt",
+                color: "#059669",
+                marginTop: "1mm",
+                fontWeight: "bold",
+              }}>
+                ✅ Dikirim oleh Admin · {sentLabel}
               </div>
             )}
           </div>
@@ -178,7 +210,11 @@ export default function SalarySlipPrintClient({
               {user.phone_number && (
                 <>
                   <InfoRow label="Rek Pribadi" value={formatPhone(user.phone_number)} bold />
-                  <InfoRow label="" value={`Dana a/n ${user.name.split(" ").slice(0, 2).join(" ")}`} bold />
+                  <InfoRow
+                    label=""
+                    value={`Dana a/n ${user.name.split(" ").slice(0, 2).join(" ")}`}
+                    bold
+                  />
                 </>
               )}
             </tbody>
@@ -189,10 +225,23 @@ export default function SalarySlipPrintClient({
         <div style={{ display: "flex", gap: "8mm", marginBottom: "6mm" }}>
           {/* Penghasilan */}
           <div style={{ flex: 1 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #111" }}>
+            <table style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              border: "1px solid #111",
+            }}>
               <thead>
                 <tr>
-                  <th colSpan={3} style={{ background: "#fff", border: "1px solid #111", padding: "3mm 4mm", textAlign: "center", fontWeight: "bold", fontSize: "11pt", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                  <th colSpan={3} style={{
+                    background: "#fff",
+                    border: "1px solid #111",
+                    padding: "3mm 4mm",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    fontSize: "11pt",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.3px",
+                  }}>
                     PENGHASILAN
                   </th>
                 </tr>
@@ -207,9 +256,18 @@ export default function SalarySlipPrintClient({
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: "1.5px solid #111" }}>
-                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", fontSize: "10.5pt" }}>Total :</td>
-                  <td style={{ padding: "3mm 2mm", fontWeight: "bold", textAlign: "right" }}>Rp</td>
-                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", textAlign: "right", minWidth: "24mm" }}>
+                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", fontSize: "10.5pt" }}>
+                    Total :
+                  </td>
+                  <td style={{ padding: "3mm 2mm", fontWeight: "bold", textAlign: "right" }}>
+                    Rp
+                  </td>
+                  <td style={{
+                    padding: "3mm 4mm",
+                    fontWeight: "bold",
+                    textAlign: "right",
+                    minWidth: "24mm",
+                  }}>
                     {formatRpFull(slip.total_income)}
                   </td>
                 </tr>
@@ -219,10 +277,23 @@ export default function SalarySlipPrintClient({
 
           {/* Potongan */}
           <div style={{ flex: 1 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #111" }}>
+            <table style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              border: "1px solid #111",
+            }}>
               <thead>
                 <tr>
-                  <th colSpan={3} style={{ background: "#fff", border: "1px solid #111", padding: "3mm 4mm", textAlign: "center", fontWeight: "bold", fontSize: "11pt", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                  <th colSpan={3} style={{
+                    background: "#fff",
+                    border: "1px solid #111",
+                    padding: "3mm 4mm",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    fontSize: "11pt",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.3px",
+                  }}>
                     POTONGAN
                   </th>
                 </tr>
@@ -231,16 +302,24 @@ export default function SalarySlipPrintClient({
                 <SlipRow label="Pelanggaran" amount={slip.deduction_violation} />
                 <SlipRow label="Cicilan Pinjaman" amount={slip.deduction_loan} />
                 <SlipRow label="Dana Pensiun" amount={slip.deduction_pension} />
-                {/* Padding rows supaya tingginya sama dengan tabel kiri */}
                 <SlipRow label="" amount={null} />
                 <SlipRow label="" amount={null} />
                 <SlipRow label="" amount={null} />
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: "1.5px solid #111" }}>
-                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", fontSize: "10.5pt" }}>Total :</td>
-                  <td style={{ padding: "3mm 2mm", fontWeight: "bold", textAlign: "right" }}>Rp</td>
-                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", textAlign: "right", minWidth: "24mm" }}>
+                  <td style={{ padding: "3mm 4mm", fontWeight: "bold", fontSize: "10.5pt" }}>
+                    Total :
+                  </td>
+                  <td style={{ padding: "3mm 2mm", fontWeight: "bold", textAlign: "right" }}>
+                    Rp
+                  </td>
+                  <td style={{
+                    padding: "3mm 4mm",
+                    fontWeight: "bold",
+                    textAlign: "right",
+                    minWidth: "24mm",
+                  }}>
                     {formatRpFull(slip.total_deduction)}
                   </td>
                 </tr>
@@ -251,34 +330,68 @@ export default function SalarySlipPrintClient({
 
         {/* ── GAJI BERSIH ── */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "10mm" }}>
-          <div style={{ border: "2px solid #111", padding: "3mm 8mm", display: "inline-flex", alignItems: "center", gap: "4mm" }}>
-            <span style={{ fontWeight: "bold", fontSize: "12pt", whiteSpace: "nowrap" }}>GAJI BERSIH :</span>
-            <span style={{ fontWeight: "bold", fontSize: "12pt", whiteSpace: "nowrap" }}>Rp</span>
-            <span style={{ fontWeight: "bold", fontSize: "13pt", minWidth: "32mm", textAlign: "right" }}>
+          <div style={{
+            border: "2px solid #111",
+            padding: "3mm 8mm",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4mm",
+          }}>
+            <span style={{ fontWeight: "bold", fontSize: "12pt", whiteSpace: "nowrap" }}>
+              GAJI BERSIH :
+            </span>
+            <span style={{ fontWeight: "bold", fontSize: "12pt", whiteSpace: "nowrap" }}>
+              Rp
+            </span>
+            <span style={{
+              fontWeight: "bold",
+              fontSize: "13pt",
+              minWidth: "32mm",
+              textAlign: "right",
+            }}>
               {formatRpFull(slip.net_salary)}
             </span>
           </div>
         </div>
 
         {/* Metode pembayaran */}
-        <div style={{ textAlign: "center", color: "#e11d48", fontWeight: "bold", fontSize: "11pt", marginBottom: "10mm", letterSpacing: "1px" }}>
+        <div style={{
+          textAlign: "center",
+          color: "#e11d48",
+          fontWeight: "bold",
+          fontSize: "11pt",
+          marginBottom: "10mm",
+          letterSpacing: "1px",
+        }}>
           TRANSFER
         </div>
 
         {/* ── TTD + TANGGAL ── */}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <div style={{ textAlign: "center", minWidth: "50mm" }}>
-            <div style={{ fontSize: "10pt", marginBottom: "1mm" }}>Depok, {todayLabel}</div>
-            <div style={{ fontSize: "10pt", marginBottom: "18mm" }}>Finance Purchasing</div>
-            {/* Space untuk TTD */}
+            <div style={{ fontSize: "10pt", marginBottom: "1mm" }}>
+              Depok, {todayLabel}
+            </div>
+            <div style={{ fontSize: "10pt", marginBottom: "18mm" }}>
+              Finance Purchasing
+            </div>
             <div style={{ borderBottom: "1px solid transparent", height: "1px" }} />
-            <div style={{ fontSize: "10pt", fontWeight: "bold", marginTop: "1mm" }}>Herliana Agustina</div>
+            <div style={{ fontSize: "10pt", fontWeight: "bold", marginTop: "1mm" }}>
+              Herliana Agustina
+            </div>
           </div>
         </div>
 
-        {/* Notes kalau ada */}
+        {/* Notes */}
         {slip.notes && (
-          <div style={{ marginTop: "6mm", padding: "3mm 4mm", border: "1px solid #ccc", borderRadius: "2mm", fontSize: "9pt", color: "#555" }}>
+          <div style={{
+            marginTop: "6mm",
+            padding: "3mm 4mm",
+            border: "1px solid #ccc",
+            borderRadius: "2mm",
+            fontSize: "9pt",
+            color: "#555",
+          }}>
             <strong>Catatan:</strong> {slip.notes}
           </div>
         )}
@@ -292,10 +405,18 @@ export default function SalarySlipPrintClient({
 function InfoRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <tr>
-      <td style={{ width: "28mm", fontWeight: "bold", padding: "0.8mm 0", verticalAlign: "top" }}>
+      <td style={{
+        width: "28mm",
+        fontWeight: "bold",
+        padding: "0.8mm 0",
+        verticalAlign: "top",
+      }}>
         {label}{label ? " :" : ""}
       </td>
-      <td style={{ padding: "0.8mm 0 0.8mm 4mm", fontWeight: bold ? "bold" : "normal" }}>
+      <td style={{
+        padding: "0.8mm 0 0.8mm 4mm",
+        fontWeight: bold ? "bold" : "normal",
+      }}>
         {value}
       </td>
     </tr>
@@ -305,13 +426,28 @@ function InfoRow({ label, value, bold }: { label: string; value: string; bold?: 
 function SlipRow({ label, amount }: { label: string; amount: number | null }) {
   return (
     <tr>
-      <td style={{ padding: "2mm 4mm", borderBottom: "1px solid #e5e7eb", fontSize: "10.5pt" }}>
+      <td style={{
+        padding: "2mm 4mm",
+        borderBottom: "1px solid #e5e7eb",
+        fontSize: "10.5pt",
+      }}>
         {label}
       </td>
-      <td style={{ padding: "2mm 2mm", borderBottom: "1px solid #e5e7eb", textAlign: "right", whiteSpace: "nowrap" }}>
+      <td style={{
+        padding: "2mm 2mm",
+        borderBottom: "1px solid #e5e7eb",
+        textAlign: "right",
+        whiteSpace: "nowrap",
+      }}>
         {amount !== null && amount !== undefined ? "Rp" : ""}
       </td>
-      <td style={{ padding: "2mm 4mm", borderBottom: "1px solid #e5e7eb", textAlign: "right", whiteSpace: "nowrap", minWidth: "22mm" }}>
+      <td style={{
+        padding: "2mm 4mm",
+        borderBottom: "1px solid #e5e7eb",
+        textAlign: "right",
+        whiteSpace: "nowrap",
+        minWidth: "22mm",
+      }}>
         {amount === null || amount === undefined ? "" : amount === 0 ? "-" : formatRp(amount)}
       </td>
     </tr>
