@@ -137,15 +137,6 @@ export default async function Page(props: Props) {
               <InfoRow label="Nama" value={data.customer_name} bold />
               <InfoRow label="WhatsApp" value={data.customer_phone} />
               {data.company_name && <InfoRow label="Perusahaan" value={data.company_name} />}
-            </Section>
-
-            <Separator />
-
-            {/* Customer */}
-            <Section title="Data Pembeli" icon="👤">
-              <InfoRow label="Nama" value={data.customer_name} bold />
-              <InfoRow label="WhatsApp" value={data.customer_phone} />
-              {data.company_name && <InfoRow label="Perusahaan" value={data.company_name} />}
               <InfoRow
                 label="Tipe"
                 value={

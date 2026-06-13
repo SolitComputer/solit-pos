@@ -636,7 +636,9 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: { overti
         )}
       </div>
       <ModalFooter>
-        {!isAutoCompleted && <button onClick={onClose} className={secondaryBtn}>Batal</button>}
+        {!isAutoCompleted && (
+          <button onClick={onClose} className={secondaryBtn}>batal</button>
+        )}
         <button onClick={upload} disabled={uploading || isProcessing} className={primaryBtn}>
           {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : "🏁 Selesai"}
         </button>
