@@ -1394,17 +1394,19 @@ type SalarySlip = {
     net_salary: number;
     status: "DRAFT" | "FINALIZED";
     finalized_at: string | null;
+    sent_at: string | null;
+    sent_by: string | null;
     notes: string | null;
     users?: { id: string; name: string; role: string };
 };
 
-function SalarySlipCard({ slip, onFinalize, onGenerate }: {
+function SalarySlipCard({ slip, onFinalize, onRefresh }: {
     slip: SalarySlip;
     onFinalize: () => void;
-    onGenerate?: () => void;
+    onRefresh?: () => void;
 }) {
     const [finalizing, setFinalizing] = useState(false);
-    const [generating, setGenerating] = useState(false);
+    const [sending, setSending] = useState(false);
 
     const handleFinalize = async () => {
         if (!confirm("Finalisasi slip gaji ini? Tidak bisa diubah lagi setelah finalisasi.")) return;
@@ -1420,11 +1422,34 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
         } finally { setFinalizing(false); }
     };
 
+    const handleSend = async () => {
+        if (!confirm(`Kirim slip gaji ke ${slip.users?.name ?? "karyawan ini"}? Slip akan otomatis difinalisasi.`)) return;
+        setSending(true);
+        try {
+            const r = await fetch("/api/attendance/salary-slip/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slip_id: slip.id }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                onRefresh?.();
+            } else {
+                alert(d.message || "Gagal mengirim slip");
+            }
+        } finally { setSending(false); }
+    };
+
+    const alreadySent = !!slip.sent_at;
+    const sentDate = slip.sent_at
+        ? new Date(slip.sent_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+        : null;
+
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden">
             {/* Header row */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white gap-3 flex-wrap">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
                         {initials(slip.users?.name || "?")}
                     </div>
@@ -1432,29 +1457,65 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
                         <p className="font-bold text-gray-800 text-sm leading-tight">{slip.users?.name || "Unknown"}</p>
                         <p className="text-[10px] text-gray-400">{MONTH_NAMES[slip.month - 1]} {slip.year}</p>
                     </div>
+                    {/* Badge status finalisasi */}
                     <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${slip.status === "FINALIZED"
                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                        : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                        : "bg-amber-100 text-amber-700 border-amber-200"
+                        }`}>
                         {slip.status === "FINALIZED" ? "✅ Final" : "⏳ Draft"}
                     </span>
+                    {/* ✅ Badge terkirim */}
+                    {alreadySent && (
+                        <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-blue-100 text-blue-700 border-blue-200"
+                            title={`Dikirim: ${sentDate}`}
+                        >
+                            📤 Terkirim {sentDate}
+                        </span>
+                    )}
                 </div>
+
+                {/* Tombol aksi */}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <a href={`/receipt/salary-slip/${slip.id}`} target="_blank" rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1">
+                    <a
+                        href={`/receipt/salary-slip/${slip.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
+                    >
                         🖨️ Cetak
                     </a>
+
                     {slip.status === "DRAFT" && (
-                        <button onClick={handleFinalize} disabled={finalizing}
-                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+                        <button
+                            onClick={handleFinalize}
+                            disabled={finalizing}
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
+                        >
                             {finalizing ? "..." : "✔ Finalisasi"}
                         </button>
                     )}
+
+                    {/* ✅ Tombol Kirim */}
+                    <button
+                        onClick={handleSend}
+                        disabled={sending || alreadySent}
+                        title={alreadySent ? `Sudah dikirim: ${sentDate}` : "Kirim slip ke akun karyawan"}
+                        className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition flex items-center gap-1 disabled:opacity-50 ${alreadySent
+                            ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
+                    >
+                        {sending
+                            ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</>
+                            : alreadySent ? "📤 Terkirim" : "📤 Kirim"
+                        }
+                    </button>
                 </div>
             </div>
 
             {/* Body — compact grid */}
             <div className="px-5 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Penghasilan */}
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                     <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide mb-1">Penghasilan</p>
                     <p className="text-xs font-black text-emerald-700 font-mono">{formatRupiah(slip.total_income)}</p>
@@ -1467,7 +1528,6 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
                     </div>
                 </div>
 
-                {/* Potongan */}
                 <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                     <p className="text-[9px] font-bold text-red-600 uppercase tracking-wide mb-1">Potongan</p>
                     <p className="text-xs font-black text-red-600 font-mono">-{formatRupiah(slip.total_deduction)}</p>
@@ -1478,13 +1538,15 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
                     </div>
                 </div>
 
-                {/* Gaji Bersih */}
                 <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-3 sm:col-span-2">
                     <p className="text-[9px] font-bold text-white/70 uppercase tracking-wide mb-1">Gaji Bersih</p>
                     <p className="text-base font-black text-white font-mono">{formatRupiah(slip.net_salary)}</p>
                     <p className="text-[9px] text-white/60 mt-1">
                         {slip.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 % Kehadiran"} · {MONTH_NAMES[slip.month - 1]} {slip.year}
                     </p>
+                    {alreadySent && (
+                        <p className="text-[9px] text-white/50 mt-0.5">Dikirim {sentDate}</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -1829,7 +1891,8 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "salary-slip" | "salary-history" | "leave" | "my-salary">("calendar");
+    const [activeTab, setActiveTab] = useState<"calendar" | "summary" | "salary" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip">("calendar");
+
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
@@ -1921,6 +1984,22 @@ export default function AttendanceDashboardPage() {
             return nameA.localeCompare(nameB, "id");
         });
     }, [salarySlips]);
+
+    const [mySlips, setMySlips] = useState<SalarySlip[]>([]);
+    const [mySlipsLoading, setMySlipsLoading] = useState(false);
+
+    const fetchMySlips = useCallback(async () => {
+        setMySlipsLoading(true);
+        try {
+            const r = await fetch("/api/attendance/salary-slip");
+            const d = await r.json();
+            if (d.success) setMySlips(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch my slips:", err);
+        } finally {
+            setMySlipsLoading(false);
+        }
+    }, []);
     const [selectedSlipMonth, setSelectedSlipMonth] = useState<{ year: number; month: number }>({
         year: new Date().getFullYear(),
         month: new Date().getMonth(),
@@ -1986,6 +2065,16 @@ export default function AttendanceDashboardPage() {
     }, [currentUser, fetchSalaryHistory]);
 
     useEffect(() => {
+        getCurrentUserClient().then(u => {
+            setCurrentUser(u);
+            if (u && !isAdminRole(u.role)) {
+
+            }
+        });
+        fetchTodayStatus();
+    }, []);
+
+    useEffect(() => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
         setLoading(true);
@@ -2011,6 +2100,9 @@ export default function AttendanceDashboardPage() {
     useEffect(() => {
         if (canViewSalary(currentUser?.role)) {
             fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
+        }
+        if (!isAdminRole(currentUser?.role) && currentUser?.id) {
+            fetchMySlips();
         }
     }, [selectedSlipMonth, currentUser, fetchSalarySlips]);
 
@@ -2452,6 +2544,9 @@ export default function AttendanceDashboardPage() {
                             tabList.push({ id: "salary", label: "💰 Rekap Gaji" });
                             tabList.push({ id: "salary-slip", label: "📄 Slip Gaji" });
                             tabList.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
+                        }
+                        if (!isAdminRole(role) && !canViewSalary(role)) {
+                            tabList.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
                         }
                         if (isAdminRole(role)) tabList.push({ id: "leave", label: "🌴 Cuti" });
 
@@ -3536,155 +3631,91 @@ export default function AttendanceDashboardPage() {
                 </div>
             )}
 
-            {/* ════ TAB GAJI SAYA (non-admin) ════ */}
-            {activeTab === "my-salary" && !isAdminRole(currentUser?.role) && (
-                <div className="max-w-2xl mx-auto space-y-6 px-4 pb-8">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white text-2xl shadow-lg">
-                                💰
+            {/* ════ TAB SLIP SAYA (non-admin) ════ */}
+            {activeTab === "my-slip" && !isAdminRole(currentUser?.role) && (
+                <div className="space-y-4 px-4 pb-8 max-w-3xl mx-auto">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-lg">
+                                📄
                             </div>
                             <div>
-                                <p className="text-sm text-gray-400 font-semibold uppercase tracking-wide">Gaji Bulan Ini</p>
-                                <p className="text-3xl font-black text-gray-800 tracking-tight mt-1">
-                                    {loading ? (
-                                        <span className="inline-block w-48 h-8 bg-gray-200 rounded-lg animate-pulse" />
-                                    ) : salaries.length > 0 && salaries[0] ? (
-                                        (() => {
-                                            const sal = salaries[0];
-                                            const stat = userSummary.find(u => u.userId === currentUser?.id);
-                                            if (!stat) return "—";
-                                            // Gaji yang dibayarkan: FIXED = pokok penuh, PERCENTAGE = hitung per hari
-                                            const earned = sal.salary_type === "FIXED"
-                                                ? sal.base_salary
-                                                : stat.totalWorkdays > 0
-                                                    ? Math.round((sal.base_salary / stat.totalWorkdays) * stat.score)
-                                                    : 0;
-                                            return formatRupiah(earned);
-                                        })()
-                                    ) : (
-                                        "Belum diatur"
-                                    )}
-                                </p>
+                                <p className="font-bold text-gray-800">Slip Gaji Saya</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Slip yang telah dikirimkan oleh admin</p>
                             </div>
                         </div>
 
-                        {salaries.length > 0 && salaries[0] && (() => {
-                            const sal = salaries[0];
-                            const stat = userSummary.find(u => u.userId === currentUser?.id);
-                            if (!stat) return null;
-
-                            const earnedByPct = stat.totalWorkdays > 0
-                                ? Math.round((sal.base_salary / stat.totalWorkdays) * stat.score)
-                                : 0;
-
-                            return (
-                                <div className="space-y-4">
-                                    {/* Gaji Pokok */}
-                                    <div className="bg-gradient-to-br from-slate-50 to-gray-50 border border-gray-200 rounded-2xl p-4">
-                                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Gaji Pokok</p>
-                                        <p className="text-2xl font-black text-gray-800">{formatRupiah(sal.base_salary)}</p>
-                                        <p className="text-[11px] text-gray-400 mt-1">
-                                            Tipe: <span className={`font-bold ${sal.salary_type === "FIXED" ? "text-emerald-600" : "text-amber-600"}`}>
-                                                {sal.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 Persentase Absen"}
-                                            </span>
-                                        </p>
-                                    </div>
-
-                                    {/* Kehadiran */}
-                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4">
-                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">📊 Kehadiran Bulan Ini</p>
-                                        <div className="flex items-baseline gap-2 mb-2">
-                                            <p className="text-2xl font-black text-blue-700">{formatPct(stat.pct)}%</p>
-                                            <span className="text-sm text-blue-600 font-semibold">
-                                                Skor {stat.score.toFixed(1)} dari {stat.totalWorkdays} hari kerja
-                                            </span>
-                                        </div>
-                                        {/* Progress bar kehadiran */}
-                                        <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden mb-3">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-700 ${stat.pct >= 90 ? "bg-emerald-500" : stat.pct >= 70 ? "bg-amber-500" : "bg-red-500"}`}
-                                                style={{ width: `${Math.min(stat.pct, 100)}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex gap-3 flex-wrap">
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                                ✅ {stat.present} tepat
-                                            </span>
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                                                ⏰ {stat.late} terlambat
-                                            </span>
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-red-100 text-red-700 border border-red-200">
-                                                ❌ {stat.absences.length} tidak hadir
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* ✅ FIX: Perhitungan — SELALU tampil untuk semua tipe gaji */}
-                                    <div className={`bg-gradient-to-br rounded-2xl p-4 border ${sal.salary_type === "PERCENTAGE" ? "from-amber-50 to-orange-50 border-amber-200" : "from-gray-50 to-slate-50 border-gray-200"}`}>
-                                        <p className={`text-xs font-bold uppercase tracking-wide mb-3 ${sal.salary_type === "PERCENTAGE" ? "text-amber-700" : "text-gray-500"}`}>
-                                            {sal.salary_type === "PERCENTAGE" ? "📐 Cara Hitung" : "📐 Estimasi Jika Berdasarkan % Kehadiran"}
-                                        </p>
-                                        <div className="space-y-2 text-sm">
-                                            {stat.totalWorkdays > 0 && (
-                                                <div className="flex items-center justify-between text-gray-600">
-                                                    <span>Gaji per hari kerja</span>
-                                                    <span className="font-mono font-bold text-gray-800">
-                                                        {formatRupiah(Math.round(sal.base_salary / stat.totalWorkdays))}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center justify-between text-gray-600">
-                                                <span>Skor kehadiran</span>
-                                                <span className="font-bold">{stat.score.toFixed(1)} poin</span>
-                                            </div>
-                                            <div className="h-px bg-gray-200 my-1" />
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-bold text-gray-700">
-                                                    {sal.salary_type === "FIXED" ? "Jika berdasarkan %" : "Gaji diterima"}
-                                                </span>
-                                                <span className={`font-black text-base font-mono ${sal.salary_type === "PERCENTAGE" ? "text-amber-700" : "text-gray-600"}`}>
-                                                    {formatRupiah(earnedByPct)}
-                                                </span>
-                                            </div>
-                                            {sal.salary_type === "FIXED" && (
-                                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
-                                                    <p className="text-[11px] text-emerald-700 font-semibold">
-                                                        💡 Kamu pakai <strong>Gaji Tetap</strong> — diterima penuh {formatRupiah(sal.base_salary)} terlepas dari kehadiran.
-                                                    </p>
-                                                    {earnedByPct < sal.base_salary && (
-                                                        <p className="text-[10px] text-emerald-600 mt-1">
-                                                            Selisih vs % absen: +{formatRupiah(sal.base_salary - earnedByPct)}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Catatan */}
-                                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-700">
-                                        <p className="font-semibold mb-1">📌 Catatan:</p>
-                                        <ul className="space-y-1 text-blue-600">
-                                            <li>• Gaji diproses setiap akhir bulan</li>
-                                            <li>• Perhitungan berdasarkan kehadiran bulan ini</li>
-                                            <li>• Hubungi admin jika ada pertanyaan</li>
-                                        </ul>
-                                    </div>
+                        {mySlipsLoading ? (
+                            <div className="space-y-3">
+                                {Array(3).fill(0).map((_, i) => (
+                                    <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />
+                                ))}
+                            </div>
+                        ) : mySlips.length === 0 ? (
+                            <div className="text-center py-12">
+                                <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                                    <span className="text-2xl opacity-40">📄</span>
                                 </div>
-                            );
-                        })()}
-                    </div>
-
-                    {salaries.length === 0 && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                                <span className="text-3xl opacity-50">💰</span>
+                                <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji yang dikirim</p>
+                                <p className="text-xs text-gray-300 mt-1">Slip akan muncul setelah admin mengirimkannya</p>
                             </div>
-                            <p className="text-sm text-gray-400 font-medium">Gaji belum diatur oleh admin</p>
-                            <p className="text-xs text-gray-300 mt-1">Hubungi admin untuk setup gaji kamu</p>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="space-y-3">
+                                {[...mySlips]
+                                    .sort((a, b) => {
+                                        if (b.year !== a.year) return b.year - a.year;
+                                        return b.month - a.month;
+                                    })
+                                    .map(slip => {
+                                        const sentDate = slip.sent_at
+                                            ? new Date(slip.sent_at).toLocaleDateString("id-ID", {
+                                                day: "numeric", month: "long", year: "numeric",
+                                            })
+                                            : null;
+                                        return (
+                                            <div key={slip.id} className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl p-4 hover:shadow-md transition">
+                                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
+                                                            📄
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-gray-800 text-sm">
+                                                                Slip Gaji — {MONTH_NAMES[slip.month - 1]} {slip.year}
+                                                            </p>
+                                                            {sentDate && (
+                                                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                                                    Dikirim {sentDate}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-emerald-100 text-emerald-700 border-emerald-200">
+                                                            ✅ Final
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="text-right">
+                                                            <p className="text-[10px] text-gray-400 font-medium">Gaji Bersih</p>
+                                                            <p className="font-black text-emerald-700 font-mono text-sm">
+                                                                {formatRupiah(slip.net_salary)}
+                                                            </p>
+                                                        </div>
+                                                        <a
+                                                            href={`/receipt/salary-slip/${slip.id}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 text-xs font-bold bg-gray-900 text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition"
+                                                        >
+                                                            🖨️ Lihat & Cetak
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -3780,6 +3811,7 @@ export default function AttendanceDashboardPage() {
                                     key={slip.id}
                                     slip={slip}
                                     onFinalize={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
+                                    onRefresh={() => fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month)}
                                 />
                             ))}
                         </div>

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       .order("month", { ascending: false });
 
     if (!FULL_ACCESS_ROLES.includes(user.role)) {
-      q = q.eq("user_id", user.id);
+      q = q.eq("user_id", user.id).not("sent_at", "is", null);
     } else if (targetUserId) {
       q = q.eq("user_id", targetUserId);
     }
