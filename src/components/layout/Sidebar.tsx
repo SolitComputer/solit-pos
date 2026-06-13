@@ -247,6 +247,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   CREW_SALES: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
   PENGANTARAN: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
   SOTECH: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_ONPOINT: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  ONPOINT: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_SOTECH: [SALES_OVERVIEW(), SALES_INVENTARIS, SALES_TRANSAKSI],
 
   // ── Teknisi family ────────────────────────────────────────────────────────
   TEKNISI: [
@@ -477,6 +480,9 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
   KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
   KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
+  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },   // ✅ NEW
+  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" }, // ✅ NEW
+  KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
 };
 
 function getInitials(name: string): string {
