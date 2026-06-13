@@ -413,7 +413,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
           <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
-            <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.laptop_name || "—"}</p>
+            <p className="text-xs font-bold text-gray-900 leading-snug">{item.laptop_name || "—"}</p>
             {(item.cpu || item.ram || item.storage) && (
               <div className="flex flex-wrap gap-1.5">
                 {item.cpu && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">⚙️ {item.cpu}</span>}
@@ -836,7 +836,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         {/* Laptop */}
         <td className="px-3 py-2.5">
           <div className="space-y-0.5">
-            <div className="text-[10px] font-bold text-gray-900 leading-tight line-clamp-1">
+            <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>
               {item.laptop_name || "—"}
             </div>
             {(item.cpu || item.ram || item.storage) && (
