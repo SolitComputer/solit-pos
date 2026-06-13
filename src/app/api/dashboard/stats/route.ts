@@ -42,23 +42,37 @@ function calcMarginFromMap(item: any, unitMap: Map<string, number>): number {
   return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
 }
 
+/**
+ * Hitung jumlah unit laptop yang benar-benar terjual dalam 1 transaksi.
+ * - Transaksi multi-unit  → unit_ids.length  (misal: 3 laptop sekaligus = 3)
+ * - Transaksi single-unit → 1                (ada unit_id tapi bukan array)
+ * - Transaksi lama        → fallback qty/quantity/1
+ */
+function countUnitsSold(item: any): number {
+  if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+    return item.unit_ids.length;
+  }
+  if (item.unit_id) return 1;
+  return Number(item.qty || item.quantity || 1);
+}
+
 function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
   const [y, m, d] = dateWIB.split("-").map(Number);
   const startWIB = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - 7 * 60 * 60 * 1000);
-  const endWIB   = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  const endWIB = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - 7 * 60 * 60 * 1000);
   return { start: startWIB.toISOString(), end: endWIB.toISOString() };
 }
 
 async function handler(req: NextRequest) {
   try {
-    const today     = getTodayWIB();
+    const today = getTodayWIB();
     const yesterday = getYesterdayWIB();
     const weekStart = getLast7DaysWIB();
 
-    const todayRange     = wibDateToUTCRange(today);
+    const todayRange = wibDateToUTCRange(today);
     const yesterdayRange = wibDateToUTCRange(yesterday);
     const weekStartRange = wibDateToUTCRange(weekStart);
-    const weekEndRange   = wibDateToUTCRange(today);
+    const weekEndRange = wibDateToUTCRange(today);
 
     const [
       { data: todayTransactions },
@@ -156,10 +170,10 @@ async function handler(req: NextRequest) {
       const paidAtWIB = new Date(new Date(item.paid_at).getTime() + 7 * 60 * 60 * 1000);
       const dateKey = paidAtWIB.toISOString().split("T")[0];
       if (trendMap[dateKey]) {
-        trendMap[dateKey].revenue    += getDealPrice(item);
-        trendMap[dateKey].profit     += calcMarginFromMap(item, unitMap); // ← pakai unitMap
-        trendMap[dateKey].trxCount   += 1;
-        trendMap[dateKey].laptopSold += Number(item.qty || item.quantity || 1);
+        trendMap[dateKey].revenue += getDealPrice(item);
+        trendMap[dateKey].profit += calcMarginFromMap(item, unitMap);
+        trendMap[dateKey].trxCount += 1;
+        trendMap[dateKey].laptopSold += countUnitsSold(item); // ✅ FIX: hitung unit nyata
       }
     });
 
@@ -176,8 +190,8 @@ async function handler(req: NextRequest) {
     todayTransactions?.forEach((item) => {
       const sales = item.sales_name || "Unknown";
       if (!salesMap[sales]) salesMap[sales] = { total: 0, profit: 0 };
-      salesMap[sales].total  += 1;
-      salesMap[sales].profit += calcMarginFromMap(item, unitMap); // ← pakai unitMap
+      salesMap[sales].total += 1;
+      salesMap[sales].profit += calcMarginFromMap(item, unitMap);
     });
 
     const topSales = Object.entries(salesMap)
@@ -198,10 +212,12 @@ async function handler(req: NextRequest) {
       .slice(0, 6);
 
     // ── TOP LAPTOP ────────────────────────────────────────────────────────
+    // ✅ FIX: hitung per unit nyata, bukan per transaksi
+    // Contoh: 1 transaksi dengan unit_ids = [id1, id2] → laptop_name = "Acer X" → +2 unit
     const laptopMap: Record<string, number> = {};
     todayTransactions?.forEach((item) => {
       const laptop = item.laptop_name || "Unknown";
-      laptopMap[laptop] = (laptopMap[laptop] || 0) + 1;
+      laptopMap[laptop] = (laptopMap[laptop] || 0) + countUnitsSold(item);
     });
 
     const topLaptop = Object.entries(laptopMap)
@@ -210,19 +226,20 @@ async function handler(req: NextRequest) {
       .slice(0, 5);
 
     // ── TOTAL LAPTOP TERJUAL HARI INI ─────────────────────────────────────
+    // ✅ FIX: hitung unit nyata dari unit_ids / unit_id
     const todayLaptopSold =
       todayTransactions?.reduce(
-        (acc, item) => acc + Number(item.qty || item.quantity || 1), 0
+        (acc, item) => acc + countUnitsSold(item), 0
       ) || 0;
 
     return NextResponse.json({
       success: true,
       data: {
         todayRevenue,
-        todayProfit:       todayGrossProfit,
+        todayProfit: todayGrossProfit,
         todayTransactions: todayTransactions?.length || 0,
         todayLaptopSold,
-        laptopReady:       laptops?.length || 0,
+        laptopReady: laptops?.length || 0,
         stockTotal,
         revenueChange,
         profitChange,
