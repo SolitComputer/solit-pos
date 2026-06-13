@@ -14,7 +14,7 @@ type OvertimeRequest = {
   actual_end: string | null;
   work_description: string | null;
   proof_photo_url: string | null;
-  status: "PENDING" | "APPROVED" | "ONGOING" | "COMPLETED" | "REJECTED" | "CANCELLED";
+  status: "PENDING" | "APPROVED" | "ONGOING" | "COMPLETED" | "REJECTED" | "CANCELLED" | "NEED_PROOF";
   rate_per_hour: number | null;
   total_pay: number | null;
   auto_completed: boolean;
@@ -38,6 +38,22 @@ const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"] as const;
 
+// ✅ Role yang boleh melihat data bayaran lembur
+const PAY_VIEW_ROLES = [
+  "KEPALA_SALES",
+  "KEPALA_MARKETING",
+  "KEPALA_TEKNISI",
+  "KEPALA_PENYEDIA_BARANG",
+  "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
+  "KEPALA_ONPOINT",
+  "KEPALA_SOTECH",
+] as const;
+
+function canViewPay(role?: string): boolean {
+  return !!role && (PAY_VIEW_ROLES as readonly string[]).includes(role);
+}
 function isAdminRole(role?: string): boolean {
   return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
@@ -280,12 +296,14 @@ function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
 const STATUS_CONFIG: Record<string, {
   label: string; icon: string; bg: string; text: string; border: string; dot: string;
 }> = {
-  PENDING:   { label: "Pending",    icon: "⏳", bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-200",  dot: "bg-amber-400"  },
-  APPROVED:  { label: "Disetujui",  icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
-  ONGOING:   { label: "Berjalan",   icon: "🟢", bg: "bg-emerald-50",text: "text-emerald-700",border: "border-emerald-200",dot: "bg-emerald-500"},
-  COMPLETED: { label: "Selesai",    icon: "🏁", bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200",   dot: "bg-blue-500"   },
-  REJECTED:  { label: "Ditolak",    icon: "✕",  bg: "bg-red-50",    text: "text-red-700",    border: "border-red-200",    dot: "bg-red-500"    },
-  CANCELLED: { label: "Dibatalkan", icon: "⊘",  bg: "bg-gray-100",  text: "text-gray-500",   border: "border-gray-200",   dot: "bg-gray-400"   },
+  PENDING:    { label: "Pending",          icon: "⏳", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   dot: "bg-amber-400"   },
+  APPROVED:   { label: "Disetujui",        icon: "✅", bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",  dot: "bg-violet-500"  },
+  ONGOING:    { label: "Berjalan",         icon: "🟢", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
+  COMPLETED:  { label: "Selesai",          icon: "🏁", bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    dot: "bg-blue-500"    },
+  // ✅ Status baru: wajib upload foto sebelum dianggap selesai
+  NEED_PROOF: { label: "Wajib Upload Foto", icon: "📸", bg: "bg-orange-50",  text: "text-orange-700",  border: "border-orange-200",  dot: "bg-orange-500"  },
+  REJECTED:   { label: "Ditolak",          icon: "✕",  bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     dot: "bg-red-500"     },
+  CANCELLED:  { label: "Dibatalkan",       icon: "⊘",  bg: "bg-gray-100",   text: "text-gray-500",    border: "border-gray-200",    dot: "bg-gray-400"    },
 };
 
 function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
@@ -390,7 +408,15 @@ function Spinner() {
 }
 
 // ── ProofPhotoModal ───────────────────────────────────────────────────────────
-function ProofPhotoModal({ overtime, onClose }: { overtime: OvertimeRequest; onClose: () => void }) {
+function ProofPhotoModal({
+  overtime,
+  onClose,
+  canViewPay: showPay,
+}: {
+  overtime: OvertimeRequest;
+  onClose: () => void;
+  canViewPay?: boolean;
+}) {
   if (!overtime.proof_photo_url) return null;
   return (
     <ModalWrapper onClose={onClose}>
@@ -415,7 +441,7 @@ function ProofPhotoModal({ overtime, onClose }: { overtime: OvertimeRequest; onC
             </p>
           </div>
         </div>
-        {overtime.total_pay != null && (
+        {showPay && overtime.total_pay != null && (
           <div className="rounded-2xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
             <p className="text-xs text-gray-400 font-medium mb-1">Total Bayaran</p>
             <p className="text-2xl font-black tracking-tight">{formatRupiah(overtime.total_pay)}</p>
@@ -720,9 +746,14 @@ function SetPayModal({ overtime, onClose, onSaved }: {
 }
 
 // ── CompleteModal ─────────────────────────────────────────────────────────────
+// ✅ Dipakai untuk: (1) selesai manual ONGOING, (2) upload foto NEED_PROOF
 function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void; isAutoCompleted?: boolean;
 }) {
+  const isNeedProof = overtime.status === "NEED_PROOF";
+  // NEED_PROOF selalu wajib upload (tidak boleh tutup tanpa foto)
+  const mustUpload = isAutoCompleted || isNeedProof;
+
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -730,7 +761,7 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
 
   const handleClose = () => {
-    if (isAutoCompleted) { setError("⚠️ Kamu wajib upload foto bukti lemburan sebelum menutup."); return; }
+    if (mustUpload) { setError("⚠️ Kamu wajib upload foto bukti lemburan sebelum menutup."); return; }
     onClose();
   };
 
@@ -742,6 +773,10 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
   };
 
   const upload = async () => {
+    if (mustUpload && !photoFile) {
+      setError("⚠️ Foto bukti wajib diupload sebelum melanjutkan.");
+      return;
+    }
     setUploading(true); setError("");
     try {
       let photoUrl: string | null = null;
@@ -769,16 +804,26 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
   };
 
   return (
-    <ModalWrapper onClose={handleClose} preventClose={isAutoCompleted}>
+    <ModalWrapper onClose={handleClose} preventClose={mustUpload}>
       <ModalHeader
-        icon="🏁"
-        title="Selesaikan Lemburan"
+        icon={isNeedProof ? "📸" : "🏁"}
+        title={isNeedProof ? "Upload Bukti Lemburan" : "Selesaikan Lemburan"}
         subtitle={overtime.users?.name}
         onClose={handleClose}
-        disableClose={isAutoCompleted}
+        disableClose={mustUpload}
       />
       <div className="px-6 py-5 space-y-4 max-h-[78vh] overflow-y-auto">
-        {isAutoCompleted && (
+        {/* Banner untuk NEED_PROOF */}
+        {isNeedProof && (
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+            <p className="font-black text-orange-800 text-sm mb-1">📸 Upload Foto Bukti Wajib!</p>
+            <p className="text-xs text-orange-700 leading-relaxed">
+              Lemburanmu sudah selesai tapi belum ada foto bukti. Kamu <strong>wajib</strong> upload foto sebelum menutup halaman ini.
+            </p>
+          </div>
+        )}
+        {/* Banner untuk auto-completed (bukan NEED_PROOF, tapi waktu habis) */}
+        {isAutoCompleted && !isNeedProof && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <p className="font-black text-amber-800 text-sm mb-1">⚡ Waktu Lembur Habis!</p>
             <p className="text-xs text-amber-700 leading-relaxed">
@@ -788,7 +833,6 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
         )}
         {error && <ErrorBanner msg={error} />}
 
-        {/* Step: preview */}
         {photoStep === "preview" && photoPreview && (
           <div>
             <label className={labelCls}>Foto Bukti</label>
@@ -802,7 +846,6 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
           </div>
         )}
 
-        {/* Step: kamera aktif */}
         {photoStep === "camera" && (
           <div>
             <label className={labelCls}>Kamera</label>
@@ -810,34 +853,42 @@ function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
           </div>
         )}
 
-        {/* Step: idle */}
         {photoStep === "idle" && (
           <div>
             <label className={labelCls}>
-              Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+              Foto Bukti{" "}
+              {mustUpload
+                ? <span className="text-red-400 normal-case tracking-normal font-bold">*</span>
+                : <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+              }
             </label>
             <button
               onClick={() => setPhotoStep("camera")}
-              className="w-full flex items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all active:scale-[0.99] group"
+              className={`w-full flex items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-8 text-center transition-all active:scale-[0.99] group ${mustUpload ? "border-orange-300 bg-orange-50/40 hover:border-orange-400 hover:bg-orange-50" : "border-gray-200 hover:border-violet-300 hover:bg-violet-50/30"}`}
             >
               <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
               <div className="text-left">
-                <p className="text-sm font-bold text-gray-700">Buka Kamera</p>
-                <p className="text-xs text-gray-400 mt-0.5">Ambil foto bukti lemburan langsung</p>
+                <p className={`text-sm font-bold ${mustUpload ? "text-orange-700" : "text-gray-700"}`}>Buka Kamera</p>
+                <p className={`text-xs mt-0.5 ${mustUpload ? "text-orange-500" : "text-gray-400"}`}>
+                  {mustUpload ? "Wajib ambil foto bukti lemburan" : "Ambil foto bukti lemburan langsung"}
+                </p>
               </div>
             </button>
           </div>
         )}
       </div>
 
-      {/* Footer — sembunyikan saat kamera aktif */}
       {photoStep !== "camera" && (
         <ModalFooter>
-          {!isAutoCompleted && (
+          {!mustUpload && (
             <button onClick={onClose} className={secondaryBtn}>Batal</button>
           )}
-          <button onClick={upload} disabled={uploading} className={primaryBtn}>
-            {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : "🏁 Selesai"}
+          <button
+            onClick={upload}
+            disabled={uploading || (mustUpload && !photoFile)}
+            className={primaryBtn}
+          >
+            {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : mustUpload ? "📷 Ambil Foto Dulu" : "🏁 Selesai"}
           </button>
         </ModalFooter>
       )}
@@ -858,7 +909,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
   const [workDescription, setWorkDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  // ✅ FIX: init "idle" langsung, tidak pakai overtime (tidak ada di scope ini)
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -871,8 +921,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
     return Math.floor((endMs - startMs) / (60 * 60 * 1000));
   };
   const previewHours = calcPreview();
-
-  // ✅ FIX: handleFileSelect dihapus — foto sekarang via CameraCapture
 
   const submit = async () => {
     if (!targetUserId) { setError("Pilih nama karyawan"); return; }
@@ -1010,7 +1058,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
             </p>
           </div>
 
-          {/* Foto Bukti */}
           <div>
             <label className={labelCls}>
               Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
@@ -1027,12 +1074,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
               </div>
             ) : photoStep === "camera" ? (
               <CameraCapture
-                onCapture={(file, url) => {
-                  setPhotoFile(file);
-                  setPhotoPreview(url);
-                  setPhotoStep("preview");
-                  setError("");
-                }}
+                onCapture={(file, url) => { setPhotoFile(file); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }}
                 onCancel={() => setPhotoStep("idle")}
               />
             ) : (
@@ -1050,7 +1092,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
           </div>
         </div>
 
-        {/* Footer — sembunyikan saat kamera aktif */}
         {photoStep !== "camera" && (
           <ModalFooter>
             <button onClick={onClose} className={secondaryBtn}>Batal</button>
@@ -1097,7 +1138,6 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
   const [status, setStatus] = useState(overtime.status);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(overtime.proof_photo_url ?? null);
-  // ✅ FIX: init "preview" jika sudah ada foto, "idle" jika belum
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">(
     overtime.proof_photo_url ? "preview" : "idle"
   );
@@ -1114,8 +1154,6 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
     if (endMs <= startMs) return null;
     return Math.floor((endMs - startMs) / (60 * 60 * 1000));
   }, [startTime, endTime]);
-
-  // ✅ FIX: handleFileSelect dihapus — foto sekarang via CameraCapture
 
   const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
 
@@ -1172,8 +1210,9 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
     finally { setSaving(false); }
   };
 
+  // ✅ Tambah NEED_PROOF ke pilihan status
   const STATUS_OPTIONS: OvertimeRequest["status"][] = [
-    "PENDING", "APPROVED", "ONGOING", "COMPLETED", "REJECTED", "CANCELLED",
+    "PENDING", "APPROVED", "ONGOING", "NEED_PROOF", "COMPLETED", "REJECTED", "CANCELLED",
   ];
 
   return (
@@ -1262,7 +1301,6 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
             </select>
           </div>
 
-          {/* Foto Bukti */}
           <div>
             <label className={labelCls}>
               Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
@@ -1279,12 +1317,7 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
               </div>
             ) : photoStep === "camera" ? (
               <CameraCapture
-                onCapture={(file, url) => {
-                  setPhotoFile(file);
-                  setPhotoPreview(url);
-                  setPhotoStep("preview");
-                  setError("");
-                }}
+                onCapture={(file, url) => { setPhotoFile(file); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }}
                 onCancel={() => setPhotoStep("idle")}
               />
             ) : (
@@ -1302,16 +1335,12 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
           </div>
         </div>
 
-        {/* Footer — sembunyikan saat kamera aktif */}
         {photoStep !== "camera" && (
           <ModalFooter>
             <button onClick={onClose} className={secondaryBtn}>Batal</button>
             <button
               onClick={save}
-              disabled={
-                saving || !requestDate || !startTime || !endTime ||
-                !reasonType || (isLainnya && !reasonCustom.trim())
-              }
+              disabled={saving || !requestDate || !startTime || !endTime || !reasonType || (isLainnya && !reasonCustom.trim())}
               className={primaryBtn}
             >
               {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
@@ -1324,8 +1353,8 @@ function EditOvertimeModal({ overtime, onClose, onSaved }: {
 }
 
 // ── DeleteConfirmModal ────────────────────────────────────────────────────────
-function DeleteConfirmModal({ overtime, onClose, onDeleted }: {
-  overtime: OvertimeRequest; onClose: () => void; onDeleted: () => void;
+function DeleteConfirmModal({ overtime, onClose, onDeleted, canViewPay: showPay }: {
+  overtime: OvertimeRequest; onClose: () => void; onDeleted: () => void; canViewPay?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -1369,7 +1398,7 @@ function DeleteConfirmModal({ overtime, onClose, onDeleted }: {
               <span className="text-gray-400">Status</span>
               <StatusBadge status={overtime.status} />
             </div>
-            {overtime.total_pay != null && (
+            {showPay && overtime.total_pay != null && (
               <div className="flex justify-between">
                 <span className="text-gray-400">Total Bayaran</span>
                 <span className="font-bold text-gray-800">{formatRupiah(overtime.total_pay)}</span>
@@ -1494,6 +1523,7 @@ export default function OvertimePage() {
       const d = await res.json();
       if (d.success) {
         await fetchOvertimes();
+        // ✅ Buka CompleteModal dengan flag NEED_PROOF agar karyawan wajib upload foto
         setCompleteData({ ...overtime, ...d.data, auto_completed: true });
         setTimeout(() => { autoCompletingIds.current.delete(overtime.id); }, 5000);
       } else {
@@ -1540,10 +1570,12 @@ export default function OvertimePage() {
     : [];
 
   const statCards = [
-    { label: "Total",   value: overtimes.length,                                          icon: "📋", accent: "from-gray-700 to-gray-900"    },
-    { label: "Pending", value: overtimes.filter((o) => o.status === "PENDING").length,    icon: "⏳", accent: "from-amber-500 to-amber-600"  },
-    { label: "Ongoing", value: overtimes.filter((o) => o.status === "ONGOING").length,    icon: "🟢", accent: "from-emerald-500 to-emerald-700"},
-    { label: "Selesai", value: overtimes.filter((o) => o.status === "COMPLETED").length,  icon: "🏁", accent: "from-blue-500 to-blue-700"    },
+    { label: "Total",        value: overtimes.length,                                               icon: "📋", accent: "from-gray-700 to-gray-900"     },
+    { label: "Pending",      value: overtimes.filter((o) => o.status === "PENDING").length,         icon: "⏳", accent: "from-amber-500 to-amber-600"   },
+    { label: "Ongoing",      value: overtimes.filter((o) => o.status === "ONGOING").length,         icon: "🟢", accent: "from-emerald-500 to-emerald-700"},
+    // ✅ Stat card khusus NEED_PROOF agar admin bisa langsung lihat berapa yang belum upload foto
+    { label: "Butuh Foto",   value: overtimes.filter((o) => o.status === "NEED_PROOF").length,      icon: "📸", accent: "from-orange-500 to-orange-600"  },
+    { label: "Selesai",      value: overtimes.filter((o) => o.status === "COMPLETED").length,       icon: "🏁", accent: "from-blue-500 to-blue-700"      },
   ];
 
   const renderActions = (o: OvertimeRequest) => (
@@ -1556,15 +1588,19 @@ export default function OvertimePage() {
           ✅ Setujui
         </button>
       )}
-      {canApproveRole(currentUser?.role) && o.status === "COMPLETED" && o.proof_photo_url && (
+      {/* ✅ Tombol lihat foto: untuk atasan (semua overtime) atau owner sendiri (overtime miliknya) */}
+      {o.proof_photo_url && (
+        canApproveRole(currentUser?.role) ||
+        currentUser?.id === o.user_id
+      ) && (
         <button
           onClick={() => setProofPhotoData(o)}
           className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
         >
-          👁️ Lihat
+          👁️ Lihat Foto
         </button>
       )}
-      {canSetPay(currentUser?.role) && o.status === "COMPLETED" && (
+      {canSetPay(currentUser?.role) && (o.status === "COMPLETED" || o.status === "NEED_PROOF") && (
         <button
           onClick={() => setSetPayData(o)}
           className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
@@ -1572,6 +1608,7 @@ export default function OvertimePage() {
           💰 {o.rate_per_hour ? "Edit" : "Set Bayar"}
         </button>
       )}
+      {/* ✅ Tombol Selesai untuk karyawan yang masih ONGOING */}
       {!canApproveRole(currentUser?.role) && currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && o.rate_per_hour && (
         <button
           onClick={() => setCompleteData(o)}
@@ -1580,6 +1617,16 @@ export default function OvertimePage() {
           🏁 Selesai
         </button>
       )}
+      {/* ✅ Tombol Upload untuk status NEED_PROOF — lebih jelas dari sebelumnya */}
+      {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && (
+        <button
+          onClick={() => setCompleteData(o)}
+          className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm animate-pulse"
+        >
+          📸 Upload Foto
+        </button>
+      )}
+      {/* ✅ Fallback: kalau COMPLETED tapi foto belum ada (edge case legacy data) */}
       {currentUser?.id === o.user_id && o.status === "COMPLETED" && !o.proof_photo_url && (
         <button
           onClick={() => setCompleteData({ ...o, auto_completed: true })}
@@ -1621,6 +1668,8 @@ export default function OvertimePage() {
     </div>
   );
 
+  const userCanViewPay = canViewPay(currentUser?.role);
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
@@ -1657,19 +1706,19 @@ export default function OvertimePage() {
             </div>
           </div>
 
-          {/* STAT CARDS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {/* STAT CARDS — 5 cards, scroll di mobile */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {statCards.map((c) => (
               <div
                 key={c.label}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 flex items-start gap-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-start gap-3 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
               >
-                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${c.accent} flex items-center justify-center text-xl flex-shrink-0 shadow-md`}>
+                <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${c.accent} flex items-center justify-center text-lg flex-shrink-0 shadow-md`}>
                   {c.icon}
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{c.label}</p>
-                  <p className="text-3xl font-black text-gray-900 tracking-tight leading-none">
+                  <p className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight leading-none">
                     {loading ? <span className="inline-block w-10 h-7 bg-gray-100 rounded-lg animate-pulse" /> : c.value}
                   </p>
                 </div>
@@ -1771,7 +1820,7 @@ export default function OvertimePage() {
                   <table className="w-full text-xs sm:text-sm">
                     <thead className="bg-gray-50/80">
                       <tr className="border-b border-gray-100">
-                        {["Karyawan", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map((h) => (
+                        {["Karyawan", "Waktu", "Alasan", "Pekerjaan", "Status", ...(userCanViewPay ? ["Bayaran"] : []), "Aksi"].map((h) => (
                           <th key={h} className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"}`}>
                             {h}
                           </th>
@@ -1792,12 +1841,14 @@ export default function OvertimePage() {
                             <span className="text-gray-500 text-xs line-clamp-2">{o.work_description || "—"}</span>
                           </td>
                           <td className="px-3 py-3.5"><StatusBadge status={o.status} /></td>
-                          <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                            {o.total_pay != null
-                              ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
-                              : <span className="text-gray-200 text-xs">—</span>
-                            }
-                          </td>
+                          {userCanViewPay && (
+                            <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                              {o.total_pay != null
+                                ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
+                                : <span className="text-gray-200 text-xs">—</span>
+                              }
+                            </td>
+                          )}
                           <td className="px-3 py-3.5">{renderActions(o)}</td>
                         </tr>
                       ))}
@@ -1848,7 +1899,7 @@ export default function OvertimePage() {
                   <table className="w-full text-xs sm:text-sm">
                     <thead className="bg-gray-50/80">
                       <tr className="border-b border-gray-100">
-                        {["Karyawan", "Tanggal", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map((h) => (
+                        {["Karyawan", "Tanggal", "Waktu", "Alasan", "Pekerjaan", "Status", ...(userCanViewPay ? ["Bayaran"] : []), "Aksi"].map((h) => (
                           <th key={h} className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"}`}>
                             {h}
                           </th>
@@ -1874,12 +1925,14 @@ export default function OvertimePage() {
                             <span className="text-gray-500 text-xs line-clamp-2">{o.work_description || "—"}</span>
                           </td>
                           <td className="px-3 py-3.5"><StatusBadge status={o.status} /></td>
-                          <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                            {o.total_pay != null
-                              ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
-                              : <span className="text-gray-200 text-xs">—</span>
-                            }
-                          </td>
+                          {userCanViewPay && (
+                            <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                              {o.total_pay != null
+                                ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
+                                : <span className="text-gray-200 text-xs">—</span>
+                              }
+                            </td>
+                          )}
                           <td className="px-3 py-3.5">{renderActions(o)}</td>
                         </tr>
                       ))}
@@ -1933,6 +1986,7 @@ export default function OvertimePage() {
         <ProofPhotoModal
           overtime={proofPhotoData}
           onClose={() => setProofPhotoData(null)}
+          canViewPay={userCanViewPay}
         />
       )}
       {editData && (
@@ -1947,6 +2001,7 @@ export default function OvertimePage() {
           overtime={deleteData}
           onClose={() => setDeleteData(null)}
           onDeleted={() => { fetchOvertimes(); setDeleteData(null); }}
+          canViewPay={userCanViewPay}
         />
       )}
       <style jsx global>{`

@@ -15,6 +15,19 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
 };
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
+// ✅ Role yang boleh melihat data bayaran lembur (rate_per_hour & total_pay)
+const PAY_VIEW_ROLES = [
+  "KEPALA_SALES",
+  "KEPALA_MARKETING",
+  "KEPALA_TEKNISI",
+  "KEPALA_PENYEDIA_BARANG",
+  "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
+  "KEPALA_ONPOINT",
+  "KEPALA_SOTECH",
+];
+
 function canApprove(approverRole: string, targetRole: string): boolean {
   if (FULL_ACCESS.includes(approverRole)) return true;
   return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
@@ -36,18 +49,26 @@ export async function GET(request: Request) {
     const lastDay = new Date(Number(year), Number(month), 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
-    // ✅ SERVER-SIDE AUTO-COMPLETE: setiap GET, cek & selesaikan overtime yang melewati scheduled_end
+    // ✅ LEGACY DATA CORRECTION: semua COMPLETED tanpa foto → NEED_PROOF
+    // Ini menangani data lama sebelum status NEED_PROOF ada
+    await supabase
+      .from("overtime_requests")
+      .update({ status: "NEED_PROOF", updated_at: new Date().toISOString() })
+      .eq("status", "COMPLETED")
+      .is("proof_photo_url", null);
+
+    // ✅ SERVER-SIDE AUTO-COMPLETE: cek & selesaikan overtime yang melewati scheduled_end
+    // Status → NEED_PROOF (bukan COMPLETED) karena foto belum ada
     const now = new Date().toISOString();
     const { data: expiredOvertimes } = await supabase
       .from("overtime_requests")
       .select("id, user_id, actual_start, scheduled_end, rate_per_hour")
       .eq("status", "ONGOING")
       .not("scheduled_end", "is", null)
-      .lt("scheduled_end", now); // scheduled_end < now
+      .lt("scheduled_end", now);
 
     if (expiredOvertimes && expiredOvertimes.length > 0) {
       for (const expired of expiredOvertimes) {
-        // actual_end = scheduled_end (bukan waktu sekarang!)
         const actualEnd = expired.scheduled_end;
         const startMs = new Date(expired.actual_start).getTime();
         const endMs = new Date(actualEnd).getTime();
@@ -59,9 +80,10 @@ export async function GET(request: Request) {
         await supabase
           .from("overtime_requests")
           .update({
-            status: "COMPLETED",
-            actual_end: actualEnd,       // ✅ = scheduled_end, BUKAN now
-            completed_at: actualEnd,     // ✅ sama
+            // ✅ NEED_PROOF: waktu habis otomatis, tapi foto belum ada → wajib upload
+            status: "NEED_PROOF",
+            actual_end: actualEnd,
+            completed_at: actualEnd,
             duration_minutes: durationMins,
             total_pay: calculatedPay,
             auto_completed: true,
@@ -69,11 +91,10 @@ export async function GET(request: Request) {
           })
           .eq("id", expired.id);
 
-        console.log(`[SERVER AUTO-COMPLETE] ${expired.id} → actual_end: ${actualEnd}`);
+        console.log(`[SERVER AUTO-COMPLETE] ${expired.id} → NEED_PROOF, actual_end: ${actualEnd}`);
       }
     }
 
-    // ... lanjut query biasa seperti semula
     let q = supabase
       .from("overtime_requests")
       .select(`
@@ -128,7 +149,17 @@ export async function GET(request: Request) {
       approver: o.approved_by ? usersMap[o.approved_by] ?? null : null,
     }));
 
-    return NextResponse.json({ success: true, data: result });
+    // ✅ Strip rate_per_hour & total_pay untuk role yang tidak berwenang melihat bayaran
+    const canSeePay = PAY_VIEW_ROLES.includes(user.role);
+    const finalResult = canSeePay
+      ? result
+      : result.map(({ rate_per_hour, total_pay, ...rest }: any) => ({
+          ...rest,
+          rate_per_hour: null,
+          total_pay: null,
+        }));
+
+    return NextResponse.json({ success: true, data: finalResult });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err?.message },
@@ -148,13 +179,11 @@ export async function POST(request: Request) {
       request_date,
       reason,
       requested_start,
-      // ─── field baru untuk normal request ─────────────────────────────
       work_description: reqWorkDesc,
-      // ─── MANUAL fields ───────────────────────────────────────────────
       is_manual,
       target_user_id,
-      actual_start_time, // "HH:MM"
-      actual_end_time, // "HH:MM"
+      actual_start_time,
+      actual_end_time,
       work_description,
       proof_photo_url,
       rate_per_hour,
@@ -162,7 +191,6 @@ export async function POST(request: Request) {
 
     // ─── MANUAL INPUT ──────────────────────────────────────────────────────
     if (is_manual === true) {
-      // Hanya ADMIN, PROGRAMMER, ASISTEN_CEO
       if (!FULL_ACCESS.includes(user.role)) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang input lembur manual" },
@@ -170,46 +198,32 @@ export async function POST(request: Request) {
         );
       }
 
-      if (
-        !target_user_id ||
-        !request_date ||
-        !actual_start_time ||
-        !actual_end_time
-      ) {
+      if (!target_user_id || !request_date || !actual_start_time || !actual_end_time) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "target_user_id, request_date, actual_start_time, actual_end_time wajib",
+            message: "target_user_id, request_date, actual_start_time, actual_end_time wajib",
           },
           { status: 400 }
         );
       }
 
-      // Build ISO timestamps dengan timezone WIB +07:00
       const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
       const actualStart = `${request_date}T${fmt(actual_start_time)}+07:00`;
       const actualEnd = `${request_date}T${fmt(actual_end_time)}+07:00`;
 
-      // Validasi end > start
       if (new Date(actualEnd).getTime() <= new Date(actualStart).getTime()) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "Jam selesai harus lebih besar dari jam mulai",
-          },
+          { success: false, message: "Jam selesai harus lebih besar dari jam mulai" },
           { status: 400 }
         );
       }
 
-      // Hitung durasi dan bayaran
       const durationMins = Math.round(
-        (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) /
-        60000
+        (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) / 60000
       );
       const billedHours = Math.floor(durationMins / 60);
 
-      // Ambil rate dari overtime_rates jika tidak disuplai
       let finalRate = rate_per_hour ?? 0;
       if (!finalRate) {
         const { data: targetUserData } = await supabase
@@ -237,7 +251,8 @@ export async function POST(request: Request) {
           request_date,
           reason: reason?.trim() || "Input manual oleh admin",
           requested_start: actual_start_time,
-          status: "COMPLETED",
+          // ✅ NEED_PROOF jika belum ada foto, COMPLETED jika sudah ada foto
+          status: proof_photo_url ? "COMPLETED" : "NEED_PROOF",
           approved_by: user.id,
           approved_at: new Date().toISOString(),
           scheduled_start: actualStart,
@@ -267,21 +282,14 @@ export async function POST(request: Request) {
     // ─── NORMAL REQUEST ────────────────────────────────────────────────────
     if (!request_date || !reason || !requested_start) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "request_date, reason, requested_start wajib",
-        },
+        { success: false, message: "request_date, reason, requested_start wajib" },
         { status: 400 }
       );
     }
 
-    // Validasi work_description wajib untuk normal request
     if (!reqWorkDesc?.trim()) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Rincian pekerjaan wajib diisi",
-        },
+        { success: false, message: "Rincian pekerjaan wajib diisi" },
         { status: 400 }
       );
     }
@@ -296,10 +304,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Sudah ada request lembur aktif untuk tanggal ini",
-        },
+        { success: false, message: "Sudah ada request lembur aktif untuk tanggal ini" },
         { status: 400 }
       );
     }
@@ -309,8 +314,8 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         request_date,
-        reason,                              // label opsi atau teks custom "Lainnya"
-        work_description: reqWorkDesc.trim(), // rincian pekerjaan dari user
+        reason,
+        work_description: reqWorkDesc.trim(),
         requested_start,
         status: "PENDING",
       })
@@ -376,20 +381,8 @@ export async function PATCH(request: Request) {
       .eq("id", overtime.user_id)
       .single();
 
-    console.log(
-      "[PATCH] Action:",
-      action,
-      "User:",
-      user.id,
-      "UserRole:",
-      user.role
-    );
-    console.log(
-      "[PATCH] Overtime user_id:",
-      overtime.user_id,
-      "Status:",
-      overtime.status
-    );
+    console.log("[PATCH] Action:", action, "User:", user.id, "UserRole:", user.role);
+    console.log("[PATCH] Overtime user_id:", overtime.user_id, "Status:", overtime.status);
 
     // ─── APPROVE ──────────────────────────────────────────────────────────
     if (action === "APPROVE") {
@@ -401,21 +394,14 @@ export async function PATCH(request: Request) {
       }
       if (!scheduled_start || !scheduled_end) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "scheduled_start dan scheduled_end wajib saat approve",
-          },
+          { success: false, message: "scheduled_start dan scheduled_end wajib saat approve" },
           { status: 400 }
         );
       }
 
-      // Pastikan request masih PENDING
       if (overtime.status !== "PENDING") {
         return NextResponse.json(
-          {
-            success: false,
-            message: "Hanya request berstatus PENDING yang bisa disetujui",
-          },
+          { success: false, message: "Hanya request berstatus PENDING yang bisa disetujui" },
           { status: 400 }
         );
       }
@@ -430,8 +416,6 @@ export async function PATCH(request: Request) {
         finalRate = rateData?.rate_per_hour ?? 0;
       }
 
-      // ✅ Langsung set ONGOING + actual_start saat approve
-      // Tidak perlu step "Mulai" lagi dari sisi karyawan
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
@@ -441,7 +425,7 @@ export async function PATCH(request: Request) {
           scheduled_start,
           scheduled_end,
           rate_per_hour: finalRate,
-          actual_start: scheduled_start,  // ✅ BENAR! = jadwal mulai
+          actual_start: scheduled_start,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -495,13 +479,19 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // ✅ Kasus 1: Upload foto untuk overtime yang sudah COMPLETED (auto_completed)
-      // Hanya update proof_photo_url, JANGAN sentuh actual_end atau total_pay
-      if (overtime.status === "COMPLETED" && !overtime.proof_photo_url) {
+      // ✅ Kasus 1: Upload foto untuk overtime yang sudah COMPLETED atau NEED_PROOF
+      // Jika ada foto → upgrade ke COMPLETED
+      // Jika tidak ada foto → pertahankan status lama
+      if (
+        (overtime.status === "COMPLETED" || overtime.status === "NEED_PROOF") &&
+        !overtime.proof_photo_url
+      ) {
         const { data, error } = await supabase
           .from("overtime_requests")
           .update({
             proof_photo_url: proof_photo_url ?? null,
+            // ✅ Upgrade ke COMPLETED hanya jika foto berhasil diupload
+            status: proof_photo_url ? "COMPLETED" : overtime.status,
             updated_at: new Date().toISOString(),
           })
           .eq("id", id)
@@ -516,7 +506,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: true, data });
       }
 
-      // ✅ Kasus 2: Selesaikan overtime yang sedang ONGOING
+      // ✅ Kasus 2: Selesaikan overtime yang sedang ONGOING (manual oleh karyawan)
       if (!["APPROVED", "ONGOING"].includes(overtime.status)) {
         return NextResponse.json(
           { success: false, message: "Status tidak valid untuk complete" },
@@ -532,11 +522,9 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // ✅ actual_end = scheduled_end jika auto_completed, bukan new Date()
-      // Ini mencegah "selesai jam 16:00" padahal dijadwalkan 15:00
       const actualEnd = auto_completed === true
-        ? (overtime.scheduled_end ?? new Date().toISOString()) // gunakan jadwal akhir
-        : new Date().toISOString(); // manual finish oleh karyawan = waktu klik
+        ? (overtime.scheduled_end ?? new Date().toISOString())
+        : new Date().toISOString();
 
       const startMs = new Date(startReference).getTime();
       const endMs = new Date(actualEnd).getTime();
@@ -554,10 +542,11 @@ export async function PATCH(request: Request) {
       const calculatedPay = billedHours * ratePerHour;
 
       const updates: any = {
-        actual_end: actualEnd,           // ✅ bukan selalu new Date()
-        status: "COMPLETED",
+        actual_end: actualEnd,
+        // ✅ COMPLETED jika ada foto, NEED_PROOF jika belum ada foto
+        status: proof_photo_url ? "COMPLETED" : "NEED_PROOF",
         proof_photo_url: proof_photo_url ?? null,
-        completed_at: actualEnd,         // ✅ konsisten dengan actual_end
+        completed_at: actualEnd,
         duration_minutes: durationMins,
         total_pay: calculatedPay,
         updated_at: new Date().toISOString(),
@@ -584,21 +573,18 @@ export async function PATCH(request: Request) {
 
     // ─── SET_PAY ──────────────────────────────────────────────────────────
     if (action === "SET_PAY") {
-      if (!canApprove(user.role, targetUser?.role ?? "")) {
+      // ✅ Hanya FULL_ACCESS yang boleh mengubah bayaran
+      if (!FULL_ACCESS.includes(user.role)) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang mengubah total bayar" },
           { status: 403 }
         );
       }
 
-      // Hanya boleh SET_PAY jika sudah COMPLETED
-      if (overtime.status !== "COMPLETED") {
+      // ✅ Boleh SET_PAY untuk COMPLETED atau NEED_PROOF
+      if (overtime.status !== "COMPLETED" && overtime.status !== "NEED_PROOF") {
         return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Bayaran hanya bisa diatur setelah lembur selesai (COMPLETED)",
-          },
+          { success: false, message: "Bayaran hanya bisa diatur setelah lembur selesai" },
           { status: 400 }
         );
       }
@@ -664,7 +650,6 @@ export async function PATCH(request: Request) {
 
     // ─── UPDATE ───────────────────────────────────────────────────────────
     if (action === "UPDATE") {
-      // Hanya FULL_ACCESS yang boleh update
       if (!FULL_ACCESS.includes(user.role)) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang mengubah data lembur" },
@@ -685,7 +670,6 @@ export async function PATCH(request: Request) {
         status: newStatus,
       } = body;
 
-      // Hitung ulang durasi & bayaran jika ada perubahan waktu atau rate
       const resolvedStart = newActualStart ?? overtime.actual_start;
       const resolvedEnd = newActualEnd ?? overtime.actual_end;
       const resolvedRate = newRate ?? overtime.rate_per_hour ?? 0;
@@ -703,7 +687,6 @@ export async function PATCH(request: Request) {
         }
       }
 
-      // Hanya set field yang dikirim (hindari null overwrite yang tidak perlu)
       const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
@@ -735,8 +718,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-
-
     return NextResponse.json(
       { success: false, message: `Action tidak dikenal: ${action}` },
       { status: 400 }
@@ -750,7 +731,6 @@ export async function PATCH(request: Request) {
   }
 }
 
-
 // ─── DELETE ───────────────────────────────────────────────────────────────
 export async function DELETE(request: Request) {
   try {
@@ -758,7 +738,6 @@ export async function DELETE(request: Request) {
     if (!user)
       return NextResponse.json({ success: false }, { status: 401 });
 
-    // Hanya FULL_ACCESS yang boleh delete
     if (!FULL_ACCESS.includes(user.role)) {
       return NextResponse.json(
         { success: false, message: "Tidak berwenang menghapus data lembur" },
@@ -776,7 +755,6 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Cek dulu data-nya ada
     const { data: existing, error: findError } = await supabase
       .from("overtime_requests")
       .select("id, proof_photo_url")
@@ -790,10 +768,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Hapus foto dari storage jika ada
     if (existing.proof_photo_url) {
-      // Ekstrak path relatif dari full URL
-      // URL format: https://xxx.supabase.co/storage/v1/object/public/documents/overtime-proofs/xxx.jpg
       const urlParts = existing.proof_photo_url.split("/documents/");
       if (urlParts.length > 1) {
         const storagePath = urlParts[1];
