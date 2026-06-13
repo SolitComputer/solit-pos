@@ -249,7 +249,61 @@ function DesktopSkeletonTable() {
   );
 }
 
-// ─── TRANSACTION CARD (Mobile View) ────────────────────────────────────
+function SerialNumberList({
+  serials,
+  maxVisible = 3,
+  align = "start",
+  size = "sm",
+  emptyDash = true,
+}: {
+  serials: string[];
+  maxVisible?: number;
+  align?: "start" | "end";
+  size?: "sm" | "md";
+  emptyDash?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (serials.length === 0) {
+    return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
+  }
+
+  const visible = expanded ? serials : serials.slice(0, maxVisible);
+  const hidden = serials.length - maxVisible;
+  const badge =
+    size === "md"
+      ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
+      : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
+
+  return (
+    <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
+      {visible.map((sn, i) => (
+        <span key={i} className={badge}>{sn}</span>
+      ))}
+
+      {!expanded && hidden > 0 && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(true); }}
+          className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100 transition whitespace-nowrap"
+        >
+          +{hidden} lagi
+        </button>
+      )}
+
+      {expanded && serials.length > maxVisible && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(false); }}
+          className="text-[9px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-200 transition whitespace-nowrap"
+        >
+          Tutup
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -360,26 +414,21 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
           <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
             <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.laptop_name || "—"}</p>
-            {(item.cpu || item.ram) && (
+            {(item.cpu || item.ram || item.storage) && (
               <div className="flex flex-wrap gap-1.5">
                 {item.cpu && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">⚙️ {item.cpu}</span>}
                 {item.ram && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">💾 {item.ram}</span>}
+                {item.storage && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">🗄️ {item.storage}</span>}
               </div>
             )}
             {(() => {
               const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
                 ? item.serial_numbers
-                : item.serial_number
-                  ? [item.serial_number]
-                  : [];
+                : item.serial_number ? [item.serial_number] : [];
               if (sns.length === 0) return null;
               return (
-                <div className="flex flex-row flex-wrap gap-1 mt-1">
-                  {sns.map((sn: string, i: number) => (
-                    <span key={i} className="text-[10px] text-gray-600 font-mono bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                      {sn}
-                    </span>
-                  ))}
+                <div className="mt-1">
+                  <SerialNumberList serials={sns} maxVisible={4} size="md" emptyDash={false} />
                 </div>
               );
             })()}
@@ -432,20 +481,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             {(() => {
               const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
                 ? item.serial_numbers
-                : item.serial_number
-                  ? [item.serial_number]
-                  : [];
+                : item.serial_number ? [item.serial_number] : [];
               if (sns.length === 0) return null;
               return (
                 <div className="flex justify-between gap-2">
                   <span className="text-gray-500 shrink-0">SN:</span>
-                  <div className="flex flex-row flex-wrap gap-1 justify-end">
-                    {sns.map((sn: string, i: number) => (
-                      <span key={i} className="font-mono font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                        {sn}
-                      </span>
-                    ))}
-                  </div>
+                  <SerialNumberList serials={sns} maxVisible={4} size="md" align="end" emptyDash={false} />
                 </div>
               );
             })()}
@@ -569,7 +610,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
 function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
   if (item.status !== "PAID") return null;
- 
+
   if (item.notes?.includes("[ORIG:RESERVED]")) return "RESERVED";
   if (item.notes?.includes("[ORIG:HELD]")) return "HELD";
 
@@ -580,7 +621,7 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
     const diffMinutes = diffMs / (1000 * 60);
     if (diffMinutes > 5) return "HELD";
   }
- 
+
   return null;
 }
 
@@ -594,12 +635,12 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
             <tr className="border-b-2 border-gray-200 bg-gray-50">
               {/* Fixed column widths untuk konsistensi */}
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & Waktu</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & waktu</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Kontak</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Sales</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[200px]">Laptop</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">SN</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Metode</th>
@@ -798,7 +839,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             <div className="text-[10px] font-bold text-gray-900 leading-tight line-clamp-1">
               {item.laptop_name || "—"}
             </div>
-            {(item.cpu || item.ram) && (
+            {(item.cpu || item.ram || item.storage) && (
               <div className="flex items-center gap-1 flex-wrap">
                 {item.cpu && (
                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">
@@ -810,35 +851,24 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                     {item.ram}
                   </span>
                 )}
+                {item.storage && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">
+                    {item.storage}
+                  </span>
+                )}
               </div>
             )}
           </div>
         </td>
 
         {/* Serial Number */}
+        {/* Serial Number */}
         <td className="px-3 py-2.5">
           {(() => {
-            // Prioritas: serial_numbers array > serial_number string
             const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
               ? item.serial_numbers
-              : item.serial_number
-                ? [item.serial_number]
-                : [];
-
-            if (sns.length === 0) return <span className="text-[10px] text-gray-300">—</span>;
-
-            return (
-              <div className="flex flex-row flex-wrap gap-1">
-                {sns.map((sn: string, i: number) => (
-                  <span
-                    key={i}
-                    className="text-[9px] font-mono font-bold text-gray-700 tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
-                  >
-                    {sn}
-                  </span>
-                ))}
-              </div>
-            );
+              : item.serial_number ? [item.serial_number] : [];
+            return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
 

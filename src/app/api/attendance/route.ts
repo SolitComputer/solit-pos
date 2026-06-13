@@ -7,6 +7,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG"];
+function canViewAllAttendance(role: string): boolean {
+  return isFullAccess(role) || SALARY_ACCESS_ROLES.includes(role);
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -28,7 +33,7 @@ export async function GET(request: Request) {
       .in("status", ["SUCCESS"])
       .order("created_at", { ascending: true });
 
-    if (!isFullAccess(user.role)) {
+    if (!canViewAllAttendance(user.role)) {   
       query = query.eq("user_id", user.id);
     }
 
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
       ip_address: item.ip_address,
       face_distance: item.face_distance,
       created_at: item.created_at,
-      late_weight: item.late_weight != null ? Number(item.late_weight) : null,  
+      late_weight: item.late_weight != null ? Number(item.late_weight) : null,
     }));
 
     return NextResponse.json({ success: true, data: formattedData });

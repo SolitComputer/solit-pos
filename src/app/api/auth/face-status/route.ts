@@ -51,13 +51,14 @@ export async function GET() {
     const [
       { data: weeklyOff },
       { data: specificOff },
+      { data: dateWork },        
       { data: manualToday },
       { data: todaySuccess },
       { data: userData },
     ] = await Promise.all([
       supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
       supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
-      // ✅ FIX: tambah created_by ke select
+      supabase.from("user_date_work").select("id").eq("user_id", user.id).eq("work_date", todayDate).maybeSingle(), 
       supabase.from("attendance_manual").select("id, status, created_by")
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
       supabase.from("face_verifications").select("id, created_at")
@@ -152,7 +153,7 @@ export async function GET() {
       return response;
     }
 
-    const isTodayDayOff = Boolean(weeklyOff) || Boolean(specificOff);
+    const isTodayDayOff = (Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork);
     const alreadyAttendedDB = Boolean(todaySuccess);
 
     const schedule = await resolveShiftConfigFromDB(user.id, supabase);

@@ -83,7 +83,23 @@ type UserLeaveData = {
 };
 
 type DayOff = { id: string; user_id: string; day_of_week: number; users?: { id: string; name: string; role: string } };
-type DateOff = { id: string; user_id: string; off_date: string; users?: { id: string; name: string; role: string } };
+type DateOff = { id: string; user_id: string; off_date: string; note?: string | null; users?: { id: string; name: string; role: string } };
+type DateWork = {
+    id: string;
+    user_id: string;
+    work_date: string;
+    note?: string | null;
+    users?: { id: string; name: string; role: string }
+};
+
+type SwapDayOff = {
+    id?: string;
+    user_id: string;
+    user_name?: string;
+    off_date: string;
+    work_date: string;
+    note?: string | null;
+};
 type UserInfo = { id: string; name: string; role: string };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
@@ -97,7 +113,13 @@ const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 function isAdminRole(role?: string): boolean {
     return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
-} const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+}
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG"] as const;
+function canViewSalary(role?: string): boolean {
+    return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
+}
+const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
 
 const MANUAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
     PRESENT: { label: "Hadir", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200", emoji: "✅" },
@@ -149,9 +171,9 @@ function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
 
     if ("late_weight" in a && a.late_weight != null) {
         const w = a.late_weight as number;
-        if (w >= 1) return "PRESENT";   
-        if (w > 0) return "LATE";     
-        return "SKIP";                  
+        if (w >= 1) return "PRESENT";
+        if (w > 0) return "LATE";
+        return "SKIP";
     }
 
     if (isLate(a.check_in_time || a.created_at, a.user_shift ?? "PAGI")) return "LATE";
@@ -1469,12 +1491,335 @@ function SalarySlipCard({ slip, onFinalize, onGenerate }: {
     );
 }
 
+function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, calMonth, onClose, onSaved }: {
+    users: UserInfo[];
+    dayOffs: DayOff[];
+    allDateOffs: DateOff[];
+    allDateWorks: DateWork[];
+    calYear: number;
+    calMonth: number;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [uid, setUid] = useState(users[0]?.id ?? "");
+    const [offDate, setOffDate] = useState("");   // hari masuk → jadi libur
+    const [workDate, setWorkDate] = useState(""); // hari libur → jadi masuk
+    const [note, setNote] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState<string | null>(null);
+    const [error, setError] = useState("");
+
+    // Ambil swap yang sudah ada untuk user ini
+    const existingSwaps = useMemo(() => {
+        // Pasangkan date_off (masuk→libur) dengan date_work (libur→masuk) berdasarkan note "Tukar libur"
+        const offMap: Record<string, DateOff> = {};
+        allDateOffs
+            .filter(d => d.user_id === uid)
+            .forEach(d => { offMap[d.off_date] = d; });
+
+        const workMap: Record<string, DateWork> = {};
+        allDateWorks
+            .filter(d => d.user_id === uid)
+            .forEach(d => { workMap[d.work_date] = d; });
+
+        const swaps: Array<{ off: DateOff; work: DateWork }> = [];
+        const workList = Object.values(workMap);
+        Object.values(offMap).forEach((off, idx) => {
+            const matchingWork = workList.find(
+                w => w.note === off.note
+            ) ?? workList[idx];
+            if (matchingWork) {
+                swaps.push({ off, work: matchingWork });
+                const wIdx = workList.indexOf(matchingWork);
+                if (wIdx !== -1) workList.splice(wIdx, 1);
+            }
+        });
+
+        return swaps;
+    }, [allDateOffs, allDateWorks, uid]);
+
+    // Info hari libur mingguan user yang dipilih
+    const userDayOffs = useMemo(() => {
+        const m = new Set<number>();
+        dayOffs.filter(d => d.user_id === uid).forEach(d => m.add(d.day_of_week));
+        return m;
+    }, [dayOffs, uid]);
+
+    const dim = new Date(calYear, calMonth + 1, 0).getDate();
+    const minDate = `${calYear}-${pad2(calMonth + 1)}-01`;
+    const maxDate = `${calYear}-${pad2(calMonth + 1)}-${pad2(dim)}`;
+
+    // Cek apakah tanggal adalah hari libur mingguan
+    const isDayOff = (dateStr: string) => {
+        if (!dateStr) return false;
+        const dow = new Date(dateStr + "T12:00:00").getDay();
+        return userDayOffs.has(dow);
+    };
+
+    const save = async () => {
+        if (!uid || !offDate || !workDate) {
+            setError("Semua field wajib diisi");
+            return;
+        }
+        if (!isDayOff(workDate)) {
+            setError(`Tanggal masuk pengganti (${workDate}) harus merupakan hari libur mingguan karyawan ini`);
+            return;
+        }
+        if (isDayOff(offDate)) {
+            setError(`Tanggal yang diganti libur (${offDate}) harus merupakan hari kerja`);
+            return;
+        }
+
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch("/api/attendance/swap-dayoff", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: uid, off_date: offDate, work_date: workDate, note: note || "Tukar libur" }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved();
+            setOffDate("");
+            setWorkDate("");
+            setNote("");
+        } catch {
+            setError("Gagal menyimpan");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteSwap = async (off: DateOff, work: DateWork) => {
+        const key = `${off.off_date}_${work.work_date}`;
+        setDeleting(key);
+        try {
+            await fetch(
+                `/api/attendance/swap-dayoff?user_id=${uid}&off_date=${off.off_date}&work_date=${work.work_date}`,
+                { method: "DELETE" }
+            );
+            onSaved();
+        } catch { }
+        finally { setDeleting(null); }
+    };
+
+    const selectedUser = users.find(u => u.id === uid);
+
+    return (
+        <ModalShell
+            onClose={onClose}
+            headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
+            title="🔄 Tukar Libur"
+            subtitle="Ganti hari libur dengan hari kerja lain dalam bulan ini"
+            footer={
+                <div className="flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+                        Tutup
+                    </button>
+                    <button
+                        onClick={save}
+                        disabled={saving || !offDate || !workDate}
+                        className="flex-1 h-11 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                            : "🔄 Simpan Tukar Libur"
+                        }
+                    </button>
+                </div>
+            }
+        >
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
+                        <span>⚠️</span>{error}
+                    </div>
+                )}
+
+                {/* Info box */}
+                <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-xs text-violet-700">
+                    <p className="font-bold mb-1">ℹ️ Cara kerja Tukar Libur:</p>
+                    <ul className="space-y-1 text-violet-600">
+                        <li>• <strong>Tanggal Diganti Libur</strong>: hari yang harusnya masuk, tapi karyawan izin/libur</li>
+                        <li>• <strong>Tanggal Masuk Pengganti</strong>: hari libur mingguan yang akan dipakai sebagai ganti masuk</li>
+                        <li>• Keduanya disimpan sekaligus dan mempengaruhi perhitungan absensi</li>
+                    </ul>
+                </div>
+
+                {/* Pilih Karyawan */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Karyawan</label>
+                    <select
+                        value={uid}
+                        onChange={e => { setUid(e.target.value); setOffDate(""); setWorkDate(""); }}
+                        className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all"
+                    >
+                        {users.map(u => (
+                            <option key={u.id} value={u.id}>{u.name} — {u.role.replace(/_/g, " ")}</option>
+                        ))}
+                    </select>
+                    {/* Tampilkan hari libur mingguan user */}
+                    {selectedUser && userDayOffs.size > 0 && (
+                        <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                            Libur mingguan: <span className="font-bold text-red-500">
+                                {Array.from(userDayOffs).sort().map(d => DAY_FULL[d]).join(", ")}
+                            </span>
+                        </p>
+                    )}
+                </div>
+
+                {/* Form Tukar */}
+                <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-4 space-y-4">
+                    <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">Pengaturan Tukar Libur</p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {/* Tanggal yang jadi libur (harusnya masuk) */}
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                📋 Tanggal Diganti Libur
+                            </label>
+                            <input
+                                type="date"
+                                value={offDate}
+                                min={minDate}
+                                max={maxDate}
+                                onChange={e => setOffDate(e.target.value)}
+                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400/20 transition-all"
+                            />
+                            {offDate && (
+                                <p className={`text-[10px] mt-1 font-semibold ${isDayOff(offDate) ? "text-red-500" : "text-emerald-600"}`}>
+                                    {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
+                                    {isDayOff(offDate) ? " ⚠️ Ini hari libur!" : " ✓ Hari kerja"}
+                                </p>
+                            )}
+                            <p className="text-[9px] text-gray-400 mt-0.5">Hari yang harusnya masuk → jadi libur</p>
+                        </div>
+
+                        {/* Tanggal pengganti (harusnya libur → jadi masuk) */}
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                ✅ Tanggal Masuk Pengganti
+                            </label>
+                            <input
+                                type="date"
+                                value={workDate}
+                                min={minDate}
+                                max={maxDate}
+                                onChange={e => setWorkDate(e.target.value)}
+                                className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/20 transition-all"
+                            />
+                            {workDate && (
+                                <p className={`text-[10px] mt-1 font-semibold ${isDayOff(workDate) ? "text-emerald-600" : "text-amber-500"}`}>
+                                    {new Date(workDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
+                                    {isDayOff(workDate) ? " ✓ Hari libur (bisa dipakai)" : " ⚠️ Ini bukan hari libur!"}
+                                </p>
+                            )}
+                            <p className="text-[9px] text-gray-400 mt-0.5">Hari libur mingguan → jadi masuk</p>
+                        </div>
+                    </div>
+
+                    {/* Preview swap */}
+                    {offDate && workDate && !isDayOff(offDate) && isDayOff(workDate) && (
+                        <div className="bg-white border border-violet-200 rounded-xl px-4 py-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Preview Tukar</p>
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="flex-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-center">
+                                    <p className="text-[10px] text-red-500 font-bold">LIBUR</p>
+                                    <p className="font-bold text-gray-800 text-xs mt-0.5">
+                                        {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                    </p>
+                                    <p className="text-[9px] text-gray-500">
+                                        {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
+                                    </p>
+                                </div>
+                                <span className="text-gray-400 font-bold text-lg">⇄</span>
+                                <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-center">
+                                    <p className="text-[10px] text-emerald-600 font-bold">MASUK</p>
+                                    <p className="font-bold text-gray-800 text-xs mt-0.5">
+                                        {new Date(workDate + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                    </p>
+                                    <p className="text-[9px] text-gray-500">
+                                        {new Date(workDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Catatan */}
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                            Catatan <span className="text-gray-300 font-normal normal-case">(opsional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="e.g. Keperluan keluarga, event kantor..."
+                            className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all"
+                        />
+                    </div>
+                </div>
+
+                {/* Daftar tukar libur yang sudah ada */}
+                {existingSwaps.length > 0 && (
+                    <div>
+                        <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">
+                            Tukar Libur Aktif ({existingSwaps.length})
+                        </p>
+                        <div className="space-y-2">
+                            {existingSwaps.map(({ off, work }) => {
+                                const key = `${off.off_date}_${work.work_date}`;
+                                return (
+                                    <div
+                                        key={key}
+                                        className="bg-white border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-sm"
+                                    >
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 text-xs flex-wrap">
+                                                <span className="bg-red-100 text-red-600 border border-red-200 px-2.5 py-1 rounded-lg font-bold">
+                                                    🔴 {new Date(off.off_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
+                                                </span>
+                                                <span className="text-gray-400 font-bold">→</span>
+                                                <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                                                    ✅ {new Date(work.work_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
+                                                </span>
+                                            </div>
+                                            {off.note && (
+                                                <span className="text-[10px] text-gray-400 truncate hidden sm:block">{off.note}</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => deleteSwap(off, work)}
+                                            disabled={deleting === key}
+                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all font-bold text-lg flex-shrink-0"
+                                        >
+                                            {deleting === key
+                                                ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                                                : "×"
+                                            }
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </ModalShell>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
     const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [manualRecords, setManualRecords] = useState<ManualAttendance[]>([]);
     const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
     const [allDateOffs, setAllDateOffs] = useState<DateOff[]>([]);
+    const [allDateWorks, setAllDateWorks] = useState<DateWork[]>([]);
+    const [showSwapModal, setShowSwapModal] = useState(false);
     const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
     const [salaries, setSalaries] = useState<UserSalary[]>([]);
     const [leaveData, setLeaveData] = useState<UserLeaveData[]>([]);
@@ -1522,6 +1867,11 @@ export default function AttendanceDashboardPage() {
     }, []);
     const fetchDayOffs = useCallback(async () => { const r = await fetch("/api/attendance/day-off"); const d = await r.json(); if (d.success) setDayOffs(d.data || []); }, []);
     const fetchAllDateOffs = useCallback(async () => { const r = await fetch("/api/attendance/date-off"); const d = await r.json(); if (d.success) setAllDateOffs(d.data || []); }, []);
+    const fetchAllDateWorks = useCallback(async () => {
+        const r = await fetch("/api/attendance/date-work");
+        const d = await r.json();
+        if (d.success) setAllDateWorks(d.data || []);
+    }, []);
     const fetchAllUsers = useCallback(async () => {
         const r = await fetch("/api/attendance/users");
         const d = await r.json();
@@ -1630,10 +1980,10 @@ export default function AttendanceDashboardPage() {
     }, [selectedMonth, fetchOvertimeTotal, fetchAllowances]);
 
     useEffect(() => {
-        if (isAdminRole(currentUser?.role)) {
+        if (canViewSalary(currentUser?.role)) {
             fetchSalaryHistory();
         }
-    }, [isAdminRole, currentUser, fetchSalaryHistory]);
+    }, [currentUser, fetchSalaryHistory]);
 
     useEffect(() => {
         if (!selectedMonth) return;
@@ -1643,25 +1993,26 @@ export default function AttendanceDashboardPage() {
             fetchAttendance(),
             fetchDayOffs(),
             fetchAllDateOffs(),
+            fetchAllDateWorks(),
             fetchManualRecords(year, month),
             fetchAllUsers(),
-            fetchSalaries(),  // ✅ Untuk SEMUA users
-            fetchAllowances()  // ✅ Untuk SEMUA users
+            fetchSalaries(),
+            fetchAllowances()
         ];
         if (isAdminRole(currentUser?.role)) {
             tasks.push(fetchLeaveData(year, month));
         }
         Promise.all(tasks).finally(() => setLoading(false));
-        if (isAdminRole(currentUser?.role)) {
+        if (canViewSalary(currentUser?.role)) {
             fetchSalarySlips(year, month);
         }
     }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser?.role]);
 
     useEffect(() => {
-        if (isAdminRole(currentUser?.role)) {
+        if (canViewSalary(currentUser?.role)) {
             fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
         }
-    }, [selectedSlipMonth, isAdminRole, currentUser, fetchSalarySlips]);
+    }, [selectedSlipMonth, currentUser, fetchSalarySlips]);
 
     const openAddManual = useCallback(async (date?: string, userId?: string) => {
         setEditManualData(null);
@@ -1696,6 +2047,7 @@ export default function AttendanceDashboardPage() {
             fetchAttendance(),
             fetchDayOffs(),
             fetchAllDateOffs(),
+            fetchAllDateWorks(),
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
@@ -1722,8 +2074,22 @@ export default function AttendanceDashboardPage() {
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
     const dateOffByName = useMemo(() => { const m: Record<string, Set<string>> = {}; allDateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); }); return m; }, [allDateOffs]);
 
-    const isDayOffForUser = (name: string, dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); return (dayOffByName[name]?.has(dow) ?? false) || (dateOffByName[name]?.has(dk) ?? false); };
-    const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
+    const dateWorkByName = useMemo(() => {
+        const m: Record<string, Set<string>> = {};
+        allDateWorks.forEach(d => {
+            const n = d.users?.name;
+            if (!n) return;
+            if (!m[n]) m[n] = new Set();
+            m[n].add(d.work_date);
+        });
+        return m;
+    }, [allDateWorks]);
+
+    const isDayOffForUser = (name: string, dk: string) => {
+        if (dateWorkByName[name]?.has(dk)) return false;
+        const dow = new Date(dk + "T12:00:00").getDay();
+        return (dayOffByName[name]?.has(dow) ?? false) || (dateOffByName[name]?.has(dk) ?? false);
+    }; const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
     const allowanceMap = useMemo(() => {
         const m: Record<string, UserAllowances> = {};
         allowances.forEach(a => (m[a.user_id] = a));
@@ -1852,7 +2218,9 @@ export default function AttendanceDashboardPage() {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
                 if (isCurrentMonth && dk > todayWIB) break;
                 const dow = new Date(dk + "T12:00:00").getDay();
-                if (dows.has(dow) || offs.has(dk)) { offDates.push(dk); continue; }
+                const isDateWork = allDateWorks.some(dw => dw.user_id === userIdByName[name] && dw.work_date === dk);
+                const isWeeklyOff = dows.has(dow) && !isDateWork; // libur mingguan, tapi bukan date_work override
+                if ((isWeeklyOff || offs.has(dk)) && !isDateWork) { offDates.push(dk); continue; }
 
                 const eff = effByName[name]?.[dk];
                 if (eff === "PRESENT") { present++; score += 1; }
@@ -1888,7 +2256,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -2016,13 +2384,33 @@ export default function AttendanceDashboardPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         {isAdminRole(currentUser?.role) && (
-                            <button
-                                onClick={() => openAddManual()}
-                                disabled={usersLoading}
-                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
-                            >
-                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => openAddManual()}
+                                    disabled={usersLoading}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
+                                >
+                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (allUsers.length === 0) fetchAllUsers();
+                                        setShowDayOffModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
+                                >
+                                    📅 Libur Mingguan
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (allUsers.length === 0) fetchAllUsers();
+                                        setShowSwapModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
+                                >
+                                    🔄 Tukar Libur
+                                </button>
+                            </>
                         )}
                         <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
@@ -2054,37 +2442,28 @@ export default function AttendanceDashboardPage() {
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
-                    {isAdminRole(currentUser?.role) ? (
-                        ([
+                    {(() => {
+                        const role = currentUser?.role;
+                        const tabList: { id: typeof activeTab; label: string }[] = [
                             { id: "calendar", label: "📅 Kalender" },
-                            { id: "summary", label: "📊 Ringkasan" },
-                            { id: "salary", label: "💰 Rekap Gaji" },
-                            { id: "salary-slip", label: "📄 Slip Gaji" },
-                            { id: "salary-history", label: "📋 Riwayat Gaji" },
-                            { id: "leave", label: "🌴 Cuti" },
-                        ] as const).map(t => (
+                        ];
+                        if (isAdminRole(role)) tabList.push({ id: "summary", label: "📊 Ringkasan" });
+                        if (canViewSalary(role)) {
+                            tabList.push({ id: "salary", label: "💰 Rekap Gaji" });
+                            tabList.push({ id: "salary-slip", label: "📄 Slip Gaji" });
+                            tabList.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
+                        }
+                        if (isAdminRole(role)) tabList.push({ id: "leave", label: "🌴 Cuti" });
+
+                        return tabList.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
                                 className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
                                     ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                    }`}>
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
                                 {t.label}
                             </button>
-                        ))
-                    ) : (
-                        ([
-                            { id: "calendar", label: "📅 Kalender" },
-                            { id: "my-salary", label: "💰 Gaji Saya" },
-                        ] as const).map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id)}
-                                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 ${activeTab === t.id
-                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                    }`}>
-                                {t.label}
-                            </button>
-                        ))
-                    )}
+                        ));
+                    })()}
                 </div>
 
                 {/* ── Filter ── */}
@@ -2542,7 +2921,7 @@ export default function AttendanceDashboardPage() {
                 )}
 
                 {/* ════ TAB GAJI ════ */}
-                {activeTab === "salary" && isAdminRole(currentUser?.role) && (
+                {activeTab === "salary" && canViewSalary(currentUser?.role) && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
                             <div>
@@ -3024,7 +3403,7 @@ export default function AttendanceDashboardPage() {
             </div>
 
             {/* ════ TAB RIWAYAT GAJI (admin only) ════ */}
-            {activeTab === "salary-history" && isAdminRole(currentUser?.role) && (
+            {activeTab === "salary-history" && canViewSalary(currentUser?.role) && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -3311,7 +3690,7 @@ export default function AttendanceDashboardPage() {
 
 
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
-            {activeTab === "salary-slip" && isAdminRole(currentUser?.role) && (
+            {activeTab === "salary-slip" && canViewSalary(currentUser?.role) && (
                 <div className="space-y-4">
                     {/* Month Selector */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -3475,6 +3854,22 @@ export default function AttendanceDashboardPage() {
                     onSaved={() => {
                         fetchAllowances();
                         setEditAllowanceUser(null);
+                    }}
+                />
+            )}
+            {showSwapModal && isAdminRole(currentUser?.role) && (
+                <SwapDayOffModal
+                    users={allUsers}
+                    dayOffs={dayOffs}
+                    allDateOffs={allDateOffs}
+                    allDateWorks={allDateWorks}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onClose={() => setShowSwapModal(false)}
+                    onSaved={() => {
+                        fetchAllDateOffs();
+                        fetchAllDateWorks();
+                        fetchDayOffs();
                     }}
                 />
             )}
