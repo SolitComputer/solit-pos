@@ -25,6 +25,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .lt("paid_at", end)
       .order("paid_at", { ascending: false, nullsFirst: false })
       .limit(10);
+      
 
     if (error) {
       return NextResponse.json(
