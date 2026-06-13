@@ -24,6 +24,7 @@ const ALL_ROLES = [
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -34,6 +35,9 @@ const ROLE_LABEL: Record<string, string> = {
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten",
+  KEPALA_ONPOINT: "Kepala Onpoint",   // ✅ NEW
+  ONPOINT: "Onpoint",                 // ✅ NEW
+  KEPALA_SOTECH: "Kepala Sotech",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -43,6 +47,9 @@ const ROLE_ICON: Record<string, string> = {
   PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
   MARKETING: "📱", KEBERSIHAN: "🧹",
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
+  KEPALA_ONPOINT: "🎯",  // ✅ NEW
+  ONPOINT: "📍",         // ✅ NEW
+  KEPALA_SOTECH: "⚙️",
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -63,6 +70,9 @@ const ROLE_BADGE: Record<string, string> = {
   PENYEDIA_BARANG: "bg-yellow-100 text-yellow-700 border-yellow-200",
   KEPALA_PENYEDIA_BARANG: "bg-orange-100 text-orange-700 border-orange-200",
   KONTEN: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
+  KEPALA_ONPOINT: "bg-green-100 text-green-700 border-green-200",   // ✅ NEW
+  ONPOINT: "bg-emerald-100 text-emerald-700 border-emerald-200",    // ✅ NEW
+  KEPALA_SOTECH: "bg-lime-100 text-lime-700 border-lime-200",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -71,9 +81,8 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${
-      type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
-    }`}>
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
+      }`}>
       {type === "ok"
         ? <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg></div>
         : <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>
@@ -138,17 +147,22 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
             <select value={role} onChange={e => setRole(e.target.value)}
               className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">{["ADMIN","PROGRAMMER","ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Management —">{["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Operasional —">{["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Akses Penuh —">{["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Management —">{["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Operasional —">{["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Onpoint & Sotech —">
+                {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
+                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+                ))}
+              </optgroup>
             </select>
             {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift Kerja</label>
             <div className="flex gap-2">
-              {(["PAGI","SORE"] as const).map(s => (
+              {(["PAGI", "SORE"] as const).map(s => (
                 <button key={s} type="button" onClick={() => setShift(s)}
                   className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                   {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
@@ -219,17 +233,22 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
             <select value={role} onChange={e => setRole(e.target.value)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">{["ADMIN","PROGRAMMER","ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Management —">{["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Operasional —">{["CREW_SALES","SOTECH","ACCOUNTING","PENGELOLA_BARANG","TEKNISI","PENGANTARAN","MARKETING","KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG","KEPALA_PENYEDIA_BARANG","KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Akses Penuh —">{["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Management —">{["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Operasional —">{["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
+              <optgroup label="— Onpoint & Sotech —">
+                {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
+                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+                ))}
+              </optgroup>
             </select>
             {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift</label>
             <div className="flex gap-2">
-              {(["PAGI","SORE"] as const).map(s => (
+              {(["PAGI", "SORE"] as const).map(s => (
                 <button key={s} type="button" onClick={() => setShift(s)}
                   className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                   {s === "PAGI" ? "🌅" : "🌆"} {s}
@@ -359,8 +378,8 @@ export default function UsersPage() {
     return result;
   }, [users, search, filterRole, sortOrder]);
 
-  const enrolled   = users.filter(u => u.face_embedding).length;
-  const pwNotSet   = users.filter(u => !u.password_set).length;
+  const enrolled = users.filter(u => u.face_embedding).length;
+  const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
 
   return (
@@ -409,10 +428,10 @@ export default function UsersPage() {
         {!loading && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total User",      value: users.length, icon: "👥", color: "text-gray-800" },
-              { label: "Akses Penuh",     value: fullAccess,   icon: "🔑", color: "text-violet-700" },
-              { label: "Wajah Terdaftar", value: enrolled,     icon: "😊", color: "text-emerald-700" },
-              { label: "Belum Set PW",    value: pwNotSet,     icon: "⚠️", color: pwNotSet > 0 ? "text-amber-700" : "text-gray-500" },
+              { label: "Total User", value: users.length, icon: "👥", color: "text-gray-800" },
+              { label: "Akses Penuh", value: fullAccess, icon: "🔑", color: "text-violet-700" },
+              { label: "Wajah Terdaftar", value: enrolled, icon: "😊", color: "text-emerald-700" },
+              { label: "Belum Set PW", value: pwNotSet, icon: "⚠️", color: pwNotSet > 0 ? "text-amber-700" : "text-gray-500" },
             ].map(c => (
               <div key={c.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 <div className="flex items-start justify-between">
@@ -458,9 +477,8 @@ export default function UsersPage() {
                   <button
                     key={r}
                     onClick={() => setFilterRole(r)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${
-                      filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                   </button>
@@ -506,10 +524,9 @@ export default function UsersPage() {
 
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
-                            FULL_ACCESS_ROLES.has(user.role) ? "bg-gradient-to-br from-violet-600 to-purple-700"
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${FULL_ACCESS_ROLES.has(user.role) ? "bg-gradient-to-br from-violet-600 to-purple-700"
                             : user.face_embedding ? "bg-[#1a1a2e]" : "bg-gray-400"
-                          }`}>
+                            }`}>
                             {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
                           </div>
                           {user.face_embedding && (
@@ -526,9 +543,8 @@ export default function UsersPage() {
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${ROLE_BADGE[user.role] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                               {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
                             </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${
-                              user.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
-                            }`}>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${user.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                              }`}>
                               {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
                             </span>
                             {!user.password_set && (

@@ -1,5 +1,6 @@
 // src/lib/permissions.ts
 
+// Tambah 3 role baru ke type
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -17,7 +18,10 @@ export type UserRole =
   | "ASISTEN_CEO"
   | "PENYEDIA_BARANG"
   | "KEPALA_PENYEDIA_BARANG"
-  | "KONTEN";
+  | "KONTEN"
+  | "KEPALA_ONPOINT"   // ✅ NEW
+  | "ONPOINT"          // ✅ NEW
+  | "KEPALA_SOTECH";   // ✅ NEW
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
@@ -37,6 +41,9 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   PENYEDIA_BARANG: "/dashboard/transactions",
   KEPALA_PENYEDIA_BARANG: "/dashboard/transactions",
   KONTEN: "/dashboard",
+  KEPALA_ONPOINT: "/dashboard",  // ✅ NEW
+  ONPOINT: "/dashboard",         // ✅ NEW
+  KEPALA_SOTECH: "/dashboard",
 };
 
 const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -47,9 +54,13 @@ const ALL_ROLES: UserRole[] = [
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
 ];
 
-const SALES_ACCESS: UserRole[] = ["KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"];
+const SALES_ACCESS: UserRole[] = [
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
+];
 
 const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
 
@@ -65,7 +76,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/dashboard/warranty": [
@@ -76,13 +87,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/transactions": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",  // ✅ NEW
     ...TRANSACTION_VIEW,
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/dashboard/users": [...FULL_ACCESS],
   "/dashboard/attendance": [...ALL_ROLES],
-  "/payment": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
+  "/payment": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"],
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG"],
   "/api/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
@@ -92,11 +104,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
-  "/api/transaction/create": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
+  "/api/transaction/create": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"],
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     ...TRANSACTION_VIEW,
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
   ],
   "/api/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
@@ -104,9 +117,18 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
 
-  "/api/units/reserve": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
-  "/api/units/hold": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN"],
-  "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES"],
+  "/api/units/reserve": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
+  ],
+  "/api/units/hold": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
+  ],
+  "/api/units/confirm-payment": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
+  ],
 
   "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
@@ -137,20 +159,24 @@ export const PERMISSIONS = {
 
   CREATE_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
   ] as UserRole[],
 
   // ✅ FIX: Tambah CREW_SALES — mereka yang paling sering konfirmasi lunas di lapangan
+
   EDIT_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
   ] as UserRole[],
 
   RESTORE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],
 
   // ✅ FIX: RESERVE_UNIT sudah benar, tidak berubah
-  RESERVE_UNIT: [
+   RESERVE_UNIT: [
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", // ✅ NEW
   ] as UserRole[],
 
   VIEW_LAPTOPS: [
