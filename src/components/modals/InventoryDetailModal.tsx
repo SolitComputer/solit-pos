@@ -15,27 +15,30 @@ interface InventoryDetail {
 
 const GRADE_CONFIG = {
   A: {
-    color: "#10B981",
-    glow: "rgba(16,185,129,0.2)",
-    border: "rgba(16,185,129,0.25)",
-    bg: "rgba(16,185,129,0.12)",
+    color: "#059669",
+    bg: "#ECFDF5",
+    border: "#A7F3D0",
     bar: "linear-gradient(90deg, #10B981, #34D399)",
+    stripColor: "linear-gradient(90deg, #10B981, #34D399)",
+    iconBg: "#ECFDF5",
     label: "Kondisi terbaik",
   },
   B: {
-    color: "#F59E0B",
-    glow: "rgba(245,158,11,0.2)",
-    border: "rgba(245,158,11,0.25)",
-    bg: "rgba(245,158,11,0.12)",
+    color: "#D97706",
+    bg: "#FFFBEB",
+    border: "#FDE68A",
     bar: "linear-gradient(90deg, #F59E0B, #FCD34D)",
+    stripColor: "linear-gradient(90deg, #F59E0B, #FCD34D)",
+    iconBg: "#FFFBEB",
     label: "Kondisi baik",
   },
   C: {
-    color: "#818CF8",
-    glow: "rgba(99,102,241,0.2)",
-    border: "rgba(99,102,241,0.25)",
-    bg: "rgba(99,102,241,0.12)",
-    bar: "linear-gradient(90deg, #818CF8, #A5B4FC)",
+    color: "#6366F1",
+    bg: "#EEF2FF",
+    border: "#C7D2FE",
+    bar: "linear-gradient(90deg, #6366F1, #818CF8)",
+    stripColor: "linear-gradient(90deg, #6366F1, #818CF8)",
+    iconBg: "#EEF2FF",
     label: "Kondisi standar",
   },
 } as const;
@@ -75,152 +78,180 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
         .idm-overlay { font-family: 'Inter', sans-serif; }
 
-        .idm-card {
-          background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
-          border: 1px solid rgba(255,255,255,0.08);
-          backdrop-filter: blur(10px);
+        .idm-shell {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 32px 80px rgba(15,23,42,0.14), 0 8px 24px rgba(15,23,42,0.08);
+        }
+        .idm-header {
+          background: linear-gradient(135deg, #F8FAFF 0%, #EEF2FF 100%);
+          border-bottom: 1px solid #E8EFFE;
+        }
+        .idm-stat {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 1px 4px rgba(15,23,42,0.06);
+          transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .idm-stat:hover { box-shadow: 0 4px 20px rgba(15,23,42,0.1); transform: translateY(-2px); }
+
+        .idm-grade-card {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+          transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .idm-grade-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,0.1); transform: translateY(-2px); }
+
+        .idm-row-card {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+          transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+        }
+        .idm-row-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,0.1); transform: translateX(4px); border-color: #C7D2FE; }
+
+        .idm-section-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #94A3B8;
         }
 
-        .idm-row { transition: background 0.2s, transform 0.2s; }
-        .idm-row:hover { background: rgba(255,255,255,0.05); transform: translateX(3px); }
-
-        .idm-scrollbar::-webkit-scrollbar { width: 4px; }
-        .idm-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .idm-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+        .idm-scroll::-webkit-scrollbar { width: 4px; }
+        .idm-scroll::-webkit-scrollbar-track { background: transparent; }
+        .idm-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
         .idm-shimmer {
-          background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
+          background: linear-gradient(90deg, #F8FAFC 25%, #EEF2FF 50%, #F8FAFC 75%);
           background-size: 200% 100%;
           animation: idm-shimmer 1.5s infinite;
+          border-radius: 12px;
         }
-        @keyframes idm-shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
+        @keyframes idm-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
-        .idm-modal-enter { opacity: 0; transform: scale(0.96) translateY(12px); }
-        .idm-modal-visible {
-          opacity: 1;
-          transform: scale(1) translateY(0);
-          transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+        .idm-enter { opacity: 0; transform: scale(0.97) translateY(16px); }
+        .idm-visible {
+          opacity: 1; transform: scale(1) translateY(0);
+          transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.25,0.64,1);
         }
+        .idm-close { background: #F1F5F9; color: #94A3B8; transition: background 0.2s, color 0.2s; }
+        .idm-close:hover { background: #FEE2E2; color: #EF4444; }
+        .idm-handle { background: #CBD5E1; }
 
-        .idm-stat-glow-blue  { box-shadow: 0 0 30px rgba(99,102,241,0.12),  inset 0 1px 0 rgba(255,255,255,0.06); }
-        .idm-stat-glow-green { box-shadow: 0 0 30px rgba(16,185,129,0.12),  inset 0 1px 0 rgba(255,255,255,0.06); }
+        .idm-footer {
+          background: linear-gradient(135deg, #F8FAFC 0%, #F0F4FF 100%);
+          border-top: 1px solid #E2E8F0;
+        }
       `}</style>
 
       <div
         className="idm-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+        style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(6px)" }}
         onClick={onClose}
       >
         <div
-          className={`relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[85vh] flex flex-col rounded-t-3xl sm:rounded-2xl overflow-hidden ${visible ? "idm-modal-visible" : "idm-modal-enter"}`}
-          style={{ background: "linear-gradient(160deg, #141820 0%, #0F1117 60%, #111318 100%)", border: "1px solid rgba(255,255,255,0.08)" }}
+          className={`idm-shell relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col rounded-t-3xl sm:rounded-2xl overflow-hidden ${visible ? "idm-visible" : "idm-enter"}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Drag handle mobile */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden">
-            <div className="w-10 h-1 rounded-full bg-white/20" />
+            <div className="idm-handle w-10 h-1 rounded-full" />
           </div>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-5 sm:px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="idm-header flex items-center justify-between px-5 sm:px-6 py-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #818CF8, #6366F1)", boxShadow: "0 0 20px rgba(99,102,241,0.4)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)", boxShadow: "0 4px 14px rgba(99,102,241,0.35)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#F1F5F9" }}>Detail Inventory</h2>
-                <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>Breakdown stok per grade dan brand</p>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0F172A" }}>Detail Inventory</h2>
+                <p className="text-xs font-medium" style={{ color: "#94A3B8" }}>Breakdown stok per grade dan brand</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.8)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.4)"; }}
-            >
+            <button onClick={onClose} className="idm-close w-8 h-8 rounded-xl flex items-center justify-center">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
 
-          {/* Scrollable content */}
-          <div className="idm-scrollbar flex-1 overflow-y-auto">
+          {/* Scrollable body */}
+          <div className="idm-scroll flex-1 overflow-y-auto" style={{ background: "#F8FAFC" }}>
             {isLoading ? (
               <div className="p-5 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2].map((i) => <div key={i} className="idm-shimmer rounded-xl h-20" />)}
-                </div>
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  {[1, 2, 3].map((i) => <div key={i} className="idm-shimmer rounded-xl h-24" />)}
-                </div>
-                <div className="space-y-2 pt-2">
-                  {[1, 2, 3, 4].map((i) => <div key={i} className="idm-shimmer rounded-xl h-14" />)}
-                </div>
+                <div className="grid grid-cols-2 gap-3">{[1,2].map(i=><div key={i} className="idm-shimmer h-24"/>)}</div>
+                <div className="grid grid-cols-3 gap-3 pt-2">{[1,2,3].map(i=><div key={i} className="idm-shimmer h-28"/>)}</div>
+                <div className="space-y-2 pt-2">{[1,2,3,4].map(i=><div key={i} className="idm-shimmer h-14"/>)}</div>
               </div>
             ) : data ? (
               <div className="p-5 space-y-5">
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="idm-card idm-stat-glow-blue rounded-xl p-3.5">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(99,102,241,0.2)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                  <div className="idm-stat rounded-2xl overflow-hidden">
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #6366F1, #818CF8)" }} />
+                    <div className="p-4">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#EEF2FF" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round">
+                          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      </div>
+                      <p className="idm-section-label">Total Unit</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0F172A" }}>{data.total}</p>
+                      <p className="text-xs font-medium mt-1" style={{ color: "#94A3B8" }}>stok tersedia</p>
                     </div>
-                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Total Unit</p>
-                    <p className="text-2xl font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{data.total}</p>
-                    <p className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>stok tersedia</p>
                   </div>
-
-                  <div className="idm-card idm-stat-glow-green rounded-xl p-3.5">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center mb-2" style={{ background: "rgba(16,185,129,0.2)" }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
+                  <div className="idm-stat rounded-2xl overflow-hidden">
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #10B981, #34D399)" }} />
+                    <div className="p-4">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#ECFDF5" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
+                          <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <p className="idm-section-label">Total Model</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0F172A" }}>{data.totalModels}</p>
+                      <p className="text-xs font-medium mt-1" style={{ color: "#94A3B8" }}>variasi unik</p>
                     </div>
-                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Total Model</p>
-                    <p className="text-2xl font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{data.totalModels}</p>
-                    <p className="text-[9px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>variasi unik</p>
                   </div>
                 </div>
 
                 {/* Grade Breakdown */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Berdasarkan Grade</p>
-                    <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>Distribusi stok</p>
+                    <p className="idm-section-label">Berdasarkan Grade</p>
+                    <p className="text-[10px] font-medium" style={{ color: "#CBD5E1" }}>Distribusi stok</p>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {(["A", "B", "C"] as const).map((grade) => {
                       const cfg = GRADE_CONFIG[grade];
                       const gradeData = data.byGrade[grade];
                       return (
-                        <div
-                          key={grade}
-                          className="idm-card rounded-xl p-3.5"
-                          style={{ border: `1px solid ${cfg.border}`, boxShadow: `0 0 20px ${cfg.glow}` }}
-                        >
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 text-sm font-black" style={{ background: cfg.bg, color: cfg.color }}>
-                            {grade}
+                        <div key={grade} className="idm-grade-card rounded-2xl overflow-hidden">
+                          <div className="h-1" style={{ background: cfg.stripColor }} />
+                          <div className="p-3">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 text-base font-black"
+                              style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+                              {grade}
+                            </div>
+                            <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Grade {grade}</p>
+                            <p className="text-xl font-extrabold mt-0.5" style={{ color: "#0F172A" }}>
+                              {gradeData.qty} <span className="text-xs font-normal" style={{ color: "#94A3B8" }}>unit</span>
+                            </p>
+                            <div className="w-full h-1.5 rounded-full mt-2.5 overflow-hidden" style={{ background: "#F1F5F9" }}>
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${gradeData.pct}%`, background: cfg.bar }} />
+                            </div>
+                            <p className="text-[10px] mt-1.5 font-bold" style={{ color: cfg.color }}>{gradeData.pct}%</p>
+                            <p className="text-[8px] mt-0.5 font-medium" style={{ color: "#CBD5E1" }}>{cfg.label}</p>
                           </div>
-                          <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Grade {grade}</p>
-                          <p className="text-lg font-bold mt-0.5" style={{ color: "#F1F5F9" }}>{gradeData.qty} <span className="text-xs font-normal" style={{ color: "rgba(255,255,255,0.4)" }}>unit</span></p>
-                          <div className="w-full h-1 rounded-full mt-2 overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${gradeData.pct}%`, background: cfg.bar }} />
-                          </div>
-                          <p className="text-[9px] mt-1.5 font-semibold" style={{ color: cfg.color }}>{gradeData.pct}%</p>
-                          <p className="text-[8px] mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>{cfg.label}</p>
                         </div>
                       );
                     })}
@@ -230,18 +261,17 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                 {/* Brand Breakdown */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.4)" }}>Top Brand</p>
-                    <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>Berdasarkan jumlah unit</p>
+                    <p className="idm-section-label">Top Brand</p>
+                    <p className="text-[10px] font-medium" style={{ color: "#CBD5E1" }}>Berdasarkan jumlah unit</p>
                   </div>
-
                   {data.byBrand.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.05)" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5">
+                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed" style={{ borderColor: "#E2E8F0" }}>
+                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F1F5F9" }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8">
                           <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                       </div>
-                      <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.35)" }}>Belum ada data brand</p>
+                      <p className="text-sm font-semibold" style={{ color: "#94A3B8" }}>Belum ada data brand</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -249,35 +279,33 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                         const pct = Math.max(4, Math.round((brand.total / maxBrand) * 100));
                         const isTop = idx === 0;
                         return (
-                          <div key={brand.name} className="idm-row idm-card rounded-xl p-3.5 cursor-default">
+                          <div key={brand.name} className="idm-row-card rounded-2xl p-4 cursor-default">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0">
                                 <div
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
+                                  className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-[11px] font-bold"
                                   style={isTop
-                                    ? { background: "linear-gradient(135deg, #818CF8, #6366F1)", color: "white", boxShadow: "0 0 12px rgba(99,102,241,0.4)" }
-                                    : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)" }
+                                    ? { background: "linear-gradient(135deg, #6366F1, #8B5CF6)", color: "white", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
+                                    : { background: "#F1F5F9", color: "#64748B" }
                                   }
                                 >
                                   #{idx + 1}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold truncate" style={{ color: "#F1F5F9" }}>{brand.name}</p>
+                                  <p className="text-sm font-semibold truncate" style={{ color: "#0F172A" }}>{brand.name}</p>
                                   {isTop && (
-                                    <p className="text-[9px] font-semibold" style={{ color: "#818CF8" }}>Paling banyak</p>
+                                    <p className="text-[9px] font-bold mt-0.5" style={{ color: "#6366F1" }}>Paling banyak</p>
                                   )}
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-sm font-bold" style={{ color: "#F1F5F9" }}>{brand.total}</p>
-                                <p className="text-[9px]" style={{ color: "rgba(255,255,255,0.35)" }}>unit</p>
+                                <p className="text-sm font-bold" style={{ color: "#0F172A" }}>{brand.total}</p>
+                                <p className="text-[9px] font-medium" style={{ color: "#94A3B8" }}>unit</p>
                               </div>
                             </div>
-                            <div className="w-full h-1 rounded-full mt-2 overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                              <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #818CF8, #A5B4FC)" : "linear-gradient(90deg, rgba(255,255,255,0.2), rgba(255,255,255,0.3))" }}
-                              />
+                            <div className="w-full h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: "#F1F5F9" }}>
+                              <div className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #6366F1, #818CF8)" : "linear-gradient(90deg, #CBD5E1, #E2E8F0)" }} />
                             </div>
                           </div>
                         );
@@ -286,24 +314,29 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                   )}
                 </div>
 
-                {/* Footer info */}
-                <div className="rounded-xl p-3.5 flex items-start gap-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" className="flex-shrink-0 mt-0.5">
-                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <p className="text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.3)" }}>
+                {/* Footer Info */}
+                <div className="rounded-2xl p-4 flex items-start gap-3"
+                  style={{ background: "linear-gradient(135deg, #F0FDF4 0%, #EEF2FF 100%)", border: "1px solid #E2E8F0" }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "#EEF2FF" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.2">
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <p className="text-[10px] leading-relaxed font-medium" style={{ color: "#64748B" }}>
                     Grade A: kondisi terbaik · Grade B: kondisi baik · Grade C: kondisi standar
                   </p>
                 </div>
 
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)" }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#FEF2F2" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
                 </div>
-                <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>Gagal memuat data</p>
-                <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>Coba tutup dan buka kembali</p>
+                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
+                <p className="text-xs font-medium" style={{ color: "#94A3B8" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
           </div>
