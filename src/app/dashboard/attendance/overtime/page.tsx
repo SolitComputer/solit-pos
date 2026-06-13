@@ -104,15 +104,188 @@ function addWatermarkToImage(
   img.src = imageDataUrl;
 }
 
+// ── CameraCapture ────────────────────────────────────────────────────────────
+type CameraCaptureProps = {
+  onCapture: (file: File, previewUrl: string) => void;
+  onCancel: () => void;
+};
+
+function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+
+  const startCamera = useCallback(async (facing: "environment" | "user") => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setIsReady(false);
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err: any) {
+      const msg =
+        err.name === "NotAllowedError"
+          ? "Izin kamera ditolak. Aktifkan izin kamera di browser."
+          : err.name === "NotFoundError"
+            ? "Kamera tidak ditemukan di perangkat ini."
+            : `Gagal membuka kamera: ${err.message}`;
+      setError(msg);
+    }
+  }, []);
+
+  useEffect(() => {
+    startCamera(facingMode);
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [facingMode, startCamera]);
+
+  const handleVideoReady = () => setIsReady(true);
+
+  const capture = () => {
+    if (!videoRef.current || !isReady) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (facingMode === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (facingMode === "user") ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const imageDataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    setIsProcessing(true);
+    addWatermarkToImage(imageDataUrl, (blob, previewUrl) => {
+      const file = new File([blob], `overtime-${Date.now()}.jpg`, { type: "image/jpeg" });
+      setIsProcessing(false);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      onCapture(file, previewUrl);
+    });
+  };
+
+  const toggleCamera = () => {
+    setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
+  };
+
+  return (
+    <div className="space-y-3">
+      {error ? (
+        <div className="rounded-2xl bg-red-50 border border-red-200 p-5 text-center space-y-3">
+          <div className="text-3xl">📵</div>
+          <p className="text-sm font-bold text-red-700">{error}</p>
+          <div className="border-t border-red-100 pt-3">
+            <p className="text-xs text-gray-400 mb-2">Atau pilih dari galeri:</p>
+            <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 transition-all">
+              <span>🖼️</span> Pilih Foto
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    const url = ev.target?.result as string;
+                    setIsProcessing(true);
+                    addWatermarkToImage(url, (blob, previewUrl) => {
+                      const f = new File([blob], file.name, { type: "image/jpeg" });
+                      setIsProcessing(false);
+                      onCapture(f, previewUrl);
+                    });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-gray-100 shadow-inner">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            onCanPlay={handleVideoReady}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""} ${isReady ? "opacity-100" : "opacity-0"}`}
+          />
+          {!isReady && !error && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <p className="text-white/70 text-xs font-semibold">Memuat kamera...</p>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={toggleCamera}
+            className="absolute top-3 right-3 w-9 h-9 rounded-xl bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-base hover:bg-black/60 transition-all active:scale-95"
+            title="Ganti kamera"
+          >
+            🔄
+          </button>
+          {isReady && (
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="w-16 h-16 border-2 border-white/30 rounded-xl" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isProcessing && (
+        <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-gray-500">Menambahkan watermark...</p>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className={secondaryBtn}
+          style={{ flex: "0 0 auto", width: "auto", padding: "0 16px" }}
+        >
+          Batal
+        </button>
+        <button
+          onClick={capture}
+          disabled={!isReady || isProcessing || !!error}
+          className={primaryBtn}
+        >
+          {isProcessing ? <Spinner /> : <><span className="text-base">📸</span><span>Ambil Foto</span></>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── STATUS CONFIG ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, {
   label: string; icon: string; bg: string; text: string; border: string; dot: string;
 }> = {
-  PENDING: { label: "Pending", icon: "⏳", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
-  APPROVED: { label: "Disetujui", icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
-  ONGOING: { label: "Berjalan", icon: "🟢", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  COMPLETED: { label: "Selesai", icon: "🏁", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  REJECTED: { label: "Ditolak", icon: "✕", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
-  CANCELLED: { label: "Dibatalkan", icon: "⊘", bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
+  PENDING:   { label: "Pending",    icon: "⏳", bg: "bg-amber-50",  text: "text-amber-700",  border: "border-amber-200",  dot: "bg-amber-400"  },
+  APPROVED:  { label: "Disetujui",  icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  ONGOING:   { label: "Berjalan",   icon: "🟢", bg: "bg-emerald-50",text: "text-emerald-700",border: "border-emerald-200",dot: "bg-emerald-500"},
+  COMPLETED: { label: "Selesai",    icon: "🏁", bg: "bg-blue-50",   text: "text-blue-700",   border: "border-blue-200",   dot: "bg-blue-500"   },
+  REJECTED:  { label: "Ditolak",    icon: "✕",  bg: "bg-red-50",    text: "text-red-700",    border: "border-red-200",    dot: "bg-red-500"    },
+  CANCELLED: { label: "Dibatalkan", icon: "⊘",  bg: "bg-gray-100",  text: "text-gray-500",   border: "border-gray-200",   dot: "bg-gray-400"   },
 };
 
 function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
@@ -138,10 +311,8 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-// ── Shared UI primitives ────────────────────────────────────────────────────
-function ModalWrapper({
-  children, onClose, preventClose,
-}: {
+// ── Shared UI primitives ─────────────────────────────────────────────────────
+function ModalWrapper({ children, onClose, preventClose }: {
   children: React.ReactNode; onClose: () => void; preventClose?: boolean;
 }) {
   return (
@@ -161,9 +332,7 @@ function ModalWrapper({
   );
 }
 
-function ModalHeader({
-  icon, title, subtitle, onClose, disableClose,
-}: {
+function ModalHeader({ icon, title, subtitle, onClose, disableClose }: {
   icon: string; title: string; subtitle?: string; onClose: () => void; disableClose?: boolean;
 }) {
   return (
@@ -179,10 +348,7 @@ function ModalHeader({
         <button
           onClick={onClose}
           disabled={disableClose}
-          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${disableClose
-            ? "text-gray-200 cursor-not-allowed"
-            : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-            }`}
+          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${disableClose ? "text-gray-200 cursor-not-allowed" : "text-gray-400 hover:text-gray-700 hover:bg-gray-100"}`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -223,12 +389,8 @@ function Spinner() {
   return <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
 }
 
-// ── ProofPhotoModal ──────────────────────────────────────────────────────────
-function ProofPhotoModal({
-  overtime, onClose,
-}: {
-  overtime: OvertimeRequest; onClose: () => void;
-}) {
+// ── ProofPhotoModal ───────────────────────────────────────────────────────────
+function ProofPhotoModal({ overtime, onClose }: { overtime: OvertimeRequest; onClose: () => void }) {
   if (!overtime.proof_photo_url) return null;
   return (
     <ModalWrapper onClose={onClose}>
@@ -267,15 +429,11 @@ function ProofPhotoModal({
   );
 }
 
-// ── ApproveModal ─────────────────────────────────────────────────────────────
-function ApproveModal({
-  overtime, onClose, onSaved,
-}: {
+// ── ApproveModal ──────────────────────────────────────────────────────────────
+function ApproveModal({ overtime, onClose, onSaved }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
-  const [scheduledStart, setScheduledStart] = useState(
-    overtime.requested_start?.substring(0, 5) || "09:00"
-  );
+  const [scheduledStart, setScheduledStart] = useState(overtime.requested_start?.substring(0, 5) || "09:00");
   const [scheduledEnd, setScheduledEnd] = useState("17:00");
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
@@ -311,8 +469,6 @@ function ApproveModal({
       <ModalHeader icon="✅" title="Setujui Lemburan" subtitle={overtime.users?.name} onClose={onClose} />
       <div className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
-
-        {/* Info pengajuan */}
         <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 space-y-2.5">
           <p className="text-xs font-black text-violet-800 uppercase tracking-wider">Info Pengajuan</p>
           <div className="space-y-2 text-sm text-gray-700">
@@ -340,47 +496,26 @@ function ApproveModal({
             )}
           </div>
         </div>
-
-        {/* Info otomatis mulai */}
         <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
           <span className="text-base flex-shrink-0">⚡</span>
           <p className="text-xs text-emerald-700 font-medium leading-relaxed">
             Setelah disetujui, lembur akan <strong>langsung berjalan otomatis</strong> — karyawan tidak perlu menekan tombol Mulai.
           </p>
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>
-              Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
-            <input
-              type="time"
-              value={scheduledStart}
-              onChange={(e) => setScheduledStart(e.target.value)}
-              className={inputCls}
-            />
+            <label className={labelCls}>Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span></label>
+            <input type="time" value={scheduledStart} onChange={(e) => setScheduledStart(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label className={labelCls}>
-              Jam Selesai <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
-            <input
-              type="time"
-              value={scheduledEnd}
-              onChange={(e) => setScheduledEnd(e.target.value)}
-              className={inputCls}
-            />
+            <label className={labelCls}>Jam Selesai <span className="text-red-400 normal-case tracking-normal">*</span></label>
+            <input type="time" value={scheduledEnd} onChange={(e) => setScheduledEnd(e.target.value)} className={inputCls} />
           </div>
         </div>
       </div>
       <ModalFooter>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button
-          onClick={approve}
-          disabled={approving || !scheduledStart || !scheduledEnd}
-          className={primaryBtn}
-        >
+        <button onClick={approve} disabled={approving || !scheduledStart || !scheduledEnd} className={primaryBtn}>
           {approving ? <Spinner /> : "✅ Setujui & Mulai"}
         </button>
       </ModalFooter>
@@ -388,17 +523,15 @@ function ApproveModal({
   );
 }
 
-// ── RequestOvertimeModal ─────────────────────────────────────────────────────
+// ── RequestOvertimeModal ──────────────────────────────────────────────────────
 const REASON_OPTIONS = [
-  { value: "Tugas Mendesak", icon: "🔴", desc: "Ada tugas yang harus diselesaikan segera" },
-  { value: "Pekerjaan Belum Selesai", icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
-  { value: "Permintaan Atasan", icon: "🔵", desc: "Diminta langsung oleh atasan" },
-  { value: "Lainnya", icon: "✏️", desc: "Alasan lain di luar opsi di atas" },
+  { value: "Tugas Mendesak",         icon: "🔴", desc: "Ada tugas yang harus diselesaikan segera" },
+  { value: "Pekerjaan Belum Selesai",icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
+  { value: "Permintaan Atasan",      icon: "🔵", desc: "Diminta langsung oleh atasan" },
+  { value: "Lainnya",                icon: "✏️", desc: "Alasan lain di luar opsi di atas" },
 ] as const;
 
-function RequestOvertimeModal({
-  onClose, onSaved, currentUser,
-}: {
+function RequestOvertimeModal({ onClose, onSaved, currentUser }: {
   onClose: () => void; onSaved: () => void; currentUser: any;
 }) {
   const [requestDate, setRequestDate] = useState("");
@@ -414,11 +547,8 @@ function RequestOvertimeModal({
   const finalReason = isLainnya ? reasonCustom.trim() : reasonType;
 
   const canSubmit =
-    !!requestDate &&
-    !!startTime &&
-    !!reasonType &&
-    (!isLainnya || !!reasonCustom.trim()) &&
-    !!workDescription.trim();
+    !!requestDate && !!startTime && !!reasonType &&
+    (!isLainnya || !!reasonCustom.trim()) && !!workDescription.trim();
 
   const submit = async () => {
     if (!requestDate.trim()) { setError("Pilih tanggal terlebih dahulu"); return; }
@@ -426,7 +556,6 @@ function RequestOvertimeModal({
     if (!reasonType) { setError("Pilih alasan lembur"); return; }
     if (isLainnya && !reasonCustom.trim()) { setError("Jelaskan alasan lembur kamu"); return; }
     if (!workDescription.trim()) { setError("Rincian pekerjaan wajib diisi"); return; }
-
     setSubmitting(true); setError("");
     try {
       const res = await fetch("/api/attendance/overtime", {
@@ -448,47 +577,19 @@ function RequestOvertimeModal({
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHeader
-        icon="📝"
-        title="Ajukan Lemburan"
-        subtitle={currentUser?.name || "Karyawan"}
-        onClose={onClose}
-      />
+      <ModalHeader icon="📝" title="Ajukan Lemburan" subtitle={currentUser?.name || "Karyawan"} onClose={onClose} />
       <div className="px-6 py-5 space-y-5 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
-
-        {/* Tanggal */}
         <div>
-          <label className={labelCls}>
-            Tanggal Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
-          </label>
-          <input
-            type="date"
-            min={today}
-            value={requestDate}
-            onChange={(e) => setRequestDate(e.target.value)}
-            className={inputCls}
-          />
+          <label className={labelCls}>Tanggal Lembur <span className="text-red-400 normal-case tracking-normal">*</span></label>
+          <input type="date" min={today} value={requestDate} onChange={(e) => setRequestDate(e.target.value)} className={inputCls} />
         </div>
-
-        {/* Jam Mulai */}
         <div>
-          <label className={labelCls}>
-            Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span>
-          </label>
-          <input
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className={inputCls}
-          />
+          <label className={labelCls}>Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span></label>
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
         </div>
-
-        {/* Alasan — pill options */}
         <div>
-          <label className={labelCls}>
-            Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
-          </label>
+          <label className={labelCls}>Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span></label>
           <div className="space-y-2">
             {REASON_OPTIONS.map((opt) => {
               const isSelected = reasonType === opt.value;
@@ -496,58 +597,30 @@ function RequestOvertimeModal({
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => {
-                    setReasonType(opt.value);
-                    if (opt.value !== "Lainnya") setReasonCustom("");
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99]
-                    ${isSelected
-                      ? "bg-gray-900 border-gray-900 shadow-sm"
-                      : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+                  onClick={() => { setReasonType(opt.value); if (opt.value !== "Lainnya") setReasonCustom(""); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${isSelected ? "bg-gray-900 border-gray-900 shadow-sm" : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}
                 >
                   <span className="text-lg flex-shrink-0">{opt.icon}</span>
                   <div className="min-w-0">
-                    <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>
-                      {opt.value}
-                    </p>
-                    <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>
-                      {opt.desc}
-                    </p>
+                    <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>{opt.value}</p>
+                    <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>{opt.desc}</p>
                   </div>
                   {isSelected && (
-                    <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">
-                      ✓
-                    </span>
+                    <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">✓</span>
                   )}
                 </button>
               );
             })}
           </div>
         </div>
-
-        {/* Lainnya — custom input */}
         {isLainnya && (
           <div>
-            <label className={labelCls}>
-              Jelaskan Alasan <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
-            <input
-              type="text"
-              value={reasonCustom}
-              onChange={(e) => setReasonCustom(e.target.value)}
-              placeholder="Tuliskan alasan spesifik kamu..."
-              className={inputCls}
-              autoFocus
-            />
+            <label className={labelCls}>Jelaskan Alasan <span className="text-red-400 normal-case tracking-normal">*</span></label>
+            <input type="text" value={reasonCustom} onChange={(e) => setReasonCustom(e.target.value)} placeholder="Tuliskan alasan spesifik kamu..." className={inputCls} autoFocus />
           </div>
         )}
-
-        {/* Rincian pekerjaan */}
         <div>
-          <label className={labelCls}>
-            Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span>
-          </label>
+          <label className={labelCls}>Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span></label>
           <textarea
             value={workDescription}
             onChange={(e) => setWorkDescription(e.target.value)}
@@ -562,11 +635,7 @@ function RequestOvertimeModal({
       </div>
       <ModalFooter>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button
-          onClick={submit}
-          disabled={submitting || !canSubmit}
-          className={primaryBtn}
-        >
+        <button onClick={submit} disabled={submitting || !canSubmit} className={primaryBtn}>
           {submitting ? <><Spinner /><span>Mengirim...</span></> : "📝 Ajukan"}
         </button>
       </ModalFooter>
@@ -574,10 +643,8 @@ function RequestOvertimeModal({
   );
 }
 
-// ── SetPayModal ──────────────────────────────────────────────────────────────
-function SetPayModal({
-  overtime, onClose, onSaved,
-}: {
+// ── SetPayModal ───────────────────────────────────────────────────────────────
+function SetPayModal({ overtime, onClose, onSaved }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
   const calcDurationHours = (): number => {
@@ -599,12 +666,7 @@ function SetPayModal({
       const res = await fetch("/api/attendance/overtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: overtime.id,
-          action: "SET_PAY",
-          rate_per_hour: Math.round(rate),
-          total_pay: Math.round(totalPay),
-        }),
+        body: JSON.stringify({ id: overtime.id, action: "SET_PAY", rate_per_hour: Math.round(rate), total_pay: Math.round(totalPay) }),
       });
       const d = await res.json();
       if (!d.success) { setError(d.message || "Gagal"); return; }
@@ -622,9 +684,7 @@ function SetPayModal({
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-xs text-gray-400 font-medium">Durasi aktual</p>
-              <p className="text-3xl font-black mt-0.5">
-                {hours} <span className="text-lg font-bold text-gray-300">jam</span>
-              </p>
+              <p className="text-3xl font-black mt-0.5">{hours} <span className="text-lg font-bold text-gray-300">jam</span></p>
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-400">Mulai</p>
@@ -644,9 +704,7 @@ function SetPayModal({
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">Rp</span>
             <input
-              type="number"
-              min={0}
-              value={rate}
+              type="number" min={0} value={rate}
               onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
               className="w-full h-11 border border-gray-200 rounded-xl pl-11 pr-4 text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
             />
@@ -655,47 +713,32 @@ function SetPayModal({
       </div>
       <ModalFooter>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={save} disabled={saving} className={primaryBtn}>
-          {saving ? <Spinner /> : "💾 Simpan"}
-        </button>
+        <button onClick={save} disabled={saving} className={primaryBtn}>{saving ? <Spinner /> : "💾 Simpan"}</button>
       </ModalFooter>
     </ModalWrapper>
   );
 }
 
-// ── CompleteModal ────────────────────────────────────────────────────────────
-function CompleteModal({
-  overtime, onClose, onSaved, isAutoCompleted,
-}: {
+// ── CompleteModal ─────────────────────────────────────────────────────────────
+function CompleteModal({ overtime, onClose, onSaved, isAutoCompleted }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void; isAutoCompleted?: boolean;
 }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
 
   const handleClose = () => {
     if (isAutoCompleted) { setError("⚠️ Kamu wajib upload foto bukti lemburan sebelum menutup."); return; }
     onClose();
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { setError("Hanya file gambar yang diterima"); return; }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageDataUrl = event.target?.result as string;
-      setIsProcessing(true);
-      addWatermarkToImage(imageDataUrl, (watermarkedBlob, previewUrl) => {
-        setPhotoPreview(previewUrl);
-        setIsProcessing(false);
-        setPhotoFile(new File([watermarkedBlob], file.name, { type: "image/jpeg" }));
-      });
-      setError("");
-    };
-    reader.readAsDataURL(file);
+  const handleCapture = (file: File, previewUrl: string) => {
+    setPhotoFile(file);
+    setPhotoPreview(previewUrl);
+    setPhotoStep("preview");
+    setError("");
   };
 
   const upload = async () => {
@@ -705,9 +748,7 @@ function CompleteModal({
       if (photoFile) {
         const formData = new FormData();
         formData.append("file", photoFile);
-        const uploadRes = await fetch("/api/attendance/overtime/upload", {
-          method: "POST", body: formData,
-        });
+        const uploadRes = await fetch("/api/attendance/overtime/upload", { method: "POST", body: formData });
         if (!uploadRes.ok) {
           const errData = await uploadRes.json();
           throw new Error(errData.message || "Upload gagal");
@@ -736,7 +777,7 @@ function CompleteModal({
         onClose={handleClose}
         disableClose={isAutoCompleted}
       />
-      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="px-6 py-5 space-y-4 max-h-[78vh] overflow-y-auto">
         {isAutoCompleted && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <p className="font-black text-amber-800 text-sm mb-1">⚡ Waktu Lembur Habis!</p>
@@ -746,67 +787,66 @@ function CompleteModal({
           </div>
         )}
         {error && <ErrorBanner msg={error} />}
-        {isProcessing && (
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-            <p className="text-xs font-semibold text-gray-500">Menambahkan watermark pada foto...</p>
-          </div>
-        )}
-        {photoPreview ? (
+
+        {/* Step: preview */}
+        {photoStep === "preview" && photoPreview && (
           <div>
             <label className={labelCls}>Foto Bukti</label>
-            <img
-              src={photoPreview}
-              alt="Preview"
-              className="w-full h-52 object-cover rounded-2xl border border-gray-100 shadow-md mb-3"
-            />
+            <img src={photoPreview} alt="Preview" className="w-full h-52 object-cover rounded-2xl border border-gray-100 shadow-md mb-3" />
             <button
-              onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+              onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }}
               className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
             >
-              ↺ Ganti Foto
+              ↺ Ambil Ulang
             </button>
           </div>
-        ) : (
+        )}
+
+        {/* Step: kamera aktif */}
+        {photoStep === "camera" && (
+          <div>
+            <label className={labelCls}>Kamera</label>
+            <CameraCapture onCapture={handleCapture} onCancel={() => setPhotoStep("idle")} />
+          </div>
+        )}
+
+        {/* Step: idle */}
+        {photoStep === "idle" && (
           <div>
             <label className={labelCls}>
-              Foto Bukti{" "}
-              <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+              Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
             </label>
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="photoInput"
-                disabled={isProcessing}
-              />
-              <label htmlFor="photoInput" className="block cursor-pointer">
-                <div className="text-4xl mb-3 opacity-60">📸</div>
-                <p className="text-sm font-bold text-gray-600">Klik untuk upload foto</p>
-                <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · maks 5MB</p>
-              </label>
-            </div>
+            <button
+              onClick={() => setPhotoStep("camera")}
+              className="w-full flex items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all active:scale-[0.99] group"
+            >
+              <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
+              <div className="text-left">
+                <p className="text-sm font-bold text-gray-700">Buka Kamera</p>
+                <p className="text-xs text-gray-400 mt-0.5">Ambil foto bukti lemburan langsung</p>
+              </div>
+            </button>
           </div>
         )}
       </div>
-      <ModalFooter>
-        {!isAutoCompleted && (
-          <button onClick={onClose} className={secondaryBtn}>batal</button>
-        )}
-        <button onClick={upload} disabled={uploading || isProcessing} className={primaryBtn}>
-          {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : "🏁 Selesai"}
-        </button>
-      </ModalFooter>
+
+      {/* Footer — sembunyikan saat kamera aktif */}
+      {photoStep !== "camera" && (
+        <ModalFooter>
+          {!isAutoCompleted && (
+            <button onClick={onClose} className={secondaryBtn}>Batal</button>
+          )}
+          <button onClick={upload} disabled={uploading} className={primaryBtn}>
+            {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : "🏁 Selesai"}
+          </button>
+        </ModalFooter>
+      )}
     </ModalWrapper>
   );
 }
 
-// ── ManualOvertimeModal ──────────────────────────────────────────────────────
-function ManualOvertimeModal({
-  onClose, onSaved, allUsers,
-}: {
+// ── ManualOvertimeModal ───────────────────────────────────────────────────────
+function ManualOvertimeModal({ onClose, onSaved, allUsers }: {
   onClose: () => void; onSaved: () => void; allUsers: User[];
 }) {
   const [targetUserId, setTargetUserId] = useState("");
@@ -818,7 +858,8 @@ function ManualOvertimeModal({
   const [workDescription, setWorkDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // ✅ FIX: init "idle" langsung, tidak pakai overtime (tidak ada di scope ini)
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -831,23 +872,7 @@ function ManualOvertimeModal({
   };
   const previewHours = calcPreview();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { setError("Hanya file gambar yang diterima"); return; }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageDataUrl = event.target?.result as string;
-      setIsProcessing(true);
-      addWatermarkToImage(imageDataUrl, (watermarkedBlob, previewUrl) => {
-        setPhotoPreview(previewUrl);
-        setIsProcessing(false);
-        setPhotoFile(new File([watermarkedBlob], file.name, { type: "image/jpeg" }));
-      });
-      setError("");
-    };
-    reader.readAsDataURL(file);
-  };
+  // ✅ FIX: handleFileSelect dihapus — foto sekarang via CameraCapture
 
   const submit = async () => {
     if (!targetUserId) { setError("Pilih nama karyawan"); return; }
@@ -866,9 +891,7 @@ function ManualOvertimeModal({
       if (photoFile) {
         const formData = new FormData();
         formData.append("file", photoFile);
-        const uploadRes = await fetch("/api/attendance/overtime/upload", {
-          method: "POST", body: formData,
-        });
+        const uploadRes = await fetch("/api/attendance/overtime/upload", { method: "POST", body: formData });
         if (!uploadRes.ok) {
           const errData = await uploadRes.json();
           throw new Error(errData.message || "Upload foto gagal");
@@ -907,85 +930,43 @@ function ManualOvertimeModal({
         style={{ animation: "modalUp 0.32s cubic-bezier(0.22,1,0.36,1)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ModalHeader
-          icon="✏️"
-          title="Input Lembur Manual"
-          subtitle="Admin · Asisten CEO · Programmer"
-          onClose={onClose}
-        />
+        <ModalHeader icon="✏️" title="Input Lembur Manual" subtitle="Admin · Asisten CEO · Programmer" onClose={onClose} />
         <div className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {error && <ErrorBanner msg={error} />}
           <div>
-            <label className={labelCls}>
-              Nama Karyawan <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
-            <select
-              value={targetUserId}
-              onChange={(e) => setTargetUserId(e.target.value)}
-              className={inputCls + " cursor-pointer"}
-            >
+            <label className={labelCls}>Nama Karyawan <span className="text-red-400 normal-case tracking-normal">*</span></label>
+            <select value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} className={inputCls + " cursor-pointer"}>
               <option value="">— Pilih karyawan —</option>
-              {allUsers
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name, "id-ID"))
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.role.replace(/_/g, " ")})
-                  </option>
-                ))}
+              {allUsers.slice().sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map((u) => (
+                <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
+              ))}
             </select>
           </div>
           <div>
-            <label className={labelCls}>
-              Tanggal Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
-            <input
-              type="date"
-              value={requestDate}
-              onChange={(e) => setRequestDate(e.target.value)}
-              className={inputCls}
-            />
+            <label className={labelCls}>Tanggal Lembur <span className="text-red-400 normal-case tracking-normal">*</span></label>
+            <input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} className={inputCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>
-                Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span>
-              </label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className={inputCls}
-              />
+              <label className={labelCls}>Jam Mulai <span className="text-red-400 normal-case tracking-normal">*</span></label>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>
-                Jam Selesai <span className="text-red-400 normal-case tracking-normal">*</span>
-              </label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className={inputCls}
-              />
+              <label className={labelCls}>Jam Selesai <span className="text-red-400 normal-case tracking-normal">*</span></label>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
             </div>
           </div>
           {previewHours !== null && (
             <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
               <span className="text-lg">⏱️</span>
               <p className="text-sm text-gray-600">
-                Durasi:{" "}
-                <span className="font-black text-gray-900">{previewHours} jam</span>
-                {previewHours === 0 && (
-                  <span className="text-amber-500 ml-2 text-xs font-bold">(kurang dari 1 jam)</span>
-                )}
+                Durasi: <span className="font-black text-gray-900">{previewHours} jam</span>
+                {previewHours === 0 && <span className="text-amber-500 ml-2 text-xs font-bold">(kurang dari 1 jam)</span>}
               </p>
             </div>
           )}
           <div>
-            <label className={labelCls}>
-              Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
+            <label className={labelCls}>Alasan Lembur <span className="text-red-400 normal-case tracking-normal">*</span></label>
             <div className="space-y-2">
               {REASON_OPTIONS.map((opt) => {
                 const isSelected = reasonType === opt.value;
@@ -993,29 +974,16 @@ function ManualOvertimeModal({
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => {
-                      setReasonType(opt.value);
-                      if (opt.value !== "Lainnya") setReasonCustom("");
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99]
-            ${isSelected
-                        ? "bg-gray-900 border-gray-900 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                    onClick={() => { setReasonType(opt.value); if (opt.value !== "Lainnya") setReasonCustom(""); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${isSelected ? "bg-gray-900 border-gray-900 shadow-sm" : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}
                   >
                     <span className="text-lg flex-shrink-0">{opt.icon}</span>
                     <div className="min-w-0">
-                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>
-                        {opt.value}
-                      </p>
-                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>
-                        {opt.desc}
-                      </p>
+                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>{opt.value}</p>
+                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>{opt.desc}</p>
                     </div>
                     {isSelected && (
-                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">
-                        ✓
-                      </span>
+                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">✓</span>
                     )}
                   </button>
                 );
@@ -1024,23 +992,12 @@ function ManualOvertimeModal({
           </div>
           {reasonType === "Lainnya" && (
             <div>
-              <label className={labelCls}>
-                Jelaskan Alasan <span className="text-red-400 normal-case tracking-normal">*</span>
-              </label>
-              <input
-                type="text"
-                value={reasonCustom}
-                onChange={(e) => setReasonCustom(e.target.value)}
-                placeholder="Tuliskan alasan spesifik..."
-                className={inputCls}
-                autoFocus
-              />
+              <label className={labelCls}>Jelaskan Alasan <span className="text-red-400 normal-case tracking-normal">*</span></label>
+              <input type="text" value={reasonCustom} onChange={(e) => setReasonCustom(e.target.value)} placeholder="Tuliskan alasan spesifik..." className={inputCls} autoFocus />
             </div>
           )}
           <div>
-            <label className={labelCls}>
-              Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span>
-            </label>
+            <label className={labelCls}>Rincian Pekerjaan <span className="text-red-400 normal-case tracking-normal">*</span></label>
             <textarea
               value={workDescription}
               onChange={(e) => setWorkDescription(e.target.value)}
@@ -1052,79 +1009,71 @@ function ManualOvertimeModal({
               Contoh: Menyelesaikan desain konten Shopee promo weekend, input stok laptop baru, dll.
             </p>
           </div>
+
+          {/* Foto Bukti */}
           <div>
             <label className={labelCls}>
-              Foto Bukti{" "}
-              <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+              Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
             </label>
-            {isProcessing && (
-              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3 mb-3">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                <p className="text-xs font-semibold text-gray-500">Menambahkan watermark...</p>
-              </div>
-            )}
-            {photoPreview ? (
+            {photoStep === "preview" && photoPreview ? (
               <div>
-                <img
-                  src={photoPreview}
-                  alt="Preview"
-                  className="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-md mb-3"
-                />
+                <img src={photoPreview} alt="Preview" className="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-md mb-3" />
                 <button
-                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }}
                   className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
                 >
-                  ↺ Ganti Foto
+                  ↺ Ambil Ulang
                 </button>
               </div>
+            ) : photoStep === "camera" ? (
+              <CameraCapture
+                onCapture={(file, url) => {
+                  setPhotoFile(file);
+                  setPhotoPreview(url);
+                  setPhotoStep("preview");
+                  setError("");
+                }}
+                onCancel={() => setPhotoStep("idle")}
+              />
             ) : (
-              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="manualPhotoInput"
-                  disabled={isProcessing}
-                />
-                <label htmlFor="manualPhotoInput" className="block cursor-pointer">
-                  <div className="text-3xl mb-2 opacity-60">📸</div>
-                  <p className="text-sm font-bold text-gray-600">Klik untuk upload foto</p>
-                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · maks 5MB</p>
-                </label>
-              </div>
+              <button
+                onClick={() => setPhotoStep("camera")}
+                className="w-full flex items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all active:scale-[0.99] group"
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">📷</span>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-700">Buka Kamera</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Ambil foto bukti langsung</p>
+                </div>
+              </button>
             )}
           </div>
         </div>
-        <ModalFooter>
-          <button onClick={onClose} className={secondaryBtn}>Batal</button>
-          <button
-            onClick={submit}
-            disabled={
-              submitting ||
-              !targetUserId ||
-              !requestDate ||
-              !startTime ||
-              !endTime ||
-              !reasonType ||
-              (reasonType === "Lainnya" && !reasonCustom.trim()) ||
-              !workDescription.trim() ||
-              isProcessing
-            }
-            className={primaryBtn}
-          >
-            {submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}
-          </button>
-        </ModalFooter>
+
+        {/* Footer — sembunyikan saat kamera aktif */}
+        {photoStep !== "camera" && (
+          <ModalFooter>
+            <button onClick={onClose} className={secondaryBtn}>Batal</button>
+            <button
+              onClick={submit}
+              disabled={
+                submitting || !targetUserId || !requestDate || !startTime || !endTime ||
+                !reasonType || (reasonType === "Lainnya" && !reasonCustom.trim()) ||
+                !workDescription.trim()
+              }
+              className={primaryBtn}
+            >
+              {submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}
+            </button>
+          </ModalFooter>
+        )}
       </div>
     </div>
   );
 }
 
-// ── EditOvertimeModal ────────────────────────────────────────────────────────
-function EditOvertimeModal({
-  overtime, onClose, onSaved,
-}: {
+// ── EditOvertimeModal ─────────────────────────────────────────────────────────
+function EditOvertimeModal({ overtime, onClose, onSaved }: {
   overtime: OvertimeRequest; onClose: () => void; onSaved: () => void;
 }) {
   const toTimeStr = (iso: string | null | undefined): string => {
@@ -1135,7 +1084,6 @@ function EditOvertimeModal({
     });
   };
 
-  // ── Cari apakah reason yang tersimpan cocok dengan salah satu opsi
   const savedReason = overtime.reason ?? "";
   const knownOptions = REASON_OPTIONS.map((o) => o.value) as string[];
   const isKnownReason = knownOptions.includes(savedReason);
@@ -1149,7 +1097,10 @@ function EditOvertimeModal({
   const [status, setStatus] = useState(overtime.status);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(overtime.proof_photo_url ?? null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // ✅ FIX: init "preview" jika sudah ada foto, "idle" jika belum
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">(
+    overtime.proof_photo_url ? "preview" : "idle"
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1164,23 +1115,7 @@ function EditOvertimeModal({
     return Math.floor((endMs - startMs) / (60 * 60 * 1000));
   }, [startTime, endTime]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { setError("Hanya file gambar yang diterima"); return; }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imageDataUrl = event.target?.result as string;
-      setIsProcessing(true);
-      addWatermarkToImage(imageDataUrl, (blob, preview) => {
-        setPhotoPreview(preview);
-        setIsProcessing(false);
-        setPhotoFile(new File([blob], file.name, { type: "image/jpeg" }));
-      });
-      setError("");
-    };
-    reader.readAsDataURL(file);
-  };
+  // ✅ FIX: handleFileSelect dihapus — foto sekarang via CameraCapture
 
   const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
 
@@ -1199,9 +1134,7 @@ function EditOvertimeModal({
       if (photoFile) {
         const formData = new FormData();
         formData.append("file", photoFile);
-        const uploadRes = await fetch("/api/attendance/overtime/upload", {
-          method: "POST", body: formData,
-        });
+        const uploadRes = await fetch("/api/attendance/overtime/upload", { method: "POST", body: formData });
         if (!uploadRes.ok) {
           const errData = await uploadRes.json();
           throw new Error(errData.message || "Upload foto gagal");
@@ -1253,70 +1186,34 @@ function EditOvertimeModal({
         style={{ animation: "modalUp 0.32s cubic-bezier(0.22,1,0.36,1)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ModalHeader
-          icon="✏️"
-          title="Edit Lembur"
-          subtitle={overtime.users?.name ?? "Karyawan"}
-          onClose={onClose}
-        />
+        <ModalHeader icon="✏️" title="Edit Lembur" subtitle={overtime.users?.name ?? "Karyawan"} onClose={onClose} />
         <div className="px-6 py-5 space-y-4 max-h-[78vh] overflow-y-auto">
           {error && <ErrorBanner msg={error} />}
-
-          {/* Tanggal */}
           <div>
-            <label className={labelCls}>
-              Tanggal <span className="text-red-400 normal-case">*</span>
-            </label>
-            <input
-              type="date"
-              value={requestDate}
-              onChange={(e) => setRequestDate(e.target.value)}
-              className={inputCls}
-            />
+            <label className={labelCls}>Tanggal <span className="text-red-400 normal-case">*</span></label>
+            <input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} className={inputCls} />
           </div>
-
-          {/* Jam Lembur */}
           <div>
-            <label className={labelCls}>
-              Jam Lembur <span className="text-red-400 normal-case">*</span>
-            </label>
+            <label className={labelCls}>Jam Lembur <span className="text-red-400 normal-case">*</span></label>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Mulai</p>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className={inputCls}
-                />
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
               </div>
               <div>
                 <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Selesai</p>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className={inputCls}
-                />
+                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
               </div>
             </div>
           </div>
-
-          {/* Preview durasi */}
           {previewDuration !== null && (
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
               <span>⏱️</span>
-              <span className="text-sm text-gray-600">
-                Durasi: <span className="font-black text-gray-900">{previewDuration} jam</span>
-              </span>
+              <span className="text-sm text-gray-600">Durasi: <span className="font-black text-gray-900">{previewDuration} jam</span></span>
             </div>
           )}
-
-          {/* Alasan — pill options */}
           <div>
-            <label className={labelCls}>
-              Alasan Lembur <span className="text-red-400 normal-case">*</span>
-            </label>
+            <label className={labelCls}>Alasan Lembur <span className="text-red-400 normal-case">*</span></label>
             <div className="space-y-2">
               {REASON_OPTIONS.map((opt) => {
                 const isSelected = reasonType === opt.value;
@@ -1324,54 +1221,28 @@ function EditOvertimeModal({
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => {
-                      setReasonType(opt.value);
-                      if (opt.value !== "Lainnya") setReasonCustom("");
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99]
-                      ${isSelected
-                        ? "bg-gray-900 border-gray-900 shadow-sm"
-                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                    onClick={() => { setReasonType(opt.value); if (opt.value !== "Lainnya") setReasonCustom(""); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${isSelected ? "bg-gray-900 border-gray-900 shadow-sm" : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}
                   >
                     <span className="text-lg flex-shrink-0">{opt.icon}</span>
                     <div className="min-w-0">
-                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>
-                        {opt.value}
-                      </p>
-                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>
-                        {opt.desc}
-                      </p>
+                      <p className={`text-sm font-bold leading-tight ${isSelected ? "text-white" : "text-gray-800"}`}>{opt.value}</p>
+                      <p className={`text-[10px] mt-0.5 leading-tight ${isSelected ? "text-gray-300" : "text-gray-400"}`}>{opt.desc}</p>
                     </div>
                     {isSelected && (
-                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">
-                        ✓
-                      </span>
+                      <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">✓</span>
                     )}
                   </button>
                 );
               })}
             </div>
           </div>
-
-          {/* Input custom jika pilih Lainnya */}
           {isLainnya && (
             <div>
-              <label className={labelCls}>
-                Jelaskan Alasan <span className="text-red-400 normal-case">*</span>
-              </label>
-              <input
-                type="text"
-                value={reasonCustom}
-                onChange={(e) => setReasonCustom(e.target.value)}
-                placeholder="Tuliskan alasan spesifik..."
-                className={inputCls}
-                autoFocus
-              />
+              <label className={labelCls}>Jelaskan Alasan <span className="text-red-400 normal-case">*</span></label>
+              <input type="text" value={reasonCustom} onChange={(e) => setReasonCustom(e.target.value)} placeholder="Tuliskan alasan spesifik..." className={inputCls} autoFocus />
             </div>
           )}
-
-          {/* Rincian Pekerjaan */}
           <div>
             <label className={labelCls}>Rincian Pekerjaan</label>
             <textarea
@@ -1382,19 +1253,11 @@ function EditOvertimeModal({
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none placeholder:text-gray-300"
             />
           </div>
-
-          {/* Status */}
           <div>
             <label className={labelCls}>Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as OvertimeRequest["status"])}
-              className={inputCls + " cursor-pointer"}
-            >
+            <select value={status} onChange={(e) => setStatus(e.target.value as OvertimeRequest["status"])} className={inputCls + " cursor-pointer"}>
               {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_CONFIG[s]?.label ?? s}
-                </option>
+                <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
               ))}
             </select>
           </div>
@@ -1402,70 +1265,66 @@ function EditOvertimeModal({
           {/* Foto Bukti */}
           <div>
             <label className={labelCls}>
-              Foto Bukti{" "}
-              <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
+              Foto Bukti <span className="normal-case tracking-normal text-gray-400 font-normal">(opsional)</span>
             </label>
-            {isProcessing && (
-              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl p-3 mb-3">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                <p className="text-xs font-semibold text-gray-500">Menambahkan watermark...</p>
-              </div>
-            )}
-            {photoPreview ? (
+            {photoStep === "preview" && photoPreview ? (
               <div>
-                <img
-                  src={photoPreview}
-                  alt="Preview"
-                  className="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-md mb-3"
-                />
+                <img src={photoPreview} alt="Preview" className="w-full h-44 object-cover rounded-2xl border border-gray-100 shadow-md mb-3" />
                 <button
-                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }}
                   className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
                 >
                   ↺ Hapus Foto
                 </button>
               </div>
+            ) : photoStep === "camera" ? (
+              <CameraCapture
+                onCapture={(file, url) => {
+                  setPhotoFile(file);
+                  setPhotoPreview(url);
+                  setPhotoStep("preview");
+                  setError("");
+                }}
+                onCancel={() => setPhotoStep("idle")}
+              />
             ) : (
-              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="editPhotoInput"
-                  disabled={isProcessing}
-                />
-                <label htmlFor="editPhotoInput" className="block cursor-pointer">
-                  <div className="text-3xl mb-2 opacity-60">📸</div>
-                  <p className="text-sm font-bold text-gray-600">Klik untuk upload foto</p>
-                  <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP · maks 5MB</p>
-                </label>
-              </div>
+              <button
+                onClick={() => setPhotoStep("camera")}
+                className="w-full flex items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all active:scale-[0.99] group"
+              >
+                <span className="text-2xl group-hover:scale-110 transition-transform">📷</span>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-700">Buka Kamera</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Ambil foto bukti langsung</p>
+                </div>
+              </button>
             )}
           </div>
         </div>
-        <ModalFooter>
-          <button onClick={onClose} className={secondaryBtn}>Batal</button>
-          <button
-            onClick={save}
-            disabled={
-              saving || isProcessing || !requestDate || !startTime || !endTime ||
-              !reasonType || (isLainnya && !reasonCustom.trim())
-            }
-            className={primaryBtn}
-          >
-            {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
-          </button>
-        </ModalFooter>
+
+        {/* Footer — sembunyikan saat kamera aktif */}
+        {photoStep !== "camera" && (
+          <ModalFooter>
+            <button onClick={onClose} className={secondaryBtn}>Batal</button>
+            <button
+              onClick={save}
+              disabled={
+                saving || !requestDate || !startTime || !endTime ||
+                !reasonType || (isLainnya && !reasonCustom.trim())
+              }
+              className={primaryBtn}
+            >
+              {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
+            </button>
+          </ModalFooter>
+        )}
       </div>
     </div>
   );
 }
 
-// ── DeleteConfirmModal ───────────────────────────────────────────────────────
-function DeleteConfirmModal({
-  overtime, onClose, onDeleted,
-}: {
+// ── DeleteConfirmModal ────────────────────────────────────────────────────────
+function DeleteConfirmModal({ overtime, onClose, onDeleted }: {
   overtime: OvertimeRequest; onClose: () => void; onDeleted: () => void;
 }) {
   const [deleting, setDeleting] = useState(false);
@@ -1474,9 +1333,7 @@ function DeleteConfirmModal({
   const handleDelete = async () => {
     setDeleting(true); setError("");
     try {
-      const res = await fetch(`/api/attendance/overtime?id=${overtime.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/attendance/overtime?id=${overtime.id}`, { method: "DELETE" });
       const d = await res.json();
       if (!d.success) { setError(d.message || "Gagal menghapus"); return; }
       onDeleted(); onClose();
@@ -1489,8 +1346,6 @@ function DeleteConfirmModal({
       <ModalHeader icon="🗑️" title="Hapus Lembur" subtitle={overtime.users?.name} onClose={onClose} />
       <div className="px-6 py-5 space-y-4">
         {error && <ErrorBanner msg={error} />}
-
-        {/* Info data yang akan dihapus */}
         <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-2">
           <p className="text-xs font-black text-red-700 uppercase tracking-wider mb-2">Data yang akan dihapus</p>
           <div className="space-y-1.5 text-sm">
@@ -1501,9 +1356,7 @@ function DeleteConfirmModal({
             <div className="flex justify-between">
               <span className="text-gray-400">Tanggal</span>
               <span className="font-bold text-gray-800">
-                {new Date(overtime.request_date).toLocaleDateString("id-ID", {
-                  day: "numeric", month: "long", year: "numeric",
-                })}
+                {new Date(overtime.request_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
               </span>
             </div>
             <div className="flex justify-between">
@@ -1524,7 +1377,6 @@ function DeleteConfirmModal({
             )}
           </div>
         </div>
-
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
           <span className="text-base flex-shrink-0">⚠️</span>
           <p className="text-xs text-amber-700 font-medium leading-relaxed">
@@ -1595,7 +1447,6 @@ export default function OvertimePage() {
     ]).finally(() => setLoading(false));
   }, [fetchOvertimes, fetchAllUsers, currentUser?.role]);
 
-  // ✅ AUTO-COMPLETE INTERVAL dengan timezone handling robust
   useEffect(() => {
     if (!currentUser) return;
 
@@ -1614,31 +1465,15 @@ export default function OvertimePage() {
 
     const checkAutoComplete = setInterval(() => {
       const now = Date.now();
-      console.log(`[CHECK] Time: ${new Date(now).toISOString()}`);
-
       overtimes.forEach((o) => {
         const isMyOvertime = o.user_id === currentUser.id;
         const isOngoing = o.status === "ONGOING";
         const notYetCompleted = !o.actual_end;
         const notAlreadyProcessing = !autoCompletingIds.current.has(o.id);
-
         if (!isMyOvertime || !isOngoing || !notAlreadyProcessing) return;
-
         const scheduledEndTime = parseTimestamp(o.scheduled_end);
-        if (scheduledEndTime === 0) {
-          console.warn(`[CHECK] Parse failed: ${o.scheduled_end}`);
-          return;
-        }
-
-        const isTimeUp = scheduledEndTime <= now;
-        console.log(
-          `[CHECK] ${o.users?.name}:`,
-          `End: ${new Date(scheduledEndTime).toISOString()}`,
-          `TimeUp: ${isTimeUp}`
-        );
-
-        if (isTimeUp && notYetCompleted && notAlreadyProcessing) {
-          console.log(`✅ [AUTO-COMPLETE] Triggered for ${o.users?.name}`);
+        if (scheduledEndTime === 0) return;
+        if (scheduledEndTime <= now && notYetCompleted) {
           handleAutoComplete(o);
         }
       });
@@ -1650,37 +1485,21 @@ export default function OvertimePage() {
   const handleAutoComplete = async (overtime: OvertimeRequest) => {
     if (autoCompletingIds.current.has(overtime.id)) return;
     autoCompletingIds.current.add(overtime.id);
-
     try {
       const res = await fetch("/api/attendance/overtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: overtime.id,
-          action: "COMPLETE",
-          proof_photo_url: null,
-          auto_completed: true,   // ✅ server akan pakai scheduled_end sebagai actual_end
-        }),
+        body: JSON.stringify({ id: overtime.id, action: "COMPLETE", proof_photo_url: null, auto_completed: true }),
       });
-
       const d = await res.json();
       if (d.success) {
         await fetchOvertimes();
-        // ✅ Tampilkan modal upload foto (status sudah COMPLETED dari server)
-        setCompleteData({
-          ...overtime,
-          ...d.data,              // ✅ gunakan data terbaru dari server
-          auto_completed: true,
-        });
-        setTimeout(() => {
-          autoCompletingIds.current.delete(overtime.id);
-        }, 5000);
+        setCompleteData({ ...overtime, ...d.data, auto_completed: true });
+        setTimeout(() => { autoCompletingIds.current.delete(overtime.id); }, 5000);
       } else {
-        console.error(`❌ Failed:`, d.message);
         autoCompletingIds.current.delete(overtime.id);
       }
-    } catch (err) {
-      console.error("[AUTO-COMPLETE] Error:", err);
+    } catch {
       autoCompletingIds.current.delete(overtime.id);
     }
   };
@@ -1690,10 +1509,7 @@ export default function OvertimePage() {
     return overtimes.filter((o) => o.status === filterStatus);
   }, [overtimes, filterStatus]);
 
-  const statuses = useMemo(
-    () => [...new Set(overtimes.map((o) => o.status))],
-    [overtimes]
-  );
+  const statuses = useMemo(() => [...new Set(overtimes.map((o) => o.status))], [overtimes]);
 
   const thisMonthOvertimes = overtimes.filter((o) => {
     const dateKey = toWIBDateKey(o.request_date);
@@ -1720,16 +1536,14 @@ export default function OvertimePage() {
   }, [calendarMonth.year, calendarMonth.month]);
 
   const selectedOvertimes = selectedDate
-    ? (byDate[selectedDate] || []).sort((a, b) =>
-      (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID")
-    )
+    ? (byDate[selectedDate] || []).sort((a, b) => (a.users?.name || "").localeCompare(b.users?.name || "", "id-ID"))
     : [];
 
   const statCards = [
-    { label: "Total", value: overtimes.length, icon: "📋", accent: "from-gray-700 to-gray-900" },
-    { label: "Pending", value: overtimes.filter((o) => o.status === "PENDING").length, icon: "⏳", accent: "from-amber-500 to-amber-600" },
-    { label: "Ongoing", value: overtimes.filter((o) => o.status === "ONGOING").length, icon: "🟢", accent: "from-emerald-500 to-emerald-700" },
-    { label: "Selesai", value: overtimes.filter((o) => o.status === "COMPLETED").length, icon: "🏁", accent: "from-blue-500 to-blue-700" },
+    { label: "Total",   value: overtimes.length,                                          icon: "📋", accent: "from-gray-700 to-gray-900"    },
+    { label: "Pending", value: overtimes.filter((o) => o.status === "PENDING").length,    icon: "⏳", accent: "from-amber-500 to-amber-600"  },
+    { label: "Ongoing", value: overtimes.filter((o) => o.status === "ONGOING").length,    icon: "🟢", accent: "from-emerald-500 to-emerald-700"},
+    { label: "Selesai", value: overtimes.filter((o) => o.status === "COMPLETED").length,  icon: "🏁", accent: "from-blue-500 to-blue-700"    },
   ];
 
   const renderActions = (o: OvertimeRequest) => (
@@ -1758,18 +1572,14 @@ export default function OvertimePage() {
           💰 {o.rate_per_hour ? "Edit" : "Set Bayar"}
         </button>
       )}
-      {!canApproveRole(currentUser?.role) &&
-        currentUser?.id === o.user_id &&
-        o.status === "ONGOING" &&
-        !o.actual_end &&
-        o.rate_per_hour && (
-          <button
-            onClick={() => setCompleteData(o)}
-            className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
-          >
-            🏁 Selesai
-          </button>
-        )}
+      {!canApproveRole(currentUser?.role) && currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && o.rate_per_hour && (
+        <button
+          onClick={() => setCompleteData(o)}
+          className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
+        >
+          🏁 Selesai
+        </button>
+      )}
       {currentUser?.id === o.user_id && o.status === "COMPLETED" && !o.proof_photo_url && (
         <button
           onClick={() => setCompleteData({ ...o, auto_completed: true })}
@@ -1778,8 +1588,6 @@ export default function OvertimePage() {
           📸 Upload
         </button>
       )}
-
-      {/* ── Tombol Edit & Delete — hanya FULL_ACCESS ── */}
       {isAdminRole(currentUser?.role) && (
         <>
           <button
@@ -1818,7 +1626,7 @@ export default function OvertimePage() {
       <div className="min-h-screen bg-[#F7F7F8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6 sm:space-y-8">
 
-          {/* ══ HEADER ══ */}
+          {/* HEADER */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div>
               <div className="flex items-center gap-3 mb-1">
@@ -1849,33 +1657,27 @@ export default function OvertimePage() {
             </div>
           </div>
 
-          {/* ══ STAT CARDS ══ */}
+          {/* STAT CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {statCards.map((c) => (
               <div
                 key={c.label}
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 flex items-start gap-4 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
               >
-                <div
-                  className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${c.accent} flex items-center justify-center text-xl flex-shrink-0 shadow-md`}
-                >
+                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${c.accent} flex items-center justify-center text-xl flex-shrink-0 shadow-md`}>
                   {c.icon}
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{c.label}</p>
                   <p className="text-3xl font-black text-gray-900 tracking-tight leading-none">
-                    {loading ? (
-                      <span className="inline-block w-10 h-7 bg-gray-100 rounded-lg animate-pulse" />
-                    ) : (
-                      c.value
-                    )}
+                    {loading ? <span className="inline-block w-10 h-7 bg-gray-100 rounded-lg animate-pulse" /> : c.value}
                   </p>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* ══ CALENDAR & TABLE ══ */}
+          {/* CALENDAR */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -1889,44 +1691,23 @@ export default function OvertimePage() {
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() =>
-                    setCalendarMonth((m) => ({
-                      month: m.month === 0 ? 11 : m.month - 1,
-                      year: m.month === 0 ? m.year - 1 : m.year,
-                    }))
-                  }
+                  onClick={() => setCalendarMonth((m) => ({ month: m.month === 0 ? 11 : m.month - 1, year: m.month === 0 ? m.year - 1 : m.year }))}
                   className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 font-bold transition-all active:scale-95 text-lg"
-                >
-                  ‹
-                </button>
+                >‹</button>
                 <button
-                  onClick={() =>
-                    setCalendarMonth({ year: new Date().getFullYear(), month: new Date().getMonth() })
-                  }
+                  onClick={() => setCalendarMonth({ year: new Date().getFullYear(), month: new Date().getMonth() })}
                   className="h-9 px-3 rounded-xl hover:bg-gray-100 text-xs font-bold text-gray-500 hover:text-gray-800 transition-all"
-                >
-                  Hari ini
-                </button>
+                >Hari ini</button>
                 <button
-                  onClick={() =>
-                    setCalendarMonth((m) => ({
-                      month: m.month === 11 ? 0 : m.month + 1,
-                      year: m.month === 11 ? m.year + 1 : m.year,
-                    }))
-                  }
+                  onClick={() => setCalendarMonth((m) => ({ month: m.month === 11 ? 0 : m.month + 1, year: m.month === 11 ? m.year + 1 : m.year }))}
                   className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 font-bold transition-all active:scale-95 text-lg"
-                >
-                  ›
-                </button>
+                >›</button>
               </div>
             </div>
             <div className="p-4 sm:p-6 overflow-x-auto">
               <div className="grid grid-cols-7 gap-1.5 mb-1.5 min-w-[320px]">
                 {DAY_NAMES.map((d, i) => (
-                  <div
-                    key={d}
-                    className={`text-center text-[10px] font-black py-2 uppercase tracking-wider ${i === 0 ? "text-red-400" : "text-gray-400"}`}
-                  >
+                  <div key={d} className={`text-center text-[10px] font-black py-2 uppercase tracking-wider ${i === 0 ? "text-red-400" : "text-gray-400"}`}>
                     {d}
                   </div>
                 ))}
@@ -1943,28 +1724,14 @@ export default function OvertimePage() {
                     <button
                       key={day}
                       onClick={() => setSelectedDate(selectedDate === dk ? null : dk)}
-                      className={`relative flex flex-col items-center justify-start pt-2.5 pb-2 rounded-xl min-h-[70px] sm:min-h-[88px] transition-all duration-200 border
-                        ${isSel
-                          ? "bg-gray-900 border-gray-800 shadow-lg"
-                          : total > 0
-                            ? "bg-violet-50 border-violet-100 hover:bg-violet-100 hover:border-violet-200"
-                            : "bg-transparent border-gray-100 hover:bg-gray-50 hover:border-gray-200"
-                        }`}
+                      className={`relative flex flex-col items-center justify-start pt-2.5 pb-2 rounded-xl min-h-[70px] sm:min-h-[88px] transition-all duration-200 border ${isSel ? "bg-gray-900 border-gray-800 shadow-lg" : total > 0 ? "bg-violet-50 border-violet-100 hover:bg-violet-100 hover:border-violet-200" : "bg-transparent border-gray-100 hover:bg-gray-50 hover:border-gray-200"}`}
                     >
-                      <span
-                        className={`text-sm sm:text-base font-black mb-1.5 transition-colors
-                          ${isSel ? "text-white" : isToday ? "text-violet-600" : isSunday ? "text-red-400" : "text-gray-700"}`}
-                      >
+                      <span className={`text-sm sm:text-base font-black mb-1.5 transition-colors ${isSel ? "text-white" : isToday ? "text-violet-600" : isSunday ? "text-red-400" : "text-gray-700"}`}>
                         {day}
                       </span>
-                      {isToday && !isSel && (
-                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-500" />
-                      )}
+                      {isToday && !isSel && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-500" />}
                       {total > 0 && (
-                        <span
-                          className={`text-[9px] sm:text-[10px] font-black rounded-full px-2 py-0.5 leading-tight
-                            ${isSel ? "bg-white/20 text-white" : "bg-violet-500 text-white"}`}
-                        >
+                        <span className={`text-[9px] sm:text-[10px] font-black rounded-full px-2 py-0.5 leading-tight ${isSel ? "bg-white/20 text-white" : "bg-violet-500 text-white"}`}>
                           {total}
                         </span>
                       )}
@@ -1975,19 +1742,15 @@ export default function OvertimePage() {
             </div>
           </div>
 
-          {/* ══ SELECTED DATE DETAILS ══ */}
+          {/* SELECTED DATE */}
           {selectedDate && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <div>
                   <p className="font-black text-gray-900 text-base sm:text-lg">
-                    {new Date(selectedDate + "T12:00:00").toLocaleDateString("id-ID", {
-                      weekday: "long", day: "numeric", month: "long", year: "numeric",
-                    })}
+                    {new Date(selectedDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5 font-medium">
-                    {selectedOvertimes.length} lemburan tercatat
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">{selectedOvertimes.length} lemburan tercatat</p>
                 </div>
                 <button
                   onClick={() => setSelectedDate(null)}
@@ -2009,11 +1772,7 @@ export default function OvertimePage() {
                     <thead className="bg-gray-50/80">
                       <tr className="border-b border-gray-100">
                         {["Karyawan", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map((h) => (
-                          <th
-                            key={h}
-                            className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"
-                              }`}
-                          >
+                          <th key={h} className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"}`}>
                             {h}
                           </th>
                         ))}
@@ -2024,9 +1783,7 @@ export default function OvertimePage() {
                         <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
                           <td className="px-4 py-3.5"><EmployeeCell o={o} /></td>
                           <td className="px-3 py-3.5 whitespace-nowrap">
-                            <span className="font-mono font-bold text-gray-700 text-xs">
-                              {formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}
-                            </span>
+                            <span className="font-mono font-bold text-gray-700 text-xs">{formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}</span>
                           </td>
                           <td className="px-3 py-3.5 max-w-[120px]">
                             <span className="text-gray-500 text-xs line-clamp-2">{o.reason || "—"}</span>
@@ -2036,11 +1793,10 @@ export default function OvertimePage() {
                           </td>
                           <td className="px-3 py-3.5"><StatusBadge status={o.status} /></td>
                           <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                            {o.total_pay != null ? (
-                              <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
-                            ) : (
-                              <span className="text-gray-200 text-xs">—</span>
-                            )}
+                            {o.total_pay != null
+                              ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
+                              : <span className="text-gray-200 text-xs">—</span>
+                            }
                           </td>
                           <td className="px-3 py-3.5">{renderActions(o)}</td>
                         </tr>
@@ -2052,15 +1808,13 @@ export default function OvertimePage() {
             </div>
           )}
 
-          {/* ══ ALL OVERTIMES TABLE ══ */}
+          {/* ALL OVERTIMES TABLE */}
           {!selectedDate && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <p className="font-black text-gray-900 text-base">Daftar Lemburan</p>
-                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                    {filtered.length} data
-                  </span>
+                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{filtered.length} data</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {["Semua", ...statuses].map((s) => {
@@ -2069,11 +1823,7 @@ export default function OvertimePage() {
                       <button
                         key={s}
                         onClick={() => setFilterStatus(s)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 border
-                          ${filterStatus === s
-                            ? "bg-gray-900 text-white border-gray-900 shadow-sm"
-                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
-                          }`}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 border ${filterStatus === s ? "bg-gray-900 text-white border-gray-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}
                       >
                         {cfg ? `${cfg.icon} ${cfg.label}` : "Semua"}
                       </button>
@@ -2084,11 +1834,7 @@ export default function OvertimePage() {
               {loading ? (
                 <div className="p-6 space-y-2.5">
                   {Array(4).fill(0).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-14 bg-gray-50 rounded-xl animate-pulse"
-                      style={{ opacity: 1 - i * 0.2 }}
-                    />
+                    <div key={i} className="h-14 bg-gray-50 rounded-xl animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
                   ))}
                 </div>
               ) : filtered.length === 0 ? (
@@ -2103,11 +1849,7 @@ export default function OvertimePage() {
                     <thead className="bg-gray-50/80">
                       <tr className="border-b border-gray-100">
                         {["Karyawan", "Tanggal", "Waktu", "Alasan", "Pekerjaan", "Status", "Bayaran", "Aksi"].map((h) => (
-                          <th
-                            key={h}
-                            className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"
-                              }`}
-                          >
+                          <th key={h} className={`px-4 py-3.5 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === "Bayaran" ? "text-right" : h === "Aksi" ? "text-center" : "text-left"}`}>
                             {h}
                           </th>
                         ))}
@@ -2119,15 +1861,11 @@ export default function OvertimePage() {
                           <td className="px-4 py-3.5"><EmployeeCell o={o} /></td>
                           <td className="px-3 py-3.5 whitespace-nowrap">
                             <span className="font-mono font-bold text-gray-600 text-xs">
-                              {new Date(o.request_date).toLocaleDateString("id-ID", {
-                                day: "numeric", month: "short", year: "numeric",
-                              })}
+                              {new Date(o.request_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                             </span>
                           </td>
                           <td className="px-3 py-3.5 whitespace-nowrap">
-                            <span className="font-mono font-bold text-gray-600 text-xs">
-                              {formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}
-                            </span>
+                            <span className="font-mono font-bold text-gray-600 text-xs">{formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}</span>
                           </td>
                           <td className="px-3 py-3.5 max-w-[120px]">
                             <span className="text-gray-500 text-xs line-clamp-2">{o.reason || "—"}</span>
@@ -2137,11 +1875,10 @@ export default function OvertimePage() {
                           </td>
                           <td className="px-3 py-3.5"><StatusBadge status={o.status} /></td>
                           <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                            {o.total_pay != null ? (
-                              <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
-                            ) : (
-                              <span className="text-gray-200 text-xs">—</span>
-                            )}
+                            {o.total_pay != null
+                              ? <span className="font-bold text-gray-800 font-mono text-xs">{formatRupiah(o.total_pay)}</span>
+                              : <span className="text-gray-200 text-xs">—</span>
+                            }
                           </td>
                           <td className="px-3 py-3.5">{renderActions(o)}</td>
                         </tr>
@@ -2152,11 +1889,10 @@ export default function OvertimePage() {
               )}
             </div>
           )}
-
         </div>
       </div>
 
-      {/* ══ MODALS ══ */}
+      {/* MODALS */}
       {showRequestModal && (
         <RequestOvertimeModal
           onClose={() => setShowRequestModal(false)}
