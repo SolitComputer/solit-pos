@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG"];
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"];
 function canViewAllAttendance(role: string): boolean {
   return isFullAccess(role) || SALARY_ACCESS_ROLES.includes(role);
 }
