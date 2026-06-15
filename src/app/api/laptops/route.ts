@@ -38,13 +38,17 @@ export const GET = withAuth(handler, [
   "PENGELOLA_BARANG",
   "KEPALA_SALES",
   "CREW_SALES",
-  "SOTECH",          // ✅ NEW
-  "KEPALA_SOTECH",   // ✅ NEW
+  "SOTECH",
+  "KEPALA_SOTECH",
   "ACCOUNTING",
   "PENGANTARAN",
   "MARKETING",
   "KEPALA_MARKETING",
   "PENYEDIA_BARANG",
   "KEPALA_PENYEDIA_BARANG",
-  "KONTEN"
+  "KONTEN",
+  "KEPALA_ONPOINT",   
+  "ONPOINT",   
+  "KEPALA_TEKNISI", 
+  "TEKNISI",      
 ]);
