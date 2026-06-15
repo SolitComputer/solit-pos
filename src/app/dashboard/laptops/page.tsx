@@ -28,6 +28,7 @@ interface Laptop {
     selling_price: number;
     qty: number;
     stok_tersedia: number;
+    stok_minus: number;
     status: string;
     ready_to_sell: boolean;
     notes: string;
@@ -384,6 +385,9 @@ export default function Page() {
                 qty: (l.laptop_units || []).length,
                 stok_tersedia: (l.laptop_units || []).filter(
                     (u: LaptopUnit) => u.status === "SIAP_JUAL"
+                ).length,
+                stok_minus: (l.laptop_units || []).filter(
+                    (u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP"
                 ).length,
             }));
             setLaptops(normalized);
@@ -960,8 +964,9 @@ export default function Page() {
                                                 <Th>GPU</Th>
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
-                                                <Th right>Tersedia</Th>
+                                                <Th right>Siap Jual</Th>
                                                 {canViewTotalStok && <Th right>Total Stok</Th>}
+                                                {canViewTotalStok && <Th right>Minus</Th>}
                                                 <Th>Status</Th>
                                                 <Th right>Aksi</Th>
                                             </tr>
@@ -1023,6 +1028,15 @@ export default function Page() {
                                                                 <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"
                                                                     }`}>
                                                                     {item.qty ?? 0}
+                                                                </span>
+                                                            </td>
+                                                        )}
+
+                                                        {canViewTotalStok && (
+                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                                <span className={`text-sm font-medium ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-300"
+                                                                    }`}>
+                                                                    {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
                                                                 </span>
                                                             </td>
                                                         )}
@@ -1096,7 +1110,7 @@ export default function Page() {
                                         </p>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
-                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Tersedia</p>
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Siap Jual</p>
                                                 <p className="text-sm font-bold text-green-700">
                                                     {filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0)} unit
                                                 </p>
@@ -1109,6 +1123,13 @@ export default function Page() {
                                                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
                                                         <p className="text-sm font-bold text-gray-700">
                                                             {filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0)} unit
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-px h-8 bg-gray-200" />
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">Terjual</p>
+                                                        <p className="text-sm font-bold text-red-500">
+                                                            {filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0)} unit
                                                         </p>
                                                     </div>
                                                 </>
@@ -1601,7 +1622,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                            {["Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga Jual", "Tersedia", "Stok", "Status", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga Jual", "Siap Jual", "Total Stok", "Minus", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3">
                                     <Shimmer w={80} h={11} />
                                 </th>
@@ -1617,8 +1638,9 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={40} h={13} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={80} h={13} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={32} h={22} r="99px" /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={24} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end gap-2"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
