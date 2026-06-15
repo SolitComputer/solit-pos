@@ -339,6 +339,9 @@ export default function Page() {
     ] as UserRole[]) : false;
     const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
     const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
+    const canViewTotalStok = userRole
+        ? hasPermission(userRole, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"] as UserRole[])
+        : false;
 
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -958,7 +961,8 @@ export default function Page() {
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
                                                 <Th right>Tersedia</Th>
-                                                <Th right>Total Stok</Th>
+                                                <Th right>Tersedia</Th>
+                                                {canViewTotalStok && <Th right>Total Stok</Th>}
                                                 <Th>Status</Th>
                                                 <Th right>Aksi</Th>
                                             </tr>
@@ -1007,14 +1011,13 @@ export default function Page() {
                                                             {fmt(item.selling_price)}
                                                         </td>
                                                         {/* Stok Tersedia (SIAP_JUAL) */}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-semibold ${(item.stok_tersedia ?? 0) === 0
-                                                                ? "bg-red-50 text-red-500"
-                                                                : "bg-green-50 text-green-700"
-                                                                }`}>
-                                                                {item.stok_tersedia ?? 0}
-                                                            </span>
-                                                        </td>
+                                                        {canViewTotalStok && (
+                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                                <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"}`}>
+                                                                    {item.qty ?? 0}
+                                                                </span>
+                                                            </td>
+                                                        )}
 
                                                         {/* Total Stok (semua unit) */}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap">
@@ -1102,12 +1105,17 @@ export default function Page() {
                                             <div className="w-px h-8 bg-gray-200" />
 
                                             {/* Yang sudah ada */}
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
-                                                <p className="text-sm font-bold text-gray-700">
-                                                    {filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0)} unit
-                                                </p>
-                                            </div>
+                                            {canViewTotalStok && (
+                                                <>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
+                                                        <p className="text-sm font-bold text-gray-700">
+                                                            {filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0)} unit
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-px h-8 bg-gray-200" />
+                                                </>
+                                            )}
                                             <div className="w-px h-8 bg-gray-200" />
                                             <div className="text-right">
                                                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Nilai Jual</p>
