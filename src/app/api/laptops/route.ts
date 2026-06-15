@@ -38,6 +38,8 @@ export const GET = withAuth(handler, [
   "PENGELOLA_BARANG",
   "KEPALA_SALES",
   "CREW_SALES",
+  "SOTECH",          // ✅ NEW
+  "KEPALA_SOTECH",   // ✅ NEW
   "ACCOUNTING",
   "PENGANTARAN",
   "MARKETING",
