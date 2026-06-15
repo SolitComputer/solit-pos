@@ -67,10 +67,12 @@ export async function GET(request: Request) {
 
     if (expiredOvertimes && expiredOvertimes.length > 0) {
       for (const expired of expiredOvertimes) {
+        // ✅ actual_end SELALU = scheduled_end (jam selesai jadwal), bukan waktu sekarang
         const actualEnd = expired.scheduled_end;
-        const startMs = new Date(expired.actual_start).getTime();
+        // ✅ Guard: kalau actual_start kosong, durasi nggak bisa dihitung → skip kalkulasi pay
+        const startMs = expired.actual_start ? new Date(expired.actual_start).getTime() : NaN;
         const endMs = new Date(actualEnd).getTime();
-        const durationMins = Math.round((endMs - startMs) / 60000);
+        const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
         const billedHours = Math.floor(durationMins / 60);
         const ratePerHour = expired.rate_per_hour ?? 0;
         const calculatedPay = billedHours * ratePerHour;
@@ -477,21 +479,41 @@ export async function PATCH(request: Request) {
         );
       }
 
-      // ✅ Kasus 1: Upload foto untuk overtime yang sudah COMPLETED atau NEED_PROOF
-      // Jika ada foto → upgrade ke COMPLETED
-      // Jika tidak ada foto → pertahankan status lama
-      if (
-        (overtime.status === "COMPLETED" || overtime.status === "NEED_PROOF") &&
-        !overtime.proof_photo_url
-      ) {
+      // ✅ Kasus 1: lembur SUDAH selesai (COMPLETED / NEED_PROOF) → mode update foto.
+      //    Ada foto  → naik ke COMPLETED. Tetap null → tetap NEED_PROOF.
+      //    Kalau body kirim null, foto lama dipertahankan (nggak kehapus).
+      //    PENTING: durasi & pay TIDAK dihitung ulang dari waktu upload foto.
+      //    actual_end dikunci ke nilai lama (atau scheduled_end kalau kosong),
+      //    jadi telat upload setelah jam selesai TIDAK menambah durasi/bayaran.
+      if (overtime.status === "COMPLETED" || overtime.status === "NEED_PROOF") {
+        const finalProof = proof_photo_url ?? overtime.proof_photo_url ?? null;
+
+        const updatePayload: Record<string, any> = {
+          proof_photo_url: finalProof,
+          status: finalProof ? "COMPLETED" : "NEED_PROOF",
+          updated_at: new Date().toISOString(),
+        };
+
+        // ✅ Recompute HANYA kalau actual_end belum pernah ke-set (record lama).
+        //    Dasar hitung tetap scheduled_end (jam selesai jadwal), BUKAN waktu upload.
+        if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
+          const lockedEnd = overtime.scheduled_end;
+          const startMs = new Date(overtime.actual_start).getTime();
+          const endMs = new Date(lockedEnd).getTime();
+          if (endMs > startMs) {
+            const durationMins = Math.round((endMs - startMs) / 60000);
+            const billedHours = Math.floor(durationMins / 60);
+            const ratePerHour = overtime.rate_per_hour ?? 0;
+            updatePayload.actual_end = lockedEnd;
+            updatePayload.completed_at = lockedEnd;
+            updatePayload.duration_minutes = durationMins;
+            updatePayload.total_pay = billedHours * ratePerHour;
+          }
+        }
+
         const { data, error } = await supabase
           .from("overtime_requests")
-          .update({
-            proof_photo_url: proof_photo_url ?? null,
-            // ✅ Upgrade ke COMPLETED hanya jika foto berhasil diupload
-            status: proof_photo_url ? "COMPLETED" : overtime.status,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq("id", id)
           .select()
           .single();
@@ -504,7 +526,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: true, data });
       }
 
-      // ✅ Kasus 2: Selesaikan overtime yang sedang ONGOING (manual oleh karyawan)
+      // ✅ Kasus 2: lembur masih ONGOING/APPROVED → diselesaikan sekarang.
       if (!["APPROVED", "ONGOING"].includes(overtime.status)) {
         return NextResponse.json(
           { success: false, message: "Status tidak valid untuk complete" },
@@ -520,9 +542,24 @@ export async function PATCH(request: Request) {
         );
       }
 
-      const actualEnd = auto_completed === true
-        ? (overtime.scheduled_end ?? new Date().toISOString())
-        : new Date().toISOString();
+      const nowIso = new Date().toISOString();
+      const scheduledEndIso = overtime.scheduled_end;
+
+      // ✅ CLAMP actual_end ke scheduled_end:
+      //    - auto_completed       → selalu pakai scheduled_end (waktu habis)
+      //    - manual & sudah lewat  → kunci ke scheduled_end (jangan ikut waktu klik)
+      //    - manual & selesai awal → pakai waktu sekarang (lebih kecil dari scheduled_end)
+      let actualEnd: string;
+      if (auto_completed === true) {
+        actualEnd = scheduledEndIso ?? nowIso;
+      } else if (
+        scheduledEndIso &&
+        new Date(nowIso).getTime() > new Date(scheduledEndIso).getTime()
+      ) {
+        actualEnd = scheduledEndIso;
+      } else {
+        actualEnd = nowIso;
+      }
 
       const startMs = new Date(startReference).getTime();
       const endMs = new Date(actualEnd).getTime();
@@ -538,12 +575,13 @@ export async function PATCH(request: Request) {
       const ratePerHour = overtime.rate_per_hour ?? 0;
       const billedHours = Math.floor(durationMins / 60);
       const calculatedPay = billedHours * ratePerHour;
+      const finalProof = proof_photo_url ?? null;
 
       const updates: any = {
         actual_end: actualEnd,
-        // ✅ COMPLETED jika ada foto, NEED_PROOF jika belum ada foto
-        status: proof_photo_url ? "COMPLETED" : "NEED_PROOF",
-        proof_photo_url: proof_photo_url ?? null,
+        // ✅ Ada foto → COMPLETED, belum ada → NEED_PROOF (wajib upload)
+        status: finalProof ? "COMPLETED" : "NEED_PROOF",
+        proof_photo_url: finalProof,
         completed_at: actualEnd,
         duration_minutes: durationMins,
         total_pay: calculatedPay,

@@ -296,14 +296,14 @@ function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
 const STATUS_CONFIG: Record<string, {
   label: string; icon: string; bg: string; text: string; border: string; dot: string;
 }> = {
-  PENDING:    { label: "Pending",          icon: "⏳", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   dot: "bg-amber-400"   },
-  APPROVED:   { label: "Disetujui",        icon: "✅", bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",  dot: "bg-violet-500"  },
-  ONGOING:    { label: "Berjalan",         icon: "🟢", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  COMPLETED:  { label: "Selesai",          icon: "🏁", bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    dot: "bg-blue-500"    },
+  PENDING: { label: "Pending", icon: "⏳", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
+  APPROVED: { label: "Disetujui", icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  ONGOING: { label: "Berjalan", icon: "🟢", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
+  COMPLETED: { label: "Selesai", icon: "🏁", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
   // ✅ Status baru: wajib upload foto sebelum dianggap selesai
-  NEED_PROOF: { label: "Wajib Upload Foto", icon: "📸", bg: "bg-orange-50",  text: "text-orange-700",  border: "border-orange-200",  dot: "bg-orange-500"  },
-  REJECTED:   { label: "Ditolak",          icon: "✕",  bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     dot: "bg-red-500"     },
-  CANCELLED:  { label: "Dibatalkan",       icon: "⊘",  bg: "bg-gray-100",   text: "text-gray-500",    border: "border-gray-200",    dot: "bg-gray-400"    },
+  NEED_PROOF: { label: "Wajib Upload Foto", icon: "📸", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+  REJECTED: { label: "Ditolak", icon: "✕", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
+  CANCELLED: { label: "Dibatalkan", icon: "⊘", bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
 };
 
 function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
@@ -551,10 +551,10 @@ function ApproveModal({ overtime, onClose, onSaved }: {
 
 // ── RequestOvertimeModal ──────────────────────────────────────────────────────
 const REASON_OPTIONS = [
-  { value: "Tugas Mendesak",         icon: "🔴", desc: "Ada tugas yang harus diselesaikan segera" },
-  { value: "Pekerjaan Belum Selesai",icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
-  { value: "Permintaan Atasan",      icon: "🔵", desc: "Diminta langsung oleh atasan" },
-  { value: "Lainnya",                icon: "✏️", desc: "Alasan lain di luar opsi di atas" },
+  { value: "Tugas Mendesak", icon: "🔴", desc: "Ada tugas yang harus diselesaikan segera" },
+  { value: "Pekerjaan Belum Selesai", icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
+  { value: "Permintaan Atasan", icon: "🔵", desc: "Diminta langsung oleh atasan" },
+  { value: "Lainnya", icon: "✏️", desc: "Alasan lain di luar opsi di atas" },
 ] as const;
 
 function RequestOvertimeModal({ onClose, onSaved, currentUser }: {
@@ -1570,12 +1570,12 @@ export default function OvertimePage() {
     : [];
 
   const statCards = [
-    { label: "Total",        value: overtimes.length,                                               icon: "📋", accent: "from-gray-700 to-gray-900"     },
-    { label: "Pending",      value: overtimes.filter((o) => o.status === "PENDING").length,         icon: "⏳", accent: "from-amber-500 to-amber-600"   },
-    { label: "Ongoing",      value: overtimes.filter((o) => o.status === "ONGOING").length,         icon: "🟢", accent: "from-emerald-500 to-emerald-700"},
+    { label: "Total", value: overtimes.length, icon: "📋", accent: "from-gray-700 to-gray-900" },
+    { label: "Pending", value: overtimes.filter((o) => o.status === "PENDING").length, icon: "⏳", accent: "from-amber-500 to-amber-600" },
+    { label: "Ongoing", value: overtimes.filter((o) => o.status === "ONGOING").length, icon: "🟢", accent: "from-emerald-500 to-emerald-700" },
     // ✅ Stat card khusus NEED_PROOF agar admin bisa langsung lihat berapa yang belum upload foto
-    { label: "Butuh Foto",   value: overtimes.filter((o) => o.status === "NEED_PROOF").length,      icon: "📸", accent: "from-orange-500 to-orange-600"  },
-    { label: "Selesai",      value: overtimes.filter((o) => o.status === "COMPLETED").length,       icon: "🏁", accent: "from-blue-500 to-blue-700"      },
+    { label: "Butuh Foto", value: overtimes.filter((o) => o.status === "NEED_PROOF").length, icon: "📸", accent: "from-orange-500 to-orange-600" },
+    { label: "Selesai", value: overtimes.filter((o) => o.status === "COMPLETED").length, icon: "🏁", accent: "from-blue-500 to-blue-700" },
   ];
 
   const renderActions = (o: OvertimeRequest) => (
@@ -1593,13 +1593,13 @@ export default function OvertimePage() {
         canApproveRole(currentUser?.role) ||
         currentUser?.id === o.user_id
       ) && (
-        <button
-          onClick={() => setProofPhotoData(o)}
-          className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
-        >
-          👁️ Lihat Foto
-        </button>
-      )}
+          <button
+            onClick={() => setProofPhotoData(o)}
+            className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"
+          >
+            👁️ Lihat Foto
+          </button>
+        )}
       {canSetPay(currentUser?.role) && (o.status === "COMPLETED" || o.status === "NEED_PROOF") && (
         <button
           onClick={() => setSetPayData(o)}
@@ -1609,7 +1609,8 @@ export default function OvertimePage() {
         </button>
       )}
       {/* ✅ Tombol Selesai untuk karyawan yang masih ONGOING */}
-      {!canApproveRole(currentUser?.role) && currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && o.rate_per_hour && (
+      {/* ✅ Tombol Selesai untuk owner yang masih ONGOING (boleh selesai lebih awal) */}
+      {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && (
         <button
           onClick={() => setCompleteData(o)}
           className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all active:scale-95 whitespace-nowrap shadow-sm"

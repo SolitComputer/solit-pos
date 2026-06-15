@@ -961,7 +961,6 @@ export default function Page() {
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
                                                 <Th right>Tersedia</Th>
-                                                <Th right>Tersedia</Th>
                                                 {canViewTotalStok && <Th right>Total Stok</Th>}
                                                 <Th>Status</Th>
                                                 <Th right>Aksi</Th>
@@ -1010,22 +1009,23 @@ export default function Page() {
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                                                             {fmt(item.selling_price)}
                                                         </td>
-                                                        {/* Stok Tersedia (SIAP_JUAL) */}
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-semibold ${(item.stok_tersedia ?? 0) === 0
+                                                                ? "bg-red-50 text-red-500"
+                                                                : "bg-green-50 text-green-700"
+                                                                }`}>
+                                                                {item.stok_tersedia ?? 0}
+                                                            </span>
+                                                        </td>
+
                                                         {canViewTotalStok && (
                                                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"}`}>
+                                                                <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"
+                                                                    }`}>
                                                                     {item.qty ?? 0}
                                                                 </span>
                                                             </td>
                                                         )}
-
-                                                        {/* Total Stok (semua unit) */}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"
-                                                                }`}>
-                                                                {item.qty ?? 0}
-                                                            </span>
-                                                        </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             {s ? (
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -1095,27 +1095,25 @@ export default function Page() {
                                             )}
                                         </p>
                                         <div className="flex items-center gap-4">
-                                            {/* ← TAMBAH block ini */}
                                             <div className="text-right">
                                                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Tersedia</p>
                                                 <p className="text-sm font-bold text-green-700">
                                                     {filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0)} unit
                                                 </p>
                                             </div>
-                                            <div className="w-px h-8 bg-gray-200" />
 
-                                            {/* Yang sudah ada */}
                                             {canViewTotalStok && (
                                                 <>
+                                                    <div className="w-px h-8 bg-gray-200" />
                                                     <div className="text-right">
                                                         <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
                                                         <p className="text-sm font-bold text-gray-700">
                                                             {filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0)} unit
                                                         </p>
                                                     </div>
-                                                    <div className="w-px h-8 bg-gray-200" />
                                                 </>
                                             )}
+
                                             <div className="w-px h-8 bg-gray-200" />
                                             <div className="text-right">
                                                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Nilai Jual</p>
