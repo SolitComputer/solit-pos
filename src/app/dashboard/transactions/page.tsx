@@ -88,8 +88,25 @@ const formatDateTime = (date: string) =>
 
 function getPaymentStyle(method: string): { text: string; icon: React.ReactNode; bg: string } {
   const m = (method ?? "").toUpperCase();
-  if (m.includes("TUNAI") || m.includes("CASH")) return { text: "💰 Tunai", bg: "emerald", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg> };
-  if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI")) return { text: "🏦 Transfer", bg: "blue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /></svg> };
+
+  const hasCash = m.includes("TUNAI") || m.includes("CASH");
+  const hasTransfer = m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI");
+
+  if (hasTransfer && hasCash) {
+    return {
+      text: "🏦💰 TF + Tunai",
+      bg: "teal",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M16 3h5v5" /><path d="M21 3l-6 6" />
+          <path d="M8 21H3v-5" /><path d="M3 21l6-6" />
+        </svg>
+      ),
+    };
+  }
+
+  if (hasCash) return { text: "💰 Tunai", bg: "emerald", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg> };
+  if (hasTransfer) return { text: "🏦 Transfer", bg: "blue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /></svg> };
   if (m.includes("QRIS") || m.includes("QR")) return { text: "📱 QRIS", bg: "purple", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /></svg> };
   return { text: method || "-", bg: "gray", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /></svg> };
 }
@@ -1272,7 +1289,7 @@ function TransactionDetailModal({
                 <span className="text-xs text-gray-500">Total Harga Jual</span>
                 <span className="text-sm font-bold text-gray-900 font-mono">Rp{totalDeal.toLocaleString("id-ID")}</span>
               </div>
-              {item.dp_amount && Number(item.dp_amount) > 0 && (
+              {Number(item.dp_amount) > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">DP</span>
                   <span className="text-sm font-bold text-blue-700 font-mono">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
