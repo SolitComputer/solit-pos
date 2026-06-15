@@ -48,5 +48,7 @@ export const GET = withAuth(handler, [
   "KEPALA_PENYEDIA_BARANG",
   "KONTEN",
   "KEPALA_ONPOINT",   
-  "ONPOINT",          
+  "ONPOINT",   
+  "KEPALA_TEKNISI", 
+  "TEKNISI",      
 ]);

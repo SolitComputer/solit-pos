@@ -68,5 +68,5 @@ async function putHandler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(handler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG", "TEKNISI"]);
-export const PUT = withAuth(putHandler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG", "TEKNISI"]);
+export const GET = withAuth(handler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"]);
+export const PUT = withAuth(putHandler, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"]);
