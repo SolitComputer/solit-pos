@@ -104,6 +104,21 @@ type SwapDayOff = {
 type UserInfo = { id: string; name: string; role: string };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
+type AttendanceDetailItem = {
+    date: string;
+    type: "PRESENT" | "LATE";
+    checkInTime: string;
+    method: string;
+    notes?: string | null;
+    manualCreatedBy?: string | null;
+};
+
+type AttendanceSummaryDetail = {
+    name: string;
+    type: "present" | "late";
+    items: AttendanceDetailItem[];
+    monthLabel: string;
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = -6.402593;
@@ -1375,6 +1390,89 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
     );
 }
 
+function AttendanceSummaryDetailModal({ detail, onClose }: {
+    detail: AttendanceSummaryDetail;
+    onClose: () => void;
+}) {
+    const isPresent = detail.type === "present";
+    const headerColor = isPresent
+        ? "bg-gradient-to-r from-emerald-600 to-green-700"
+        : "bg-gradient-to-r from-amber-500 to-orange-600";
+    const title = isPresent ? "✅ Detail Hari Tepat Waktu" : "⏰ Detail Hari Terlambat";
+
+    const fmt = (d: string) =>
+        new Date(d + "T12:00:00").toLocaleDateString("id-ID", {
+            weekday: "long", day: "numeric", month: "long",
+        });
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className={`${headerColor} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
+                    <div>
+                        <p className="font-bold text-white text-base">{title}</p>
+                        <p className="text-xs text-white/70 mt-1">{detail.name} · {detail.monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">
+                        {isPresent ? "Hari tepat waktu" : "Hari terlambat"} ({detail.items.length})
+                    </p>
+                    {detail.items.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Tidak ada data</p>
+                    ) : (
+                        detail.items.map(item => (
+                            <div
+                                key={item.date}
+                                className={`flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 border ${isPresent
+                                    ? "bg-emerald-50/60 border-emerald-100"
+                                    : "bg-amber-50/60 border-amber-100"
+                                    }`}
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-gray-800">{fmt(item.date)}</p>
+                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                        <span className="font-mono text-[11px] font-bold text-gray-600">
+                                            🕐 {item.checkInTime}
+                                        </span>
+                                        {item.method === "MANUAL" && (
+                                            <span className="text-[10px] text-blue-600 font-bold">✏️ Manual</span>
+                                        )}
+                                        {item.manualCreatedBy && (
+                                            <span className="text-[10px] text-violet-500 font-semibold">
+                                                oleh {item.manualCreatedBy}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${isPresent
+                                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-100 text-amber-700 border-amber-200"
+                                    }`}>
+                                    {isPresent ? "✅ Tepat" : "⏰ Terlambat"}
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 type SalarySlip = {
     id: string;
     user_id: string;
@@ -1921,7 +2019,7 @@ export default function AttendanceDashboardPage() {
     const [usersLoading, setUsersLoading] = useState(false);
     const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
-
+    const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -2466,6 +2564,80 @@ export default function AttendanceDashboardPage() {
         }
     }, [salaryMap, allowanceMap, overtimeTotal, calYear, calMonth]);
 
+    const buildAttendanceDetail = useCallback((
+        userName: string,
+        type: "present" | "late"
+    ): AttendanceSummaryDetail => {
+        const targetStatus = type === "present" ? "PRESENT" : "LATE";
+        const items: AttendanceDetailItem[] = [];
+        const dim = new Date(calYear, calMonth + 1, 0).getDate();
+        const todayWIB = getWIBToday();
+
+        const userIdByName: Record<string, string> = {};
+        allUsers.forEach(u => { userIdByName[u.name] = u.id; });
+        const userId = userIdByName[userName] ?? "";
+
+        // Build manual record lookup untuk user ini
+        const manualByDate: Record<string, ManualAttendance> = {};
+        manualRecords.forEach(mr => {
+            if (mr.user_id === userId && mr.attendance_date.startsWith(thisMonthKey)) {
+                manualByDate[mr.attendance_date] = mr;
+            }
+        });
+
+        // Build auto attendance lookup untuk user ini
+        const autoByDate: Record<string, Attendance> = {};
+        thisMonthAtt.forEach(a => {
+            if (a.user_name === userName && a.source === "AUTO") {
+                const dk = toWIBDateKey(a.check_in_time || a.created_at);
+                autoByDate[dk] = a;
+            }
+        });
+
+        for (let d = 1; d <= dim; d++) {
+            const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
+            if (dk > todayWIB) break;
+
+            // Cek apakah hari ini libur
+            if (isDayOffForUser(userName, dk)) continue;
+
+            const manualRec = manualByDate[dk];
+            const autoRec = autoByDate[dk];
+
+            let dayStatus: "PRESENT" | "LATE" | null = null;
+            let checkInTime = "";
+            let method = "FACE";
+            let manualCreatedBy: string | null = null;
+
+            if (manualRec) {
+                if (manualRec.status === "PRESENT") dayStatus = "PRESENT";
+                else if (manualRec.status === "LATE") dayStatus = "LATE";
+                method = "MANUAL";
+                checkInTime = toWIBTime(manualRec.check_in_time);
+                manualCreatedBy = manualRec.created_by_name ?? null;
+            } else if (autoRec) {
+                dayStatus = autoRec.displayStatus === "PRESENT"
+                    ? "PRESENT"
+                    : autoRec.displayStatus === "LATE"
+                        ? "LATE"
+                        : null;
+                checkInTime = toWIBTime(autoRec.check_in_time || autoRec.created_at);
+                method = "FACE";
+            }
+
+            if (dayStatus === targetStatus) {
+                items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy });
+            }
+        }
+
+        return {
+            name: userName,
+            type,
+            items,
+            monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
+        };
+    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser]);
+
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!document.hidden && selectedMonth) {
@@ -2976,8 +3148,32 @@ export default function AttendanceDashboardPage() {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.present}</span></td>
-                                                    <td className="px-4 py-4 text-center">{u.late > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200">{u.late}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.present > 0 ? (
+                                                            <button
+                                                                onClick={() => setAttendanceSummaryDetail(buildAttendanceDetail(u.name, "present"))}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200 hover:bg-emerald-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail hari tepat waktu ${u.name}`}
+                                                            >
+                                                                {u.present}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.late > 0 ? (
+                                                            <button
+                                                                onClick={() => setAttendanceSummaryDetail(buildAttendanceDetail(u.name, "late"))}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 text-amber-700 text-sm font-black border border-amber-200 hover:bg-amber-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail hari terlambat ${u.name}`}
+                                                            >
+                                                                {u.late}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
                                                     <td className="px-4 py-4 text-center">
                                                         {absent > 0 ? (
                                                             <button
@@ -3895,17 +4091,16 @@ export default function AttendanceDashboardPage() {
                 && (
                     <LeaveModal users={allUsers} leaveData={leaveData} calYear={calYear} calMonth={calMonth} onClose={() => setShowLeaveModal(false)} onSaved={() => { fetchLeaveData(calYear, calMonth); }} />
                 )}
-            {showShiftModal && isAdminRole(currentUser?.role)
-                && (
-                    <ShiftConfigModal
-                        users={allUsers}
-                        initialUserId={shiftModalUserId}
-                        onClose={() => {
-                            setShowShiftModal(false);
-                            setShiftModalUserId(undefined);
-                        }}
-                    />
-                )}
+            {showShiftModal && canManage && (
+                <ShiftConfigModal
+                    users={allUsers}
+                    initialUserId={shiftModalUserId}
+                    onClose={() => {
+                        setShowShiftModal(false);
+                        setShiftModalUserId(undefined);
+                    }}
+                />
+            )}
             {editSalaryUser && isAdminRole(currentUser?.role)
                 && (
                     <InlineSalaryEditModal
@@ -3952,6 +4147,12 @@ export default function AttendanceDashboardPage() {
                         fetchAllDateWorks();
                         fetchDayOffs();
                     }}
+                />
+            )}
+            {attendanceSummaryDetail && (
+                <AttendanceSummaryDetailModal
+                    detail={attendanceSummaryDetail}
+                    onClose={() => setAttendanceSummaryDetail(null)}
                 />
             )}
             <style jsx global>{`
