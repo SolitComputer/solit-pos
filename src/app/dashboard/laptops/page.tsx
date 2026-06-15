@@ -27,6 +27,7 @@ interface Laptop {
     condition_note: string;
     selling_price: number;
     qty: number;
+    stok_tersedia: number;
     status: string;
     ready_to_sell: boolean;
     notes: string;
@@ -373,10 +374,14 @@ export default function Page() {
         try {
             const res = await fetch("/api/laptops");
             const result = await res.json();
+            // SESUDAH
             const normalized = (result.data || []).map((l: Laptop) => ({
                 ...l,
                 selling_price: Math.round(Number(l.selling_price) || 0),
-                qty: Number(l.qty) || 0,
+                qty: (l.laptop_units || []).length,
+                stok_tersedia: (l.laptop_units || []).filter(
+                    (u: LaptopUnit) => u.status === "SIAP_JUAL"
+                ).length,
             }));
             setLaptops(normalized);
         } catch {
@@ -658,7 +663,7 @@ export default function Page() {
                 }
             });
         });
-        
+
 
         const buffer = await wb.xlsx.writeBuffer();
         const blob = new Blob([buffer], {
@@ -952,7 +957,8 @@ export default function Page() {
                                                 <Th>GPU</Th>
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
-                                                <Th right>Stok</Th>
+                                                <Th right>Tersedia</Th>
+                                                <Th right>Total Stok</Th>
                                                 <Th>Status</Th>
                                                 <Th right>Aksi</Th>
                                             </tr>
@@ -1000,8 +1006,20 @@ export default function Page() {
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap">
                                                             {fmt(item.selling_price)}
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right">
-                                                            <span className={`font-medium ${(item.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>
+                                                        {/* Stok Tersedia (SIAP_JUAL) */}
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-semibold ${(item.stok_tersedia ?? 0) === 0
+                                                                ? "bg-red-50 text-red-500"
+                                                                : "bg-green-50 text-green-700"
+                                                                }`}>
+                                                                {item.stok_tersedia ?? 0}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* Total Stok (semua unit) */}
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`text-sm font-medium ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-600"
+                                                                }`}>
                                                                 {item.qty ?? 0}
                                                             </span>
                                                         </td>
@@ -1074,6 +1092,16 @@ export default function Page() {
                                             )}
                                         </p>
                                         <div className="flex items-center gap-4">
+                                            {/* ← TAMBAH block ini */}
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Tersedia</p>
+                                                <p className="text-sm font-bold text-green-700">
+                                                    {filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0)} unit
+                                                </p>
+                                            </div>
+                                            <div className="w-px h-8 bg-gray-200" />
+
+                                            {/* Yang sudah ada */}
                                             <div className="text-right">
                                                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">Total Stok</p>
                                                 <p className="text-sm font-bold text-gray-700">
@@ -1567,8 +1595,8 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                            {["Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga Jual", "Stok", "Status", "Aksi"].map(h => (
-                                <th key={h} className="px-4 py-3 text-left">
+                            {["Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga Jual", "Tersedia", "Stok", "Status", "Aksi"].map(h => (
+                                <th key={h} className="px-4 py-3">
                                     <Shimmer w={80} h={11} />
                                 </th>
                             ))}
@@ -1584,6 +1612,7 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={80} h={13} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={55} h={13} /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={14} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={32} h={22} r="99px" /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={14} /></div></td>
                                 <td className="px-4 py-3.5"><Shimmer w={70} h={24} r="99px" /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end gap-2"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
