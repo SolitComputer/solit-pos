@@ -1,5 +1,5 @@
-// src/components/layout/Sidebar.tsx - COMPLETE FIX
 "use client";
+// src/components/layout/Sidebar.tsx
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -133,6 +133,22 @@ const Icons = {
       <polyline points="8 6 2 12 8 18" />
     </svg>
   ),
+  // ✅ NEW: Service icons
+  serviceQueue: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+    </svg>
+  ),
+  serviceDone: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  serviceHistory: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5"/>
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -173,7 +189,17 @@ const ADMIN_TRANSAKSI: MenuGroup = {
   ],
 };
 
-// SALES family overview (accepts extra items after Absensi+Lembur)
+// ✅ NEW: Menu group servis
+const SERVICE_MENU: MenuGroup = {
+  label: "Servis",
+  items: [
+    { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
+    { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
+    { name: "Riwayat Servis", href: "/dashboard/service/history", icon: Icons.serviceHistory },
+  ],
+};
+
+// SALES family overview
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
@@ -206,7 +232,7 @@ const SALES_TRANSAKSI: MenuGroup = {
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── Full access ───────────────────────────────────────────────────────────
-  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI],
+  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU], // ✅ +SERVICE
 
   PROGRAMMER: [
     {
@@ -223,6 +249,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS,
     ADMIN_TRANSAKSI,
+    SERVICE_MENU, // ✅
   ],
 
   ASISTEN_CEO: [
@@ -240,6 +267,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS,
     ADMIN_TRANSAKSI,
+    SERVICE_MENU, // ✅
   ],
 
   // ── Sales family ──────────────────────────────────────────────────────────
@@ -271,6 +299,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
+    SERVICE_MENU, // ✅ Teknisi bisa lihat antrian servis
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -292,6 +321,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
+    SERVICE_MENU, // ✅ Kepala Teknisi bisa akses + buat formulir
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -387,7 +417,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // ── Supplier (Penyedia Barang) ────────────────────────────────────────────
   PENYEDIA_BARANG: [
     {
       label: "Overview",
@@ -436,14 +465,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // ── Content Creator ───────────────────────────────────────────────────────
   KONTEN: [
     {
       label: "Overview",
-      items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-      ],
+      items: [ITEM_ABSENSI, ITEM_LEMBUR],
     },
     {
       label: "Inventaris",
@@ -458,6 +483,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
+  ],
+
+  // ✅ NEW: Customer Service — bisa buat formulir + lihat semua servis
+  CUSTOMER_SERVICE: [
+    {
+      label: "Overview",
+      items: [ITEM_ABSENSI, ITEM_LEMBUR],
+    },
+    SERVICE_MENU,
   ],
 };
 
@@ -480,16 +514,16 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
   KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
   KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
-  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },   // ✅ NEW
-  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" }, // ✅ NEW
+  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
+  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
+  CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" }, // ✅ NEW
 };
 
 function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-// ── NavItem ───────────────────────────────────────────────────────────────────
 function NavItem({ item, isActive, onClick }: {
   item: MenuItem; isActive: boolean; onClick?: () => void;
 }) {
@@ -507,7 +541,6 @@ function NavItem({ item, isActive, onClick }: {
   );
 }
 
-// ── SidebarContent ────────────────────────────────────────────────────────────
 function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
   onClose?: () => void; onLogout: () => void;
@@ -517,7 +550,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-      {/* ── Logo + User ── */}
+      {/* Logo + User */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
@@ -565,7 +598,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
       <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
-      {/* ── Nav ── */}
+      {/* Nav */}
       <nav
         className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-3"
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
@@ -584,18 +617,12 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
               </p>
               <div className="space-y-0.5">
                 {group.items.map(item => {
-                  // ── Active state logic ──────────────────────────────────
                   const isActive = (() => {
-                    // Exact match
                     if (pathname === item.href) return true;
-                    // /dashboard hanya exact, tidak prefix
                     if (item.href === "/dashboard") return false;
-                    // Absensi: aktif hanya jika PERSIS /dashboard/attendance
-                    // (bukan sub-route seperti /overtime)
                     if (item.href === "/dashboard/attendance") {
                       return pathname === "/dashboard/attendance";
                     }
-                    // /dashboard/laptops: exclude sub-pages ready & minus
                     if (item.href === "/dashboard/laptops") {
                       return (
                         pathname === "/dashboard/laptops" ||
@@ -604,7 +631,10 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
                           !pathname.startsWith("/dashboard/laptops/minus"))
                       );
                     }
-                    // Default: prefix match
+                    // ✅ Service routes: exact match untuk sub-pages
+                    if (item.href.startsWith("/dashboard/service/")) {
+                      return pathname === item.href;
+                    }
                     return pathname.startsWith(item.href);
                   })();
 
@@ -623,7 +653,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
         )}
       </nav>
 
-      {/* ── Logout ── */}
+      {/* Logout */}
       <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
         <button onClick={onLogout}
           className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all">
@@ -635,7 +665,6 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
   );
 }
 
-// ── Sidebar (main export) ─────────────────────────────────────────────────────
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<any>(() => getCachedUser());
@@ -659,7 +688,6 @@ export default function Sidebar() {
     fetchUser();
   }, []);
 
-  // Close mobile sidebar on route change
   useEffect(() => { setOpen(false); }, [pathname]);
 
   const handleLogout = async () => {
@@ -676,7 +704,6 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
@@ -688,20 +715,17 @@ export default function Sidebar() {
         </svg>
       </button>
 
-      {/* Mobile overlay */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Mobile drawer */}
       <aside
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden">
         <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} />
       </aside>
