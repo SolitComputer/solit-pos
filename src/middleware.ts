@@ -7,11 +7,11 @@ import {
   UserRole,
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
- 
+
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
- 
+
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -21,29 +21,29 @@ const FACE_API_WHITELIST = [
   "/api/auth/login",
   "/api/presence", // ✅ NEW: presence heartbeat route
 ];
- 
+
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
- 
+
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
 }
- 
+
 const SYSTEM_OPEN_HOUR = 6;
 const SYSTEM_CLOSE_HOUR = 22;
- 
+
 function isWithinSystemHours(): boolean {
   const nowUTC = new Date();
   const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
   const hour = nowWIB.getUTCHours();
   return hour >= SYSTEM_OPEN_HOUR && hour < SYSTEM_CLOSE_HOUR;
 }
- 
+
 function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
-  const faceAttended    = request.cookies.get("face_attended")?.value;
-  const faceVerified    = request.cookies.get("face_verified")?.value;
+  const faceAttended = request.cookies.get("face_attended")?.value;
+  const faceVerified = request.cookies.get("face_verified")?.value;
   const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-  const dayOffToday     = request.cookies.get("day_off_today")?.value;
+  const dayOffToday = request.cookies.get("day_off_today")?.value;
   return (
     faceAttended === userId ||
     faceVerified === userId ||
@@ -51,7 +51,7 @@ function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
     dayOffToday === userId
   );
 }
- 
+
 // ─── Cookie helper ─────────────────────────────────────────────────────────────
 const SESSION_COOKIES = [
   "token",
@@ -60,7 +60,7 @@ const SESSION_COOKIES = [
   "attendance_skipped",
   "day_off_today",
 ];
- 
+
 function clearSessionAndRedirect(url: URL): NextResponse {
   const response = NextResponse.redirect(url);
   for (const name of SESSION_COOKIES) {
@@ -74,7 +74,7 @@ function clearSessionAndRedirect(url: URL): NextResponse {
   }
   return response;
 }
- 
+
 // ─── Auto-logout 03:00 WIB threshold ──────────────────────────────────────────
 function getAutoLogoutThreshold(): number {
   const nowUTC = Date.now();
@@ -89,11 +89,11 @@ function getAutoLogoutThreshold(): number {
     : Date.UTC(y, mo, d - 1, -4, 0, 0);
   return Math.floor(thresholdUTC / 1000);
 }
- 
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
- 
+
   // ── Public routes ────────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
@@ -111,44 +111,44 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.next();
   }
- 
+
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
- 
+
   if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
- 
+
   if (pathname.startsWith("/face-verify")) {
     if (!token) return NextResponse.redirect(new URL("/login", request.url));
     return NextResponse.next();
   }
- 
+
   if (PUBLIC_API_ROUTES.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
- 
+
   if (FACE_API_WHITELIST.some(p => pathname.startsWith(p))) {
     if (!token) return NextResponse.json({ success: false }, { status: 401 });
     return NextResponse.next();
   }
- 
+
   if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
- 
+
   // ── Verifikasi JWT ───────────────────────────────────────────────────────────
   const user = await verifyToken(token);
   if (!user) {
     return clearSessionAndRedirect(new URL("/login", request.url));
   }
- 
+
   // ── Hanya check auto-logout & force-logout untuk page routes ────────────────
   const isPageRoute = !pathname.startsWith("/api/");
- 
+
   if (isPageRoute) {
     // Check 1: Auto-logout jam 03:00 WIB
     const issuedAt: number = (user as any).iat ?? 0;
@@ -158,7 +158,7 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("reason", "session_expired");
       return clearSessionAndRedirect(loginUrl);
     }
- 
+
     // Check 2: Admin force-logout
     try {
       const supabase = createClient(
@@ -171,7 +171,7 @@ export async function middleware(request: NextRequest) {
         .select("force_logout_at")
         .eq("id", (user as any).id)
         .maybeSingle();
- 
+
       if (userRecord?.force_logout_at) {
         const forceLogoutAtSec = new Date(userRecord.force_logout_at).getTime() / 1000;
         if (issuedAt < forceLogoutAtSec) {
@@ -184,7 +184,7 @@ export async function middleware(request: NextRequest) {
       // DB error → lanjut saja (fail-open)
     }
   }
- 
+
   // ── Attendance check ─────────────────────────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
@@ -195,12 +195,12 @@ export async function middleware(request: NextRequest) {
       );
     }
   }
- 
+
   // ── Route permission check ───────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
- 
+
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     if (!allowed.includes(user.role as UserRole)) {
@@ -209,7 +209,7 @@ export async function middleware(request: NextRequest) {
       );
     }
   }
- 
+
   // ── Pass headers ke downstream ───────────────────────────────────────────────
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
@@ -217,7 +217,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-user-name", user.name);
   return response;
 }
- 
+
 export const config = {
   matcher: [
     "/dashboard/:path*",
@@ -235,6 +235,7 @@ export const config = {
     "/api/reports/:path*",
     "/dashboard/warranty/:path*",
     "/api/attendance/:path*",
-    "/api/presence", // ✅ NEW
+    "/api/messages/:path*", // ✅ NEW
+    "/api/presence",
   ],
 };

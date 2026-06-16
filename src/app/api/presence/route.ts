@@ -24,11 +24,11 @@ export async function POST(request: NextRequest) {
       .from("user_presence")
       .upsert(
         {
-          user_id:      user.id,
-          user_name:    user.name,
-          user_role:    user.role,
+          user_id: user.id,
+          user_name: user.name,
+          user_role: user.role,
           current_page: page,
-          last_seen:    new Date().toISOString(),
+          last_seen: new Date().toISOString(),
         },
         { onConflict: "user_id" }
       );
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── GET: Ambil semua user + merge dengan presence data (admin only) ─────────
+// ─── GET: Ambil semua user + merge dengan presence data ──────────────────────
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -53,13 +54,9 @@ export async function GET() {
       return NextResponse.json({ success: false }, { status: 401 });
     }
 
-    const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
-    if (!FULL_ACCESS.includes(user.role)) {
-      return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
-    }
+    // ✅ HAPUS guard FULL_ACCESS — semua role yang login boleh lihat data presence
+    // Data yang dikembalikan tidak sensitif (hanya nama, role, status online, halaman aktif)
 
-    // ✅ FIX: Ambil SEMUA user dari tabel users (bukan hanya yang ada di presence)
-    // Fetch parallel: semua users + semua presence data
     const [usersResult, presenceResult] = await Promise.all([
       supabase
         .from("users")
@@ -76,9 +73,8 @@ export async function GET() {
     }
 
     const now = Date.now();
-    const ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 menit
+    const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 
-    // Buat map presence: user_id → presence record
     const presenceMap = new Map<string, { current_page: string; last_seen: string }>();
     for (const p of presenceResult.data ?? []) {
       presenceMap.set(p.user_id, {
@@ -87,7 +83,6 @@ export async function GET() {
       });
     }
 
-    // ✅ Merge: setiap user pasti masuk, presence optional
     const merged = (usersResult.data ?? []).map((u: any) => {
       const presence = presenceMap.get(u.id);
       const last_seen = presence?.last_seen ?? null;
@@ -99,9 +94,9 @@ export async function GET() {
         : false;
 
       return {
-        user_id:      u.id,
-        user_name:    u.name,
-        user_role:    u.role,
+        user_id: u.id,
+        user_name: u.name,
+        user_role: u.role,
         current_page: presence?.current_page ?? null,
         last_seen,
         is_online,

@@ -503,7 +503,7 @@ export default function PendingOrdersPage() {
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
 
     const canConfirm = userRole
-        ? (["ADMIN", "KEPALA_SALES", "CREW_SALES"] as UserRole[]).includes(userRole)
+        ? (["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES"] as UserRole[]).includes(userRole)
         : false;
 
     useEffect(() => {
@@ -780,9 +780,9 @@ export default function PendingOrdersPage() {
                     onSuccess={() => {
                         const inv = confirmPaymentTx.invoice_number;
                         setAlertModal(`✅ Transaksi ${inv} berhasil dilunasi!`);
-                        fetchData();        
-                        fetchHistory();    
-                        setActiveTab("history"); 
+                        fetchData();
+                        fetchHistory();
+                        setActiveTab("history");
                     }} />
             )}
             {detailTx && <DetailModal tx={detailTx} onClose={() => setDetailTx(null)} />}

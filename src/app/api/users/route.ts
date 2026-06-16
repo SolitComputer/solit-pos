@@ -18,15 +18,27 @@ function normalizePhone(raw: string): string {
 }
 
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  if (!isFullAccess(user.role)) {
-    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
-  }
+  const FULL_ACCESS_SET = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+  const KEPALA_SET = new Set([
+    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+  ]);
+
+  const isAdmin = FULL_ACCESS_SET.has(user.role);
+  const isKepala = KEPALA_SET.has(user.role);
+
+  // ✅ Admin → semua field lengkap
+  // ✅ Kepala → nama, role, shift, phone (tapi tidak ada face/password/force_logout info)
+  // ✅ Lainnya → hanya nama dan role
+  const selectFields = isAdmin
+    ? "id, name, phone_number, email, role, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
+    : isKepala
+      ? "id, name, phone_number, role, shift"
+      : "id, name, role";
 
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select(
-      "id, name, phone_number, email, role, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
-    )
+    .select(selectFields)
     .order("role")
     .order("name");
 
@@ -37,10 +49,14 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const users = (data ?? []).map((u: any) => ({
     ...u,
     shift: u.shift ?? "PAGI",
-    password_set: u.password_set ?? false,
-    face_embedding: u.face_embedding !== null && u.face_embedding !== undefined,
-    // ✅ Include force_logout_at untuk UI tahu apakah user ini sedang "force-logged-out"
-    force_logout_at: u.force_logout_at ?? null,
+    password_set: isAdmin ? (u.password_set ?? false) : false,
+    face_embedding: isAdmin
+      ? (u.face_embedding !== null && u.face_embedding !== undefined)
+      : false,
+    force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
+    phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
+    // Kepala tidak dapat email
+    email: isAdmin ? (u.email ?? null) : null,
   }));
 
   return NextResponse.json({ success: true, users });
@@ -222,7 +238,7 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
   return NextResponse.json({ success: true });
 }
 
-export const GET    = withAuth(getHandler);
-export const POST   = withAuth(postHandler);
-export const PUT    = withAuth(putHandler);
+export const GET = withAuth(getHandler);
+export const POST = withAuth(postHandler);
+export const PUT = withAuth(putHandler);
 export const DELETE = withAuth(deleteHandler);

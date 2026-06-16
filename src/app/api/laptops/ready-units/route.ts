@@ -61,4 +61,5 @@ export const GET = withAuth(handler, [
   "KONTEN",
   "TEKNISI",
   "KEPALA_TEKNISI",
+  "PKL",
 ]);

@@ -97,17 +97,17 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       // Buat warranty untuk setiap unit
       const warrantiesToInsert = units.map(u => ({
         invoice_number,
-        serial_number:     u.serial_number.toUpperCase(),
-        customer_name:     transaction.customer_name,
-        customer_phone:    transaction.customer_phone || null,
-        laptop_name:       transaction.laptop_name,
-        laptop_id:         u.laptop_id,
-        unit_id:           u.id,
-        warranty_start:    now.split("T")[0],
-        warranty_end:      warrantyEnd.toISOString().split("T")[0],
+        serial_number: u.serial_number.toUpperCase(),
+        customer_name: transaction.customer_name,
+        customer_phone: transaction.customer_phone || null,
+        laptop_name: transaction.laptop_name,
+        laptop_id: u.laptop_id,
+        unit_id: u.id,
+        warranty_start: now.split("T")[0],
+        warranty_end: warrantyEnd.toISOString().split("T")[0],
         warranty_duration: warrantyDuration,
-        status:            "ACTIVE",
-        created_by:        user.name,
+        status: "ACTIVE",
+        created_by: user.name,
       }));
 
       await supabase.from("warranties").insert(warrantiesToInsert);
@@ -187,8 +187,8 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         laptop_name: transaction.laptop_name,
         laptop_id: unit.laptop_id,
         unit_id: unit.id,
-        warranty_start:    now.split("T")[0],
-        warranty_end:      warrantyEnd.toISOString().split("T")[0],
+        warranty_start: now.split("T")[0],
+        warranty_end: warrantyEnd.toISOString().split("T")[0],
         warranty_duration: warrantyDuration,
         status: "ACTIVE",
         created_by: user.name,
@@ -215,4 +215,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-export const POST = withAuth(postHandler, PERMISSIONS.EDIT_TRANSACTION);
+export const POST = withAuth(postHandler, [
+  "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
+  "KEPALA_SALES",
+]);
