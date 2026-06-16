@@ -1,10 +1,13 @@
+// src/types/service.ts
+
 export type ServiceStatus =
   | "ANTRIAN"
   | "SEDANG_DIKERJAKAN"
   | "MENUNGGU_SPAREPART"
   | "DONE"
   | "SUDAH_DIAMBIL"
-  | "TIDAK_JADI";
+  | "TIDAK_JADI"
+  | "GAGAL_DIPERBAIKI"; // ✅ NEW
 
 export interface ServiceOrder {
   id: string;
@@ -34,6 +37,13 @@ export interface ServiceOrder {
   tanggal_selesai?: string;
   tanggal_diambil?: string;
 
+  // Payment ✅ NEW
+  payment_amount?: number;
+  payment_note?: string;
+  payment_method?: "CASH" | "TRANSFER" | "QRIS";
+  payment_confirmed_at?: string;
+  payment_by?: string;
+
   // User tracking
   created_by?: string;
   dikerjakan_by?: string;
@@ -44,6 +54,7 @@ export interface ServiceOrder {
   created_by_user?: { id: string; name: string };
   dikerjakan_by_user?: { id: string; name: string };
   diambil_by_user?: { id: string; name: string };
+  payment_by_user?: { id: string; name: string };
 
   updated_at: string;
 }
@@ -66,6 +77,7 @@ export const STATUS_LABEL: Record<ServiceStatus, string> = {
   DONE: "Selesai",
   SUDAH_DIAMBIL: "Sudah Diambil",
   TIDAK_JADI: "Tidak Jadi",
+  GAGAL_DIPERBAIKI: "Gagal Diperbaiki", // ✅
 };
 
 export const STATUS_COLOR: Record<ServiceStatus, string> = {
@@ -75,4 +87,5 @@ export const STATUS_COLOR: Record<ServiceStatus, string> = {
   DONE: "bg-green-100 text-green-800 border-green-200",
   SUDAH_DIAMBIL: "bg-gray-100 text-gray-600 border-gray-200",
   TIDAK_JADI: "bg-red-100 text-red-700 border-red-200",
+  GAGAL_DIPERBAIKI: "bg-rose-100 text-rose-700 border-rose-200", // ✅
 };
