@@ -19,14 +19,133 @@ const fmtShort = (n: number): string => {
   return `Rp ${n}`;
 };
 
+// Target gross profit harian (Rupiah) — ubah angka ini kalau target berubah
+const DAILY_PROFIT_TARGET = 5_000_000;
+
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4;
+  const pct = max > 0 ? Math.min(100, Math.max(4, (value / max) * 100)) : 4;
   return (
     <div className="w-full h-1.5 rounded-full overflow-hidden mt-3" style={{ background: "#F1F5F9" }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{ width: `${pct}%`, background: color }}
       />
+    </div>
+  );
+}
+
+function TargetStatusBanner({ profit }: { profit: number }) {
+  const met = profit >= DAILY_PROFIT_TARGET; // >= : tepat 5jt sudah dianggap tercapai
+  const pct = Math.floor(Math.min(100, (profit / DAILY_PROFIT_TARGET) * 100));
+  const diff = Math.abs(profit - DAILY_PROFIT_TARGET);
+  const achievedPct = Math.max(0, Math.floor((profit / DAILY_PROFIT_TARGET) * 100)); // display only, bisa > 100%
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl p-4"
+      style={{
+        background: met
+          ? "linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%)"
+          : "linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)",
+        border: `1px solid ${met ? "#A7F3D0" : "#FECACA"}`,
+        boxShadow: met
+          ? "0 1px 3px rgba(5,150,105,0.08), 0 10px 28px rgba(16,185,129,0.10)"
+          : "0 1px 3px rgba(220,38,38,0.08), 0 10px 28px rgba(239,68,68,0.10)",
+      }}
+    >
+      {/* Watermark dekoratif */}
+      <svg
+        className="absolute -top-5 -right-5 pointer-events-none"
+        width="128" height="128" viewBox="0 0 24 24" fill="none"
+        stroke={met ? "#10B981" : "#EF4444"} strokeWidth="1.5"
+        strokeLinecap="round" strokeLinejoin="round"
+        style={{ opacity: 0.07 }}
+      >
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
+      </svg>
+
+      {/* Header */}
+      <div className="relative flex items-center justify-between gap-3 mb-3.5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: met ? "#DCFCE7" : "#FEE2E2",
+              border: `1px solid ${met ? "#A7F3D0" : "#FECACA"}`,
+              boxShadow: met
+                ? "0 2px 8px rgba(16,185,129,0.20)"
+                : "0 2px 8px rgba(239,68,68,0.20)",
+            }}
+          >
+            {met ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#94A3B8" }}>
+              Status Target Harian
+            </p>
+            <p className="text-[15px] font-extrabold leading-tight truncate" style={{ color: met ? "#059669" : "#DC2626" }}>
+              {met ? "Melebihi Target" : "Belum Melebihi Target"}
+            </p>
+          </div>
+        </div>
+
+        {/* Persentase besar */}
+        <div className="text-right flex-shrink-0">
+          <p className="text-2xl font-extrabold leading-none tabular-nums" style={{ color: met ? "#059669" : "#DC2626" }}>
+            {achievedPct}%
+          </p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider mt-1" style={{ color: "#94A3B8" }}>
+            dari target
+          </p>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        className="relative w-full h-2.5 rounded-full overflow-hidden"
+        style={{ background: "rgba(255,255,255,0.85)", border: `1px solid ${met ? "#A7F3D0" : "#FECACA"}` }}
+      >
+        <div
+          className="h-full rounded-full transition-all duration-1000 ease-out"
+          style={{
+            width: `${Math.max(4, pct)}%`,
+            background: met
+              ? "linear-gradient(90deg, #10B981, #34D399)"
+              : "linear-gradient(90deg, #EF4444, #F87171)",
+            boxShadow: met
+              ? "0 0 8px rgba(16,185,129,0.5)"
+              : "0 0 8px rgba(239,68,68,0.5)",
+          }}
+        />
+      </div>
+
+      {/* Footer: pesan + target */}
+      <div className="relative flex items-center justify-between gap-3 mt-3">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ background: met ? "#10B981" : "#EF4444" }}
+          />
+          <p className="text-[11px] font-medium truncate" style={{ color: met ? "#059669" : "#DC2626" }}>
+            {met
+              ? diff > 0
+                ? `Surplus ${fmtRupiah(diff)} di atas target`
+                : "Tepat mencapai target"
+              : `Kurang ${fmtRupiah(diff)} lagi untuk capai target`}
+          </p>
+        </div>
+        <p className="text-[11px] font-semibold flex-shrink-0" style={{ color: "#475569" }}>
+          Target <span className="font-extrabold" style={{ color: "#0F172A" }}>{fmtShort(DAILY_PROFIT_TARGET)}</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -64,7 +183,6 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
 
   if (!isOpen) return null;
 
-  const maxDailyProfit = data ? Math.max(...data.daily.map((d) => d.gross_profit), 1) : 1;
   const maxWeeklyProfit = data ? Math.max(...data.weekly.map((w) => w.gross_profit), 1) : 1;
 
   const tabs = [
@@ -320,6 +438,9 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                   </div>
                 </div>
 
+                {/* ── Status Target Harian ── */}
+                <TargetStatusBanner profit={data.today.gross_profit} />
+
                 {/* ── Tabs ── */}
                 <div className="gpdm-tabs-wrap flex gap-1">
                   {tabs.map(({ key, label }) => (
@@ -371,7 +492,15 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                               </div>
                             </div>
                           </div>
-                          <MiniBar value={day.gross_profit} max={maxDailyProfit} color="linear-gradient(90deg, #10B981, #34D399)" />
+                          <MiniBar
+                            value={day.gross_profit}
+                            max={DAILY_PROFIT_TARGET}
+                            color={
+                              day.gross_profit >= DAILY_PROFIT_TARGET
+                                ? "linear-gradient(90deg, #10B981, #34D399)"
+                                : "linear-gradient(90deg, #EF4444, #F87171)"
+                            }
+                          />
                         </div>
                       ))
                     )}
