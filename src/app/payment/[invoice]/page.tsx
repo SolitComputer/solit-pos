@@ -628,7 +628,7 @@ export default function EditTransactionPage() {
             </Field>
             <Field label="Metode Pembayaran">
               <select name="payment_method" value={formData.payment_method || ""} onChange={handleChange} className={selectCls}>
-                {["CASH", "TRANSFER", "DP", "CICILAN", "LAINNYA"].map(m => (
+                {["CASH", "TRANSFER", "TF_CASH", "DP", "CICILAN", "LAINNYA"].map(m => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>

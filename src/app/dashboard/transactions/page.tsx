@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { createPortal } from "react-dom";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
@@ -87,8 +88,25 @@ const formatDateTime = (date: string) =>
 
 function getPaymentStyle(method: string): { text: string; icon: React.ReactNode; bg: string } {
   const m = (method ?? "").toUpperCase();
-  if (m.includes("TUNAI") || m.includes("CASH")) return { text: "💰 Tunai", bg: "emerald", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg> };
-  if (m.includes("TRANSFER") || m.includes("BCA") || m.includes("BRI")) return { text: "🏦 Transfer", bg: "blue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /></svg> };
+
+  const hasCash = m.includes("TUNAI") || m.includes("CASH");
+  const hasTransfer = m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI");
+
+  if (hasTransfer && hasCash) {
+    return {
+      text: "🏦💰 TF + Tunai",
+      bg: "teal",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M16 3h5v5" /><path d="M21 3l-6 6" />
+          <path d="M8 21H3v-5" /><path d="M3 21l6-6" />
+        </svg>
+      ),
+    };
+  }
+
+  if (hasCash) return { text: "💰 Tunai", bg: "emerald", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg> };
+  if (hasTransfer) return { text: "🏦 Transfer", bg: "blue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /></svg> };
   if (m.includes("QRIS") || m.includes("QR")) return { text: "📱 QRIS", bg: "purple", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /></svg> };
   return { text: method || "-", bg: "gray", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" /></svg> };
 }
@@ -304,7 +322,7 @@ function SerialNumberList({
   );
 }
 
-function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored }: any) {
+function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -410,31 +428,55 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         )}
 
         {/* Laptop Info */}
+        {/* Laptop Info */}
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
-          <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
-            <p className="text-xs font-bold text-gray-900 leading-snug">{item.laptop_name || "—"}</p>
-            {(item.cpu || item.ram || item.storage || item.gpu) && (
-              <div className="flex flex-wrap gap-1.5">
-                {item.cpu && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">⚙️ {item.cpu}</span>}
-                {item.ram && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">💾 {item.ram}</span>}
-                {item.storage && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">🗄️ {item.storage}</span>}
-                {/* ✅ TAMBAHAN VGA */}
-                {item.vga && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold">🎮 {item.gpu}</span>}
-              </div>
-            )}
-            {(() => {
-              const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-                ? item.serial_numbers
-                : item.serial_number ? [item.serial_number] : [];
-              if (sns.length === 0) return null;
+          {(() => {
+            const grouped: any[] = item.grouped_items ?? [];
+            if (grouped.length > 1) {
               return (
-                <div className="mt-1">
-                  <SerialNumberList serials={sns} maxVisible={4} size="md" emptyDash={false} />
+                <div className="space-y-2">
+                  {grouped.map((g: any, idx: number) => (
+                    <div key={idx} className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">{g.unit_count}x</span>
+                        <p className="text-xs font-bold text-gray-900 leading-snug">{g.laptop_name}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
+                        {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
+                      </div>
+                      {g.serial_numbers?.length > 0 && (
+                        <div className="mt-1.5">
+                          <SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               );
-            })()}
-          </div>
+            }
+            // Single laptop — tampilan lama
+            return (
+              <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
+                <p className="text-xs font-bold text-gray-900 leading-snug">{item.laptop_name || "—"}</p>
+                {(item.cpu || item.ram || item.storage || item.gpu) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {item.cpu && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">⚙️ {item.cpu}</span>}
+                    {item.ram && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">💾 {item.ram}</span>}
+                    {item.storage && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[10px] font-bold">🗄️ {item.storage}</span>}
+                    {item.vga && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold">🎮 {item.gpu}</span>}
+                  </div>
+                )}
+                {(() => {
+                  const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+                    ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
+                  if (sns.length === 0) return null;
+                  return <div className="mt-1"><SerialNumberList serials={sns} maxVisible={4} size="md" emptyDash={false} /></div>;
+                })()}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Price & Margin */}
@@ -499,12 +541,20 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           </div>
         )}
 
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="w-full h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition"
-        >
-          {showDetails ? "Sembunyikan" : "Lihat"} Detail
-        </button>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition"
+          >
+            {showDetails ? "Sembunyikan" : "Info"} Detail
+          </button>
+          <button
+            onClick={() => onRowClick?.(item)}
+            className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition"
+          >
+            🔍 Lihat Laptop
+          </button>
+        </div>
 
         <div className="grid grid-cols-3 gap-2">
           {item.payment_photo && (
@@ -628,7 +678,7 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
 }
 
 // ─── TRANSACTION TABLE (Desktop View) ────────────────────────────────────
-function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored }: any) {
+function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
@@ -660,6 +710,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
                 canRestoreTransaction={canRestoreTransaction}
                 canSeeFinancials={canSeeFinancials}
                 onRestored={onRestored}
+                onRowClick={onRowClick}
               />
             ))}
           </tbody>
@@ -731,7 +782,7 @@ function StatusBadgeMobile({ item }: { item: any }) {
 }
 
 // ─── TABLE ROW COMPONENT ────────────────────────────────────
-function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored }: any) {
+function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -776,7 +827,10 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
 
   return (
     <>
-      <tr className="hover:bg-blue-50/40 transition-colors duration-100 group">
+      <tr
+        className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer"
+        onClick={() => onRowClick?.(item)}
+      >
         {/* Status */}
         <td className="px-3 py-2.5">
           <StatusBadge item={item} />
@@ -836,43 +890,71 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         </td>
 
         {/* Laptop */}
+        {/* Laptop */}
         <td className="px-3 py-2.5">
-          <div className="space-y-0.5">
-            <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>
-              {item.laptop_name || "—"}
-            </div>
-            {(item.cpu || item.ram || item.storage || item.vga) && ( 
-              <div className="flex items-center gap-1 flex-wrap">
-                {item.cpu && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">
-                    {item.cpu}
-                  </span>
-                )}
-                {item.ram && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">
-                    {item.ram}
-                  </span>
-                )}
-                {item.storage && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">
-                    {item.storage}
-                  </span>
-                )}
-                {/* ✅ TAMBAHAN VGA */}
-                {item.vga && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold whitespace-nowrap border border-purple-100">
-                     {item.gpu}
-                  </span>
+          {(() => {
+            const grouped: any[] = item.grouped_items ?? [];
+            if (grouped.length > 1) {
+              // Multi laptop — tampilkan semua nama
+              return (
+                <div className="space-y-1">
+                  {grouped.map((g: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-1.5">
+                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">
+                        {g.unit_count}x
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
+                        <div className="flex gap-0.5 flex-wrap mt-0.5">
+                          {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
+                          {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            // Single laptop — tampilan lama
+            return (
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>
+                  {item.laptop_name || "—"}
+                </div>
+                {(item.cpu || item.ram || item.storage || item.vga) && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {item.cpu && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.cpu}</span>}
+                    {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.ram}</span>}
+                    {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
+                    {item.vga && <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold whitespace-nowrap border border-purple-100">{item.gpu}</span>}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </td>
 
         {/* Serial Number */}
-        {/* Serial Number */}
         <td className="px-3 py-2.5">
           {(() => {
+            const grouped: any[] = item.grouped_items ?? [];
+            if (grouped.length > 1) {
+              // Multi laptop — tampilkan SN per grup
+              return (
+                <div className="space-y-1.5">
+                  {grouped.map((g: any, idx: number) => (
+                    <div key={idx} className="space-y-0.5">
+                      {g.serial_numbers?.length > 0 ? (
+                        <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" />
+                      ) : (
+                        <span className="text-[9px] text-gray-300">—</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            // Single — tampilan lama
             const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
               ? item.serial_numbers
               : item.serial_number ? [item.serial_number] : [];
@@ -924,7 +1006,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         </td>
 
         {/* Aksi */}
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center gap-0.5">
             {item.payment_photo && (
               <button
@@ -1038,7 +1120,231 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   );
 }
 
-// ─── MAIN PAGE COMPONENT ────────────────────────────────────
+// ─── TRANSACTION DETAIL MODAL ──────────────────────────────────────────
+function TransactionDetailModal({
+  item,
+  onClose,
+  canSeeFinancials,
+}: {
+  item: any;
+  onClose: () => void;
+  canSeeFinancials: boolean;
+}) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    document.body.style.overflow = "hidden";        // ← lock scroll background
+    return () => {
+      window.removeEventListener("keydown", h);
+      document.body.style.overflow = "";            // ← restore saat ditutup
+    };
+  }, [onClose]);
+
+  const payStyle = getPaymentStyle(item.payment_method ?? "");
+  const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
+  const grouped: any[] = item.grouped_items ?? [];
+  const isMulti = grouped.length > 1;
+
+  const totalDeal = Number(item.deal_price ?? item.amount ?? 0);
+  const totalMargin = Number(item.other ?? 0);
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between flex-shrink-0 bg-gradient-to-r from-gray-50 to-white">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+                {STATUS_LABEL[item.status] ?? item.status}
+              </span>
+              {isMulti && (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">
+                  {grouped.length} Laptop
+                </span>
+              )}
+            </div>
+            <h2 className="font-bold text-gray-800 text-base">{item.customer_name}</h2>
+            <p className="text-xs text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
+            <p className="text-xs text-gray-400 mt-0.5">📅 {formatDateShort(item.created_at)}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+          {/* Customer + Sales */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Customer</p>
+              <p className="text-sm font-bold text-gray-800">{item.customer_name}</p>
+              {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5">📱 {item.customer_phone}</p>}
+              {item.customer_type && item.customer_type !== "UMUM" && (
+                <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                  {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
+                </span>
+              )}
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Sales</p>
+              {item.sales_name ? (
+                <>
+                  <p className="text-sm font-bold text-gray-800">{item.sales_name}</p>
+                  {item.employee_role && (
+                    <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                      {item.employee_role}
+                    </span>
+                  )}
+                </>
+              ) : <p className="text-sm text-gray-300">—</p>}
+            </div>
+          </div>
+
+          {/* Grouped Laptop Items */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              💻 {isMulti ? `Detail Laptop (${grouped.length} item)` : "Detail Laptop"}
+            </p>
+            <div className="space-y-2">
+              {grouped.length > 0 ? grouped.map((g: any, idx: number) => (
+                <div key={idx} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="px-3.5 py-2.5 bg-gray-50 border-b border-gray-100 flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-800 leading-snug">{g.laptop_name}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
+                        {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
+                        {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
+                        {g.vga && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-semibold border border-purple-200">{g.vga}</span>}
+                      </div>
+                    </div>
+                    {isMulti && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0">
+                        {g.unit_count}x
+                      </span>
+                    )}
+                  </div>
+
+                  {g.serial_numbers?.length > 0 && (
+                    <div className="px-3.5 py-2 border-b border-gray-100">
+                      <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Serial Number</p>
+                      <div className="flex flex-wrap gap-1">
+                        {g.serial_numbers.map((sn: string, i: number) => (
+                          <span key={i} className="font-mono text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{sn}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {canSeeFinancials && (
+                    <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Jual</p>
+                        <p className="text-xs font-bold text-blue-700 font-mono">
+                          Rp{(g.allocated_deal_price ?? g.selling_price_total ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Modal</p>
+                        <p className="text-xs font-bold text-gray-700 font-mono">
+                          Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Margin</p>
+                        <p className={`text-xs font-bold font-mono ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          {(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )) : (
+                <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
+                  <p className="text-sm font-bold text-gray-800">{item.laptop_name || "—"}</p>
+                  {item.serial_number && (
+                    <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded mt-1.5 inline-block">
+                      {item.serial_number}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Summary */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💰 Pembayaran</p>
+            <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Total Harga Jual</span>
+                <span className="text-sm font-bold text-gray-900 font-mono">Rp{totalDeal.toLocaleString("id-ID")}</span>
+              </div>
+              {Number(item.dp_amount) > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">DP</span>
+                  <span className="text-sm font-bold text-blue-700 font-mono">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                </div>
+              )}
+              {canSeeFinancials && totalMargin !== 0 && (
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                  <span className="text-xs font-semibold text-gray-600">Total Margin</span>
+                  <span className={`text-sm font-bold font-mono ${totalMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {totalMargin >= 0 ? "+" : ""}Rp{Math.abs(totalMargin).toLocaleString("id-ID")}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-gray-500">Metode</span>
+                <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
+              </div>
+              {item.source_platform && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Platform</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${platformBadge.color}`}>
+                    {platformBadge.text}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          {item.notes && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+              <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">Catatan</p>
+              <p className="text-xs text-amber-900">{item.notes}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
+          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">
+            📄 Receipt
+          </a>
+          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition">
+            ✏️ Edit
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Render via portal ke body → lepas dari ancestor ber-transform / z-index sidebar
+  if (typeof document === "undefined") return null;
+  return createPortal(modalContent, document.body);
+}
+
 export default function Page() {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1057,6 +1363,7 @@ export default function Page() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [detailItem, setDetailItem] = useState<any | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -1151,6 +1458,13 @@ export default function Page() {
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
+      {detailItem && (
+        <TransactionDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          canSeeFinancials={canSeeFinancials}
+        />
+      )}
 
       <div className={`${isMobile ? "px-4" : "max-w-[1600px] mx-auto px-6"} py-6 space-y-5`}>
         {/* Header */}
@@ -1354,6 +1668,7 @@ export default function Page() {
                 canSeeFinancials={canSeeFinancials}
                 canRestoreTransaction={canRestoreTransaction}
                 onRestored={() => fetchTransactions()}
+                onRowClick={setDetailItem}
               />
             ))}
           </div>
@@ -1365,6 +1680,7 @@ export default function Page() {
             canSeeFinancials={canSeeFinancials}
             onPhotoClick={setPhotoModal}
             onRestored={() => fetchTransactions()}
+            onRowClick={setDetailItem}
           />
         )}
 
