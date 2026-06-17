@@ -45,56 +45,30 @@ export function usePushNotification() {
 
         setIsLoading(true);
         try {
-            // 1. Minta permission dari user
             const perm = await Notification.requestPermission();
             setPermission(perm as PermissionState);
-            if (perm !== "granted") {
-                console.warn("[push] Permission ditolak:", perm);
-                return false;
-            }
+            if (perm !== "granted") return false;
 
-            // 2. Pastikan SW sudah terdaftar dan aktif
-            // Daftarkan dulu jika belum
             await navigator.serviceWorker.register("/sw.js");
-            // Tunggu sampai SW benar-benar ready/active
             const reg = await navigator.serviceWorker.ready;
-            console.log("[push] SW ready, state:", reg.active?.state);
 
-            // 3. Cek VAPID key
             const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
             if (!vapidKey) {
-                console.error("[push] NEXT_PUBLIC_VAPID_PUBLIC_KEY belum diset di .env.local");
+                console.error("[push] VAPID key tidak ada");
                 return false;
             }
-            console.log("[push] VAPID key tersedia:", vapidKey.slice(0, 20) + "...");
 
-            // 4. Cek apakah sudah ada subscription aktif
             const existingSub = await reg.pushManager.getSubscription();
             if (existingSub) {
-                // Sudah subscribe, kirim ulang ke server (mungkin belum tersimpan)
-                console.log("[push] Subscription sudah ada, kirim ulang ke server");
-                const res = await fetch("/api/push/subscribe", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(existingSub.toJSON()),
-                });
-                const data = await res.json();
-                console.log("[push] Re-register response:", data);
-                if (res.ok) {
-                    setIsSubscribed(true);
-                    return true;
-                }
+                await existingSub.unsubscribe();
             }
 
-            // 5. Buat subscription baru
-            console.log("[push] Membuat subscription baru...");
+            // Buat subscription baru
             const subscription = await reg.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(vapidKey),
             });
-            console.log("[push] Subscription berhasil dibuat:", subscription.endpoint.slice(0, 60) + "...");
 
-            // 6. Kirim subscription ke server
             const res = await fetch("/api/push/subscribe", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -102,14 +76,12 @@ export function usePushNotification() {
             });
 
             const data = await res.json();
-            console.log("[push] Server response:", data);
-
             if (res.ok && data.success) {
                 setIsSubscribed(true);
                 return true;
             }
 
-            console.error("[push] Server gagal simpan subscription:", data.message);
+            console.error("[push] Server gagal simpan:", data.message);
             return false;
         } catch (err) {
             console.error("[push] subscribe error:", err);

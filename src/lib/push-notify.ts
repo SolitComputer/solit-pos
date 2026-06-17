@@ -107,62 +107,64 @@ export async function sendPushToUser(
  * Kirim push notification ke semua user kecuali sender (group broadcast)
  */
 export async function sendPushBroadcast(
-    excludeUserId: string,
-    payload: PushPayload
+  excludeUserId: string,
+  payload: PushPayload
 ): Promise<void> {
-    if (!vapidReady) return;
+  if (!vapidReady) return;
 
-    const { data: subs, error } = await supabaseAdmin
-        .from("push_subscriptions")
-        .select("user_id, endpoint, p256dh, auth")
-        .neq("user_id", excludeUserId);
+  const { data: subs, error } = await supabaseAdmin
+    .from("push_subscriptions")
+    .select("user_id, endpoint, p256dh, auth")
+    .neq("user_id", excludeUserId);
 
-    if (error) { console.error("[push] DB error:", error.message); return; }
-    if (!subs || subs.length === 0) {
-        console.log("[push] Tidak ada subscriber untuk broadcast");
-        return;
-    }
+  if (error) { console.error("[push] DB error:", error.message); return; }
+  if (!subs || subs.length === 0) {
+    console.log("[push] Tidak ada subscriber untuk broadcast");
+    return;
+  }
 
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: payload.tag ?? `group-${Date.now()}`,
-        requireInteraction: false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
+  const notification = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    icon: payload.icon ?? "/favicon.ico",
+    badge: "/favicon.ico",
+    // ✅ Tag unik per broadcast agar tidak saling replace
+    tag: `${payload.tag ?? "notif"}-${Date.now()}`,
+    requireInteraction: payload.requireInteraction ?? false,
+    data: { url: payload.url ?? "/dashboard/users" },
+  });
 
-    console.log(`[push] Broadcasting ke ${subs.length} device(s)`);
-    await sendAndCleanup(subs, notification);
+  console.log(`[push] Broadcasting ke ${subs.length} device(s)`);
+  await sendAndCleanup(subs, notification);
 }
 
-/**
- * Kirim push notification ke banyak user sekaligus
- */
+// ✅ Sama untuk sendPushToUser — tag unik per DM
 export async function sendPushToUsers(
-    userIds: string[],
-    payload: PushPayload
+  userId: string,
+  payload: PushPayload
 ): Promise<void> {
-    if (!vapidReady || userIds.length === 0) return;
+  if (!vapidReady) return;
 
-    const { data: subs, error } = await supabaseAdmin
-        .from("push_subscriptions")
-        .select("user_id, endpoint, p256dh, auth")
-        .in("user_id", userIds);
+  const { data: subs, error } = await supabaseAdmin
+    .from("push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId);
 
-    if (error) { console.error("[push] DB error:", error.message); return; }
-    if (!subs || subs.length === 0) return;
+  if (error) { console.error("[push] DB error:", error.message); return; }
+  if (!subs || subs.length === 0) return;
 
-    const notification = JSON.stringify({
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon ?? "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: payload.tag ?? `notif-${Date.now()}`,
-        requireInteraction: payload.requireInteraction ?? false,
-        data: { url: payload.url ?? "/dashboard/users" },
-    });
+  const notification = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    icon: payload.icon ?? "/favicon.ico",
+    badge: "/favicon.ico",
+    // ✅ DM: tag per sender agar masih bisa group per orang
+    // tapi tetap unique dengan timestamp jika spam
+    tag: payload.tag ? `${payload.tag}-${Date.now()}` : `notif-${Date.now()}`,
+    requireInteraction: payload.requireInteraction ?? false,
+    data: { url: payload.url ?? "/dashboard/users" },
+  });
 
-    await sendAndCleanup(subs, notification);
+  console.log(`[push] Sending to user ${userId}, ${subs.length} device(s)`);
+  await sendAndCleanup(subs, notification);
 }
