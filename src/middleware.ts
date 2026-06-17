@@ -236,8 +236,9 @@ export const config = {
     "/api/reports/:path*",
     "/dashboard/warranty/:path*",
     "/api/attendance/:path*",
-    "/api/messages/:path*", // ✅ NEW
+    "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",
+    "/api/push/:path*",  
   ],
 };
