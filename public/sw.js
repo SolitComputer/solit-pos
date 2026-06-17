@@ -1,6 +1,4 @@
 // public/sw.js
-// Service Worker — handles push notifications
-
 self.addEventListener("install", (event) => {
     self.skipWaiting();
 });
@@ -9,7 +7,6 @@ self.addEventListener("activate", (event) => {
     event.waitUntil(clients.claim());
 });
 
-// ─── Handle push event ────────────────────────────────────────────────────────
 self.addEventListener("push", (event) => {
     if (!event.data) return;
 
@@ -20,54 +17,50 @@ self.addEventListener("push", (event) => {
         payload = { title: "Solit POS", body: event.data.text() };
     }
 
-    const {
-        title = "Solit POS",
-        body = "Ada pesan baru",
-        icon = "/favicon.ico",
-        badge = "/favicon.ico",
-        tag,
-        data = {},
-        requireInteraction = false,
-    } = payload;
-
-    const options = {
-        body,
-        icon,
-        badge,
-        tag: tag || `msg-${Date.now()}`,
-        data,
-        requireInteraction,
-        vibrate: [200, 100, 200],
-        actions: [
-            { action: "open", title: "Buka" },
-            { action: "dismiss", title: "Tutup" },
-        ],
-    };
+    const title = payload.title || "Solit POS";
+    const body = payload.body || "Ada pesan baru";
+    const icon = payload.icon || "/favicon.ico";
+    const badge = payload.badge || "/favicon.ico";
+    const tag = payload.tag || ("msg-" + Date.now());
+    const data = payload.data || {};
+    const requireInteraction = payload.requireInteraction || false;
 
     event.waitUntil(
-        self.registration.showNotification(title, options)
+        self.registration.showNotification(title, {
+            body,
+            icon,
+            badge,
+            tag,
+            data,
+            requireInteraction,
+            vibrate: [200, 100, 200],
+            actions: [
+                { action: "open", title: "Buka" },
+                { action: "dismiss", title: "Tutup" },
+            ],
+        })
     );
 });
 
-// ─── Handle notification click ────────────────────────────────────────────────
 self.addEventListener("notificationclick", (event) => {
     event.notification.close();
 
     if (event.action === "dismiss") return;
 
-    const url = event.notification.data?.url || "/dashboard/users";
+    const url = (event.notification.data && event.notification.data.url)
+        ? event.notification.data.url
+        : "/dashboard/users";
 
     event.waitUntil(
-        clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-            // Fokus ke tab yang sudah buka app jika ada
-            for (const client of clientList) {
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+            for (var i = 0; i < clientList.length; i++) {
+                var client = clientList[i];
                 if (client.url.includes(self.location.origin) && "focus" in client) {
                     client.focus();
-                    client.postMessage({ type: "NOTIFICATION_CLICK", url });
+                    client.postMessage({ type: "NOTIFICATION_CLICK", url: url });
                     return;
                 }
             }
-            // Buka tab baru jika belum ada
             if (clients.openWindow) {
                 return clients.openWindow(url);
             }
