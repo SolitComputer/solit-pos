@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { ChatManager } from "@/components/ui/ChatBubble";
+import { GroupChatPanel } from "@/components/ui/GroupChatPanel";
 
 interface User {
   id: string;
@@ -93,9 +94,8 @@ const KEPALA_ROLES = new Set([
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${
-      type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
-    }`}>
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
+      }`}>
       {type === "ok"
         ? <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg></div>
         : <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>
@@ -376,6 +376,7 @@ export default function UsersPage() {
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
   const [activeChats, setActiveChats] = useState<Array<{ user: { id: string; name: string; role: string } }>>([]);
+  const [showGroupChat, setShowGroupChat] = useState(false);
 
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
 
@@ -522,6 +523,19 @@ export default function UsersPage() {
               Tambah User
             </button>
           )}
+          {currentUserInfo && (
+            <button
+              onClick={() => setShowGroupChat(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+              </svg>
+              💬 Grup Chat
+            </button>
+          )}
+
         </div>
 
         {/* ── Stat Cards — hanya admin ── */}
@@ -571,9 +585,8 @@ export default function UsersPage() {
                   <button
                     key={r}
                     onClick={() => setFilterRole(r)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${
-                      filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                   </button>
@@ -622,11 +635,10 @@ export default function UsersPage() {
 
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
-                            FULL_ACCESS_ROLES.has(user.role)
-                              ? "bg-gradient-to-br from-violet-600 to-purple-700"
-                              : (isAdmin && user.face_embedding) ? "bg-[#1a1a2e]" : "bg-gray-400"
-                          }`}>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${FULL_ACCESS_ROLES.has(user.role)
+                            ? "bg-gradient-to-br from-violet-600 to-purple-700"
+                            : (isAdmin && user.face_embedding) ? "bg-[#1a1a2e]" : "bg-gray-400"
+                            }`}>
                             {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
                           </div>
                           {isAdmin && user.face_embedding && (
@@ -648,11 +660,10 @@ export default function UsersPage() {
 
                             {/* Shift — admin & kepala */}
                             {(isAdmin || isKepala) && user.shift && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${
-                                user.shift === "PAGI"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                                  : "bg-blue-50 text-blue-700 border-blue-200"
-                              }`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${user.shift === "PAGI"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                                }`}>
                                 {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
                               </span>
                             )}
@@ -801,6 +812,14 @@ export default function UsersPage() {
           currentUser={currentUserInfo}
           activeChats={activeChats}
           onClose={closeChat}
+        />
+      )}
+
+      {/* ✅ Group Chat Panel — INI YANG KURANG */}
+      {showGroupChat && currentUserInfo && (
+        <GroupChatPanel
+          currentUser={currentUserInfo}
+          onClose={() => setShowGroupChat(false)}
         />
       )}
     </DashboardLayout>

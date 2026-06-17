@@ -424,8 +424,9 @@ export function OnlineUsersPanel() {
   const onlineCount = presence.filter(p => p.is_online).length;
   const offlineCount = presence.filter(p => !p.is_online).length;
 
-  // ✅ Admin → panel lengkap dengan filter, halaman aktif, last seen
-  if (isAdmin) {
+  // ─── SESUDAH ───────────────────────────────────────────────────────────────────
+  // ✅ Admin + Kepala → panel lengkap dengan filter All/Online/Offline
+  if (isAdmin || isKepala) {
     return (
       <OnlineUsersPanelFull
         presence={presence}
@@ -438,7 +439,7 @@ export function OnlineUsersPanel() {
     );
   }
 
-  // ✅ Kepala & user biasa → panel simpel, hanya nama + status online
+  // ✅ User biasa (Crew Sales, Teknisi, dll) → panel simpel, hanya nama + status online
   return (
     <OnlineUsersPanelSimple
       presence={presence}

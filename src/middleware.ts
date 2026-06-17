@@ -19,8 +19,9 @@ const FACE_API_WHITELIST = [
   "/api/auth/me",
   "/api/auth/logout",
   "/api/auth/login",
-  "/api/presence", // ✅ NEW: presence heartbeat route
-];
+  "/api/presence",
+  "/api/group-chat",
+  "/api/push/subscribe",];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
@@ -237,5 +238,6 @@ export const config = {
     "/api/attendance/:path*",
     "/api/messages/:path*", // ✅ NEW
     "/api/presence",
+    "/api/group-chat",
   ],
 };

@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 
-// GET — ambil history chat antara current user & receiver
+// ✅ Wajib Node.js runtime agar web-push bisa jalan
+export const runtime = "nodejs";
+
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const { searchParams } = new URL(req.url);
   const receiverId = searchParams.get("with");
@@ -25,7 +27,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-  // Mark as read — pesan dari receiver ke current user
   await supabaseAdmin
     .from("messages")
     .update({ is_read: true })
@@ -36,7 +37,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, messages: data ?? [] });
 }
 
-// POST — kirim pesan
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const body = await req.json();
   const { receiver_id, content } = body;
@@ -49,10 +49,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "Pesan terlalu panjang (max 1000 karakter)" }, { status: 400 });
   }
 
-  // Verifikasi receiver ada
   const { data: receiver } = await supabaseAdmin
     .from("users")
-    .select("id")
+    .select("id, name")
     .eq("id", receiver_id)
     .maybeSingle();
 
@@ -72,18 +71,28 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
+  // ✅ Push SETELAH response berhasil — import dinamis agar tidak crash saat web-push gagal load
+  const trimmedContent = content.trim();
+  const senderName = user.name;
+  const senderId = user.id;
+
+  Promise.resolve().then(async () => {
+    try {
+      const { sendPushToUser } = await import("@/lib/push-notify");
+      await sendPushToUser(receiver_id, {
+        title: `💬 ${senderName}`,
+        body: trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent,
+        tag: `dm-${senderId}`,
+        url: "/dashboard/users",
+        requireInteraction: false,
+      });
+    } catch (err) {
+      console.error("[push DM]", err);
+    }
+  });
+
   return NextResponse.json({ success: true, message: data });
 }
 
-// GET unread count — /api/messages?unread=1
-async function getUnreadCount(userId: string) {
-  const { count } = await supabaseAdmin
-    .from("messages")
-    .select("*", { count: "exact", head: true })
-    .eq("receiver_id", userId)
-    .eq("is_read", false);
-  return count ?? 0;
-}
-
-export const GET  = withAuth(getHandler);
+export const GET = withAuth(getHandler);
 export const POST = withAuth(postHandler);
