@@ -1,7 +1,45 @@
 "use client";
 
 import Sidebar from "./Sidebar";
-import { usePresence } from "@/hooks/usePresence"; 
+import { usePresence } from "@/hooks/usePresence";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+
+// ✅ Simpan & restore scroll position per halaman
+function ScrollRestorer() {
+  const pathname = usePathname();
+  // Map pathname → scroll position, persist selama session
+  const positions = useRef<Record<string, number>>({});
+  // Flag: apakah ini navigasi pertama ke pathname ini
+  const isFirstVisit = useRef<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // Saat pathname berubah: restore posisi scroll halaman baru
+    const saved = positions.current[pathname];
+    const firstVisit = !isFirstVisit.current[pathname];
+
+    if (firstVisit) {
+      // Halaman baru yang belum pernah dikunjungi → scroll ke top wajar
+      isFirstVisit.current[pathname] = true;
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } else if (saved !== undefined) {
+      // Kembali ke halaman yang sudah pernah dikunjungi → restore
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: saved, behavior: "instant" });
+      });
+    }
+
+    // Simpan posisi scroll saat user scroll di halaman ini
+    const handleScroll = () => {
+      positions.current[pathname] = window.scrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [pathname]);
+
+  return null;
+}
 
 export default function DashboardLayout({
   children,
@@ -9,13 +47,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   usePresence();
+
   return (
-    
-    <div className="flex h-screen overflow-hidden bg-[#f5f4f0]">
+    <div className="flex min-h-screen bg-[#f5f4f0]">
+      {/* ✅ Pasang scroll restorer */}
+      <ScrollRestorer />
+
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
-        <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0">
+        <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
           <div className="w-9" />
           <span className="text-sm font-bold text-[#1a1a2e] tracking-tight mx-auto">
             Solit POS
@@ -23,13 +65,11 @@ export default function DashboardLayout({
           <div className="w-9" />
         </div>
 
-        {/* ← Ganti ini */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1">
           <div className="p-4 lg:p-5 max-w-[1280px]">
             {children}
           </div>
         </main>
-
       </div>
     </div>
   );

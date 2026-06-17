@@ -6,7 +6,7 @@ import ServiceFormModal from "@/components/service/ServiceFormModal";
 import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
-import ServicePaymentModal from "@/components/service/ServicePaymentModal";
+// ✅ ServicePaymentModal DIHAPUS — payment sekarang di halaman Done
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { SERVICE_CREATE_ROLES, SERVICE_TEKNISI_ROLES, hasPermission } from "@/lib/permissions";
@@ -33,7 +33,8 @@ function formatDate(iso?: string) {
 type DialogState = {
   open: boolean;
   orderId: string;
-  action: "mulai" | "sparepart" | "gagal_diperbaiki" | "";
+  // ✅ Tambah "done" ke union type
+  action: "mulai" | "sparepart" | "gagal_diperbaiki" | "done" | "";
   title: string;
   description: string;
   confirmLabel: string;
@@ -45,7 +46,6 @@ type DialogState = {
 
 const DIALOG_CLOSED: DialogState = { open: false, orderId: "", action: "", title: "", description: "", confirmLabel: "" };
 
-// ── Realtime hook ─────────────────────────────────────────────────────────────
 function useAntrianRealtime() {
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,14 +107,13 @@ function useAntrianRealtime() {
   return { orders, loading, connected, refresh };
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default function AntrianPage() {
   const { user } = useAuthUser();
   const { orders, loading, connected, refresh } = useAntrianRealtime();
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
+  // ✅ HAPUS: paymentOrder state
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const canCreate = user ? hasPermission(user.role as UserRole, SERVICE_CREATE_ROLES) : false;
@@ -142,6 +141,13 @@ export default function AntrianPage() {
         reasonLabel: "Keterangan Sparepart",
         reasonPlaceholder: "cth: butuh baterai 14.8V...",
       },
+      // ✅ Done sekarang cukup dialog konfirmasi biasa, TANPA payment
+      done: {
+        title: "Tandai Selesai",
+        description: `Tandai "${order.nama} — ${order.type_laptop}" sebagai SELESAI? Payment akan dikonfirmasi saat pelanggan mengambil laptop.`,
+        confirmLabel: "Ya, Tandai Selesai",
+        confirmClass: "bg-emerald-600 hover:bg-emerald-700",
+      },
       gagal_diperbaiki: {
         title: "Tandai Gagal Diperbaiki",
         description: `Tandai "${order.nama} — ${order.type_laptop}" sebagai GAGAL diperbaiki? Tulis alasannya.`,
@@ -165,26 +171,12 @@ export default function AntrianPage() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
     setDialog(DIALOG_CLOSED);
-    showToast("Status berhasil diperbarui!");
-    refresh();
-  };
-
-  const handlePaymentConfirm = async (payment: {
-    payment_amount: number;
-    payment_note: string;
-    payment_method: "CASH" | "TRANSFER" | "QRIS";
-    hasil_analisa?: string;
-  }) => {
-    if (!paymentOrder) return;
-    const res = await fetch(`/api/service/${paymentOrder.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "done", ...payment }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Gagal");
-    setPaymentOrder(null);
-    showToast("Order berhasil ditandai selesai! Payment tersimpan.");
+    // ✅ Pesan berbeda untuk action done
+    showToast(
+      dialog.action === "done"
+        ? "Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
+        : "Status berhasil diperbarui!"
+    );
     refresh();
   };
 
@@ -196,7 +188,6 @@ export default function AntrianPage() {
 
   return (
     <DashboardLayout>
-
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white border-b border-gray-100 px-6 py-4">
@@ -323,7 +314,8 @@ export default function AntrianPage() {
                                 {o.status === "SEDANG_DIKERJAKAN" && (
                                   <>
                                     <Btn label="Sparepart" color="orange" onClick={() => openDialog(o, "sparepart")} />
-                                    <Btn label="Done" color="green" onClick={() => { setPaymentOrder(o); }} />
+                                    {/* ✅ Done sekarang buka dialog biasa, bukan payment modal */}
+                                    <Btn label="Done" color="green" onClick={() => openDialog(o, "done")} />
                                     <Btn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                   </>
                                 )}
@@ -371,12 +363,7 @@ export default function AntrianPage() {
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />
 
-        <ServicePaymentModal
-          open={!!paymentOrder}
-          order={paymentOrder}
-          onClose={() => setPaymentOrder(null)}
-          onConfirm={handlePaymentConfirm}
-        />
+        {/* ✅ ServicePaymentModal DIHAPUS dari sini */}
 
         {toast && (
           <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"}`}>

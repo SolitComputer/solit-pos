@@ -1248,9 +1248,9 @@ function TransactionDetailModal({
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
                       <div>
-                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Jual</p>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Deal</p>
                         <p className="text-xs font-bold text-blue-700 font-mono">
-                          Rp{(g.allocated_deal_price ?? g.selling_price_total ?? 0).toLocaleString("id-ID")}
+                          Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}
                         </p>
                       </div>
                       <div>

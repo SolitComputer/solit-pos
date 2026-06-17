@@ -169,8 +169,20 @@ export async function PATCH(
       if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
         return NextResponse.json({ success: false, message: "Status tidak valid untuk diambil" }, { status: 400 });
       newStatus = "SUDAH_DIAMBIL";
-      updatePayload = { diambil_by: user.id, tanggal_diambil: new Date().toISOString() };
-      logCatatan = "Laptop sudah diambil pelanggan";
+      updatePayload = {
+        diambil_by: user.id,
+        tanggal_diambil: new Date().toISOString(),
+        ...(payment_amount !== undefined && payment_amount > 0 ? {
+          payment_amount,
+          payment_note: payment_note || null,
+          payment_method: payment_method || "CASH",
+          payment_by: user.id,
+          payment_confirmed_at: new Date().toISOString(),
+        } : {}),
+      };
+      logCatatan = payment_amount
+        ? `Laptop sudah diambil · Biaya: Rp ${payment_amount.toLocaleString("id-ID")}`
+        : "Laptop sudah diambil pelanggan";
       break;
 
     case "tidak_jadi":

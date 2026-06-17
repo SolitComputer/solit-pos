@@ -60,16 +60,13 @@ export default function HistoryPage() {
 
     return (
         <DashboardLayout>
-
             <div className="min-h-screen bg-gray-50">
                 {/* Header */}
                 <div className="bg-white border-b border-gray-100 px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-lg font-bold text-[#1a1a2e]">Riwayat Servis</h1>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                                {orders.length} total riwayat
-                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">{orders.length} total riwayat</p>
                         </div>
                         <button
                             onClick={fetchOrders}
@@ -101,10 +98,11 @@ export default function HistoryPage() {
                             <button
                                 key={s}
                                 onClick={() => setFilterStatus(s)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${filterStatus === s
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                                    filterStatus === s
                                         ? "bg-[#1a1a2e] text-white"
                                         : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                    }`}
+                                }`}
                             >
                                 {s === "ALL" ? "Semua" : STATUS_LABEL[s]}
                             </button>
@@ -116,7 +114,9 @@ export default function HistoryPage() {
                 <div className="p-6">
                     {loading ? (
                         <div className="space-y-3">
-                            {[1, 2, 3].map(i => <div key={i} className="h-16 bg-white rounded-2xl animate-pulse border border-gray-100" />)}
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="h-16 bg-white rounded-2xl animate-pulse border border-gray-100" />
+                            ))}
                         </div>
                     ) : filtered.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -137,7 +137,7 @@ export default function HistoryPage() {
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b border-gray-100">
-                                            {["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Selesai", "Total Waktu", "Dibuat oleh", "Dikerjakan oleh", "Diambil oleh", "Status", "Ket."].map(h => (
+                                            {["No", "Pelanggan", "Laptop", "Keluhan", "Jam Masuk", "Jam Done", "Jam Diambil", "Durasi Servis", "Payment", "Dibuat oleh", "Dikerjakan oleh", "Diambil oleh", "Status", "Ket."].map(h => (
                                                 <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                                                     {h}
                                                 </th>
@@ -145,51 +145,119 @@ export default function HistoryPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filtered.map(o => (
-                                            <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 transition">
-                                                <td className="px-4 py-3 text-gray-400 text-xs font-mono">{o.no_urut}</td>
-                                                <td className="px-4 py-3">
-                                                    <p className="font-semibold text-gray-800">{o.nama}</p>
-                                                    <p className="text-xs text-gray-400">{o.no_hp}</p>
-                                                    {o.alamat && <p className="text-xs text-gray-400 truncate max-w-[120px]">{o.alamat}</p>}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <p className="font-medium text-gray-700">{o.type_laptop}</p>
-                                                    <p className="text-xs text-gray-400">{[o.cpu, o.ram, o.storage].filter(Boolean).join(" · ") || "—"}</p>
-                                                </td>
-                                                <td className="px-4 py-3 max-w-[160px]">
-                                                    <p className="text-xs text-gray-600 line-clamp-2">{o.keluhan}</p>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                                                    {formatDate(o.tanggal_masuk)}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                                                    {formatDate(o.tanggal_selesai || o.tanggal_diambil)}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">
-                                                    {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500">
-                                                    {o.created_by_user?.name || "—"}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500">
-                                                    {o.dikerjakan_by_user?.name || "—"}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500">
-                                                    {o.diambil_by_user?.name || "—"}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <ServiceStatusBadge status={o.status} />
-                                                </td>
-                                                <td className="px-4 py-3 max-w-[140px]">
-                                                    {o.alasan_tidak_jadi ? (
-                                                        <p className="text-xs text-red-500 line-clamp-2">{o.alasan_tidak_jadi}</p>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-300">—</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {filtered.map(o => {
+                                            // ✅ Deteksi order yang berasal dari GAGAL_DIPERBAIKI
+                                            // Cirinya: status SUDAH_DIAMBIL tapi ada alasan_tidak_jadi
+                                            const isFromGagal = o.status === "SUDAH_DIAMBIL" && !!o.alasan_tidak_jadi;
+                                            const isTidakJadi = o.status === "TIDAK_JADI";
+
+                                            return (
+                                                <tr
+                                                    key={o.id}
+                                                    className={`border-b border-gray-50 transition ${
+                                                        isTidakJadi
+                                                            ? "bg-red-50/50 hover:bg-red-50"
+                                                            : isFromGagal
+                                                            ? "bg-rose-50/30 hover:bg-rose-50/50"
+                                                            : "hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{o.no_urut}</td>
+                                                    <td className="px-4 py-3">
+                                                        <p className="font-semibold text-gray-800">{o.nama}</p>
+                                                        <p className="text-xs text-gray-400">{o.no_hp}</p>
+                                                        {o.alamat && (
+                                                            <p className="text-xs text-gray-400 truncate max-w-[120px]">{o.alamat}</p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <p className="font-medium text-gray-700">{o.type_laptop}</p>
+                                                        <p className="text-xs text-gray-400">
+                                                            {[o.cpu, o.ram, o.storage].filter(Boolean).join(" · ") || "—"}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-4 py-3 max-w-[160px]">
+                                                        <p className="text-xs text-gray-600 line-clamp-2">{o.keluhan}</p>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                                        {formatDate(o.tanggal_masuk)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                                        {formatDate(o.tanggal_selesai)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                                        {formatDate(o.tanggal_diambil)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">
+                                                        {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
+                                                    </td>
+
+                                                    {/* ✅ Kolom Payment */}
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        {o.payment_amount ? (
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-emerald-700">
+                                                                    {new Intl.NumberFormat("id-ID", {
+                                                                        style: "currency",
+                                                                        currency: "IDR",
+                                                                        maximumFractionDigits: 0,
+                                                                    }).format(o.payment_amount)}
+                                                                </p>
+                                                                <p className="text-[10px] text-gray-400">{o.payment_method || "CASH"}</p>
+                                                            </div>
+                                                        ) : isTidakJadi ? (
+                                                            // Tidak jadi — tidak ada transaksi
+                                                            <span className="text-xs text-gray-300">—</span>
+                                                        ) : isFromGagal ? (
+                                                            // Dari GAGAL, diambil tanpa biaya
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[10px] font-medium">
+                                                                Gratis
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-300">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-3 text-xs text-gray-500">
+                                                        {o.created_by_user?.name || "—"}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500">
+                                                        {o.dikerjakan_by_user?.name || "—"}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500">
+                                                        {o.diambil_by_user?.name || "—"}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <ServiceStatusBadge status={o.status} />
+                                                    </td>
+
+                                                    {/* ✅ Kolom Ket. — badge + alasan untuk ex-GAGAL */}
+                                                    <td className="px-4 py-3 max-w-[160px]">
+                                                        {isFromGagal ? (
+                                                            <div className="space-y-1">
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[10px] font-semibold whitespace-nowrap">
+                                                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                                        <circle cx="12" cy="12" r="10" />
+                                                                        <line x1="15" y1="9" x2="9" y2="15" />
+                                                                        <line x1="9" y1="9" x2="15" y2="15" />
+                                                                    </svg>
+                                                                    Gagal Diperbaiki
+                                                                </span>
+                                                                <p className="text-xs text-gray-500 line-clamp-2">
+                                                                    {o.alasan_tidak_jadi}
+                                                                </p>
+                                                            </div>
+                                                        ) : isTidakJadi && o.alasan_tidak_jadi ? (
+                                                            <p className="text-xs text-red-500 line-clamp-2">
+                                                                {o.alasan_tidak_jadi}
+                                                            </p>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-300">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
