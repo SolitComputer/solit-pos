@@ -237,5 +237,6 @@ export const config = {
     "/api/attendance/:path*",
     "/api/messages/:path*", // ✅ NEW
     "/api/presence",
+     "/api/group-chat",
   ],
 };

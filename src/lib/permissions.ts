@@ -138,7 +138,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
-
+  // Di dalam ROUTE_PERMISSIONS, tambahkan:
+  "/api/group-chat": [...ALL_ROLES],
+  
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
