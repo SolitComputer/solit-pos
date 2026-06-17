@@ -790,7 +790,7 @@ export default function UsersPage() {
                 <span className="text-sm flex-shrink-0">ℹ️</span>
                 <div>
                   <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
-                  <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatis setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
+                  <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatiss setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
                 </div>
               </div>
             )}
