@@ -7,6 +7,10 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const KEPALA_ROLES = [
+  "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+];
 
 type PresenceRecord = {
   user_id: string;
@@ -58,140 +62,112 @@ const ROLE_LABEL: Record<string, string> = {
   SOTECH: "Sotech", ACCOUNTING: "Accounting", PENGELOLA_BARANG: "Pengelola Barang",
   PENGANTARAN: "Pengantaran", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia",
-  KONTEN: "Konten",
+  KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
+  KEPALA_SOTECH: "Kepala Sotech", PKL: "PKL", CUSTOMER_SERVICE: "Customer Service",
 };
 
 function initials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase();
 }
 
-export function OnlineUsersPanel() {
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
-  const [presence, setPresence] = useState<PresenceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+// ── Panel simpel untuk Kepala & User biasa ────────────────────────────────────
+// Hanya tampilkan siapa yang online, tanpa halaman aktif & detail waktu
+function OnlineUsersPanelSimple({
+  presence,
+  loading,
+  onlineCount,
+}: {
+  presence: PresenceRecord[];
+  loading: boolean;
+  onlineCount: number;
+}) {
+  const onlineUsers = presence.filter(p => p.is_online);
 
-  // ── Ref untuk Supabase client — dibuat sekali, tidak trigger re-render ──────
-  const supabaseRef = useRef(
-    createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+          <p className="text-sm font-bold text-gray-800">Sedang Online</p>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+            {onlineCount} orang
+          </span>
+        </div>
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <div className="px-4 py-3 space-y-2">
+          {Array(3).fill(0).map((_, i) => (
+            <div key={i} className="flex items-center gap-2 animate-pulse">
+              <div className="w-7 h-7 rounded-xl bg-gray-200 flex-shrink-0" />
+              <div className="h-2.5 bg-gray-200 rounded w-28" />
+            </div>
+          ))}
+        </div>
+      ) : onlineUsers.length === 0 ? (
+        <div className="py-6 text-center">
+          <div className="text-2xl mb-1">😴</div>
+          <p className="text-xs text-gray-400">Belum ada yang online</p>
+        </div>
+      ) : (
+        <div className="px-4 py-3 flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+          {onlineUsers.map(p => (
+            <div
+              key={p.user_id}
+              className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-2.5 py-1.5"
+              title={`${p.user_name} — ${ROLE_LABEL[p.user_role] ?? p.user_role}`}
+            >
+              <div className="relative flex-shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[8px] font-black">
+                  {initials(p.user_name)}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-gray-800 truncate max-w-[80px]">
+                  {p.user_name.split(" ")[0]}
+                </p>
+                <p className="text-[9px] text-gray-400 truncate">
+                  {ROLE_LABEL[p.user_role] ?? p.user_role}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+          <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir</p>
+        </div>
+      )}
+    </div>
   );
+}
 
-  // ── Cek role ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    getCurrentUserClient().then(user => {
-      setCurrentUserRole(user?.role ?? null);
-      setRoleLoading(false);
-    });
-  }, []);
-
-  const isAllowed = !roleLoading && !!currentUserRole && FULL_ACCESS_ROLES.includes(currentUserRole);
-
-  // ── Recalculate is_online ─────────────────────────────────────────────────
-  const recalculate = useCallback((records: PresenceRecord[]): PresenceRecord[] => {
-    const now = Date.now();
-    return records.map(p => ({
-      ...p,
-      is_online: p.last_seen
-        ? now - new Date(p.last_seen).getTime() < ONLINE_THRESHOLD_MS
-        : false,
-      seconds_ago: p.last_seen
-        ? Math.floor((now - new Date(p.last_seen).getTime()) / 1000)
-        : null,
-    }));
-  }, []);
-
-  // ── Fetch initial data ────────────────────────────────────────────────────
-  const fetchPresence = useCallback(async () => {
-    try {
-      const res = await fetch("/api/presence");
-      const data = await res.json();
-      if (data.success) {
-        setPresence(recalculate(data.data || []));
-        setLastUpdate(new Date());
-      }
-    } catch (err) {
-      console.error("[OnlineUsersPanel] fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [recalculate]);
-
-  // ── Master effect: fetch + realtime + ticker — semua dalam SATU useEffect ──
-  // Ini mencegah error "cannot add postgres_changes callbacks after subscribe()"
-  // karena channel hanya dibuat SATU kali dan tidak pernah di-recreate.
-  useEffect(() => {
-    if (!isAllowed) return;
-
-    // 1) Fetch awal
-    fetchPresence();
-
-    // 2) Realtime subscription — setup SEBELUM subscribe, tidak boleh di-split
-    const channel = supabaseRef.current
-      .channel("user_presence_realtime") // nama unik, tidak konflik
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "user_presence" },
-        (payload) => {
-          const now = Date.now();
-
-          if (payload.eventType === "DELETE") {
-            const deletedId = (payload.old as any).user_id;
-            setPresence(prev =>
-              prev.map(p =>
-                p.user_id === deletedId
-                  ? { ...p, is_online: false, current_page: null }
-                  : p
-              )
-            );
-            return;
-          }
-
-          const updated = payload.new as any;
-          setPresence(prev =>
-            prev.map(p => {
-              if (p.user_id !== updated.user_id) return p;
-              return {
-                ...p,
-                current_page: updated.current_page,
-                last_seen: updated.last_seen,
-                is_online: now - new Date(updated.last_seen).getTime() < ONLINE_THRESHOLD_MS,
-                seconds_ago: Math.floor((now - new Date(updated.last_seen).getTime()) / 1000),
-              };
-            })
-          );
-          setLastUpdate(new Date());
-        }
-      )
-      .subscribe(); // ← subscribe SETELAH semua .on() terdaftar
-
-    // 3) Ticker: recalculate is_online setiap 10 detik
-    const ticker = setInterval(() => {
-      setPresence(prev => recalculate(prev));
-    }, 10_000);
-
-    // Cleanup saat unmount atau isAllowed berubah
-    return () => {
-      clearInterval(ticker);
-      supabaseRef.current.removeChannel(channel);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAllowed]); // ← hanya re-run jika isAllowed berubah (false → true)
-
-  // ── Early returns ─────────────────────────────────────────────────────────
-  if (roleLoading) return null;
-  if (!isAllowed) return null;
-
-  const onlineCount  = presence.filter(p => p.is_online).length;
-  const offlineCount = presence.filter(p => !p.is_online).length;
+// ── Panel lengkap untuk Admin ─────────────────────────────────────────────────
+function OnlineUsersPanelFull({
+  presence,
+  loading,
+  onlineCount,
+  offlineCount,
+  lastUpdate,
+  fetchPresence,
+}: {
+  presence: PresenceRecord[];
+  loading: boolean;
+  onlineCount: number;
+  offlineCount: number;
+  lastUpdate: Date;
+  fetchPresence: () => void;
+}) {
+  const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
 
   const filtered = presence
     .filter(p => {
-      if (filter === "online")  return p.is_online;
+      if (filter === "online") return p.is_online;
       if (filter === "offline") return !p.is_online;
       return true;
     })
@@ -242,9 +218,8 @@ export function OnlineUsersPanel() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${
-                filter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
-              }`}
+              className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${filter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                }`}
             >
               {f === "all"
                 ? `Semua (${presence.length})`
@@ -278,7 +253,6 @@ export function OnlineUsersPanel() {
           </p>
         </div>
       ) : (
-        // max-h agar panel tidak terlalu panjang dan bisa sticky
         <div className="divide-y divide-gray-100 overflow-y-auto max-h-80">
           {filtered.map(p => {
             const pageInfo = getPageLabel(p.current_page);
@@ -287,19 +261,15 @@ export function OnlineUsersPanel() {
                 key={p.user_id}
                 className={`px-4 py-2.5 flex items-center gap-2.5 hover:bg-gray-50/50 transition-colors ${p.is_online ? "" : "opacity-55"}`}
               >
-                {/* Avatar */}
                 <div className="relative flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-[9px] font-black shadow-sm ${
-                    p.is_online ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gray-400"
-                  }`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-[9px] font-black shadow-sm ${p.is_online ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gray-400"
+                    }`}>
                     {initials(p.user_name)}
                   </div>
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${
-                    p.is_online ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
-                  }`} />
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${p.is_online ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
+                    }`} />
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-gray-800 truncate leading-tight">{p.user_name}</p>
                   <div className="flex items-center gap-1 mt-0.5">
@@ -308,7 +278,6 @@ export function OnlineUsersPanel() {
                   </div>
                 </div>
 
-                {/* Status */}
                 <div className="flex-shrink-0">
                   {p.is_online ? (
                     <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -330,5 +299,151 @@ export function OnlineUsersPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Main export — auto-detect role & render panel yang sesuai ─────────────────
+export function OnlineUsersPanel() {
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [presence, setPresence] = useState<PresenceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  const supabaseRef = useRef(
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  );
+
+  useEffect(() => {
+    getCurrentUserClient().then(user => {
+      setCurrentUserRole(user?.role ?? null);
+      setRoleLoading(false);
+    });
+  }, []);
+
+  // ✅ Semua role yang boleh lihat panel (admin + kepala + semua user)
+  const isAdmin = !!currentUserRole && FULL_ACCESS_ROLES.includes(currentUserRole);
+  const isKepala = !!currentUserRole && KEPALA_ROLES.includes(currentUserRole);
+  // Semua role yang sudah login boleh lihat versi simpel
+  const isAllowed = !roleLoading && !!currentUserRole;
+
+  const recalculate = useCallback((records: PresenceRecord[]): PresenceRecord[] => {
+    const now = Date.now();
+    return records.map(p => ({
+      ...p,
+      is_online: p.last_seen
+        ? now - new Date(p.last_seen).getTime() < ONLINE_THRESHOLD_MS
+        : false,
+      seconds_ago: p.last_seen
+        ? Math.floor((now - new Date(p.last_seen).getTime()) / 1000)
+        : null,
+    }));
+  }, []);
+
+  const fetchPresence = useCallback(async () => {
+    try {
+      const res = await fetch("/api/presence");
+
+      // ✅ TEMPORARY DEBUG — hapus setelah fix
+      console.log("[presence] status:", res.status, "role:", currentUserRole);
+
+      const data = await res.json();
+
+      // ✅ TEMPORARY DEBUG
+      console.log("[presence] data:", data);
+
+      if (data.success) {
+        setPresence(recalculate(data.data || []));
+        setLastUpdate(new Date());
+      }
+    } catch (err) {
+      console.error("[OnlineUsersPanel] fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [recalculate, currentUserRole]); // ← tambah currentUserRole di deps
+
+  useEffect(() => {
+    if (!isAllowed) return;
+
+    fetchPresence();
+
+    const channel = supabaseRef.current
+      .channel("user_presence_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_presence" },
+        (payload) => {
+          const now = Date.now();
+
+          if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as any).user_id;
+            setPresence(prev =>
+              prev.map(p =>
+                p.user_id === deletedId
+                  ? { ...p, is_online: false, current_page: null }
+                  : p
+              )
+            );
+            return;
+          }
+
+          const updated = payload.new as any;
+          setPresence(prev =>
+            prev.map(p => {
+              if (p.user_id !== updated.user_id) return p;
+              return {
+                ...p,
+                current_page: updated.current_page,
+                last_seen: updated.last_seen,
+                is_online: now - new Date(updated.last_seen).getTime() < ONLINE_THRESHOLD_MS,
+                seconds_ago: Math.floor((now - new Date(updated.last_seen).getTime()) / 1000),
+              };
+            })
+          );
+          setLastUpdate(new Date());
+        }
+      )
+      .subscribe();
+
+    const ticker = setInterval(() => {
+      setPresence(prev => recalculate(prev));
+    }, 10_000);
+
+    return () => {
+      clearInterval(ticker);
+      supabaseRef.current.removeChannel(channel);
+    };
+  }, [isAllowed]);
+
+  if (roleLoading || !isAllowed) return null;
+
+  const onlineCount = presence.filter(p => p.is_online).length;
+  const offlineCount = presence.filter(p => !p.is_online).length;
+
+  // ✅ Admin → panel lengkap dengan filter, halaman aktif, last seen
+  if (isAdmin) {
+    return (
+      <OnlineUsersPanelFull
+        presence={presence}
+        loading={loading}
+        onlineCount={onlineCount}
+        offlineCount={offlineCount}
+        lastUpdate={lastUpdate}
+        fetchPresence={fetchPresence}
+      />
+    );
+  }
+
+  // ✅ Kepala & user biasa → panel simpel, hanya nama + status online
+  return (
+    <OnlineUsersPanelSimple
+      presence={presence}
+      loading={loading}
+      onlineCount={onlineCount}
+    />
   );
 }

@@ -1,6 +1,8 @@
 // src/lib/permissions.ts
 
 // ─── Role Types ───────────────────────────────────────────────────────────────
+// src/lib/permissions.ts
+
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -22,7 +24,8 @@ export type UserRole =
   | "KEPALA_ONPOINT"
   | "ONPOINT"
   | "KEPALA_SOTECH"
-  | "CUSTOMER_SERVICE"; // ✅ NEW: bisa buat formulir servis
+  | "PKL"
+  | "CUSTOMER_SERVICE";
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
@@ -45,6 +48,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_ONPOINT: "/dashboard",
   ONPOINT: "/dashboard",
   KEPALA_SOTECH: "/dashboard",
+  PKL: "/dashboard/laptops/ready",
   CUSTOMER_SERVICE: "/dashboard/service/antrian", // ✅ CS langsung ke antrian
 };
 
@@ -57,7 +61,7 @@ const ALL_ROLES: UserRole[] = [
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL", "CUSTOMER_SERVICE",
   "CUSTOMER_SERVICE", // ✅ NEW
 ];
 
@@ -100,11 +104,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "PKL",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ],
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
+    "TEKNISI", "KEPALA_TEKNISI", "PKL",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "TEKNISI", "KEPALA_TEKNISI",
   ],
@@ -122,9 +130,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
-  "/dashboard/users": [...FULL_ACCESS],
+  "/dashboard/users": [...ALL_ROLES],
   "/dashboard/attendance": [...ALL_ROLES],
-
+  "/api/messages": [...ALL_ROLES],
   // ✅ Service Queue Routes
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
@@ -133,7 +141,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG"],
   "/api/laptops": [
@@ -141,13 +149,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
     "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "PKL",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
@@ -162,15 +172,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/api/units/reserve": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
   "/api/units/hold": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
   "/api/units/confirm-payment": [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    ...FULL_ACCESS, "KEPALA_SALES",
   ],
   "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
@@ -212,7 +221,7 @@ export const PERMISSIONS = {
 
   CREATE_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ] as UserRole[],
 
   EDIT_TRANSACTION: [
@@ -226,13 +235,15 @@ export const PERMISSIONS = {
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ] as UserRole[],
 
   VIEW_LAPTOPS: [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING",
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "PKL",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ] as UserRole[],
   CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
@@ -261,6 +272,7 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "TEKNISI", "KEPALA_TEKNISI", "PKL",
     "TEKNISI", "KEPALA_TEKNISI",
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],

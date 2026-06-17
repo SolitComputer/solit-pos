@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { ChatManager } from "@/components/ui/ChatBubble";
 
 interface User {
   id: string;
@@ -25,6 +26,7 @@ const ALL_ROLES = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "PKL", "CUSTOMER_SERVICE",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -35,9 +37,11 @@ const ROLE_LABEL: Record<string, string> = {
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten",
-  KEPALA_ONPOINT: "Kepala Onpoint",   // ✅ NEW
-  ONPOINT: "Onpoint",                 // ✅ NEW
+  KEPALA_ONPOINT: "Kepala Onpoint",
+  ONPOINT: "Onpoint",
   KEPALA_SOTECH: "Kepala Sotech",
+  PKL: "PKL",
+  CUSTOMER_SERVICE: "Customer Service",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -47,9 +51,11 @@ const ROLE_ICON: Record<string, string> = {
   PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
   MARKETING: "📱", KEBERSIHAN: "🧹",
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
-  KEPALA_ONPOINT: "🎯",  // ✅ NEW
-  ONPOINT: "📍",         // ✅ NEW
+  KEPALA_ONPOINT: "🎯",
+  ONPOINT: "📍",
   KEPALA_SOTECH: "⚙️",
+  PKL: "🎓",
+  CUSTOMER_SERVICE: "🎧",
 };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -70,25 +76,75 @@ const ROLE_BADGE: Record<string, string> = {
   PENYEDIA_BARANG: "bg-yellow-100 text-yellow-700 border-yellow-200",
   KEPALA_PENYEDIA_BARANG: "bg-orange-100 text-orange-700 border-orange-200",
   KONTEN: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
-  KEPALA_ONPOINT: "bg-green-100 text-green-700 border-green-200",   // ✅ NEW
-  ONPOINT: "bg-emerald-100 text-emerald-700 border-emerald-200",    // ✅ NEW
+  KEPALA_ONPOINT: "bg-green-100 text-green-700 border-green-200",
+  ONPOINT: "bg-emerald-100 text-emerald-700 border-emerald-200",
   KEPALA_SOTECH: "bg-lime-100 text-lime-700 border-lime-200",
+  PKL: "bg-slate-100 text-slate-600 border-slate-200",
+  CUSTOMER_SERVICE: "bg-sky-100 text-sky-700 border-sky-200",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+const KEPALA_ROLES = new Set([
+  "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+]);
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
-      }`}>
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slideIn ${
+      type === "ok" ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-red-50 text-red-700 border border-red-200"
+    }`}>
       {type === "ok"
         ? <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg></div>
         : <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>
       }
       {msg}
     </div>
+  );
+}
+
+// ── RoleSelect ────────────────────────────────────────────────────────────────
+function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+    >
+      <optgroup label="— Akses Penuh —">
+        {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
+      </optgroup>
+      <optgroup label="— Management —">
+        {["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
+      </optgroup>
+      <optgroup label="— Operasional —">
+        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
+      </optgroup>
+      <optgroup label="— Penyedia & Konten —">
+        {["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
+      </optgroup>
+      <optgroup label="— Onpoint & Sotech —">
+        {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
+      </optgroup>
+      <optgroup label="— Magang —">
+        <option value="PKL">🎓 PKL</option>
+      </optgroup>
+      <optgroup label="— Layanan —">
+        <option value="CUSTOMER_SERVICE">🎧 Customer Service</option>
+      </optgroup>
+    </select>
   );
 }
 
@@ -145,19 +201,22 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)}
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">{["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Management —">{["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Operasional —">{["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Onpoint & Sotech —">
-                {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-            </select>
-            {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
+            <RoleSelect value={role} onChange={setRole} />
+            {FULL_ACCESS_ROLES.has(role) && (
+              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1">
+                <span>⚠️</span> Role ini memiliki akses penuh ke semua fitur
+              </p>
+            )}
+            {role === "PKL" && (
+              <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <span>🎓</span> Akses terbatas: lihat laptop, buat payment, scanner
+              </p>
+            )}
+            {role === "CUSTOMER_SERVICE" && (
+              <p className="text-[10px] text-sky-600 mt-1.5 flex items-center gap-1">
+                <span>🎧</span> Akses layanan pelanggan — konfigurasi lanjut menyusul
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift Kerja</label>
@@ -232,18 +291,17 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition">
-              <optgroup label="— Akses Penuh —">{["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Management —">{["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Operasional —">{["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Penyedia & Konten —">{["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>)}</optgroup>
-              <optgroup label="— Onpoint & Sotech —">
-                {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
-                  <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-                ))}
-              </optgroup>
-            </select>
-            {FULL_ACCESS_ROLES.has(role) && <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1"><span>⚠️</span> Role ini memiliki akses penuh ke semua fitur</p>}
+            <RoleSelect value={role} onChange={setRole} />
+            {FULL_ACCESS_ROLES.has(role) && (
+              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1">
+                <span>⚠️</span> Role ini memiliki akses penuh ke semua fitur
+              </p>
+            )}
+            {role === "PKL" && (
+              <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <span>🎓</span> Akses terbatas: lihat laptop, buat payment, scanner
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Shift</label>
@@ -315,13 +373,19 @@ export default function UsersPage() {
   const [confirmLogoutUser, setConfirmLogoutUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isKepala, setIsKepala] = useState(false);
+  const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [activeChats, setActiveChats] = useState<Array<{ user: { id: string; name: string; role: string } }>>([]);
 
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
 
-  // Cek role untuk render OnlineUsersPanel
   useEffect(() => {
     getCurrentUserClient().then(u => {
-      setIsAdmin(!!u && FULL_ACCESS_ROLES.has(u.role));
+      if (u) {
+        setIsAdmin(FULL_ACCESS_ROLES.has(u.role));
+        setIsKepala(KEPALA_ROLES.has(u.role));
+        setCurrentUserInfo({ id: u.id, name: u.name, role: u.role });
+      }
     });
   }, []);
 
@@ -366,9 +430,26 @@ export default function UsersPage() {
     finally { setLoggingOut(false); setConfirmLogoutUser(null); }
   };
 
+  const openChat = (targetUser: User) => {
+    if (!currentUserInfo || targetUser.id === currentUserInfo.id) return;
+    setActiveChats(prev => {
+      if (prev.some(c => c.user.id === targetUser.id)) return prev;
+      const limited = prev.length >= 3 ? prev.slice(1) : prev;
+      return [...limited, {
+        user: { id: targetUser.id, name: targetUser.name, role: targetUser.role }
+      }];
+    });
+  };
+
+  const closeChat = (userId: string) => {
+    setActiveChats(prev => prev.filter(c => c.user.id !== userId));
+  };
+
   const filtered = useMemo(() => {
     let result = users.filter(u => {
-      const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || (u.phone_number ?? "").includes(search);
+      const matchSearch = !search
+        || u.name.toLowerCase().includes(search.toLowerCase())
+        || (u.phone_number ?? "").includes(search);
       return matchSearch && (filterRole === "Semua" || u.role === filterRole);
     });
     result.sort((a, b) => {
@@ -382,12 +463,15 @@ export default function UsersPage() {
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
 
+  // ✅ Apakah user berhak lihat panel online (admin & kepala)
+  const showOnlinePanel = isAdmin || isKepala;
+
   return (
     <DashboardLayout>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Modals */}
-      {confirmReset && (
+      {/* ── Modals — hanya admin ── */}
+      {isAdmin && confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmReset(null)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
@@ -404,28 +488,44 @@ export default function UsersPage() {
           </div>
         </div>
       )}
-      {confirmLogoutUser && <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />}
-      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />}
-      {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />}
+      {isAdmin && confirmLogoutUser && (
+        <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
+      )}
+      {isAdmin && showCreate && (
+        <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
+      )}
+      {isAdmin && editUser && (
+        <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
+      )}
 
-      {/* ── Page wrapper: max-w-7xl untuk muat 2 kolom ── */}
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">Manajemen User</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Kelola akun, role, shift, dan wajah karyawan</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isAdmin
+                ? "Kelola akun, role, shift, dan wajah karyawan"
+                : isKepala
+                  ? "Lihat detail dan chat dengan anggota tim"
+                  : "Lihat dan chat dengan rekan kerja"
+              }
+            </p>
           </div>
-          <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition shadow-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Tambah User
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition shadow-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Tambah User
+            </button>
+          )}
         </div>
 
-        {/* Stat Cards */}
-        {!loading && (
+        {/* ── Stat Cards — hanya admin ── */}
+        {!loading && isAdmin && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total User", value: users.length, icon: "👥", color: "text-gray-800" },
@@ -444,11 +544,6 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* ─────────────────────────────────────────────────────────────────────
-            LAYOUT 2 KOLOM
-            Kiri  : filter + daftar user (flex-1, scrollable dalam card)
-            Kanan : online panel + info (w-72, sticky → tidak ikut scroll)
-        ──────────────────────────────────────────────────────────────────── */}
         <div className="flex gap-5 items-start">
 
           {/* ── Kolom Kiri ── */}
@@ -459,7 +554,7 @@ export default function UsersPage() {
               <div className="flex gap-2 items-center">
                 <input
                   type="text"
-                  placeholder="Cari nama atau nomor WA..."
+                  placeholder="Cari nama..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="flex-1 h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition min-w-0"
@@ -471,14 +566,14 @@ export default function UsersPage() {
                   {sortOrder === "asc" ? "↑ A-Z" : "↓ Z-A"}
                 </button>
               </div>
-              {/* Role filter pills — scrollable horizontal di mobile */}
               <div className="flex gap-1.5 flex-wrap max-h-20 overflow-y-auto">
                 {["Semua", ...ALL_ROLES].map(r => (
                   <button
                     key={r}
                     onClick={() => setFilterRole(r)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 ${
+                      filterRole === r ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                   >
                     {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                   </button>
@@ -486,19 +581,20 @@ export default function UsersPage() {
               </div>
             </div>
 
-            {/* Daftar user — max-height + overflow-y → internal scroll, bukan halaman */}
+            {/* Daftar user */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              {/* Sub-header: jumlah + legend */}
               <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-gray-500">
                   {filtered.length === users.length
                     ? `${users.length} karyawan`
                     : `${filtered.length} dari ${users.length} karyawan`}
                 </p>
-                <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                  <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500" />Wajah terdaftar</span>
-                  <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" />Akses penuh</span>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                    <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500" />Wajah terdaftar</span>
+                    <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" />Akses penuh</span>
+                  </div>
+                )}
               </div>
 
               {loading ? (
@@ -506,7 +602,10 @@ export default function UsersPage() {
                   {Array(6).fill(0).map((_, i) => (
                     <div key={i} className="p-4 flex items-center gap-3 animate-pulse">
                       <div className="w-10 h-10 rounded-xl bg-gray-200" />
-                      <div className="flex-1 space-y-2"><div className="h-3 bg-gray-200 rounded w-28" /><div className="h-3 bg-gray-100 rounded w-40" /></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-gray-200 rounded w-28" />
+                        <div className="h-3 bg-gray-100 rounded w-40" />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -516,7 +615,6 @@ export default function UsersPage() {
                   <p className="text-gray-400 text-sm">Tidak ada user ditemukan</p>
                 </div>
               ) : (
-                // ✅ overflow-y-auto + max-h → daftar scroll sendiri, bukan halaman
                 <div className="divide-y divide-gray-100 overflow-y-auto max-h-[calc(100vh-340px)]">
                   {filtered.map(user => (
                     <div key={user.id} className="px-4 py-3 hover:bg-gray-50/50 transition">
@@ -524,61 +622,123 @@ export default function UsersPage() {
 
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${FULL_ACCESS_ROLES.has(user.role) ? "bg-gradient-to-br from-violet-600 to-purple-700"
-                            : user.face_embedding ? "bg-[#1a1a2e]" : "bg-gray-400"
-                            }`}>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
+                            FULL_ACCESS_ROLES.has(user.role)
+                              ? "bg-gradient-to-br from-violet-600 to-purple-700"
+                              : (isAdmin && user.face_embedding) ? "bg-[#1a1a2e]" : "bg-gray-400"
+                          }`}>
                             {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
                           </div>
-                          {user.face_embedding && (
+                          {isAdmin && user.face_embedding && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-white flex items-center justify-center">
                               <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                             </div>
                           )}
                         </div>
 
-                        {/* Info */}
+                        {/* ── Info ── */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-semibold text-gray-800 truncate">{user.name}</span>
+
+                            {/* Role badge — semua lihat */}
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${ROLE_BADGE[user.role] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                               {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
                             </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${user.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
+
+                            {/* Shift — admin & kepala */}
+                            {(isAdmin || isKepala) && user.shift && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${
+                                user.shift === "PAGI"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
                               }`}>
-                              {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
-                            </span>
-                            {!user.password_set && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold flex-shrink-0">🔑 Belum PW</span>
+                                {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
+                              </span>
                             )}
-                            {user.force_logout_at && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold flex-shrink-0"
-                                title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}>
+
+                            {/* Status badges — admin only */}
+                            {isAdmin && !user.password_set && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-semibold flex-shrink-0">
+                                🔑 Belum PW
+                              </span>
+                            )}
+                            {isAdmin && user.force_logout_at && (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-semibold flex-shrink-0"
+                                title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}
+                              >
                                 🚪 Out
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-                            {user.phone_number ?? <span className="text-orange-400 italic">Nomor belum diset</span>}
-                          </p>
+
+                          {/* Phone — admin & kepala */}
+                          {(isAdmin || isKepala) && (
+                            <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                              {user.phone_number
+                                ? user.phone_number
+                                : isAdmin
+                                  ? <span className="text-orange-400 italic">Nomor belum diset</span>
+                                  : null
+                              }
+                            </p>
+                          )}
                         </div>
 
-                        {/* Actions */}
+                        {/* ── Actions ── */}
                         <div className="flex items-center gap-0.5 flex-shrink-0">
-                          <button onClick={() => setEditUser(user)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition" title="Edit">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          </button>
-                          {user.face_embedding && (
-                            <button onClick={() => setConfirmReset(user)}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition" title="Reset wajah">
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+
+                          {/* Chat — semua user kecuali diri sendiri */}
+                          {currentUserInfo && user.id !== currentUserInfo.id && (
+                            <button
+                              onClick={() => openChat(user)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                              title={`Chat dengan ${user.name}`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
                             </button>
                           )}
-                          <button onClick={() => setConfirmLogoutUser(user)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition" title={`Paksa logout ${user.name}`}>
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                          </button>
+
+                          {/* Edit — admin only */}
+                          {isAdmin && (
+                            <button onClick={() => setEditUser(user)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                              title="Edit">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          )}
+
+                          {/* Reset wajah — admin only */}
+                          {isAdmin && user.face_embedding && (
+                            <button onClick={() => setConfirmReset(user)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition"
+                              title="Reset wajah">
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                            </button>
+                          )}
+
+                          {/* Paksa logout — admin only */}
+                          {isAdmin && (
+                            <button onClick={() => setConfirmLogoutUser(user)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition"
+                              title={`Paksa logout ${user.name}`}>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
+
                       </div>
                     </div>
                   ))}
@@ -587,38 +747,42 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* ── Kolom Kanan: sticky, hanya muncul di lg+ ── */}
-          {isAdmin && (
+          {/* ── Kolom Kanan — admin & kepala ── */}
+          {showOnlinePanel && (
             <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
-
-              {/* Info auto-logout */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
-                <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
-                <div>
-                  <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
-                  <p className="text-[11px] text-blue-600 mt-0.5 leading-relaxed">
-                    Session diakhiri otomatis setiap 03:00 WIB. Gunakan tombol 🚪 untuk paksa logout manual.
-                  </p>
+              {/* Info auto-logout — hanya admin */}
+              {isAdmin && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                  <span className="text-sm flex-shrink-0 mt-0.5">ℹ️</span>
+                  <div>
+                    <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
+                    <p className="text-[11px] text-blue-600 mt-0.5 leading-relaxed">
+                      Session diakhiri otomatis setiap 03:00 WIB. Gunakan tombol 🚪 untuk paksa logout manual.
+                    </p>
+                  </div>
                 </div>
-              </div>
-              {/* Panel online */}
+              )}
+              {/* ✅ OnlineUsersPanel — admin dapat versi lengkap, kepala dapat versi simpel */}
               <OnlineUsersPanel />
-
             </div>
           )}
         </div>
 
-        {/* Mobile: Panel online + info di bawah daftar (layar < lg) */}
-        {isAdmin && (
+        {/* ── Mobile: Panel online — admin & kepala ── */}
+        {showOnlinePanel && (
           <div className="lg:hidden space-y-3">
+            {/* ✅ OnlineUsersPanel mobile */}
             <OnlineUsersPanel />
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
-              <span className="text-sm flex-shrink-0">ℹ️</span>
-              <div>
-                <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
-                <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatis setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
+            {/* Info auto-logout — hanya admin */}
+            {isAdmin && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                <span className="text-sm flex-shrink-0">ℹ️</span>
+                <div>
+                  <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
+                  <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatis setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -630,6 +794,15 @@ export default function UsersPage() {
         .animate-slideIn { animation: slideIn 0.3s ease-out; }
         .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16,1,0.3,1); }
       `}</style>
+
+      {/* Chat Manager */}
+      {currentUserInfo && (
+        <ChatManager
+          currentUser={currentUserInfo}
+          activeChats={activeChats}
+          onClose={closeChat}
+        />
+      )}
     </DashboardLayout>
   );
 }
