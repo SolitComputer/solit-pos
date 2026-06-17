@@ -94,7 +94,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
         <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-base font-bold text-[#1a1a2e]">Konfirmasi Selesai & Payment</h2>
+              <h2 className="text-base font-bold text-[#1a1a2e]">Konfirmasi Diambil & Payment</h2>
               <p className="text-xs text-gray-400 mt-0.5">
                 {order.nama} · {order.type_laptop}
               </p>
@@ -223,7 +223,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-            ) : "✓ Konfirmasi Selesai"}
+            ) : "✓ Konfirmasi Diambil"}
           </button>
         </div>
       </div>

@@ -16,11 +16,9 @@ ChartJS.register(
   Filler, Tooltip, Legend
 );
 
-// PERBAIKAN: fmtRupiah untuk nominal utama — tidak dibulatkan
 const fmtRupiah = (n: number): string =>
   "Rp " + (n || 0).toLocaleString("id-ID");
 
-// fmtShort hanya untuk chart tooltip & label kecil di dalam kartu rank
 const fmtShort = (n: number): string => {
   if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
@@ -107,7 +105,6 @@ function ChartSkeleton() {
   );
 }
 
-// PERBAIKAN: StatCard — nilai keuangan ditampilkan penuh
 function StatCard({ label, value, color, bg, border, bar, icon }: any) {
   return (
     <div className={`bg-white rounded-2xl border ${border} shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
@@ -115,7 +112,6 @@ function StatCard({ label, value, color, bg, border, bar, icon }: any) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
-          {/* Teks lebih kecil sedikit agar angka panjang tidak overflow */}
           <p className={`text-base font-extrabold mt-1 tracking-tight ${color} group-hover:scale-105 transition-transform origin-left break-words`}>
             {value}
           </p>
@@ -157,7 +153,6 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
                 {item.name}
               </p>
               <div className="text-right flex-shrink-0">
-                {/* rank list pakai fmtShort karena ruang sempit */}
                 <p className="text-xs font-bold text-gray-800">{fmtShort(item[revenueKey])}</p>
                 <p className="text-[10px] text-gray-400">{item.count}x</p>
               </div>
@@ -201,10 +196,16 @@ export default function ReportsPage() {
   const [topLaptop, setTopLaptop] = useState<RankItem[]>([]);
   const [topSource, setTopSource] = useState<RankItem[]>([]);
 
-  const fetchReport = async () => {
+  // ✅ FIX: Terima optional params supaya applyPreset bisa pass nilai baru
+  // langsung tanpa tunggu React commit state (stale closure problem)
+  const fetchReport = async (from?: string, to?: string, group?: string) => {
+    const f = from ?? dateFrom;
+    const t = to ?? dateTo;
+    const g = group ?? groupBy;
+
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/reports?from=${dateFrom}&to=${dateTo}&group=${groupBy}`);
+      const res = await fetch(`/api/reports?from=${f}&to=${t}&group=${g}`);
       const result = await res.json();
       if (result.success) {
         setSummary(result.data.summary);
@@ -222,15 +223,18 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReport(); }, []);
 
+  // ✅ FIX: Pass nilai baru langsung ke fetchReport, tidak tunggu setState settle
   const applyPreset = (preset: string) => {
     const { from, to } = getPreset(preset);
     setDateFrom(from);
     setDateTo(to);
     setActivePreset(preset);
-    if (["today", "yesterday"].includes(preset)) setGroupBy("day");
-    else if (["this_week", "last_7"].includes(preset)) setGroupBy("day");
-    else if (["this_month", "last_month", "last_30"].includes(preset)) setGroupBy("day");
-    else if (preset === "this_year") setGroupBy("month");
+
+    let group = "day";
+    if (preset === "this_year") group = "month";
+    setGroupBy(group);
+
+    fetchReport(from, to, group);
   };
 
   const trendLabels = trend.map(t => t.label);
@@ -273,20 +277,19 @@ export default function ReportsPage() {
     ],
   };
 
-
- const barData = {
-  labels: trendLabels,
-  datasets: [{
-    label: "Transaksi",
-    data: trendTrx,
-    backgroundColor: "#3B82F6",
-    borderRadius: 8,
-    borderSkipped: false as const,
-    hoverBackgroundColor: "#2563EB",
-    barPercentage: 0.45,        // 👈 LINE 289 - Bar width
-    categoryPercentage: 0.65,   // 👈 LINE 290 - Spacing
-  }],
-};
+  const barData = {
+    labels: trendLabels,
+    datasets: [{
+      label: "Transaksi",
+      data: trendTrx,
+      backgroundColor: "#3B82F6",
+      borderRadius: 8,
+      borderSkipped: false as const,
+      hoverBackgroundColor: "#2563EB",
+      barPercentage: 0.45,
+      categoryPercentage: 0.65,
+    }],
+  };
 
   const chartOpts = {
     responsive: true,
@@ -310,46 +313,46 @@ export default function ReportsPage() {
     },
   } as const;
 
-const barOpts = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: "rgba(59, 130, 246, 0.95)",
-      titleColor: "#fff",
-      bodyColor: "#fff",
-      cornerRadius: 8,
-      padding: 10,
-      callbacks: { 
-        label: (c: any) => `${c.raw} transaksi`,
+  const barOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(59, 130, 246, 0.95)",
+        titleColor: "#fff",
+        bodyColor: "#fff",
+        cornerRadius: 8,
+        padding: 10,
+        callbacks: {
+          label: (c: any) => `${c.raw} transaksi`,
+        },
       },
     },
-  },
-  scales: {
-    x: { 
-      grid: { display: false },
-      ticks: { 
-        font: { size: 10 }, 
-        color: "#9CA3AF",              // Diubah dari #6B7280
-        maxRotation: 0
-      } 
-    },
-    y: { 
-      grid: { 
-        color: "rgba(156, 163, 175, 0.25)",  // Diubah dari rgba(0, 0, 0, 0.06) - 4x lebih terang
-        drawBorder: false,
-        lineWidth: 1.2,                      // ← TAMBAHAN: Garis lebih tegas
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          font: { size: 10 },
+          color: "#9CA3AF",
+          maxRotation: 0,
+        },
       },
-      ticks: { 
-        font: { size: 10 }, 
-        color: "#9CA3AF",
-        stepSize: 1,
+      y: {
+        grid: {
+          color: "rgba(156, 163, 175, 0.25)",
+          drawBorder: false,
+          lineWidth: 1.2,
+        },
+        ticks: {
+          font: { size: 10 },
+          color: "#9CA3AF",
+          stepSize: 1,
+        },
+        beginAtZero: true,
       },
-      beginAtZero: true,                     // ← TAMBAHAN: Y-axis mulai dari 0
     },
-  },
-} as const;
+  } as const;
 
   const PRESETS = [
     { id: "today", label: "Hari ini", icon: "📅" },
@@ -386,7 +389,7 @@ const barOpts = {
               <p className="text-sm text-gray-500 ml-10">Omzet, profit, dan analisis transaksi</p>
             </div>
             <button
-              onClick={fetchReport}
+              onClick={() => fetchReport()}
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 bg-white shadow-sm group"
             >
@@ -456,7 +459,7 @@ const barOpts = {
                 </select>
               </div>
               <button
-                onClick={fetchReport}
+                onClick={() => fetchReport()}
                 disabled={isLoading}
                 className="h-10 px-6 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg transform hover:scale-105"
               >
@@ -466,7 +469,7 @@ const barOpts = {
           </div>
         </div>
 
-        {/* Summary Cards — PERBAIKAN: fmtRupiah untuk angka penuh */}
+        {/* Summary Cards */}
         {isLoading ? (
           <SummarySkeleton />
         ) : summary ? (

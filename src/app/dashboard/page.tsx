@@ -9,7 +9,7 @@ import { SalesDetailModal } from "@/components/modals/SalesDetailModal";
 import { LaptopDetailModal } from "@/components/modals/LaptopDetailModal";
 import { GrossProfitDetailModal } from "@/components/modals/GrossProfitDetailModal";
 import { TransactionDetailModal } from "@/components/modals/TransactionDetailModal";
-
+import ServiceDashboardWidget from "@/components/service/ServiceDashboardWidget";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -361,6 +361,13 @@ export default function Page() {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
+  const SERVICE_DASHBOARD_ROLES = [
+    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+    "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
+  ];
+  const canSeeServiceDashboard = userRole
+    ? SERVICE_DASHBOARD_ROLES.includes(userRole)
+    : false;
 
   const fetchAll = useCallback(async (showRefreshAnimation = false) => {
     if (showRefreshAnimation) {
@@ -742,6 +749,13 @@ export default function Page() {
             </>
           )}
         </div>
+
+        {canSeeServiceDashboard && (
+          <div className="fade-up" style={{ animationDelay: "0.07s" }}>
+            <ServiceDashboardWidget canSeeFinancials={canSeeFinancials} />
+          </div>
+        )}
+
 
         {/* ── Section Label ── */}
         <div className="flex items-center gap-2 fade-up" style={{ animationDelay: "0.08s" }}>

@@ -45,7 +45,7 @@ const FIELDS: Array<{
   { key: "kelengkapan", label: "Kelengkapan",      placeholder: "cth: Charger, tas, mouse", cols: 2 },
   // Row 3: keluhan
   { key: "keluhan",      label: "Keluhan",          required: true, type: "textarea", placeholder: "Deskripsikan keluhan pelanggan secara detail", cols: 2 },
-  { key: "hasil_analisa", label: "Hasil Analisa",  type: "textarea", placeholder: "Opsional — bisa diisi teknisi nanti", cols: 2 },
+  { key: "hasil_analisa", label: "Diagnosa Sementara",  type: "textarea", placeholder: "Opsional — bisa diisi teknisi nanti", cols: 2 },
 ];
 
 export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFormModalProps) {
@@ -230,7 +230,7 @@ export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFo
               ]} />
               <ConfirmSection title="Keluhan & Analisa" rows={[
                 { label: "Keluhan", value: form.keluhan },
-                { label: "Hasil Analisa", value: form.hasil_analisa || "—" },
+                { label: "Diagnosa Sementara", value: form.hasil_analisa || "—" },
               ]} />
             </div>
           )}
