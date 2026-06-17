@@ -16,13 +16,20 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
+    // paid_at disimpan sebagai UTC ISO string: "2026-06-16T04:30:00.000Z"
+    // WIB = UTC+7, jadi:
+    // - "2026-06-16T00:00:00 WIB" = "2026-06-15T17:00:00Z" UTC
+    // - "2026-06-16T23:59:59 WIB" = "2026-06-16T16:59:59Z" UTC
+    const fromUTC = new Date(`${dateFrom}T00:00:00+07:00`).toISOString();
+    const toUTC   = new Date(`${dateTo}T23:59:59+07:00`).toISOString();
+
     const { data: transactions, error } = await supabase
       .from("transactions")
       .select("*")
       .eq("status", "PAID")
-      .gte("pickup_date", dateFrom)  
-      .lte("pickup_date", dateTo)    
-      .order("pickup_date", { ascending: true });
+      .gte("paid_at", fromUTC)
+      .lte("paid_at", toUTC)
+      .order("paid_at", { ascending: true });
 
     if (error) {
       return NextResponse.json(
@@ -42,15 +49,30 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const totalTrx = txList.length;
     const avgDeal  = totalTrx > 0 ? Math.round(totalRevenue / totalTrx) : 0;
 
-    const getGroupKey = (pickupDate: string): string => {
-      if (!pickupDate) return "unknown";
+    // ✅ FIX: paid_at adalah UTC ISO string ("2026-06-16T04:30:00.000Z")
+    // Konversi ke tanggal WIB dengan cara: parse UTC → tambah 7 jam → ambil YYYY-MM-DD
+    const getDateWIB = (paidAt: string): string => {
+      if (!paidAt) return "";
+      try {
+        // new Date("2026-06-16T04:30:00.000Z") → timestamp UTC
+        // + 7 jam → timestamp WIB
+        // toISOString().slice(0,10) → "2026-06-16"
+        const utcDate = new Date(paidAt);
+        const wibMs = utcDate.getTime() + 7 * 60 * 60 * 1000;
+        return new Date(wibMs).toISOString().slice(0, 10);
+      } catch {
+        return "";
+      }
+    };
+
+    const getGroupKey = (dateStr: string): string => {
+      if (!dateStr) return "unknown";
 
       if (groupBy === "month") {
-        // "2026-06-07" → "2026-06"
-        return pickupDate.slice(0, 7);
+        return dateStr.slice(0, 7); // "2026-06"
       }
       if (groupBy === "week") {
-        const [y, m, d] = pickupDate.split("-").map(Number);
+        const [y, m, d] = dateStr.split("-").map(Number);
         const date = new Date(y, m - 1, d);
         const day  = date.getDay() || 7;
         const dt   = new Date(date);
@@ -59,26 +81,26 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         const weekNo = Math.ceil((((dt.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
         return `${dt.getFullYear()}-W${String(weekNo).padStart(2, "0")}`;
       }
-      return pickupDate;
+      // day → "2026-06-16"
+      return dateStr;
     };
 
-    const getLabel = (key: string, pickupDate: string): string => {
+    const getLabel = (key: string, dateStr: string): string => {
       if (groupBy === "day") {
-        // Parse dari "YYYY-MM-DD" tanpa timezone issue
-        const [y, m, d] = pickupDate.split("-").map(Number);
+        const [y, m, d] = dateStr.split("-").map(Number);
         return new Date(y, m - 1, d).toLocaleDateString("id-ID", {
-          day: "numeric", month: "short", year: "numeric",
+          day: "numeric", month: "short",
         });
       }
       if (groupBy === "month") {
         const [y, m] = key.split("-").map(Number);
         return new Date(y, m - 1, 1).toLocaleDateString("id-ID", {
-          month: "long", year: "numeric",
+          month: "short", year: "numeric",
         });
       }
       // week
-      const [year, week] = key.split("-W");
-      return `Minggu ${week}, ${year}`;
+      const [, week] = key.split("-W");
+      return `Minggu ${week}`;
     };
 
     const groupMap: Record<string, {
@@ -86,8 +108,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     }> = {};
 
     txList.forEach(t => {
-      const pickupDate = (t.pickup_date as string) || "";
-      const key  = getGroupKey(pickupDate);
+      const paidAt  = (t.paid_at as string) || "";
+      const dateStr = getDateWIB(paidAt);
+      if (!dateStr) return; // skip kalau paid_at null/kosong
+
+      const key  = getGroupKey(dateStr);
       const deal = Number(t.deal_price || t.amount || 0);
       const inv  = Number(t.inventory_price || 0);
       const prof = inv > 0 ? deal - inv : Number(t.other || 0);
@@ -95,7 +120,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       if (!groupMap[key]) {
         groupMap[key] = {
           revenue: 0, profit: 0, trxCount: 0,
-          label: getLabel(key, pickupDate),
+          label: getLabel(key, dateStr),
         };
       }
 
@@ -108,6 +133,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, val]) => ({ key, ...val }));
 
+    // ── Top Sales ────────────────────────────────────────────────────────────
     const salesMap: Record<string, { revenue: number; profit: number; count: number }> = {};
     txList.forEach(t => {
       const name = t.sales_name || "Unknown";
@@ -124,6 +150,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
+    // ── Top Laptop ───────────────────────────────────────────────────────────
     const laptopMap: Record<string, { revenue: number; profit: number; count: number }> = {};
     txList.forEach(t => {
       const name = t.laptop_name || "Unknown";
@@ -140,6 +167,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
+    // ── Top Source ───────────────────────────────────────────────────────────
     const sourceMap: Record<string, { revenue: number; count: number }> = {};
     txList.forEach(t => {
       const src = t.source_platform || "Unknown";

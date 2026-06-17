@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
@@ -29,7 +30,7 @@ interface LaptopUnit {
     };
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const GRADE_BADGE: Record<string, string> = {
@@ -40,16 +41,16 @@ const GRADE_BADGE: Record<string, string> = {
 
 const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
-    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
-    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
-    PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "📦 Packing" },
+    RESERVED:  { badge: "bg-violet-50 text-violet-700 border-violet-200",   dot: "bg-violet-500",  label: "Dipesan (DP)" },
+    HELD:      { badge: "bg-orange-50 text-orange-700 border-orange-200",   dot: "bg-orange-500",  label: "Diambil Dulu" },
+    SOLD:      { badge: "bg-gray-100 text-gray-500 border-gray-200",        dot: "bg-gray-400",    label: "Terjual" },
+    PACKING:   { badge: "bg-sky-50 text-sky-700 border-sky-200",            dot: "bg-sky-500",     label: "📦 Packing" },
 };
 
 const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition";
 const labelCls = "block text-xs font-medium text-gray-500 mb-1.5";
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -72,6 +73,7 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     );
 }
 
+// ─── SkeletonRows ─────────────────────────────────────────────────────────────
 function SkeletonRows() {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -79,21 +81,32 @@ function SkeletonRows() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                            {["Laptop", "SN", "Grade", "Harga Jual", "Status", "Pemesan", "Aksi"].map(h => (
-                                <th key={h} className="px-4 py-3 text-left"><div className="h-3 bg-gray-200 rounded w-20 animate-pulse" /></th>
+                            {["No", "Laptop", "Serial Number", "Grade", "Harga Jual", "Status", "Pemesan", "Aksi"].map(h => (
+                                <th key={h} className="px-4 py-3.5 text-left">
+                                    <div className="h-2.5 bg-gray-200 rounded-full w-16 animate-pulse" />
+                                </th>
                             ))}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {[...Array(6)].map((_, i) => (
-                            <tr key={i} className="animate-pulse">
-                                <td className="px-4 py-3.5"><div className="h-4 bg-gray-100 rounded w-40" /></td>
-                                <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-28" /></td>
-                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-16" /></td>
-                                <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-24 ml-auto" /></td>
-                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-20" /></td>
-                                <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded w-24" /></td>
-                                <td className="px-4 py-3.5"><div className="flex gap-1 justify-end"><div className="h-7 bg-gray-100 rounded-lg w-12" /><div className="h-7 bg-gray-100 rounded-lg w-12" /></div></td>
+                            <tr key={i} style={{ opacity: 1 - i * 0.13 }}>
+                                <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded-full w-5 mx-auto animate-pulse" /></td>
+                                <td className="px-4 py-3.5 space-y-1.5">
+                                    <div className="h-3.5 bg-gray-100 rounded-full w-36 animate-pulse" />
+                                    <div className="h-2.5 bg-gray-100 rounded-full w-24 animate-pulse" />
+                                </td>
+                                <td className="px-4 py-3.5"><div className="h-6 bg-gray-100 rounded-lg w-28 animate-pulse" /></td>
+                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-16 animate-pulse" /></td>
+                                <td className="px-4 py-3.5"><div className="h-3.5 bg-gray-100 rounded-full w-24 ml-auto animate-pulse" /></td>
+                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-20 animate-pulse" /></td>
+                                <td className="px-4 py-3.5"><div className="h-3.5 bg-gray-100 rounded-full w-20 animate-pulse" /></td>
+                                <td className="px-4 py-3.5">
+                                    <div className="flex gap-1.5 justify-end">
+                                        <div className="h-7 bg-gray-100 rounded-lg w-14 animate-pulse" />
+                                        <div className="h-7 bg-gray-100 rounded-lg w-14 animate-pulse" />
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -103,16 +116,23 @@ function SkeletonRows() {
     );
 }
 
-function StatCard({ label, value, icon, color, bg, bar }: any) {
+// ─── StatCard ─────────────────────────────────────────────────────────────────
+function StatCard({ label, value, icon, color, bg, bar }: {
+    label: string; value: number; icon: string;
+    color: string; bg: string; bar: string;
+}) {
     return (
-        <div className={`${bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
-            <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
-                    <p className={`text-2xl font-extrabold mt-1 ${color}`}>{value}</p>
+        <div className={`${bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-4 sm:p-5 relative overflow-hidden group hover:-translate-y-0.5`}>
+            {/* Bottom accent bar */}
+            <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-50 group-hover:opacity-100 transition-opacity`} />
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-2">{label}</p>
+                    <p className={`text-2xl sm:text-3xl font-black tracking-tight leading-none ${color}`}>{value}</p>
                 </div>
-                <div className="text-2xl opacity-60 group-hover:opacity-100 transition-opacity">{icon}</div>
+                <div className={`w-10 h-10 rounded-2xl ${bar} flex items-center justify-center text-lg flex-shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity`}>
+                    {icon}
+                </div>
             </div>
         </div>
     );
@@ -122,6 +142,7 @@ function StatCard({ label, value, icon, color, bg, bar }: any) {
 export default function ReadyPage() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
     const [salesName, setSalesName] = useState("");
 
@@ -153,7 +174,7 @@ export default function ReadyPage() {
                 setUnits((result.data || []).map((u: LaptopUnit) => ({
                     ...u,
                     purchase_price: Math.round(Number(u.purchase_price) || 0),
-                    selling_price: Math.round(Number(u.selling_price) || 0),
+                    selling_price:  Math.round(Number(u.selling_price)  || 0),
                 })));
             }
         } catch { setUnits([]); }
@@ -165,7 +186,7 @@ export default function ReadyPage() {
     const filtered = useMemo(() => {
         let list = [...units];
         if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
-        if (filterGrade !== "ALL") list = list.filter(u => u.grade === filterGrade);
+        if (filterGrade  !== "ALL") list = list.filter(u => u.grade  === filterGrade);
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(u =>
@@ -185,199 +206,367 @@ export default function ReadyPage() {
     }, [units, filterStatus, filterGrade, search]);
 
     const counts = {
-        all: units.length,
-        siap: units.filter(u => u.status === "SIAP_JUAL").length,
+        all:      units.length,
+        siap:     units.filter(u => u.status === "SIAP_JUAL").length,
         reserved: units.filter(u => u.status === "RESERVED").length,
-        held: units.filter(u => u.status === "HELD").length,
-        packing: units.filter(u => u.status === "PACKING").length,
+        held:     units.filter(u => u.status === "HELD").length,
+        packing:  units.filter(u => u.status === "PACKING").length,
     };
+
+    // ── Export Excel ──────────────────────────────────────────────────────────
+    const exportToExcel = () => {
+        if (filtered.length === 0) return;
+        setIsExporting(true);
+        try {
+            const rows = filtered.map((u, idx) => ({
+                "No":             idx + 1,
+                "Nama Laptop":    u.laptop?.laptop_name  ?? "—",
+                "Brand":          u.laptop?.brand        ?? "—",
+                "CPU":            u.laptop?.cpu          ?? "—",
+                "RAM":            u.laptop?.ram          ?? "—",
+                "Storage":        u.laptop?.storage      ?? "—",
+                "Serial Number":  u.serial_number        ?? "—",
+                "Grade":          `Grade ${u.grade}`,
+                "Harga Beli":     u.purchase_price,
+                "Harga Jual":     u.selling_price,
+                "Status":         STATUS_CONFIG[u.status]?.label ?? u.status,
+                "Catatan":        u.notes                ?? "—",
+                "Tanggal Input":  u.created_at
+                    ? new Date(u.created_at).toLocaleDateString("id-ID", {
+                          day: "2-digit", month: "short", year: "numeric",
+                      })
+                    : "—",
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws["!cols"] = [
+                { wch: 5  }, { wch: 36 }, { wch: 14 }, { wch: 24 },
+                { wch: 10 }, { wch: 14 }, { wch: 24 }, { wch: 10 },
+                { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 16 },
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Laptop Siap Jual");
+
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+            XLSX.writeFile(wb, `SiapJual_${dateStr}.xlsx`);
+        } catch (err) {
+            console.error("Export Excel gagal:", err);
+            setAlertMsg("Gagal export Excel. Coba lagi.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const hasActiveFilter = search || filterStatus !== "ALL" || filterGrade !== "ALL";
 
     return (
         <DashboardLayout>
             <style>{`
                 @keyframes fadeIn  { from { opacity:0; transform:scale(0.95) }  to { opacity:1; transform:scale(1) } }
                 @keyframes scaleIn { from { opacity:0; transform:scale(0.9) }   to { opacity:1; transform:scale(1) } }
-                @keyframes slideIn { from { opacity:0; transform:translateX(-30px) } to { opacity:1; transform:translateX(0) } }
-                @keyframes fadeUp  { from { opacity:0; transform:translateY(15px) }  to { opacity:1; transform:translateY(0) } }
+                @keyframes slideIn { from { opacity:0; transform:translateX(-24px) } to { opacity:1; transform:translateX(0) } }
+                @keyframes fadeUp  { from { opacity:0; transform:translateY(12px) }  to { opacity:1; transform:translateY(0) } }
                 @keyframes slideUp { from { opacity:0; transform:translateY(100%) }  to { opacity:1; transform:translateY(0) } }
-                .animate-fadeIn  { animation: fadeIn  0.3s ease-out; }
-                .animate-scaleIn { animation: scaleIn 0.25s ease-out; }
-                .animate-slideIn { animation: slideIn 0.4s ease-out; }
-                .animate-fadeUp  { animation: fadeUp  0.4s ease-out; }
-                .animate-slideUp { animation: slideUp 0.3s ease-out; }
+                .animate-fadeIn  { animation: fadeIn  0.25s ease-out; }
+                .animate-scaleIn { animation: scaleIn 0.2s  ease-out; }
+                .animate-slideIn { animation: slideIn 0.35s ease-out; }
+                .animate-fadeUp  { animation: fadeUp  0.35s ease-out; }
+                .animate-slideUp { animation: slideUp 0.3s  ease-out; }
                 .table-scroll { scrollbar-width:thin; scrollbar-color:#cbd5e1 #f1f5f9; }
-                .table-scroll::-webkit-scrollbar { height:8px; width:8px; }
-                .table-scroll::-webkit-scrollbar-track { background:#f1f5f9; border-radius:10px; }
+                .table-scroll::-webkit-scrollbar { height:6px; }
+                .table-scroll::-webkit-scrollbar-track { background:#f8fafc; border-radius:10px; }
                 .table-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:10px; }
-                .data-row { transition: all 0.2s ease; }
-                .data-row:hover { transform: translateX(2px); }
+                .data-row { transition: background 0.15s ease, transform 0.15s ease; }
+                .data-row:hover { transform: translateX(1px); }
+                .scrollbar-hide::-webkit-scrollbar { display: none; }
+                .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            <main className="min-h-screen bg-white p-4 sm:p-6 lg:p-8">
-                <div className="max-w-full mx-auto space-y-5">
+            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+                <div className="max-w-full mx-auto space-y-5 sm:space-y-6">
 
-                    {/* Header */}
-                    <div className="flex flex-wrap items-end justify-between gap-3 animate-slideIn">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1 h-7 bg-gray-300 rounded-full" />
-                            <div className="w-8 h-8 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm">
+                    {/* ── Header ─────────────────────────────────────────── */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 animate-slideIn">
+                        {/* Judul */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-1 h-8 rounded-full bg-gray-800 flex-shrink-0" />
+                            <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                    <path d="M9 12l2 2 4-4" /><rect x="2" y="3" width="20" height="14" rx="2" />
-                                    <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                                    <path d="M9 12l2 2 4-4" />
+                                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
                                 </svg>
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-800">Laptop Siap Jual</h1>
-                                <p className="text-xs text-gray-400 mt-0.5">Unit tersedia, dipesan, dan diambil reseller</p>
+                                <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Laptop Siap Jual</h1>
+                                <p className="text-xs text-gray-400 font-medium mt-0.5">
+                                    {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
+                                </p>
                             </div>
                         </div>
-                        <button onClick={fetchUnits} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 px-3 py-2 rounded-xl transition-all bg-white hover:bg-gray-50 group">
-                            <svg className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all} icon="💻" color="text-gray-800" bg="bg-white" bar="bg-gray-400" />
-                        <StatCard label="Siap Jual" value={counts.siap} icon="✅" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
-                        <StatCard label="Dipesan" value={counts.reserved} icon="🔒" color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
-                        <StatCard label="Diambil" value={counts.held} icon="📦" color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
-                    </div>
+                        {/* Button group */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* Export Excel */}
+                            <button
+                                onClick={exportToExcel}
+                                disabled={isExporting || filtered.length === 0}
+                                title={filtered.length === 0 ? "Tidak ada data untuk di-export" : `Export ${filtered.length} unit ke Excel`}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 h-9 px-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {isExporting ? (
+                                    <>
+                                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Mengexport...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Export Excel</span>
+                                        <span className="sm:hidden">Excel</span>    
+                                    </>
+                                )}
+                            </button>
 
-                    {/* Filter */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                            {[
-                                { value: "ALL", label: "Semua", count: counts.all },
-                                { value: "SIAP_JUAL", label: "✅ Siap Jual", count: counts.siap },
-                                { value: "RESERVED", label: "🔒 Dipesan", count: counts.reserved },
-                                { value: "HELD", label: "📦 Diambil", count: counts.held },
-                                { value: "PACKING", label: "📦 Packing", count: counts.packing },
-                            ].map(opt => (
-                                <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-md scale-105" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}>
-                                    <span>{opt.label}</span>
-                                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>{opt.count}</span>
-                                </button>
-                            ))}
+                            {/* Refresh */}
+                            <button
+                                onClick={fetchUnits}
+                                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 h-9 px-3.5 rounded-xl transition-all active:scale-[0.98] group"
+                            >
+                                <svg
+                                    className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Refresh
+                            </button>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <div className="relative flex-1 group">
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    </div>
+
+                    {/* ── Stat Cards ─────────────────────────────────────── */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
+                        <StatCard label="Total Unit"  value={counts.all}      icon="💻" color="text-gray-900"    bg="bg-white"      bar="bg-gray-800"    />
+                        <StatCard label="Siap Jual"   value={counts.siap}     icon="✅" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
+                        <StatCard label="Dipesan"     value={counts.reserved} icon="🔒" color="text-violet-600"  bg="bg-violet-50"  bar="bg-violet-500"  />
+                        <StatCard label="Diambil"     value={counts.held}     icon="📦" color="text-orange-600"  bg="bg-orange-50"  bar="bg-orange-500"  />
+                    </div>
+
+                    {/* ── Filter ─────────────────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        {/* Status chips — scrollable */}
+                        <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+                            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+                                {[
+                                    { value: "ALL",       label: "Semua",        count: counts.all,      dot: ""              },
+                                    { value: "SIAP_JUAL", label: "Siap Jual",    count: counts.siap,     dot: "bg-emerald-500"},
+                                    { value: "RESERVED",  label: "Dipesan (DP)", count: counts.reserved, dot: "bg-violet-500" },
+                                    { value: "HELD",      label: "Diambil Dulu", count: counts.held,     dot: "bg-orange-500" },
+                                    { value: "PACKING",   label: "Packing",      count: counts.packing,  dot: "bg-sky-500"    },
+                                ].map(opt => {
+                                    const isActive = filterStatus === opt.value;
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setFilterStatus(opt.value)}
+                                            className={`flex-shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold transition-all duration-150 ${isActive ? "bg-gray-900 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800"}`}
+                                        >
+                                            {opt.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? "bg-white/60" : opt.dot}`} />}
+                                            <span>{opt.label}</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${isActive ? "bg-white/20 text-white" : "bg-white text-gray-500"}`}>
+                                                {opt.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Search + Grade + Reset */}
+                        <div className="px-4 py-3 flex flex-wrap gap-2">
+                            <div className="relative flex-1 min-w-[180px]">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
-                                <input type="text" placeholder="Cari nama laptop, SN, atau pemesan..." value={search} onChange={e => setSearch(e.target.value)}
-                                    className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama, SN, brand, atau pemesan..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
+                                />
+                                {search && (
+                                    <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                )}
                             </div>
-                            <select value={filterGrade} onChange={e => setFilterGrade(e.target.value)}
-                                className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 text-gray-700 focus:outline-none transition cursor-pointer">
-                                <option value="ALL">⭐ Semua Grade</option>
+                            <select
+                                value={filterGrade}
+                                onChange={e => setFilterGrade(e.target.value)}
+                                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium"
+                            >
+                                <option value="ALL">Semua Grade</option>
                                 <option value="A">🏆 Grade A</option>
                                 <option value="B">👍 Grade B</option>
                                 <option value="C">⚠️ Grade C</option>
                             </select>
-                            {(search || filterStatus !== "ALL" || filterGrade !== "ALL") && (
-                                <button onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
-                                    className="h-10 px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition flex items-center gap-1.5">
-                                    ✕ Reset
+                            {hasActiveFilter && (
+                                <button
+                                    onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
+                                    className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98]"
+                                >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Reset
                                 </button>
                             )}
                         </div>
                     </div>
 
-                    {/* Table */}
-                    {isLoading ? <SkeletonRows /> : filtered.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-                            <div className="text-6xl mb-4">💻</div>
-                            <p className="text-gray-500 font-semibold">Tidak ada unit ditemukan</p>
-                            <p className="text-gray-400 text-sm mt-2">Coba ubah filter pencarian</p>
+                    {/* ── Table ──────────────────────────────────────────── */}
+                    {isLoading ? (
+                        <SkeletonRows />
+                    ) : filtered.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20 gap-3">
+                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-3xl">💻</div>
+                            <div className="text-center">
+                                <p className="text-gray-600 font-bold text-sm">Tidak ada unit ditemukan</p>
+                                <p className="text-gray-400 text-xs mt-1">
+                                    {hasActiveFilter ? "Coba ubah atau reset filter di atas" : "Belum ada unit yang terdaftar"}
+                                </p>
+                            </div>
+                            {hasActiveFilter && (
+                                <button
+                                    onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
+                                    className="mt-1 h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
+                                >
+                                    Reset Filter
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                             <div className="overflow-x-auto table-scroll">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="bg-gray-50 border-b border-gray-100">
-                                            <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-10">No</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Serial Number</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Grade</th>
-                                            <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Harga Jual</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                                            <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pemesan</th>
-                                            <th className="px-4 py-3 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
+                                        <tr className="bg-gray-50/80 border-b border-gray-100">
+                                            <th className="px-4 py-3 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest w-10">No</th>
+                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Laptop</th>
+                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Serial Number</th>
+                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Grade</th>
+                                            <th className="px-4 py-3 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Harga Jual</th>
+                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Pemesan</th>
+                                            <th className="px-4 py-3 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-
                                         {filtered.map((unit, idx) => {
                                             const st = STATUS_CONFIG[unit.status];
                                             const isAvailable = unit.status === "SIAP_JUAL";
-                                            const isPending = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
+                                            const isPending   = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
                                             return (
-                                                <tr key={unit.id} className={`data-row ${unit.status === "RESERVED" ? "bg-violet-50/30 hover:bg-violet-50/50" : unit.status === "HELD" ? "bg-orange-50/30 hover:bg-orange-50/50" : "hover:bg-gray-50/70"}`}>
-                                                    <td className="px-4 py-3.5 text-center whitespace-nowrap w-10">
-                                                        <span className="text-xs font-medium text-gray-400">{idx + 1}</span>
+                                                <tr
+                                                    key={unit.id}
+                                                    className={`data-row ${unit.status === "RESERVED" ? "bg-violet-50/20 hover:bg-violet-50/40" : unit.status === "HELD" ? "bg-orange-50/20 hover:bg-orange-50/40" : "hover:bg-gray-50/60"}`}
+                                                >
+                                                    {/* No */}
+                                                    <td className="px-4 py-3.5 text-center w-10">
+                                                        <span className="text-[11px] font-semibold text-gray-300 tabular-nums">{idx + 1}</span>
                                                     </td>
-                                                    <td className="px-4 py-3.5 max-w-[220px]">
-                                                        <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>{unit.laptop?.laptop_name || "—"}</p>
-                                                        <div className="flex flex-wrap gap-1 mt-1">
-                                                            {unit.laptop?.brand && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{unit.laptop.brand}</span>}
-                                                            {unit.laptop?.cpu && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{unit.laptop.cpu}</span>}
-                                                            {unit.laptop?.ram && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{unit.laptop.ram}</span>}
+
+                                                    {/* Laptop */}
+                                                    <td className="px-4 py-3.5" style={{ maxWidth: 240 }}>
+                                                        <p className="font-semibold text-gray-800 text-xs truncate" title={unit.laptop?.laptop_name}>
+                                                            {unit.laptop?.laptop_name || "—"}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            {unit.laptop?.brand   && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.brand}</span>}
+                                                            {unit.laptop?.cpu     && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.cpu}</span>}
+                                                            {unit.laptop?.ram     && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.ram}</span>}
                                                         </div>
                                                     </td>
+
+                                                    {/* Serial Number */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <code className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{unit.serial_number}</code>
+                                                        <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{unit.serial_number}</code>
                                                     </td>
+
+                                                    {/* Grade */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
                                                             {unit.grade === "A" ? "🏆" : unit.grade === "B" ? "👍" : "⚠️"} Grade {unit.grade}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right font-bold text-gray-800 whitespace-nowrap tabular-nums">{fmt(unit.selling_price)}</td>
+
+                                                    {/* Harga Jual */}
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="font-bold text-gray-800 text-xs tabular-nums">{fmt(unit.selling_price)}</span>
+                                                    </td>
+
+                                                    {/* Status */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         {st && (
-                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${st.badge}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${st.dot} animate-pulse`} />{st.label}
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${st.badge}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
+                                                                {st.label}
                                                             </span>
                                                         )}
                                                     </td>
+
+                                                    {/* Pemesan */}
                                                     <td className="px-4 py-3.5">
                                                         {isPending && unit.reserved_by ? (
                                                             <div>
                                                                 <p className="text-xs font-semibold text-gray-700">{unit.reserved_by}</p>
-                                                                {unit.reserved_invoice && <p className="text-[10px] text-gray-400 font-mono mt-0.5">{unit.reserved_invoice}</p>}
+                                                                {unit.reserved_invoice && (
+                                                                    <p className="text-[9px] text-gray-400 font-mono mt-0.5 bg-gray-100 px-1.5 py-0.5 rounded-md inline-block">{unit.reserved_invoice}</p>
+                                                                )}
                                                             </div>
-                                                        ) : <span className="text-gray-300 text-xs">—</span>}
+                                                        ) : (
+                                                            <span className="text-gray-200 text-xs">—</span>
+                                                        )}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+
+                                                    {/* Aksi */}
+                                                    <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
                                                             {isAvailable && canCreateTx && (
                                                                 <>
-                                                                    <button onClick={() => setReserveTarget({ unit, type: "RESERVED" })}
-                                                                        className="px-2.5 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition">
+                                                                    <button
+                                                                        onClick={() => setReserveTarget({ unit, type: "RESERVED" })}
+                                                                        className="px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition active:scale-95"
+                                                                    >
                                                                         🔒 DP
                                                                     </button>
-                                                                    <button onClick={() => setReserveTarget({ unit, type: "HELD" })}
-                                                                        className="px-2.5 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
+                                                                    <button
+                                                                        onClick={() => setReserveTarget({ unit, type: "HELD" })}
+                                                                        className="px-2.5 py-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition active:scale-95"
+                                                                    >
                                                                         📦 Ambil
                                                                     </button>
                                                                 </>
                                                             )}
                                                             {isPending && canConfirmTx && !confirmedUnitIds.has(unit.id) && (
-                                                                <button onClick={() => setConfirmTarget(unit)}
-                                                                    className="px-2.5 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                                                                <button
+                                                                    onClick={() => setConfirmTarget(unit)}
+                                                                    className="px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition active:scale-95"
+                                                                >
                                                                     ✓ Lunas
                                                                 </button>
                                                             )}
                                                             {isPending && confirmedUnitIds.has(unit.id) && (
-                                                                <span className="px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-1">
-                                                                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                                                <span className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-1">
+                                                                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                                    </svg>
                                                                     Lunas
                                                                 </span>
                                                             )}
@@ -389,15 +578,37 @@ export default function ReadyPage() {
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-                                <p className="text-xs text-gray-400">Menampilkan <span className="font-semibold text-gray-600">{filtered.length}</span> dari <span className="font-semibold text-gray-600">{units.length}</span> unit</p>
+
+                            {/* Footer tabel */}
+                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex items-center justify-between gap-3">
+                                <p className="text-[11px] text-gray-400">
+                                    Menampilkan{" "}
+                                    <span className="font-bold text-gray-600">{filtered.length}</span>{" "}
+                                    dari{" "}
+                                    <span className="font-bold text-gray-600">{units.length}</span>{" "}
+                                    unit
+                                    {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
+                                </p>
+                                <button
+                                    onClick={exportToExcel}
+                                    disabled={isExporting || filtered.length === 0}
+                                    className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export Excel
+                                </button>
                             </div>
                         </div>
                     )}
+
                 </div>
             </main>
 
+            {/* ── Modals ─────────────────────────────────────────────────── */}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
+
             {reserveTarget && (
                 <ReserveModal
                     unit={reserveTarget.unit}
@@ -407,6 +618,7 @@ export default function ReadyPage() {
                     onSuccess={() => { setAlertMsg("Berhasil disimpan ✅"); fetchUnits(); }}
                 />
             )}
+
             {confirmTarget && (
                 <ConfirmPaymentModal
                     unit={confirmTarget}
@@ -429,19 +641,19 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
 }) {
     const isDP = type === "RESERVED";
     const [form, setForm] = useState({
-        customer_name: "",
-        customer_phone: "",
-        company_name: "Solit",
-        dp_amount: "",
-        deal_price: String(unit.selling_price || ""),
-        payment_method: "TRANSFER",
-        source_platform: "",
-        notes: "",
+        customer_name:    "",
+        customer_phone:   "",
+        company_name:     "Solit",
+        dp_amount:        "",
+        deal_price:       String(unit.selling_price || ""),
+        payment_method:   "TRANSFER",
+        source_platform:  "",
+        notes:            "",
         software_request: "",
-        pickup_method: "COD",
-        pickup_date: "",
-        pickup_time: "",
-        pickup_location: "",
+        pickup_method:    "COD",
+        pickup_date:      "",
+        pickup_time:      "",
+        pickup_location:  "",
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -458,30 +670,30 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!form.customer_name.trim()) { setError("Nama pelanggan wajib diisi"); return; }
-        if (isDP && !form.dp_amount) { setError("Jumlah DP wajib diisi"); return; }
-        if (!form.deal_price) { setError("Harga deal wajib diisi"); return; }
-
+        if (isDP && !form.dp_amount)    { setError("Jumlah DP wajib diisi"); return; }
+        if (!form.deal_price)           { setError("Harga deal wajib diisi"); return; }
         setLoading(true); setError("");
         try {
             const res = await fetch("/api/units/reserve", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    unit_id: unit.id, type,
-                    customer_name: form.customer_name.trim(),
-                    customer_phone: form.customer_phone.trim() || null,
-                    company_name: form.company_name.trim() || null,
-                    dp_amount: isDP ? Number(form.dp_amount) : undefined,
-                    deal_price: Number(form.deal_price),
-                    payment_method: form.payment_method,
-                    source_platform: form.source_platform || null,
-                    notes: form.notes || null,
-                    sales_name: salesName,
+                    unit_id:          unit.id,
+                    type,
+                    customer_name:    form.customer_name.trim(),
+                    customer_phone:   form.customer_phone.trim() || null,
+                    company_name:     form.company_name.trim()   || null,
+                    dp_amount:        isDP ? Number(form.dp_amount) : undefined,
+                    deal_price:       Number(form.deal_price),
+                    payment_method:   form.payment_method,
+                    source_platform:  form.source_platform || null,
+                    notes:            form.notes           || null,
+                    sales_name:       salesName,
                     software_request: form.software_request || null,
-                    pickup_method: form.pickup_method || null,
-                    pickup_date: form.pickup_date || null,
-                    pickup_time: form.pickup_time || null,
-                    pickup_location: form.pickup_location || null,
+                    pickup_method:    form.pickup_method    || null,
+                    pickup_date:      form.pickup_date      || null,
+                    pickup_time:      form.pickup_time      || null,
+                    pickup_location:  form.pickup_location  || null,
                 }),
             });
             const result = await res.json();
@@ -528,7 +740,7 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                     </div>
                 </div>
 
-                {/* ✅ Form — semua field lengkap */}
+                {/* Form */}
                 <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
@@ -536,20 +748,14 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                             {error}
                         </div>
                     )}
-
-                    {/* Nama Pelanggan */}
                     <div>
                         <label className={labelCls}>Nama Pelanggan / Reseller <span className="text-red-400">*</span></label>
                         <input name="customer_name" value={form.customer_name} onChange={set} placeholder="Nama lengkap..." autoFocus className={inputCls} required />
                     </div>
-
-                    {/* No WA */}
                     <div>
                         <label className={labelCls}>No. WhatsApp</label>
                         <input name="customer_phone" value={form.customer_phone} onChange={set} placeholder="08xxxxxxxxxx" className={inputCls} />
                     </div>
-
-                    {/* Harga Deal + DP (jika tipe DP) */}
                     <div className={`grid gap-3 ${isDP ? "grid-cols-2" : "grid-cols-1"}`}>
                         <div>
                             <label className={labelCls}>Harga Deal (Rp) <span className="text-red-400">*</span></label>
@@ -562,8 +768,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                             </div>
                         )}
                     </div>
-
-                    {/* Metode Bayar + Sumber */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className={labelCls}>Metode Pembayaran</label>
@@ -586,8 +790,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                             </select>
                         </div>
                     </div>
-
-                    {/* Pickup */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className={labelCls}>Metode Pengambilan</label>
@@ -602,8 +804,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                             <input name="pickup_date" type="date" value={form.pickup_date} onChange={set} className={inputCls} />
                         </div>
                     </div>
-
-                    {/* Software & Catatan */}
                     <div>
                         <label className={labelCls}>Request Software</label>
                         <input name="software_request" value={form.software_request} onChange={set} placeholder="e.g. Office, Windows 11..." className={inputCls} />
@@ -619,7 +819,10 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                     <button type="button" onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
                     <button type="button" onClick={() => handleSubmit()} disabled={loading}
                         className={`flex-1 h-11 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md ${isDP ? "bg-gray-800 hover:bg-gray-900" : "bg-gray-700 hover:bg-gray-800"}`}>
-                        {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : isDP ? "Kunci Unit (DP)" : "Konfirmasi Ambil"}
+                        {loading
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                            : isDP ? "Kunci Unit (DP)" : "Konfirmasi Ambil"
+                        }
                     </button>
                 </div>
             </div>
@@ -661,7 +864,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
 
     const handleConfirm = async () => {
         if (!unit.reserved_invoice) { setError("Invoice tidak ditemukan"); return; }
-        if (!unit.serial_number) { setError("Serial number tidak ditemukan"); return; }
+        if (!unit.serial_number)    { setError("Serial number tidak ditemukan"); return; }
         setLoading(true); setError("");
         try {
             const res = await fetch("/api/units/confirm-payment", {
@@ -669,8 +872,8 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     invoice_number: unit.reserved_invoice,
-                    serial_number: unit.serial_number,
-                    payment_photo: paymentProof || null,
+                    serial_number:  unit.serial_number,
+                    payment_photo:  paymentProof || null,
                 }),
             });
             const result = await res.json();
@@ -681,7 +884,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     };
 
     const statusColor = unit.status === "RESERVED" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-orange-50 text-orange-700 border-orange-200";
-    const statusDot = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
+    const statusDot   = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
     const statusLabel = unit.status === "RESERVED" ? "DP" : "Ambil Dulu";
 
     return (
@@ -689,6 +892,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
+                {/* Header */}
                 <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -706,15 +910,16 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     </div>
                 </div>
 
+                {/* Body */}
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
-                            { label: "Status", value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
-                            { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
-                            { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
-                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
+                            { label: "Status",        value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
+                            { label: "Invoice",       value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
+                            { label: "Dipesan oleh",  value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
+                            { label: "Laptop",        value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
                             { label: "Serial Number", value: <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-md text-gray-800">{unit.serial_number || "—"}</code> },
-                            { label: "Harga Jual", value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
+                            { label: "Harga Jual",    value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
                                 <span className="text-xs text-gray-400">{row.label}</span>
@@ -723,13 +928,20 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                         ))}
                     </div>
 
-                    {/* Upload bukti bayar */}
+                    {/* Upload bukti */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Bukti Pembayaran <span className="text-gray-400 font-normal">(opsional)</span></label>
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProofUpload} className="hidden" />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingProof}
-                            className={`w-full h-10 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100"}`}>
-                            {uploadingProof ? <><div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />Mengupload...</> : paymentProof ? "✅ Foto terupload — klik untuk ganti" : "📸 Upload foto bukti bayar"}
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingProof}
+                            className={`w-full h-10 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100"}`}
+                        >
+                            {uploadingProof
+                                ? <><div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />Mengupload...</>
+                                : paymentProof ? "✅ Foto terupload — klik untuk ganti" : "📸 Upload foto bukti bayar"
+                            }
                         </button>
                     </div>
 
@@ -746,11 +958,18 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     )}
                 </div>
 
+                {/* Footer */}
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
-                    <button onClick={handleConfirm} disabled={loading || uploadingProof}
-                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md">
-                        {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</> : <>✓ Konfirmasi Lunas</>}
+                    <button
+                        onClick={handleConfirm}
+                        disabled={loading || uploadingProof}
+                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
+                    >
+                        {loading
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+                            : <>✓ Konfirmasi Lunas</>
+                        }
                     </button>
                 </div>
             </div>
