@@ -21,7 +21,8 @@ export type UserRole =
   | "KONTEN"
   | "KEPALA_ONPOINT"
   | "ONPOINT"
-  | "KEPALA_SOTECH";
+  | "KEPALA_SOTECH"
+  | "CUSTOMER_SERVICE"; // ✅ NEW: bisa buat formulir servis
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
@@ -31,8 +32,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   CREW_SALES: "/dashboard",
   ACCOUNTING: "/dashboard",
   PENGELOLA_BARANG: "/dashboard/laptops",
-  TEKNISI: "/dashboard/laptops",
-  KEPALA_TEKNISI: "/dashboard/laptops",
+  TEKNISI: "/dashboard/service/antrian",        // ✅ Teknisi langsung ke antrian
+  KEPALA_TEKNISI: "/dashboard/service/antrian", // ✅ Kepala Teknisi langsung ke antrian
   PENGANTARAN: "/dashboard",
   MARKETING: "/dashboard/laptops",
   KEBERSIHAN: "/dashboard",
@@ -44,6 +45,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_ONPOINT: "/dashboard",
   ONPOINT: "/dashboard",
   KEPALA_SOTECH: "/dashboard",
+  CUSTOMER_SERVICE: "/dashboard/service/antrian", // ✅ CS langsung ke antrian
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
@@ -56,6 +58,7 @@ const ALL_ROLES: UserRole[] = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "CUSTOMER_SERVICE", // ✅ NEW
 ];
 
 const SALES_ACCESS: UserRole[] = [
@@ -64,6 +67,29 @@ const SALES_ACCESS: UserRole[] = [
 ];
 
 const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
+
+// ─── Service Queue Role Groups ────────────────────────────────────────────────
+// Yang bisa MELIHAT semua menu service (antrian, done, history)
+export const SERVICE_VIEW_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "TEKNISI",
+  "KEPALA_TEKNISI",
+  "CUSTOMER_SERVICE",
+];
+
+// Yang bisa BUAT FORMULIR servis
+export const SERVICE_CREATE_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "KEPALA_TEKNISI",
+  "CUSTOMER_SERVICE",
+];
+
+// Yang bisa UPDATE STATUS (done, sedang dikerjakan, dll) — teknisi
+export const SERVICE_TEKNISI_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "TEKNISI",
+  "KEPALA_TEKNISI",
+];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -74,14 +100,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ],
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "TEKNISI", "KEPALA_TEKNISI",   // ✅ NEW
+    "TEKNISI", "KEPALA_TEKNISI",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/dashboard/warranty": [
@@ -99,6 +124,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/dashboard/users": [...FULL_ACCESS],
   "/dashboard/attendance": [...ALL_ROLES],
+
+  // ✅ Service Queue Routes
+  "/dashboard/service": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
+
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -109,8 +141,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
     "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
@@ -155,7 +186,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/schedule": [...FULL_ACCESS],
   "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/overtime": [...ALL_ROLES],
-  // ✅ Semua kepala divisi bisa set rates lembur divisinya
   "/api/attendance/overtime/rates": [
     ...FULL_ACCESS,
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
@@ -163,6 +193,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
   "/api/attendance": [...ALL_ROLES],
+
+  // ✅ Service API Routes
+  "/api/service": [...SERVICE_VIEW_ROLES],
 };
 
 export const PERMISSIONS = {
@@ -189,7 +222,6 @@ export const PERMISSIONS = {
 
   RESTORE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],
 
-  // ✅ FIX: RESERVE_UNIT sudah benar, tidak berubah
   RESERVE_UNIT: [
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
@@ -201,8 +233,7 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING",
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ] as UserRole[],
   CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
   EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
@@ -215,8 +246,7 @@ export const PERMISSIONS = {
   VIEW_UNITS: [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ] as UserRole[],
   CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
   EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
@@ -231,10 +261,17 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "TEKNISI", "KEPALA_TEKNISI",   
+    "TEKNISI", "KEPALA_TEKNISI",
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
+
+  // ✅ Service Queue Permissions
+  VIEW_SERVICE: [...SERVICE_VIEW_ROLES] as UserRole[],
+  CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
+  UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
+  COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[], // done
+  CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[], // sudah diambil
 } as const;
 
 export function hasPermission(
@@ -274,39 +311,25 @@ export function isSubordinate(headRole: string, targetRole: string): boolean {
   return (getSubordinateRoles(headRole) as string[]).includes(targetRole);
 }
 
-/**
- * Apakah user bisa mengelola absensi orang lain?
- * Full access → semua | Kepala divisi → divisinya saja
- */
 export function canManageAttendance(role: string): boolean {
   return isFullAccess(role) || isDivisionHead(role);
 }
 
-/** Apakah user bisa approve lembur? */
 export function canApproveOvertime(role: string): boolean {
   return isFullAccess(role) || isDivisionHead(role);
 }
 
-/**
- * Daftar role yang boleh DIKELOLA seorang user.
- * Full access → semua role | Kepala divisi → bawahan divisinya | lainnya → none
- */
 export function getManageableRoles(role: string): UserRole[] {
   if (isFullAccess(role)) return [...ALL_ROLES];
   if (isDivisionHead(role)) return getSubordinateRoles(role);
   return [];
 }
 
-/**
- * Apakah `actorRole` boleh mengelola data milik user ber-role `targetRole`?
- * Full access → selalu | Kepala divisi → hanya jika target adalah bawahannya
- */
 export function canManageTargetRole(actorRole: string, targetRole: string): boolean {
   if (isFullAccess(actorRole)) return true;
   return isSubordinate(actorRole, targetRole);
 }
 
-/** Apakah user bisa melihat data bayaran lembur? */
 export function canViewOvertimePay(role: string): boolean {
   const PAY_VIEW: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -316,12 +339,10 @@ export function canViewOvertimePay(role: string): boolean {
   return (PAY_VIEW as string[]).includes(role);
 }
 
-/** Apakah user bisa melihat data gaji/salary? */
 export function canViewSalary(role: string): boolean {
   return (["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as string[]).includes(role);
 }
 
-/** Label nama divisi dari kepala */
 export function getDivisionLabel(headRole: string): string {
   const labels: Record<string, string> = {
     KEPALA_TEKNISI: "Divisi Teknisi",
