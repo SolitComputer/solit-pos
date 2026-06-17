@@ -32,7 +32,6 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         is_deleted
       )
     `)
-    .eq("is_deleted", false)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -119,7 +118,10 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  // ✅ Dynamic import — push berjalan SETELAH response, tidak memblokir/crash handler
+  // ✅ Log untuk debug production
+  console.log("[group-chat POST] inserted:", data?.id, "by:", user.name);
+
+  // Push notification (non-blocking)
   const trimmedContent = content.trim();
   const senderName = user.name;
   const senderId = user.id;

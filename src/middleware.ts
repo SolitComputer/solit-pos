@@ -1,3 +1,4 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -12,6 +13,7 @@ const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
 
+// ✅ Hapus /api/group-chat dari sini
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -20,8 +22,8 @@ const FACE_API_WHITELIST = [
   "/api/auth/logout",
   "/api/auth/login",
   "/api/presence",
-  "/api/group-chat",
-  "/api/push/subscribe",];
+  "/api/push/subscribe",
+];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
@@ -53,7 +55,6 @@ function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
   );
 }
 
-// ─── Cookie helper ─────────────────────────────────────────────────────────────
 const SESSION_COOKIES = [
   "token",
   "face_attended",
@@ -76,7 +77,6 @@ function clearSessionAndRedirect(url: URL): NextResponse {
   return response;
 }
 
-// ─── Auto-logout 03:00 WIB threshold ──────────────────────────────────────────
 function getAutoLogoutThreshold(): number {
   const nowUTC = Date.now();
   const nowWIB = new Date(nowUTC + 7 * 3600_000);
@@ -84,7 +84,6 @@ function getAutoLogoutThreshold(): number {
   const y = nowWIB.getUTCFullYear();
   const mo = nowWIB.getUTCMonth();
   const d = nowWIB.getUTCDate();
-  // 03:00 WIB = 20:00 UTC hari sebelumnya = Date.UTC(y,mo,d,-4,0,0)
   const thresholdUTC = wibHour >= 3
     ? Date.UTC(y, mo, d, -4, 0, 0)
     : Date.UTC(y, mo, d - 1, -4, 0, 0);
@@ -95,7 +94,6 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
-  // ── Public routes ────────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
@@ -141,17 +139,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── Verifikasi JWT ───────────────────────────────────────────────────────────
+  // ── Verifikasi JWT + inject headers ─────────────────────────────────────────
   const user = await verifyToken(token);
   if (!user) {
     return clearSessionAndRedirect(new URL("/login", request.url));
   }
 
-  // ── Hanya check auto-logout & force-logout untuk page routes ────────────────
   const isPageRoute = !pathname.startsWith("/api/");
 
   if (isPageRoute) {
-    // Check 1: Auto-logout jam 03:00 WIB
     const issuedAt: number = (user as any).iat ?? 0;
     const autoLogoutThreshold = getAutoLogoutThreshold();
     if (issuedAt > 0 && issuedAt < autoLogoutThreshold) {
@@ -160,7 +156,6 @@ export async function middleware(request: NextRequest) {
       return clearSessionAndRedirect(loginUrl);
     }
 
-    // Check 2: Admin force-logout
     try {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -182,11 +177,10 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch {
-      // DB error → lanjut saja (fail-open)
+      // fail-open
     }
   }
 
-  // ── Attendance check ─────────────────────────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
     const hasAttended = hasAttendanceBypass(request, user.id);
@@ -197,7 +191,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Route permission check ───────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
@@ -211,7 +204,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Pass headers ke downstream ───────────────────────────────────────────────
+  // ✅ Headers diset di sini — group-chat dan messages sekarang dapat headers ini
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);
@@ -239,6 +232,10 @@ export const config = {
     "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",
+<<<<<<< HEAD
     "/api/push/:path*",  
+=======
+    "/api/service/:path*",
+>>>>>>> origin/develop
   ],
 };

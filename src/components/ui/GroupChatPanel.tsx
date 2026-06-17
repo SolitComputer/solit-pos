@@ -1,4 +1,3 @@
-// src/components/ui/GroupChatPanel.tsx
 "use client";
 
 import {
@@ -6,12 +5,9 @@ import {
   KeyboardEvent, Fragment,
 } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "@/services/supabaseClient";
 
-// ─── Supabase client (anon — hanya untuk Realtime) ────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = getSupabaseClient();
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface ReplyPreview {

@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { getSupabaseClient } from "@/services/supabaseClient";
 
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -310,12 +311,8 @@ export function OnlineUsersPanel() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const supabaseRef = useRef(
-    createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  );
+  const supabaseRef = useRef(getSupabaseClient());
+  const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
 
   useEffect(() => {
     getCurrentUserClient().then(user => {
@@ -371,8 +368,17 @@ export function OnlineUsersPanel() {
 
     fetchPresence();
 
+    // Cleanup channel lama dulu sebelum buat baru
+    if (channelRef.current) {
+      supabaseRef.current.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Nama channel unik pakai timestamp supaya tidak konflik
+    const channelName = `user_presence_${Date.now()}`;
+
     const channel = supabaseRef.current
-      .channel("user_presence_realtime")
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_presence" },
@@ -409,13 +415,18 @@ export function OnlineUsersPanel() {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     const ticker = setInterval(() => {
       setPresence(prev => recalculate(prev));
     }, 10_000);
 
     return () => {
       clearInterval(ticker);
-      supabaseRef.current.removeChannel(channel);
+      if (channelRef.current) {
+        supabaseRef.current.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [isAllowed]);
 
