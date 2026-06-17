@@ -3,16 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 
+export const runtime = "nodejs";
+
 const MAX_CONTENT_LENGTH = 2000;
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 100;
 
-// ─── GET — ambil pesan group (paginated) ──────────────────────────────────────
 async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), MAX_LIMIT);
-  // cursor pagination: ambil pesan sebelum timestamp ini (untuk load more ke atas)
-  const before = searchParams.get("before"); // ISO timestamp
+  const before = searchParams.get("before");
 
   let query = supabaseAdmin
     .from("group_messages")
@@ -47,7 +47,6 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  // Reverse supaya chronological (terbaru di bawah)
   const messages = (data ?? []).reverse();
 
   return NextResponse.json({
@@ -57,7 +56,6 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   });
 }
 
-// ─── POST — kirim pesan ke group ─────────────────────────────────────────────
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   let body: any;
   try {
@@ -78,7 +76,6 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     );
   }
 
-  // Validasi reply_to_id jika ada
   if (reply_to_id) {
     const { data: replyMsg } = await supabaseAdmin
       .from("group_messages")
@@ -122,10 +119,29 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
+  // ✅ Dynamic import — push berjalan SETELAH response, tidak memblokir/crash handler
+  const trimmedContent = content.trim();
+  const senderName = user.name;
+  const senderId = user.id;
+
+  Promise.resolve().then(async () => {
+    try {
+      const { sendPushBroadcast } = await import("@/lib/push-notify");
+      await sendPushBroadcast(senderId, {
+        title: `👥 All Team Solit — ${senderName}`,
+        body: trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent,
+        tag: "group-chat",
+        url: "/dashboard/users",
+        requireInteraction: false,
+      });
+    } catch (err: unknown) {
+      console.error("[push group]", err);
+    }
+  });
+
   return NextResponse.json({ success: true, message: data });
 }
 
-// ─── DELETE — hapus pesan sendiri (soft delete) ───────────────────────────────
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("id");
@@ -134,7 +150,6 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
   }
 
-  // Cek kepemilikan (admin bisa hapus semua, user hanya miliknya)
   const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
   const isAdmin = FULL_ACCESS.has(user.role);
 
