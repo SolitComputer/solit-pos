@@ -725,10 +725,20 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<any>(() => getCachedUser());
-  const [loading, setLoading] = useState(!getCachedUser());
+  const [user, setUser] = useState<any>(null);      
+  const [loading, setLoading] = useState(true);    
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const cached = getCachedUser();
+    if (cached) {
+      setUser(cached);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (hasFetched.current) return;
