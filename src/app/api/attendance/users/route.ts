@@ -15,7 +15,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (scope.all) {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, role, shift")
+      .select("id, name, role, shift, created_at")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
@@ -26,17 +26,17 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data: data ?? [] });
   }
 
-  // Kepala divisi → dirinya + bawahannya | user biasa → dirinya saja
+  // ✅ PKL / Kepala divisi / User biasa → filtered by visibleIds
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, role, shift")
+    .select("id, name, role, shift, created_at")
     .in("id", scope.visibleIds)
     .eq("is_active", true)
     .order("name", { ascending: true });
 
   if (error) {
     console.error("[attendance/users GET] scoped error:", error);
-    // Fallback dari token kalau query gagal
+    // Fallback: kembalikan user sendiri saja
     return NextResponse.json({
       success: true,
       data: [{
@@ -44,6 +44,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
         name: (user as any).name ?? "Unknown",
         role: user.role,
         shift: (user as any).shift ?? "PAGI",
+        created_at: null,
       }],
     });
   }
