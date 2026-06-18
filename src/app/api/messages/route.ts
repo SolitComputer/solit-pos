@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 export const runtime = "nodejs";
 
-const MESSAGE_SELECT = "id, sender_id, receiver_id, content, is_read, is_deleted, edited_at, created_at";
+const MESSAGE_SELECT = "id, sender_id, receiver_id, content, is_read, is_deleted, edited_at, created_at, attachment_url, attachment_type, attachment_name, attachment_size";
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
@@ -41,21 +41,28 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
 // ── POST ──────────────────────────────────────────────────────────────────────
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  const body = await req.json();
-  const { receiver_id, content } = body;
-
-  if (!receiver_id || !content?.trim()) {
-    return NextResponse.json({ success: false, message: "receiver_id dan content wajib" }, { status: 400 });
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
   }
-  if (content.trim().length > 1000) {
+
+  const { receiver_id, content, attachment_url, attachment_type, attachment_name, attachment_size } = body;
+
+  // Wajib ada salah satu: teks atau attachment
+  if (!receiver_id) {
+    return NextResponse.json({ success: false, message: "receiver_id wajib" }, { status: 400 });
+  }
+  if (!content?.trim() && !attachment_url) {
+    return NextResponse.json({ success: false, message: "Pesan atau attachment wajib ada" }, { status: 400 });
+  }
+  if (content?.trim() && content.trim().length > 1000) {
     return NextResponse.json({ success: false, message: "Pesan terlalu panjang (max 1000 karakter)" }, { status: 400 });
   }
 
   const { data: receiver } = await supabaseAdmin
-    .from("users")
-    .select("id, name")
-    .eq("id", receiver_id)
-    .maybeSingle();
+    .from("users").select("id, name").eq("id", receiver_id).maybeSingle();
 
   if (!receiver) {
     return NextResponse.json({ success: false, message: "User tujuan tidak ditemukan" }, { status: 404 });
@@ -63,22 +70,36 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const { data, error } = await supabaseAdmin
     .from("messages")
-    .insert({ sender_id: user.id, receiver_id, content: content.trim() })
+    .insert({
+      sender_id: user.id,
+      receiver_id,
+      content: content?.trim() ?? "",
+      attachment_url: attachment_url ?? null,
+      attachment_type: attachment_type ?? null,
+      attachment_name: attachment_name ?? null,
+      attachment_size: attachment_size ?? null,
+    })
     .select(MESSAGE_SELECT)
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-  const trimmedContent = content.trim();
+  const trimmedContent = content?.trim() ?? "";
   const senderName = user.name;
   const senderId = user.id;
 
   Promise.resolve().then(async () => {
     try {
       const { sendPushToUser } = await import("@/lib/push-notify");
+      const pushBody = attachment_type === "image"
+        ? "📷 Mengirim foto"
+        : attachment_type === "file"
+          ? `📎 ${attachment_name ?? "File"}`
+          : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
+
       await sendPushToUser(receiver_id, {
         title: `💬 ${senderName}`,
-        body: trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent,
+        body: pushBody,
         tag: `dm-${senderId}`,
         url: "/dashboard/users",
         requireInteraction: false,
@@ -106,12 +127,8 @@ async function patchHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "Pesan terlalu panjang (max 1000 karakter)" }, { status: 400 });
   }
 
-  // Cek ownership — hanya sender yang boleh edit
   const { data: msg } = await supabaseAdmin
-    .from("messages")
-    .select("id, sender_id, is_deleted")
-    .eq("id", id)
-    .maybeSingle();
+    .from("messages").select("id, sender_id, is_deleted").eq("id", id).maybeSingle();
 
   if (!msg) return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
   if (msg.is_deleted) return NextResponse.json({ success: false, message: "Pesan yang dihapus tidak bisa diedit" }, { status: 400 });
@@ -137,22 +154,16 @@ async function deleteHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (!id) return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
 
   const { data: msg } = await supabaseAdmin
-    .from("messages")
-    .select("id, sender_id, receiver_id")
-    .eq("id", id)
-    .maybeSingle();
+    .from("messages").select("id, sender_id, receiver_id").eq("id", id).maybeSingle();
 
   if (!msg) return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
 
-  // Hanya sender atau receiver yang boleh hapus (di chat DM, keduanya bisa hapus di sisi mereka)
   if (msg.sender_id !== user.id && msg.receiver_id !== user.id) {
     return NextResponse.json({ success: false, message: "Tidak bisa hapus pesan ini" }, { status: 403 });
   }
 
   const { error } = await supabaseAdmin
-    .from("messages")
-    .update({ is_deleted: true })
-    .eq("id", id);
+    .from("messages").update({ is_deleted: true }).eq("id", id);
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 

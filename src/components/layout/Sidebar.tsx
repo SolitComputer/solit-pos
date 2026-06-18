@@ -477,7 +477,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        // ✅ Absensi ada — PKL bisa lihat absensi sesama PKL
+         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         // ❌ ITEM_USERS dihapus — PKL tidak boleh akses Management User
         // ❌ Chat tidak ada — PKL tidak boleh akses Group Chat
@@ -504,7 +504,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // ── Customer Service ──────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -516,6 +515,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },        // ✅ Tambah
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },

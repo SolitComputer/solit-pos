@@ -35,6 +35,12 @@ interface GroupMessage {
     reply_to?: ReplyPreview | null;
 }
 
+interface UserOption {
+    id: string;
+    name: string;
+    role: string;
+}
+
 interface CurrentUser {
     id: string;
     name: string;
@@ -107,6 +113,37 @@ function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ─── Render teks dengan highlight @mention ────────────────────────────────────
+function renderTextWithMentions(text: string, currentUserId?: string, currentUserName?: string) {
+    // Match @semua atau @NamaLengkap (huruf, spasi, titik)
+    const parts = text.split(/(@semua|@[A-Za-z][A-Za-z\s.]*)/g);
+    return parts.map((part, i) => {
+        if (part === "@semua") {
+            return (
+                <span key={i} className="inline-flex items-center px-1 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-xs">
+                    @semua
+                </span>
+            );
+        }
+        if (part.startsWith("@") && part.length > 1) {
+            const mentionName = part.slice(1).trim();
+            const isMe = currentUserName && mentionName.toLowerCase() === currentUserName.toLowerCase();
+            return (
+                <span
+                    key={i}
+                    className={`inline-flex items-center px-1 py-0.5 rounded-md font-semibold text-xs ${isMe
+                        ? "bg-blue-200 text-blue-800"
+                        : "bg-[#1a1a2e]/10 text-[#1a1a2e]"
+                        }`}
+                >
+                    {part}
+                </span>
+            );
+        }
+        return <span key={i}>{part}</span>;
+    });
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -208,7 +245,6 @@ function AttachmentDisplay({
         );
     }
 
-    // File card
     const ext = name?.split(".").pop()?.toUpperCase() ?? "FILE";
     return (
         <a
@@ -216,15 +252,13 @@ function AttachmentDisplay({
             target="_blank"
             rel="noopener noreferrer"
             download={name ?? true}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl no-underline transition ${
-                isMine ? "bg-white/10 hover:bg-white/20" : "bg-gray-100 hover:bg-gray-200"
-            }`}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl no-underline transition ${isMine ? "bg-white/10 hover:bg-white/20" : "bg-gray-100 hover:bg-gray-200"
+                }`}
             style={{ maxWidth: 240 }}
             onClick={e => e.stopPropagation()}
         >
-            <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${
-                isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
-            }`}>
+            <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
+                }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -255,13 +289,14 @@ interface BubbleProps {
     msg: GroupMessage;
     isMine: boolean;
     isAdmin: boolean;
+    currentUserName: string;
     onReply: (msg: GroupMessage) => void;
     onDelete: (id: string) => void;
     onEdit: (id: string, newContent: string) => Promise<boolean>;
     onScrollToReply: (id: string) => void;
 }
 
-function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
+function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
@@ -314,7 +349,6 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
         if (e.key === "Escape") { setIsEditing(false); setEditContent(msg.content); }
     };
 
-    // ── Deleted ──────────────────────────────────────────────────────────────
     if (msg.is_deleted) {
         return (
             <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
@@ -361,11 +395,9 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                 )}
 
                 <div className="relative">
-                    {/* ── Edit mode ── */}
                     {isEditing ? (
-                        <div className={`rounded-2xl shadow-sm px-3 pt-2 pb-2 min-w-[200px] ${
-                            isMine ? "bg-[#1a1a2e] rounded-br-sm" : "bg-white border border-gray-200 rounded-bl-sm"
-                        }`}>
+                        <div className={`rounded-2xl shadow-sm px-3 pt-2 pb-2 min-w-[200px] ${isMine ? "bg-[#1a1a2e] rounded-br-sm" : "bg-white border border-gray-200 rounded-bl-sm"
+                            }`}>
                             <textarea
                                 ref={editRef}
                                 value={editContent}
@@ -377,9 +409,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
-                                    isMine ? "text-white placeholder:text-white/40" : "text-gray-800 placeholder:text-gray-400"
-                                }`}
+                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-gray-800 placeholder:text-gray-400"
+                                    }`}
                                 style={{ minHeight: 22 }}
                             />
                             <div className="flex items-center justify-between mt-2 gap-2">
@@ -389,18 +420,16 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[10px] px-2 py-0.5 rounded-lg transition ${
-                                            isMine ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100"
-                                        }`}
+                                        className={`text-[10px] px-2 py-0.5 rounded-lg transition ${isMine ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100"
+                                            }`}
                                     >
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${
-                                            isMine ? "bg-white/20 text-white hover:bg-white/30" : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
-                                        }`}
+                                        className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white hover:bg-white/30" : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
+                                            }`}
                                     >
                                         {saving ? "..." : "Simpan"}
                                     </button>
@@ -408,23 +437,20 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                             </div>
                         </div>
                     ) : (
-                        /* ── Normal bubble ── */
                         <div
-                            className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${
-                                isMine
-                                    ? "bg-[#1a1a2e] text-white rounded-br-sm"
-                                    : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
-                            }`}
+                            className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${isMine
+                                ? "bg-[#1a1a2e] text-white rounded-br-sm"
+                                : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
+                                }`}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
                         >
                             {/* Reply preview */}
                             {msg.reply_to && (
                                 <div
-                                    className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${
-                                        isMine
-                                            ? "bg-white/10 border-white/40 text-white/80"
-                                            : "bg-gray-50 border-gray-300 text-gray-600"
-                                    }`}
+                                    className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${isMine
+                                        ? "bg-white/10 border-white/40 text-white/80"
+                                        : "bg-gray-50 border-gray-300 text-gray-600"
+                                        }`}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}
                                 >
                                     <p className="font-semibold truncate">{msg.reply_to.sender_name}</p>
@@ -432,10 +458,10 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                         {msg.reply_to.is_deleted
                                             ? "🚫 Pesan dihapus"
                                             : msg.reply_to.attachment_type === "image"
-                                            ? "📷 Foto"
-                                            : msg.reply_to.attachment_type === "file"
-                                            ? "📎 File"
-                                            : msg.reply_to.content}
+                                                ? "📷 Foto"
+                                                : msg.reply_to.attachment_type === "file"
+                                                    ? "📎 File"
+                                                    : msg.reply_to.content}
                                     </p>
                                 </div>
                             )}
@@ -453,9 +479,11 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 </div>
                             )}
 
-                            {/* Text content */}
+                            {/* Text dengan mention highlight */}
                             {hasContent && (
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                    {renderTextWithMentions(msg.content, undefined, currentUserName)}
+                                </p>
                             )}
 
                             {/* Timestamp */}
@@ -470,9 +498,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                     {showMenu && !isEditing && (
                         <div
                             ref={menuRef}
-                            className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[140px] ${
-                                isMine ? "right-0" : "left-0"
-                            }`}
+                            className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[140px] ${isMine ? "right-0" : "left-0"
+                                }`}
                         >
                             <button
                                 onClick={() => { onReply(msg); setShowMenu(false); }}
@@ -484,8 +511,6 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 </svg>
                                 Balas
                             </button>
-
-                            {/* Edit hanya untuk pesan teks (bukan pure attachment) */}
                             {isMine && hasContent && (
                                 <button
                                     onClick={() => { setIsEditing(true); setShowMenu(false); }}
@@ -498,7 +523,6 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                     Edit
                                 </button>
                             )}
-
                             {(isMine || isAdmin) && (
                                 <button
                                     onClick={() => { onDelete(msg.id); setShowMenu(false); }}
@@ -534,16 +558,87 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
     );
 }
 
+// ─── MentionDropdown ──────────────────────────────────────────────────────────
+interface MentionDropdownProps {
+    query: string;
+    users: UserOption[];
+    selectedIndex: number;
+    onSelect: (user: UserOption | null) => void;
+}
+
+function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropdownProps) {
+    const filtered = query === ""
+        ? users
+        : users.filter(u =>
+            u.name.toLowerCase().includes(query.toLowerCase()) ||
+            (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(query.toLowerCase())
+        );
+
+    // Tambah opsi @semua di awal
+    const showSemua = "semua".includes(query.toLowerCase()) || query === "";
+    const totalItems = (showSemua ? 1 : 0) + filtered.length;
+
+    if (totalItems === 0) return null;
+
+    return (
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+            <div className="px-3 py-2 border-b border-gray-50">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Mention</p>
+            </div>
+            <div className="max-h-52 overflow-y-auto">
+                {showSemua && (
+                    <button
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-gray-50"
+                            }`}
+                        onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}
+                    >
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-amber-600 font-bold text-xs">@</span>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-800">semua</p>
+                            <p className="text-[10px] text-gray-400">Mention seluruh anggota</p>
+                        </div>
+                    </button>
+                )}
+                {filtered.map((user, i) => {
+                    const idx = (showSemua ? 1 : 0) + i;
+                    return (
+                        <button
+                            key={user.id}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${selectedIndex === idx ? "bg-blue-50" : "hover:bg-gray-50"
+                                }`}
+                            onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}
+                        >
+                            <div
+                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
+                                style={{ backgroundColor: getAvatarColor(user.role) }}
+                            >
+                                {getInitials(user.name)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-gray-800 truncate">{user.name}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{ROLE_LABEL[user.role] ?? user.role}</p>
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 // ─── InputArea ────────────────────────────────────────────────────────────────
 interface InputAreaProps {
     currentUser: CurrentUser;
     replyTo: GroupMessage | null;
+    users: UserOption[];
     onCancelReply: () => void;
     onSend: (content: string) => Promise<void>;
     onSendAttachment: (file: File, caption: string) => Promise<void>;
 }
 
-function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachment }: InputAreaProps) {
+function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendAttachment }: InputAreaProps) {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -552,14 +647,124 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
         url: string; name: string; type: "image" | "file"; size: number;
     } | null>(null);
 
+    // ── Mention state ─────────────────────────────────────────────────────────
+    const [mentionActive, setMentionActive] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState("");
+    const [mentionIndex, setMentionIndex] = useState(0);
+    const [mentionStart, setMentionStart] = useState(0); // posisi @ di textarea
+
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
+    // ── Mention helpers ───────────────────────────────────────────────────────
+    const getMentionFilteredList = () => {
+        const showSemua = "semua".includes(mentionQuery.toLowerCase()) || mentionQuery === "";
+        const filtered = mentionQuery === ""
+            ? users
+            : users.filter(u =>
+                u.name.toLowerCase().includes(mentionQuery.toLowerCase()) ||
+                (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(mentionQuery.toLowerCase())
+            );
+        return { showSemua, filtered, total: (showSemua ? 1 : 0) + filtered.length };
+    };
+
+    const insertMention = (user: UserOption | null) => {
+        const ta = inputRef.current;
+        if (!ta) return;
+
+        const before = input.slice(0, mentionStart); // teks sebelum @
+        const after = input.slice(ta.selectionStart);  // teks setelah cursor
+        const mentionText = user ? `@${user.name} ` : `@semua `;
+        const newValue = before + mentionText + after;
+
+        setInput(newValue);
+        setMentionActive(false);
+        setMentionQuery("");
+        setMentionIndex(0);
+
+        // Set cursor setelah mention
+        requestAnimationFrame(() => {
+            const pos = before.length + mentionText.length;
+            ta.focus();
+            ta.setSelectionRange(pos, pos);
+            ta.style.height = "auto";
+            ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+        });
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
+        const val = e.target.value;
+        const cursor = e.target.selectionStart ?? 0;
+        setInput(val);
+
+        // Resize textarea
         const ta = e.target;
         ta.style.height = "auto";
         ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+
+        // Detect mention: cari @ terakhir sebelum cursor
+        const textBeforeCursor = val.slice(0, cursor);
+        const lastAt = textBeforeCursor.lastIndexOf("@");
+
+        if (lastAt !== -1) {
+            const textAfterAt = textBeforeCursor.slice(lastAt + 1);
+            // Aktifkan mention jika: ada @ dan tidak ada spasi > 1 kata setelah @
+            // Maks 30 karakter query dan tidak ada newline
+            const validQuery = !textAfterAt.includes("\n") && textAfterAt.length <= 30;
+            // Pastikan @ ini bukan bagian dari kata (preceded by spasi/awal)
+            const charBefore = lastAt > 0 ? val[lastAt - 1] : " ";
+            const isAtStart = charBefore === " " || charBefore === "\n" || lastAt === 0;
+
+            if (validQuery && isAtStart) {
+                setMentionActive(true);
+                setMentionQuery(textAfterAt);
+                setMentionStart(lastAt);
+                setMentionIndex(0);
+                return;
+            }
+        }
+
+        setMentionActive(false);
+        setMentionQuery("");
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        // Mention navigation
+        if (mentionActive) {
+            const { total } = getMentionFilteredList();
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setMentionIndex(i => (i + 1) % total);
+                return;
+            }
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setMentionIndex(i => (i - 1 + total) % total);
+                return;
+            }
+            if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                const { showSemua, filtered } = getMentionFilteredList();
+                if (mentionIndex === 0 && showSemua) {
+                    insertMention(null);
+                } else {
+                    const userIdx = showSemua ? mentionIndex - 1 : mentionIndex;
+                    if (filtered[userIdx]) insertMention(filtered[userIdx]);
+                }
+                return;
+            }
+            if (e.key === "Escape") {
+                setMentionActive(false);
+                return;
+            }
+        }
+
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (preview) handleSendFile();
+            else handleSendText();
+        }
+        if (e.key === "Escape" && replyTo) onCancelReply();
     };
 
     const resetInput = () => {
@@ -574,6 +779,7 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
         await onSend(input.trim());
         resetInput();
         setSending(false);
+        setMentionActive(false);
         inputRef.current?.focus();
     };
 
@@ -584,28 +790,14 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
         resetInput();
         cancelPreview();
         setUploading(false);
+        setMentionActive(false);
         inputRef.current?.focus();
-    };
-
-    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            if (preview) handleSendFile();
-            else handleSendText();
-        }
-        if (e.key === "Escape" && replyTo) onCancelReply();
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Ukuran file maksimal 5MB");
-            e.target.value = "";
-            return;
-        }
-
+        if (file.size > 5 * 1024 * 1024) { alert("Ukuran file maksimal 5MB"); e.target.value = ""; return; }
         const isImage = file.type.startsWith("image/");
         const previewUrl = isImage ? URL.createObjectURL(file) : "";
         setPreview({ url: previewUrl, name: file.name, type: isImage ? "image" : "file", size: file.size });
@@ -632,7 +824,7 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
                         <p className="text-xs text-gray-500 truncate mt-0.5">
                             {replyTo.attachment_type === "image" ? "📷 Foto"
                                 : replyTo.attachment_type === "file" ? "📎 File"
-                                : replyTo.content}
+                                    : replyTo.content}
                         </p>
                     </div>
                     <button onClick={onCancelReply}
@@ -682,7 +874,17 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
                     <Avatar name={currentUser.name} role={currentUser.role} size={32} />
                 </div>
 
-                <div className="flex-1 flex items-end gap-2 bg-gray-100 rounded-2xl px-3 py-2 min-h-[42px]">
+                <div className="flex-1 flex items-end gap-2 bg-gray-100 rounded-2xl px-3 py-2 min-h-[42px] relative">
+                    {/* Mention dropdown — muncul di atas textarea */}
+                    {mentionActive && (
+                        <MentionDropdown
+                            query={mentionQuery}
+                            users={users}
+                            selectedIndex={mentionIndex}
+                            onSelect={insertMention}
+                        />  
+                    )}
+
                     {/* Attach button */}
                     <button
                         onClick={() => fileRef.current?.click()}
@@ -701,7 +903,11 @@ function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachme
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={preview ? "Tambah caption (opsional)..." : "Tulis pesan ke All Team Solit..."}
+                        onBlur={() => {
+                            // Delay agar klik item dropdown sempat ter-register
+                            setTimeout(() => setMentionActive(false), 150);
+                        }}
+                        placeholder={preview ? "Tambah caption (opsional)..." : "Tulis pesan... ketik @ untuk mention"}
                         maxLength={2000}
                         rows={1}
                         disabled={isLoading}
@@ -746,13 +952,28 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
     const [unread, setUnread] = useState(0);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
+    const [users, setUsers] = useState<UserOption[]>([]);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
 
-    // ── Fetch ─────────────────────────────────────────────────────────────────
+    // ── Fetch user list untuk mention ─────────────────────────────────────────
+    useEffect(() => {
+        fetch("/api/users")
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Filter out current user dari mention list
+                    const others = (data.users as UserOption[]).filter(u => u.id !== currentUser.id);
+                    setUsers(others);
+                }
+            })
+            .catch(() => { /* silent fail — mention tetap bisa jalan dengan list kosong */ });
+    }, [currentUser.id]);
+
+    // ── Fetch messages ────────────────────────────────────────────────────────
     const fetchMessages = useCallback(async () => {
         setLoading(true);
         try {
@@ -877,7 +1098,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     // ── Send text ─────────────────────────────────────────────────────────────
     const send = useCallback(async (content: string) => {
         if (!content.trim()) return;
-
         const tempId = `temp-${Date.now()}`;
         const optimistic: GroupMessage = {
             id: tempId,
@@ -897,10 +1117,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted, attachment_type: replyTo.attachment_type }
                 : null,
         };
-
         setMessages(prev => [...prev, optimistic]);
         setReplyTo(null);
-
         try {
             const res = await fetch("/api/group-chat", {
                 method: "POST",
@@ -947,13 +1165,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         setReplyTo(null);
 
         try {
-            // 1. Upload file
             const formData = new FormData();
             formData.append("file", file);
-            const uploadRes = await fetch("/api/group-chat/upload", {
-                method: "POST",
-                body: formData,
-            });
+            const uploadRes = await fetch("/api/group-chat/upload", { method: "POST", body: formData });
             const uploadData = await uploadRes.json();
 
             if (!uploadData.success) {
@@ -963,7 +1177,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 return;
             }
 
-            // 2. Kirim pesan dengan URL attachment
             const msgRes = await fetch("/api/group-chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -979,7 +1192,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const msgData = await msgRes.json();
 
             if (previewUrl) URL.revokeObjectURL(previewUrl);
-
             if (msgData.success) {
                 setMessages(prev => prev.map(m => m.id === tempId ? msgData.message : m));
             } else {
@@ -1141,6 +1353,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                                 msg={msg}
                                                 isMine={isMine}
                                                 isAdmin={isAdmin}
+                                                currentUserName={currentUser.name}
                                                 onReply={setReplyTo}
                                                 onDelete={deleteMessage}
                                                 onEdit={editMessage}
@@ -1174,10 +1387,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     </div>
                 )}
 
-                {/* Input Area (includes reply preview) */}
+                {/* Input Area */}
                 <InputArea
                     currentUser={currentUser}
                     replyTo={replyTo}
+                    users={users}
                     onCancelReply={() => setReplyTo(null)}
                     onSend={send}
                     onSendAttachment={sendAttachment}
