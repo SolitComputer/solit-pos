@@ -81,7 +81,7 @@ export const SERVICE_CREATE_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "KEPALA_TEKNISI",
   "CUSTOMER_SERVICE",
-  "TEKNISI", 
+  "TEKNISI",
 ];
 
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
@@ -199,8 +199,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/attendance": [...ALL_ROLES],
 
-  // ✅ Service API Routes
   "/api/service": [...SERVICE_VIEW_ROLES],
+
+  "/dashboard/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
+  "/api/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
+
 };
 
 export const PERMISSIONS = {
