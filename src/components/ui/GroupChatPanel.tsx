@@ -186,9 +186,24 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
 
     if (msg.is_deleted) {
         return (
-            <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                <div className="px-3 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 text-xs italic max-w-[70%]">
-                    🚫 {isMine ? "Kamu" : msg.sender_name} menghapus pesan ini
+            <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
+                {!isMine && (
+                    <div className="flex-shrink-0 self-end mb-1">
+                        <Avatar name={msg.sender_name} role={msg.sender_role} size={30} />
+                    </div>
+                )}
+                <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
+                    {!isMine && (
+                        <span
+                            className="text-[10px] font-semibold mb-0.5 px-1"
+                            style={{ color: getAvatarColor(msg.sender_role) }}
+                        >
+                            {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
+                        </span>
+                    )}
+                    <div className="px-3 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 text-xs italic">
+                        🚫 menghapus pesan ini
+                    </div>
                 </div>
             </div>
         );
@@ -243,8 +258,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
                                         className={`text-[10px] px-2 py-0.5 rounded-lg transition ${isMine
-                                                ? "text-white/60 hover:bg-white/10 hover:text-white"
-                                                : "text-gray-500 hover:bg-gray-100"
+                                            ? "text-white/60 hover:bg-white/10 hover:text-white"
+                                            : "text-gray-500 hover:bg-gray-100"
                                             }`}
                                     >
                                         Batal
@@ -253,8 +268,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
                                         className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${isMine
-                                                ? "bg-white/20 text-white hover:bg-white/30"
-                                                : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
+                                            ? "bg-white/20 text-white hover:bg-white/30"
+                                            : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
                                             }`}
                                     >
                                         {saving ? "..." : "Simpan"}
@@ -266,16 +281,16 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                         /* ── Normal bubble ── */
                         <div
                             className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${isMine
-                                    ? "bg-[#1a1a2e] text-white rounded-br-sm"
-                                    : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
+                                ? "bg-[#1a1a2e] text-white rounded-br-sm"
+                                : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
                                 }`}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
                         >
                             {msg.reply_to && (
                                 <div
                                     className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${isMine
-                                            ? "bg-white/10 border-white/40 text-white/80"
-                                            : "bg-gray-50 border-gray-300 text-gray-600"
+                                        ? "bg-white/10 border-white/40 text-white/80"
+                                        : "bg-gray-50 border-gray-300 text-gray-600"
                                         }`}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}
                                 >
