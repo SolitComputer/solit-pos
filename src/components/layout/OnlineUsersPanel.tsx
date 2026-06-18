@@ -2,9 +2,9 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { getSupabaseClient } from "@/services/supabaseClient";
+import { ChatManager } from "@/components/ui/ChatBubble";
 
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -22,6 +22,13 @@ type PresenceRecord = {
   is_online: boolean;
   seconds_ago: number | null;
 };
+
+// Tipe user untuk ChatManager (sama persis dengan ChatUser di ChatBubble)
+interface ChatUser {
+  id: string;
+  name: string;
+  role: string;
+}
 
 function getPageLabel(page: string | null): { label: string; emoji: string } {
   if (!page) return { label: "Belum aktif", emoji: "💤" };
@@ -71,16 +78,28 @@ function initials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase();
 }
 
-// ── Panel simpel untuk Kepala & User biasa ────────────────────────────────────
-// Hanya tampilkan siapa yang online, tanpa halaman aktif & detail waktu
+// ── Tooltip Hint "Klik untuk chat" ────────────────────────────────────────────
+function ChatHintTooltip() {
+  return (
+    <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-[9px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
+      💬 Klik untuk chat
+    </span>
+  );
+}
+
+// ── Panel simpel untuk User biasa ─────────────────────────────────────────────
 function OnlineUsersPanelSimple({
   presence,
   loading,
   onlineCount,
+  currentUserId,
+  onChatOpen,
 }: {
   presence: PresenceRecord[];
   loading: boolean;
   onlineCount: number;
+  currentUserId: string;
+  onChatOpen: (user: ChatUser) => void;
 }) {
   const onlineUsers = presence.filter(p => p.is_online);
 
@@ -114,41 +133,56 @@ function OnlineUsersPanelSimple({
         </div>
       ) : (
         <div className="px-4 py-3 flex flex-wrap gap-2 max-h-48 overflow-y-auto">
-          {onlineUsers.map(p => (
-            <div
-              key={p.user_id}
-              className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-2.5 py-1.5"
-              title={`${p.user_name} — ${ROLE_LABEL[p.user_role] ?? p.user_role}`}
-            >
-              <div className="relative flex-shrink-0">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[8px] font-black">
-                  {initials(p.user_name)}
+          {onlineUsers.map(p => {
+            const isSelf = p.user_id === currentUserId;
+            return (
+              <div
+                key={p.user_id}
+                // ← Hanya tampilkan pointer & interaksi jika bukan diri sendiri
+                className={`relative group flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-xl px-2.5 py-1.5 transition-all ${isSelf
+                    ? "cursor-default"
+                    : "cursor-pointer hover:bg-emerald-100 hover:border-emerald-300 hover:shadow-sm active:scale-95"
+                  }`}
+                title={isSelf ? `${p.user_name} (Kamu)` : `${p.user_name} — ${ROLE_LABEL[p.user_role] ?? p.user_role}`}
+                onClick={() => {
+                  if (isSelf) return;
+                  onChatOpen({ id: p.user_id, name: p.user_name, role: p.user_role });
+                }}
+              >
+                {/* Tooltip */}
+                {!isSelf && <ChatHintTooltip />}
+
+                <div className="relative flex-shrink-0">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[8px] font-black">
+                    {initials(p.user_name)}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white animate-pulse" />
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white animate-pulse" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold text-gray-800 truncate max-w-[80px]">
+                    {p.user_name.split(" ")[0]}
+                    {isSelf && <span className="text-gray-400 font-normal"> (Kamu)</span>}
+                  </p>
+                  <p className="text-[9px] text-gray-400 truncate">
+                    {ROLE_LABEL[p.user_role] ?? p.user_role}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-gray-800 truncate max-w-[80px]">
-                  {p.user_name.split(" ")[0]}
-                </p>
-                <p className="text-[9px] text-gray-400 truncate">
-                  {ROLE_LABEL[p.user_role] ?? p.user_role}
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {!loading && (
         <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-          <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir</p>
+          <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir · Klik nama untuk chat</p>
         </div>
       )}
     </div>
   );
 }
 
-// ── Panel lengkap untuk Admin ─────────────────────────────────────────────────
+// ── Panel lengkap untuk Admin & Kepala ────────────────────────────────────────
 function OnlineUsersPanelFull({
   presence,
   loading,
@@ -156,6 +190,8 @@ function OnlineUsersPanelFull({
   offlineCount,
   lastUpdate,
   fetchPresence,
+  currentUserId,
+  onChatOpen,
 }: {
   presence: PresenceRecord[];
   loading: boolean;
@@ -163,6 +199,8 @@ function OnlineUsersPanelFull({
   offlineCount: number;
   lastUpdate: Date;
   fetchPresence: () => void;
+  currentUserId: string;
+  onChatOpen: (user: ChatUser) => void;
 }) {
   const [filter, setFilter] = useState<"all" | "online" | "offline">("all");
 
@@ -257,11 +295,24 @@ function OnlineUsersPanelFull({
         <div className="divide-y divide-gray-100 overflow-y-auto max-h-80">
           {filtered.map(p => {
             const pageInfo = getPageLabel(p.current_page);
+            const isSelf = p.user_id === currentUserId;
+
             return (
               <div
                 key={p.user_id}
-                className={`px-4 py-2.5 flex items-center gap-2.5 hover:bg-gray-50/50 transition-colors ${p.is_online ? "" : "opacity-55"}`}
+                // ← Row klik untuk buka chat, kecuali diri sendiri
+                className={`relative group px-4 py-2.5 flex items-center gap-2.5 transition-colors ${p.is_online ? "" : "opacity-55"
+                  } ${isSelf
+                    ? "cursor-default"
+                    : "cursor-pointer hover:bg-emerald-50/60 active:bg-emerald-100/60"
+                  }`}
+                onClick={() => {
+                  if (isSelf) return;
+                  onChatOpen({ id: p.user_id, name: p.user_name, role: p.user_role });
+                }}
+                title={isSelf ? `${p.user_name} (Kamu)` : `💬 Chat dengan ${p.user_name}`}
               >
+                {/* Avatar */}
                 <div className="relative flex-shrink-0">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-[9px] font-black shadow-sm ${p.is_online ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gray-400"
                     }`}>
@@ -271,15 +322,33 @@ function OnlineUsersPanelFull({
                     }`} />
                 </div>
 
+                {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-800 truncate leading-tight">{p.user_name}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-bold text-gray-800 truncate leading-tight">{p.user_name}</p>
+                    {isSelf && (
+                      <span className="text-[8px] text-gray-400 font-normal flex-shrink-0">(Kamu)</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1 mt-0.5">
                     <span className="text-xs leading-none">{pageInfo.emoji}</span>
                     <p className="text-[10px] text-gray-400 truncate">{pageInfo.label}</p>
                   </div>
                 </div>
 
-                <div className="flex-shrink-0">
+                {/* Status + Chat icon on hover */}
+                <div className="flex-shrink-0 flex items-center gap-1.5">
+                  {/* Icon chat muncul hover, kecuali self */}
+                  {!isSelf && (
+                    <svg
+                      className="w-3.5 h-3.5 text-gray-300 group-hover:text-emerald-500 transition-colors flex-shrink-0"
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  )}
+
                   {p.is_online ? (
                     <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
                       <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />Online
@@ -296,36 +365,39 @@ function OnlineUsersPanelFull({
 
       {!loading && presence.length > 0 && (
         <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-          <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir</p>
+          <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir · Klik nama untuk chat 💬</p>
         </div>
       )}
     </div>
   );
 }
 
-// ── Main export — auto-detect role & render panel yang sesuai ─────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 export function OnlineUsersPanel() {
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; role: string } | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [presence, setPresence] = useState<PresenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // ── Active chats state (bisa buka beberapa bubble sekaligus) ──────────────
+  const [activeChats, setActiveChats] = useState<ChatUser[]>([]);
 
   const supabaseRef = useRef(getSupabaseClient());
   const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
 
   useEffect(() => {
     getCurrentUserClient().then(user => {
-      setCurrentUserRole(user?.role ?? null);
+      if (user) {
+        setCurrentUser({ id: user.id, name: user.name, role: user.role });
+      }
       setRoleLoading(false);
     });
   }, []);
 
-  // ✅ Semua role yang boleh lihat panel (admin + kepala + semua user)
-  const isAdmin = !!currentUserRole && FULL_ACCESS_ROLES.includes(currentUserRole);
-  const isKepala = !!currentUserRole && KEPALA_ROLES.includes(currentUserRole);
-  // Semua role yang sudah login boleh lihat versi simpel
-  const isAllowed = !roleLoading && !!currentUserRole;
+  const isAdmin = !!currentUser?.role && FULL_ACCESS_ROLES.includes(currentUser.role);
+  const isKepala = !!currentUser?.role && KEPALA_ROLES.includes(currentUser.role);
+  const isAllowed = !roleLoading && !!currentUser;
 
   const recalculate = useCallback((records: PresenceRecord[]): PresenceRecord[] => {
     const now = Date.now();
@@ -343,15 +415,7 @@ export function OnlineUsersPanel() {
   const fetchPresence = useCallback(async () => {
     try {
       const res = await fetch("/api/presence");
-
-      // ✅ TEMPORARY DEBUG — hapus setelah fix
-      console.log("[presence] status:", res.status, "role:", currentUserRole);
-
       const data = await res.json();
-
-      // ✅ TEMPORARY DEBUG
-      console.log("[presence] data:", data);
-
       if (data.success) {
         setPresence(recalculate(data.data || []));
         setLastUpdate(new Date());
@@ -361,20 +425,18 @@ export function OnlineUsersPanel() {
     } finally {
       setLoading(false);
     }
-  }, [recalculate, currentUserRole]); // ← tambah currentUserRole di deps
+  }, [recalculate]);
 
   useEffect(() => {
     if (!isAllowed) return;
 
     fetchPresence();
 
-    // Cleanup channel lama dulu sebelum buat baru
     if (channelRef.current) {
       supabaseRef.current.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
-    // Nama channel unik pakai timestamp supaya tidak konflik
     const channelName = `user_presence_${Date.now()}`;
 
     const channel = supabaseRef.current
@@ -430,32 +492,56 @@ export function OnlineUsersPanel() {
     };
   }, [isAllowed]);
 
-  if (roleLoading || !isAllowed) return null;
+  // ── Chat handlers ──────────────────────────────────────────────────────────
+  const handleChatOpen = useCallback((user: ChatUser) => {
+    setActiveChats(prev => {
+      // Jika sudah ada → tidak duplikat, cukup biarkan
+      if (prev.some(c => c.id === user.id)) return prev;
+      // Maksimal 3 bubble terbuka bersamaan supaya tidak penuh layar
+      const next = prev.length >= 3 ? prev.slice(1) : prev;
+      return [...next, user];
+    });
+  }, []);
+
+  const handleChatClose = useCallback((userId: string) => {
+    setActiveChats(prev => prev.filter(c => c.id !== userId));
+  }, []);
+
+  if (roleLoading || !isAllowed || !currentUser) return null;
 
   const onlineCount = presence.filter(p => p.is_online).length;
   const offlineCount = presence.filter(p => !p.is_online).length;
 
-  // ─── SESUDAH ───────────────────────────────────────────────────────────────────
-  // ✅ Admin + Kepala → panel lengkap dengan filter All/Online/Offline
-  if (isAdmin || isKepala) {
-    return (
-      <OnlineUsersPanelFull
-        presence={presence}
-        loading={loading}
-        onlineCount={onlineCount}
-        offlineCount={offlineCount}
-        lastUpdate={lastUpdate}
-        fetchPresence={fetchPresence}
-      />
-    );
-  }
-
-  // ✅ User biasa (Crew Sales, Teknisi, dll) → panel simpel, hanya nama + status online
   return (
-    <OnlineUsersPanelSimple
-      presence={presence}
-      loading={loading}
-      onlineCount={onlineCount}
-    />
+    <>
+      {/* Panel utama */}
+      {isAdmin || isKepala ? (
+        <OnlineUsersPanelFull
+          presence={presence}
+          loading={loading}
+          onlineCount={onlineCount}
+          offlineCount={offlineCount}
+          lastUpdate={lastUpdate}
+          fetchPresence={fetchPresence}
+          currentUserId={currentUser.id}
+          onChatOpen={handleChatOpen}
+        />
+      ) : (
+        <OnlineUsersPanelSimple
+          presence={presence}
+          loading={loading}
+          onlineCount={onlineCount}
+          currentUserId={currentUser.id}
+          onChatOpen={handleChatOpen}
+        />
+      )}
+
+      {/* Bubble chat — render di luar panel supaya float di atas semua konten */}
+      <ChatManager
+        currentUser={currentUser}
+        activeChats={activeChats.map(u => ({ user: u }))}
+        onClose={handleChatClose}
+      />
+    </>
   );
 }
