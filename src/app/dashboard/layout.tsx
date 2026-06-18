@@ -1,15 +1,15 @@
-// src/app/dashboard/layout.tsx
-import { NotificationBanner } from "@/components/ui/NotificationBanner";
+import DashboardLayout
+  from "@/components/layout/DashboardLayout";
 
 export default function Layout({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+  React.ReactNode;
 }) {
   return (
-    <>
+    <main>
       {children}
-      <NotificationBanner />
-    </>
+    </main>
   );
 }

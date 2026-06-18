@@ -1,3 +1,4 @@
+// src/components/layout/DashboardLayout.tsx
 "use client";
 
 import Sidebar from "./Sidebar";
@@ -8,28 +9,22 @@ import { usePathname } from "next/navigation";
 // ✅ Simpan & restore scroll position per halaman
 function ScrollRestorer() {
   const pathname = usePathname();
-  // Map pathname → scroll position, persist selama session
   const positions = useRef<Record<string, number>>({});
-  // Flag: apakah ini navigasi pertama ke pathname ini
   const isFirstVisit = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Saat pathname berubah: restore posisi scroll halaman baru
     const saved = positions.current[pathname];
     const firstVisit = !isFirstVisit.current[pathname];
 
     if (firstVisit) {
-      // Halaman baru yang belum pernah dikunjungi → scroll ke top wajar
       isFirstVisit.current[pathname] = true;
       window.scrollTo({ top: 0, behavior: "instant" });
     } else if (saved !== undefined) {
-      // Kembali ke halaman yang sudah pernah dikunjungi → restore
       requestAnimationFrame(() => {
         window.scrollTo({ top: saved, behavior: "instant" });
       });
     }
 
-    // Simpan posisi scroll saat user scroll di halaman ini
     const handleScroll = () => {
       positions.current[pathname] = window.scrollY;
     };
@@ -50,7 +45,6 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-[#f5f4f0]">
-      {/* ✅ Pasang scroll restorer */}
       <ScrollRestorer />
 
       <Sidebar />
@@ -71,6 +65,13 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+
+      {/*
+        ❌ ChatManager DIHAPUS dari sini
+        ✅ Dipindah ke src/app/dashboard/layout.tsx
+        karena DashboardLayout di-render ulang setiap navigasi (dipanggil dari tiap page)
+        sedangkan app/dashboard/layout.tsx hanya mount SEKALI selama di /dashboard/*
+      */}
     </div>
   );
 }

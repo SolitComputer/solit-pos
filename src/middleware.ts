@@ -11,9 +11,13 @@ import { createClient } from "@supabase/supabase-js";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
-const PUBLIC_API_ROUTES = ["/api/warranty/check", "/api/auth/set-password"];
+const PUBLIC_API_ROUTES = [
+  "/api/warranty/check",
+  "/api/auth/set-password",
+  "/api/service/stream",   
+  "/api/service/public",   
+];
 
-// ✅ Hapus /api/group-chat dari sini
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -189,6 +193,11 @@ export async function middleware(request: NextRequest) {
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
+  }
+
+  const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
+  if (user.role === "PKL" && PKL_BLOCKED_ROUTES.some(r => pathname.startsWith(r))) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)

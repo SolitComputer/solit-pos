@@ -232,41 +232,33 @@ const SALES_TRANSAKSI: MenuGroup = {
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── Full access ───────────────────────────────────────────────────────────
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
-
   PROGRAMMER: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
   ],
-
   ASISTEN_CEO: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
   ],
 
   // ── Sales family ──────────────────────────────────────────────────────────
@@ -284,9 +276,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -299,9 +289,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -312,9 +300,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -357,8 +343,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
       ],
@@ -392,8 +377,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
@@ -432,9 +416,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -446,9 +428,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
@@ -457,9 +437,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -471,13 +449,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
-  // FIX: Hapus duplicate items property, pakai yang lengkap (dengan ITEM_USERS)
   KONTEN: [
     {
       label: "Overview",
@@ -492,17 +467,21 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
   // ── PKL ───────────────────────────────────────────────────────────────────
+  // ✅ PKL: Absensi ada, tapi TIDAK ada Management User dan TIDAK ada Chat
   PKL: [
     {
       label: "Overview",
-      items: [ITEM_USERS],
+      items: [
+        // ✅ Absensi ada — PKL bisa lihat absensi sesama PKL
+        ITEM_ABSENSI,
+        // ❌ ITEM_USERS dihapus — PKL tidak boleh akses Management User
+        // ❌ Chat tidak ada — PKL tidak boleh akses Group Chat
+      ],
     },
     {
       label: "Inventaris",
@@ -525,16 +504,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // FIX: Hapus duplicate CUSTOMER_SERVICE key, pakai versi lengkap (dengan absensi + SERVICE_MENU)
-  // Cari bagian ini dan ganti:
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -547,8 +522,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Transaksi",
       items: [
+        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
-        // ❌ "Buat Payment" dihapus
       ],
     },
     SERVICE_MENU,
@@ -577,7 +552,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
   ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
-  PKL: { label: "PKL", className: "bg-slate-100 text-slate-600" },
+  // ✅ PKL: badge amber supaya mudah dibedakan
+  PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
 };
 

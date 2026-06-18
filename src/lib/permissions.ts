@@ -81,6 +81,7 @@ export const SERVICE_CREATE_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "KEPALA_TEKNISI",
   "CUSTOMER_SERVICE",
+  "TEKNISI", 
 ];
 
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
@@ -121,7 +122,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
-  "/dashboard/users": [...ALL_ROLES],
+  "/dashboard/users": ALL_ROLES.filter(r => r !== "PKL"),
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
 
@@ -137,8 +138,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
 
   // ─── API Routes ───────────────────────────────────────────────────────────
-  "/api/messages": [...ALL_ROLES],
-  "/api/group-chat": [...ALL_ROLES],
+  "/api/messages": ALL_ROLES.filter(r => r !== "PKL"),
+  "/api/group-chat": ALL_ROLES.filter(r => r !== "PKL"),
 
   // ✅ FIX: Tambah push notification route
   "/api/push/subscribe": [...ALL_ROLES],
@@ -359,3 +360,4 @@ export function getDivisionLabel(headRole: string): string {
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
 }
+export const PKL_VISIBLE_ROLES: UserRole[] = ["PKL"]; 
