@@ -9,52 +9,73 @@ const MAX_CONTENT_LENGTH = 2000;
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 100;
 
+const MESSAGE_SELECT = `
+  id,
+  sender_id,
+  sender_name,
+  sender_role,
+  content,
+  reply_to_id,
+  is_deleted,
+  edited_at,
+  created_at,
+  reply_to:reply_to_id (
+    id,
+    sender_name,
+    content,
+    is_deleted
+  )
+` as const;
+
+// ── GET ──────────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const { searchParams } = new URL(req.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), MAX_LIMIT);
+
+  const singleId = searchParams.get("id");
+  if (singleId) {
+    const { data, error } = await supabaseAdmin
+      .from("group_messages")
+      .select(MESSAGE_SELECT)
+      .eq("id", singleId)
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, message: data });
+  }
+
+  const limit = Math.min(
+    parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)),
+    MAX_LIMIT
+  );
   const before = searchParams.get("before");
 
   let query = supabaseAdmin
     .from("group_messages")
-    .select(`
-      id,
-      sender_id,
-      sender_name,
-      sender_role,
-      content,
-      reply_to_id,
-      is_deleted,
-      created_at,
-      reply_to:reply_to_id (
-        id,
-        sender_name,
-        content,
-        is_deleted
-      )
-    `)
+    .select(MESSAGE_SELECT)
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (before) {
-    query = query.lt("created_at", before);
-  }
+  if (before) query = query.lt("created_at", before);
 
   const { data, error } = await query;
 
   if (error) {
-    console.error("[group-chat GET]", error.message);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  const messages = (data ?? []).reverse();
-
   return NextResponse.json({
     success: true,
-    messages,
+    messages: (data ?? []).reverse(),
     has_more: (data ?? []).length === limit,
   });
 }
 
+// ── POST ─────────────────────────────────────────────────────────────────────
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   let body: any;
   try {
@@ -82,7 +103,10 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .eq("id", reply_to_id)
       .maybeSingle();
     if (!replyMsg) {
-      return NextResponse.json({ success: false, message: "Pesan yang direply tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: "Pesan yang direply tidak ditemukan" },
+        { status: 404 }
+      );
     }
   }
 
@@ -95,33 +119,13 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       content: content.trim(),
       reply_to_id: reply_to_id ?? null,
     })
-    .select(`
-      id,
-      sender_id,
-      sender_name,
-      sender_role,
-      content,
-      reply_to_id,
-      is_deleted,
-      created_at,
-      reply_to:reply_to_id (
-        id,
-        sender_name,
-        content,
-        is_deleted
-      )
-    `)
+    .select(MESSAGE_SELECT)
     .single();
 
   if (error) {
-    console.error("[group-chat POST]", error.message);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  // ✅ Log untuk debug production
-  console.log("[group-chat POST] inserted:", data?.id, "by:", user.name);
-
-  // Push notification (non-blocking)
   const trimmedContent = content.trim();
   const senderName = user.name;
   const senderId = user.id;
@@ -144,6 +148,70 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, message: data });
 }
 
+// ── PATCH — edit pesan ────────────────────────────────────────────────────────
+async function patchHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
+  }
+
+  const { id, content } = body;
+
+  if (!id) {
+    return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
+  }
+  if (!content?.trim()) {
+    return NextResponse.json({ success: false, message: "Konten tidak boleh kosong" }, { status: 400 });
+  }
+  if (content.trim().length > MAX_CONTENT_LENGTH) {
+    return NextResponse.json(
+      { success: false, message: `Pesan terlalu panjang (max ${MAX_CONTENT_LENGTH} karakter)` },
+      { status: 400 }
+    );
+  }
+
+  // Ambil pesan untuk cek ownership
+  const { data: msg } = await supabaseAdmin
+    .from("group_messages")
+    .select("id, sender_id, is_deleted")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!msg) {
+    return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
+  }
+  if (msg.is_deleted) {
+    return NextResponse.json({ success: false, message: "Pesan yang dihapus tidak bisa diedit" }, { status: 400 });
+  }
+
+  // Hanya sender sendiri yang boleh edit (admin pun tidak bisa edit pesan orang lain)
+  if (msg.sender_id !== user.id) {
+    return NextResponse.json(
+      { success: false, message: "Hanya pengirim yang bisa mengedit pesan" },
+      { status: 403 }
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("group_messages")
+    .update({
+      content: content.trim(),
+      edited_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select(MESSAGE_SELECT)
+    .single();
+
+  if (error) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, message: data });
+}
+
+// ── DELETE — soft delete ──────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("id");
@@ -164,9 +232,11 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   if (!msg) {
     return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
   }
-
   if (!isAdmin && msg.sender_id !== user.id) {
-    return NextResponse.json({ success: false, message: "Tidak bisa hapus pesan orang lain" }, { status: 403 });
+    return NextResponse.json(
+      { success: false, message: "Tidak bisa hapus pesan orang lain" },
+      { status: 403 }
+    );
   }
 
   const { error } = await supabaseAdmin
@@ -183,4 +253,5 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
 export const GET    = withAuth(getHandler);
 export const POST   = withAuth(postHandler);
+export const PATCH  = withAuth(patchHandler);
 export const DELETE = withAuth(deleteHandler);

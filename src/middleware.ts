@@ -232,10 +232,6 @@ export const config = {
     "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",
-<<<<<<< HEAD
-    "/api/push/:path*",  
-=======
     "/api/service/:path*",
->>>>>>> origin/develop
   ],
 };
