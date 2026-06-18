@@ -1,0 +1,1101 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { getCurrentUserClient } from "@/lib/auth-client";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type UserRole = string;
+
+type PKLReport = {
+    id: string;
+    user_id: string;
+    division: string;
+    report_date: string;
+    title: string;
+    description: string;
+    status: "SUBMITTED" | "REVIEWED" | "REVISION";
+    review_note: string | null;
+    reviewed_at: string | null;
+    created_at: string;
+    updated_at: string;
+    users?: { id: string; name: string; role: string };
+    reviewer?: { id: string; name: string; role: string } | null;
+    created_by_admin?: string | null;
+};
+
+type PKLUser = { id: string; name: string; role: string };
+
+const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const KEPALA_ROLES = [
+    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+];
+
+const DIVISIONS = [
+    { id: "MARKETING",       label: "Marketing",         emoji: "📣", color: "bg-pink-100 text-pink-700 border-pink-200" },
+    { id: "SALES",           label: "Sales",             emoji: "🛒", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    { id: "PENYEDIA_BARANG", label: "Penyedia Barang",   emoji: "📦", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    { id: "TEKNISI",         label: "Teknisi",           emoji: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
+    { id: "ONPOINT",         label: "Onpoint",           emoji: "🎯", color: "bg-blue-100 text-blue-700 border-blue-200" },
+    { id: "SOTECH",          label: "Sotech",            emoji: "💻", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+    { id: "UMUM",            label: "Umum",              emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" },
+];
+
+const STATUS_CONFIG = {
+    SUBMITTED: { label: "Terkirim",  emoji: "📤", bg: "bg-blue-100",   color: "text-blue-700",   border: "border-blue-200"   },
+    REVIEWED:  { label: "Disetujui", emoji: "✅", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
+    REVISION:  { label: "Revisi",    emoji: "🔄", bg: "bg-amber-100",  color: "text-amber-700",  border: "border-amber-200"  },
+};
+
+const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function isFullAccess(role?: string)  { return !!role && FULL_ACCESS.includes(role); }
+function isKepala(role?: string)      { return !!role && KEPALA_ROLES.includes(role); }
+function isPKL(role?: string)         { return !!role && (role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-")); }
+function canAccessPage(role?: string) { return isFullAccess(role) || isKepala(role) || isPKL(role); }
+function canReview(role?: string)     { return isFullAccess(role) || isKepala(role); }
+function canAddManual(role?: string)  { return isFullAccess(role); }
+
+function initials(name: string) {
+    return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+function pad2(n: number) { return String(n).padStart(2, "0"); }
+function getWIBToday() {
+    return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function formatDate(iso: string) {
+    const d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+function formatDateShort(iso: string) {
+    const d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+function getDivisionInfo(id: string) {
+    return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" };
+}
+
+// ── Modal: Tambah/Edit Laporan ────────────────────────────────────────────────
+function ReportFormModal({
+    currentUser,
+    editData,
+    prefillDate,
+    prefillDivision,
+    prefillUserId,
+    allPKLUsers,
+    onClose,
+    onSaved,
+}: {
+    currentUser: any;
+    editData?: PKLReport | null;
+    prefillDate?: string | null;
+    prefillDivision?: string;
+    prefillUserId?: string;
+    allPKLUsers?: PKLUser[];
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const isEdit       = !!editData;
+    const isAdminAdd   = canAddManual(currentUser?.role) && !!prefillUserId && prefillUserId !== currentUser?.id;
+    const isPKLUser    = isPKL(currentUser?.role);
+
+    const [form, setForm] = useState({
+        report_date:  editData?.report_date ?? prefillDate ?? getWIBToday(),
+        division:     editData?.division    ?? prefillDivision ?? DIVISIONS[0].id,
+        title:        editData?.title       ?? "",
+        description:  editData?.description ?? "",
+        pkl_user_id:  prefillUserId ?? currentUser?.id ?? "",
+    });
+    const [saving, setSaving]   = useState(false);
+    const [error, setError]     = useState("");
+
+    const save = async () => {
+        if (!form.description.trim()) { setError("Deskripsi laporan wajib diisi"); return; }
+        if (!form.report_date)        { setError("Tanggal laporan wajib diisi"); return; }
+        setSaving(true); setError("");
+
+        try {
+            let body: Record<string, any>;
+            let method = "POST";
+            let url = "/api/pkl-reports";
+
+            if (isEdit) {
+                method = "PATCH";
+                body = { id: editData!.id, title: form.title, description: form.description };
+            } else if (isAdminAdd) {
+                body = {
+                    action: "admin_add",
+                    pkl_user_id: form.pkl_user_id,
+                    division: form.division,
+                    report_date: form.report_date,
+                    title: form.title || `Laporan ${form.report_date}`,
+                    description: form.description,
+                };
+            } else {
+                body = {
+                    division: form.division,
+                    report_date: form.report_date,
+                    title: form.title || `Laporan ${form.report_date}`,
+                    description: form.description,
+                };
+            }
+
+            const res = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan"); return; }
+            onSaved(); onClose();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">
+                            {isEdit ? "✏️ Edit Laporan Kerja" : isAdminAdd ? "➕ Tambah Laporan (Admin)" : "📝 Buat Laporan Kerja"}
+                        </p>
+                        <p className="text-xs text-white/70 mt-1">
+                            {isEdit ? "Update isi laporan kerja PKL" : "Catat kegiatan kerja harian PKL"}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
+                            <span>⚠️</span>{error}
+                        </div>
+                    )}
+
+                    {/* Pilih PKL — admin only */}
+                    {canAddManual(currentUser?.role) && !isEdit && allPKLUsers && allPKLUsers.length > 0 && (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                PKL yang dimasukkan laporannya
+                            </label>
+                            <select
+                                value={form.pkl_user_id}
+                                onChange={e => setForm(f => ({ ...f, pkl_user_id: e.target.value }))}
+                                className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
+                            >
+                                <option value="">— Pilih PKL —</option>
+                                {allPKLUsers.map(u => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Divisi */}
+                    {!isEdit && (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Divisi Penempatan</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {DIVISIONS.map(div => (
+                                    <button
+                                        key={div.id}
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, division: div.id }))}
+                                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${form.division === div.id
+                                            ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-md scale-[1.02]"
+                                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        <span>{div.emoji}</span>
+                                        <span>{div.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tanggal */}
+                    {!isEdit && (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Tanggal Laporan</label>
+                            <input
+                                type="date"
+                                value={form.report_date}
+                                max={getWIBToday()}
+                                onChange={e => setForm(f => ({ ...f, report_date: e.target.value }))}
+                                className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
+                            />
+                        </div>
+                    )}
+
+                    {/* Judul */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                            Judul <span className="text-gray-300 font-normal normal-case">(opsional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={form.title}
+                            onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                            placeholder={`Contoh: Laporan Kerja ${form.report_date}`}
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
+                        />
+                    </div>
+
+                    {/* Deskripsi */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                            Deskripsi Kegiatan Kerja <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                            value={form.description}
+                            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                            rows={6}
+                            placeholder={`Ceritakan kegiatan yang dilakukan hari ini:\n- Tugas apa yang dikerjakan\n- Hasil yang dicapai\n- Kendala yang dihadapi (jika ada)\n- Hal yang dipelajari`}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all resize-none leading-relaxed"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">
+                            {form.description.length} karakter · minimal 20 karakter
+                        </p>
+                    </div>
+
+                    {/* Preview info */}
+                    {form.report_date && form.description && (
+                        <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl px-4 py-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Preview</p>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${getDivisionInfo(form.division).color}`}>
+                                    {getDivisionInfo(form.division).emoji} {getDivisionInfo(form.division).label}
+                                </span>
+                                <span className="text-[10px] text-gray-400">{formatDateShort(form.report_date)}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 line-clamp-2">{form.description}</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+                        Batal
+                    </button>
+                    <button
+                        onClick={save}
+                        disabled={saving || form.description.trim().length < 20}
+                        className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                            : isEdit ? "💾 Simpan Perubahan" : "📤 Kirim Laporan"
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Modal: Review Laporan ─────────────────────────────────────────────────────
+function ReviewModal({
+    report,
+    currentUser,
+    onClose,
+    onSaved,
+}: {
+    report: PKLReport;
+    currentUser: any;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [note, setNote]     = useState(report.review_note ?? "");
+    const [status, setStatus] = useState<"REVIEWED" | "REVISION">("REVIEWED");
+    const [saving, setSaving] = useState(false);
+    const [error, setError]   = useState("");
+
+    const submit = async () => {
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/pkl-reports", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "review", report_id: report.id, review_note: note, status }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal"); return; }
+            onSaved(); onClose();
+        } catch { setError("Gagal menyimpan"); }
+        finally { setSaving(false); }
+    };
+
+    const div = getDivisionInfo(report.division);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">🔍 Review Laporan</p>
+                        <p className="text-xs text-white/70 mt-1">{report.users?.name ?? "—"} · {formatDateShort(report.report_date)}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
+
+                    {/* Isi laporan */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${div.color}`}>
+                                {div.emoji} {div.label}
+                            </span>
+                            <span className="text-xs text-gray-500">{formatDate(report.report_date)}</span>
+                        </div>
+                        {report.title && <p className="font-bold text-gray-800 text-sm mb-1">{report.title}</p>}
+                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{report.description}</p>
+                    </div>
+
+                    {/* Status review */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Status Review</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button type="button" onClick={() => setStatus("REVIEWED")}
+                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${status === "REVIEWED"
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    }`}>
+                                <span>✅</span> Disetujui
+                            </button>
+                            <button type="button" onClick={() => setStatus("REVISION")}
+                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${status === "REVISION"
+                                    ? "bg-amber-500 text-white border-amber-500 shadow-md"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    }`}>
+                                <span>🔄</span> Perlu Revisi
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Catatan reviewer */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                            Catatan Review <span className="text-gray-300 font-normal normal-case">(opsional)</span>
+                        </label>
+                        <textarea
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            rows={3}
+                            placeholder="Tambahkan masukan, arahan, atau catatan untuk PKL ini..."
+                            className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all resize-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={submit} disabled={saving}
+                        className="flex-1 h-11 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "✔️ Simpan Review"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Modal: Detail Laporan ─────────────────────────────────────────────────────
+function ReportDetailModal({
+    report,
+    currentUser,
+    onClose,
+    onEdit,
+    onReview,
+    onDelete,
+}: {
+    report: PKLReport;
+    currentUser: any;
+    onClose: () => void;
+    onEdit: () => void;
+    onReview: () => void;
+    onDelete: () => void;
+}) {
+    const div    = getDivisionInfo(report.division);
+    const status = STATUS_CONFIG[report.status] ?? STATUS_CONFIG.SUBMITTED;
+    const isOwner    = currentUser?.id === report.user_id;
+    const canEdit    = isPKL(currentUser?.role) && isOwner && report.status !== "REVIEWED";
+    const canDel     = isOwner || isFullAccess(currentUser?.role);
+    const canDoReview = canReview(currentUser?.role);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">📄 Detail Laporan</p>
+                        <p className="text-xs text-white/70 mt-1">
+                            {report.users?.name ?? "—"} · {formatDateShort(report.report_date)}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {/* Meta */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${div.color}`}>
+                            {div.emoji} {div.label}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
+                            {status.emoji} {status.label}
+                        </span>
+                        {report.created_by_admin && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-violet-100 text-violet-700 border-violet-200">
+                                🔒 Input Admin
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Tanggal */}
+                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Tanggal</p>
+                        <p className="text-sm font-bold text-gray-800">{formatDate(report.report_date)}</p>
+                    </div>
+
+                    {/* Judul */}
+                    {report.title && (
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Judul</p>
+                            <p className="text-sm font-bold text-gray-800">{report.title}</p>
+                        </div>
+                    )}
+
+                    {/* Deskripsi */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Deskripsi Kegiatan</p>
+                        <div className="bg-white border border-gray-100 rounded-xl px-4 py-3">
+                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{report.description}</p>
+                        </div>
+                    </div>
+
+                    {/* Review note */}
+                    {report.review_note && (
+                        <div className={`rounded-xl px-4 py-3 border ${report.status === "REVIEWED" ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+                            <p className={`text-[10px] font-bold uppercase tracking-wide mb-1 ${report.status === "REVIEWED" ? "text-emerald-600" : "text-amber-600"}`}>
+                                💬 Catatan Reviewer
+                                {report.reviewer && <span className="font-normal normal-case ml-1">— {report.reviewer.name}</span>}
+                            </p>
+                            <p className="text-sm text-gray-700 leading-relaxed">{report.review_note}</p>
+                        </div>
+                    )}
+
+                    {/* Info waktu */}
+                    <div className="text-[10px] text-gray-400 space-y-0.5">
+                        <p>Dibuat: {new Date(report.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}</p>
+                        {report.reviewed_at && <p>Direview: {new Date(report.reviewed_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}</p>}
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 flex-wrap">
+                    {canDel && (
+                        <button onClick={onDelete}
+                            className="h-10 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-all">
+                            🗑️ Hapus
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button onClick={onEdit}
+                            className="h-10 px-4 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all">
+                            ✏️ Edit
+                        </button>
+                    )}
+                    {canDoReview && (
+                        <button onClick={onReview}
+                            className="flex-1 h-10 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all">
+                            🔍 Review Laporan
+                        </button>
+                    )}
+                    {!canDoReview && !canEdit && (
+                        <button onClick={onClose} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-all">
+                            Tutup
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function PKLReportsPage() {
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [reports, setReports]         = useState<PKLReport[]>([]);
+    const [pklUsers, setPKLUsers]       = useState<PKLUser[]>([]);
+    const [loading, setLoading]         = useState(true);
+    const [totalCount, setTotalCount]   = useState(0);
+
+    // Filters
+    const [activeDivision, setActiveDivision] = useState<string>("ALL");
+    const [filterStatus,   setFilterStatus]   = useState<string>("ALL");
+    const [filterPKL,      setFilterPKL]      = useState<string>("ALL");
+    const [filterMonth,    setFilterMonth]    = useState<string>(() => getWIBToday().slice(0, 7));
+
+    // Modal states
+    const [showForm,    setShowForm]    = useState(false);
+    const [showReview,  setShowReview]  = useState(false);
+    const [showDetail,  setShowDetail]  = useState(false);
+    const [selectedReport, setSelectedReport] = useState<PKLReport | null>(null);
+    const [editReport,     setEditReport]     = useState<PKLReport | null>(null);
+    const [prefillDate,    setPrefillDate]    = useState<string | null>(null);
+
+    // ── Fetch ──────────────────────────────────────────────────────────────
+    const fetchReports = useCallback(async () => {
+        if (!currentUser) return;
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (activeDivision !== "ALL") params.set("division", activeDivision);
+            if (filterStatus !== "ALL")   params.set("status", filterStatus);
+            if (filterPKL !== "ALL")      params.set("pkl_user_id", filterPKL);
+            if (filterMonth) {
+                params.set("date_from", `${filterMonth}-01`);
+                const [y, m] = filterMonth.split("-").map(Number);
+                const lastDay = new Date(y, m, 0).getDate();
+                params.set("date_to", `${filterMonth}-${pad2(lastDay)}`);
+            }
+            const res = await fetch(`/api/pkl-reports?${params}`);
+            const d   = await res.json();
+            if (d.success) { setReports(d.data || []); setTotalCount(d.count ?? 0); }
+        } finally { setLoading(false); }
+    }, [currentUser, activeDivision, filterStatus, filterPKL, filterMonth]);
+
+    const fetchPKLUsers = useCallback(async () => {
+        const res = await fetch("/api/attendance/users");
+        const d   = await res.json();
+        if (d.success) {
+            const pkl = (d.data || []).filter((u: PKLUser) =>
+                u.role === "PKL" || u.role.startsWith("PKL_") || u.role.startsWith("PKL-")
+            );
+            setPKLUsers(pkl);
+        }
+    }, []);
+
+    useEffect(() => {
+        getCurrentUserClient().then(u => setCurrentUser(u));
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        fetchReports();
+        if (isFullAccess(currentUser.role)) fetchPKLUsers();
+    }, [currentUser, fetchReports, fetchPKLUsers]);
+
+    // ── Delete ─────────────────────────────────────────────────────────────
+    const handleDelete = async (id: string) => {
+        if (!confirm("Hapus laporan ini?")) return;
+        const res = await fetch(`/api/pkl-reports?id=${id}`, { method: "DELETE" });
+        const d   = await res.json();
+        if (d.success) { setShowDetail(false); fetchReports(); }
+        else alert(d.message || "Gagal menghapus");
+    };
+
+    // ── Derived stats ──────────────────────────────────────────────────────
+    const stats = useMemo(() => {
+        const submitted = reports.filter(r => r.status === "SUBMITTED").length;
+        const reviewed  = reports.filter(r => r.status === "REVIEWED").length;
+        const revision  = reports.filter(r => r.status === "REVISION").length;
+        const uniquePKL = new Set(reports.map(r => r.user_id)).size;
+        return { total: reports.length, submitted, reviewed, revision, uniquePKL };
+    }, [reports]);
+
+    // ── Group by PKL user (untuk tampilan ringkasan) ───────────────────────
+    const reportsByPKL = useMemo(() => {
+        const map: Record<string, PKLReport[]> = {};
+        reports.forEach(r => {
+            const uid = r.user_id;
+            if (!map[uid]) map[uid] = [];
+            map[uid].push(r);
+        });
+        return map;
+    }, [reports]);
+
+    // ── Access guard ───────────────────────────────────────────────────────
+    if (currentUser && !canAccessPage(currentUser.role)) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+                        <span className="text-3xl">🚫</span>
+                    </div>
+                    <p className="text-base font-bold text-gray-700">Akses Ditolak</p>
+                    <p className="text-sm text-gray-400 mt-1">Halaman ini hanya untuk PKL dan pemantau divisi</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    const isPKLUser    = isPKL(currentUser?.role);
+    const isAdminUser  = isFullAccess(currentUser?.role);
+    const isKepalaUser = isKepala(currentUser?.role);
+
+    return (
+        <DashboardLayout>
+            <div className="max-w-6xl mx-auto px-4 py-8 space-y-6 animate-fadeIn">
+
+                {/* ── Header ── */}
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-gray-800 flex items-center gap-2">
+                            🎓 Laporan Kerja PKL
+                        </h1>
+                        <p className="text-xs text-gray-400 mt-1">
+                            {isPKLUser
+                                ? "Buat dan pantau laporan kerja harianmu"
+                                : `Pantau laporan kerja ${stats.uniquePKL} PKL aktif`}
+                        </p>
+                    </div>
+                    {(isPKLUser || isAdminUser) && (
+                        <button
+                            onClick={() => { setEditReport(null); setPrefillDate(null); setShowForm(true); }}
+                            className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-5 py-2.5 rounded-xl hover:opacity-90 transition-all shadow-md"
+                        >
+                            ➕ {isPKLUser ? "Buat Laporan" : "Tambah Manual"}
+                        </button>
+                    )}
+                </div>
+
+                {/* ── Stat Cards ── */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                        { label: "Total Laporan",  value: stats.total,     icon: "📋", gradient: "from-gray-50 to-gray-100",   iconBg: "bg-gray-100" },
+                        { label: "Terkirim",       value: stats.submitted, icon: "📤", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
+                        { label: "Disetujui",      value: stats.reviewed,  icon: "✅", gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
+                        { label: "Perlu Revisi",   value: stats.revision,  icon: "🔄", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
+                    ].map(c => (
+                        <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl p-4 shadow-sm`}>
+                            <div className="flex items-start justify-between mb-2">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{c.label}</p>
+                                <div className={`w-7 h-7 rounded-xl ${c.iconBg} flex items-center justify-center`}>
+                                    <span className="text-sm">{c.icon}</span>
+                                </div>
+                            </div>
+                            <p className="text-2xl font-black text-gray-800">
+                                {loading ? <span className="inline-block w-8 h-6 bg-white/50 rounded animate-pulse" /> : c.value}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* ── Filter Bar ── */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+
+                    {/* Filter divisi — tab style */}
+                    {!isPKLUser && (
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Filter Divisi</p>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setActiveDivision("ALL")}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${activeDivision === "ALL"
+                                        ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
+                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                        }`}
+                                >
+                                    🌐 Semua Divisi
+                                </button>
+                                {DIVISIONS.map(div => (
+                                    <button
+                                        key={div.id}
+                                        onClick={() => setActiveDivision(div.id)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${activeDivision === div.id
+                                            ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
+                                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        {div.emoji} {div.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Row filter lainnya */}
+                    <div className="flex flex-wrap gap-3">
+                        {/* Bulan */}
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Bulan</p>
+                            <input
+                                type="month"
+                                value={filterMonth}
+                                onChange={e => setFilterMonth(e.target.value)}
+                                className="h-9 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+                            />
+                        </div>
+
+                        {/* Status */}
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                            <select
+                                value={filterStatus}
+                                onChange={e => setFilterStatus(e.target.value)}
+                                className="h-9 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none min-w-[140px]"
+                            >
+                                <option value="ALL">Semua Status</option>
+                                <option value="SUBMITTED">📤 Terkirim</option>
+                                <option value="REVIEWED">✅ Disetujui</option>
+                                <option value="REVISION">🔄 Perlu Revisi</option>
+                            </select>
+                        </div>
+
+                        {/* Filter PKL — admin/kepala */}
+                        {!isPKLUser && pklUsers.length > 0 && (
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">PKL</p>
+                                <select
+                                    value={filterPKL}
+                                    onChange={e => setFilterPKL(e.target.value)}
+                                    className="h-9 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none min-w-[160px]"
+                                >
+                                    <option value="ALL">Semua PKL</option>
+                                    {pklUsers.map(u => (
+                                        <option key={u.id} value={u.id}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Refresh */}
+                        <div className="flex items-end">
+                            <button onClick={fetchReports}
+                                className="h-9 px-4 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── PKL Summary Cards (untuk admin/kepala lihat per PKL) ── */}
+                {!isPKLUser && Object.keys(reportsByPKL).length > 0 && (
+                    <div>
+                        <p className="text-sm font-bold text-gray-600 mb-3">📊 Ringkasan per PKL</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {Object.entries(reportsByPKL).map(([uid, rpts]) => {
+                                const pklName    = rpts[0]?.users?.name ?? "—";
+                                const pklRole    = rpts[0]?.users?.role ?? "PKL";
+                                const reviewed   = rpts.filter(r => r.status === "REVIEWED").length;
+                                const submitted  = rpts.filter(r => r.status === "SUBMITTED").length;
+                                const revision   = rpts.filter(r => r.status === "REVISION").length;
+                                const pct        = rpts.length > 0 ? Math.round((reviewed / rpts.length) * 100) : 0;
+                                const divCounts: Record<string, number> = {};
+                                rpts.forEach(r => { divCounts[r.division] = (divCounts[r.division] ?? 0) + 1; });
+                                const topDiv = Object.entries(divCounts).sort((a, b) => b[1] - a[1])[0];
+
+                                return (
+                                    <div key={uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-all">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                                                {initials(pklName)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-gray-800 text-sm truncate">{pklName}</p>
+                                                <p className="text-[10px] text-amber-600 font-semibold">{pklRole.replace(/_/g, " ")}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-3 gap-2 mb-3">
+                                            <div className="bg-blue-50 rounded-lg p-2 text-center">
+                                                <p className="text-lg font-black text-blue-600">{submitted}</p>
+                                                <p className="text-[9px] text-gray-400 font-medium">Terkirim</p>
+                                            </div>
+                                            <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                                                <p className="text-lg font-black text-emerald-600">{reviewed}</p>
+                                                <p className="text-[9px] text-gray-400 font-medium">Disetujui</p>
+                                            </div>
+                                            <div className="bg-amber-50 rounded-lg p-2 text-center">
+                                                <p className="text-lg font-black text-amber-600">{revision}</p>
+                                                <p className="text-[9px] text-gray-400 font-medium">Revisi</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Progress bar */}
+                                        <div className="mb-2">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-[10px] text-gray-500">Tingkat Persetujuan</p>
+                                                <p className={`text-[10px] font-bold ${pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-amber-600" : "text-red-500"}`}>{pct}%</p>
+                                            </div>
+                                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${pct >= 80 ? "bg-emerald-400" : pct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {topDiv && (
+                                            <p className="text-[10px] text-gray-400">
+                                                Divisi utama: <span className="font-bold text-gray-600">{getDivisionInfo(topDiv[0]).emoji} {getDivisionInfo(topDiv[0]).label}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Daftar Laporan ── */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                            <p className="text-base font-bold text-gray-800">
+                                {isPKLUser ? "Laporan Kerjamu" : "Semua Laporan"}
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                {filterMonth ? `${MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} ${filterMonth.split("-")[0]}` : "Semua bulan"}
+                                {" · "}{totalCount} laporan
+                            </p>
+                        </div>
+
+                        {/* Shortcut tambah laporan — PKL */}
+                        {isPKLUser && (
+                            <button
+                                onClick={() => { setPrefillDate(getWIBToday()); setEditReport(null); setShowForm(true); }}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all"
+                            >
+                                ✏️ Laporan Hari Ini
+                            </button>
+                        )}
+                    </div>
+
+                    {loading ? (
+                        <div className="p-6 space-y-3">
+                            {Array(4).fill(0).map((_, i) => (
+                                <div key={i} className="h-20 bg-gray-50 rounded-2xl animate-pulse" />
+                            ))}
+                        </div>
+                    ) : reports.length === 0 ? (
+                        <div className="py-16 text-center px-4">
+                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl opacity-40">📋</span>
+                            </div>
+                            <p className="text-sm text-gray-400 font-medium">Belum ada laporan</p>
+                            {isPKLUser && (
+                                <button
+                                    onClick={() => { setEditReport(null); setShowForm(true); }}
+                                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all"
+                                >
+                                    ➕ Buat Laporan Pertama
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-50">
+                            {reports.map(report => {
+                                const div    = getDivisionInfo(report.division);
+                                const status = STATUS_CONFIG[report.status] ?? STATUS_CONFIG.SUBMITTED;
+                                const isToday = report.report_date === getWIBToday();
+
+                                return (
+                                    <div
+                                        key={report.id}
+                                        className="px-6 py-4 hover:bg-gray-50/60 transition-colors cursor-pointer group"
+                                        onClick={() => { setSelectedReport(report); setShowDetail(true); }}
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            {/* Avatar */}
+                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mt-0.5">
+                                                {initials(report.users?.name ?? "?")}
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                    {!isPKLUser && (
+                                                        <p className="text-sm font-bold text-gray-800">{report.users?.name ?? "—"}</p>
+                                                    )}
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${div.color}`}>
+                                                        {div.emoji} {div.label}
+                                                    </span>
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
+                                                        {status.emoji} {status.label}
+                                                    </span>
+                                                    {isToday && (
+                                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                                            Hari ini
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-xs text-gray-500 mb-1">{formatDate(report.report_date)}</p>
+
+                                                {report.title && (
+                                                    <p className="text-sm font-semibold text-gray-700 truncate mb-0.5">{report.title}</p>
+                                                )}
+                                                <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                                                    {report.description}
+                                                </p>
+
+                                                {/* Review note preview */}
+                                                {report.review_note && (
+                                                    <div className={`mt-2 text-[11px] px-3 py-1.5 rounded-lg flex items-start gap-1.5 ${report.status === "REVIEWED"
+                                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                                                        }`}>
+                                                        <span className="flex-shrink-0">💬</span>
+                                                        <span className="line-clamp-1">{report.review_note}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Chevron */}
+                                            <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Kalender view untuk PKL — tampilkan streak laporan ── */}
+                {isPKLUser && (() => {
+                    const [y, m] = filterMonth ? filterMonth.split("-").map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+                    const dim    = new Date(y, m, 0).getDate();
+                    const fd     = new Date(y, m - 1, 1).getDay();
+                    const reportDates = new Set(reports.map(r => r.report_date));
+                    const reviewedDates = new Set(reports.filter(r => r.status === "REVIEWED").map(r => r.report_date));
+                    const revisionDates = new Set(reports.filter(r => r.status === "REVISION").map(r => r.report_date));
+                    const today = getWIBToday();
+
+                    return (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                                <p className="text-sm font-bold text-gray-800">📅 Kalender Laporan</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">Hijau = disetujui · Biru = terkirim · Kuning = revisi</p>
+                            </div>
+                            <div className="p-4">
+                                <div className="grid grid-cols-7 mb-2">
+                                    {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(d => (
+                                        <div key={d} className="text-center text-[10px] font-black text-gray-400 uppercase py-1">{d}</div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 gap-1">
+                                    {Array(fd).fill(null).map((_, i) => <div key={`e-${i}`} />)}
+                                    {Array.from({ length: dim }, (_, i) => i + 1).map(day => {
+                                        const dk     = `${y}-${pad2(m)}-${pad2(day)}`;
+                                        const hasRep = reportDates.has(dk);
+                                        const isRev  = reviewedDates.has(dk);
+                                        const isRevision = revisionDates.has(dk);
+                                        const isTod  = dk === today;
+                                        const isFuture = dk > today;
+
+                                        return (
+                                            <button
+                                                key={day}
+                                                disabled={isFuture}
+                                                onClick={() => {
+                                                    if (hasRep) {
+                                                        const r = reports.find(r => r.report_date === dk);
+                                                        if (r) { setSelectedReport(r); setShowDetail(true); }
+                                                    } else {
+                                                        setPrefillDate(dk);
+                                                        setEditReport(null);
+                                                        setShowForm(true);
+                                                    }
+                                                }}
+                                                className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs font-bold transition-all ${isFuture ? "text-gray-200 cursor-not-allowed" :
+                                                    isRev ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300" :
+                                                        isRevision ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300" :
+                                                            hasRep ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300" :
+                                                                isTod ? "ring-2 ring-[#1a1a2e] text-[#1a1a2e] font-black" :
+                                                                    "hover:bg-gray-100 text-gray-600"
+                                                    }`}
+                                            >
+                                                {day}
+                                                {hasRep && <div className={`w-1 h-1 rounded-full mt-0.5 ${isRev ? "bg-emerald-500" : isRevision ? "bg-amber-500" : "bg-blue-500"}`} />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Legend */}
+                                <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-50 flex-wrap">
+                                    {[
+                                        { color: "bg-emerald-400", label: "Disetujui" },
+                                        { color: "bg-blue-400", label: "Terkirim" },
+                                        { color: "bg-amber-400", label: "Perlu Revisi" },
+                                        { color: "ring-2 ring-[#1a1a2e] bg-white", label: "Hari ini" },
+                                    ].map(({ color, label }) => (
+                                        <span key={label} className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                                            <span className={`w-3 h-3 rounded-full ${color}`} />{label}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+            </div>
+
+            {/* ── Modals ── */}
+            {showForm && (
+                <ReportFormModal
+                    currentUser={currentUser}
+                    editData={editReport}
+                    prefillDate={prefillDate}
+                    prefillDivision={activeDivision !== "ALL" ? activeDivision : undefined}
+                    allPKLUsers={isAdminUser ? pklUsers : undefined}
+                    onClose={() => { setShowForm(false); setEditReport(null); setPrefillDate(null); }}
+                    onSaved={() => { fetchReports(); setShowForm(false); setEditReport(null); setPrefillDate(null); }}
+                />
+            )}
+
+            {showDetail && selectedReport && (
+                <ReportDetailModal
+                    report={selectedReport}
+                    currentUser={currentUser}
+                    onClose={() => { setShowDetail(false); setSelectedReport(null); }}
+                    onEdit={() => { setEditReport(selectedReport); setShowDetail(false); setShowForm(true); }}
+                    onReview={() => { setShowDetail(false); setShowReview(true); }}
+                    onDelete={() => handleDelete(selectedReport.id)}
+                />
+            )}
+
+            {showReview && selectedReport && (
+                <ReviewModal
+                    report={selectedReport}
+                    currentUser={currentUser}
+                    onClose={() => { setShowReview(false); setSelectedReport(null); }}
+                    onSaved={() => { fetchReports(); setShowReview(false); setSelectedReport(null); }}
+                />
+            )}
+
+            <style jsx global>{`
+                @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes scaleIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
+                .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16,1,0.3,1); }
+                .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16,1,0.3,1); }
+            `}</style>
+        </DashboardLayout>
+    );
+}

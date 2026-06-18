@@ -148,12 +148,24 @@ const Icons = {
       <path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" />
     </svg>
   ),
+  pklReport: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M9 13h6M9 17h4M9 9h1" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
+const ITEM_PKL_REPORT: MenuItem = {
+    name: "Laporan Kerja PKL",
+    href: "/dashboard/pkl-reports",
+    icon: Icons.pklReport,
+  };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -162,6 +174,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI,
     ITEM_LEMBUR,
+    ITEM_PKL_REPORT,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -205,6 +218,7 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI,
     ITEM_LEMBUR,
+    ITEM_PKL_REPORT,
     ...extra,
   ],
 });
@@ -237,7 +251,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -251,7 +265,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -300,7 +314,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
       ],
     },
     {
@@ -437,7 +451,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
       ],
     },
     {
@@ -477,10 +491,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        // ✅ Absensi ada — PKL bisa lihat absensi sesama PKL
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
         // ❌ ITEM_USERS dihapus — PKL tidak boleh akses Management User
         // ❌ Chat tidak ada — PKL tidak boleh akses Group Chat
+        ITEM_PKL_REPORT,
       ],
     },
     {

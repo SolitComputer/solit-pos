@@ -14,8 +14,8 @@ const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
 const PUBLIC_API_ROUTES = [
   "/api/warranty/check",
   "/api/auth/set-password",
-  "/api/service/stream",   
-  "/api/service/public",   
+  "/api/service/stream",
+  "/api/service/public",
 ];
 
 const FACE_API_WHITELIST = [
@@ -238,6 +238,8 @@ export const config = {
     "/api/reports/:path*",
     "/dashboard/warranty/:path*",
     "/api/attendance/:path*",
+    "/api/pkl-reports/:path*",
+    "/dashboard/pkl-reports/:path*",
     "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",

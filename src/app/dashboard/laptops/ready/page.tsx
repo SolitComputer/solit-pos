@@ -41,10 +41,10 @@ const GRADE_BADGE: Record<string, string> = {
 
 const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
-    RESERVED:  { badge: "bg-violet-50 text-violet-700 border-violet-200",   dot: "bg-violet-500",  label: "Dipesan (DP)" },
-    HELD:      { badge: "bg-orange-50 text-orange-700 border-orange-200",   dot: "bg-orange-500",  label: "Diambil Dulu" },
-    SOLD:      { badge: "bg-gray-100 text-gray-500 border-gray-200",        dot: "bg-gray-400",    label: "Terjual" },
-    PACKING:   { badge: "bg-sky-50 text-sky-700 border-sky-200",            dot: "bg-sky-500",     label: "📦 Packing" },
+    RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
+    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
+    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+    PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "📦 Packing" },
 };
 
 const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition";
@@ -155,8 +155,9 @@ export default function ReadyPage() {
     const [confirmTarget, setConfirmTarget] = useState<LaptopUnit | null>(null);
     const [confirmedUnitIds, setConfirmedUnitIds] = useState<Set<string>>(new Set());
 
-    const canCreateTx = userRole ? hasPermission(userRole, PERMISSIONS.RESERVE_UNIT) : false;
-    const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+    const isPKL = userRole ? (userRole === "PKL" || userRole.startsWith("PKL_") || userRole.startsWith("PKL-")) : false;
+    const canCreateTx = userRole ? hasPermission(userRole, PERMISSIONS.RESERVE_UNIT) && !isPKL : false;
+    const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -174,7 +175,7 @@ export default function ReadyPage() {
                 setUnits((result.data || []).map((u: LaptopUnit) => ({
                     ...u,
                     purchase_price: Math.round(Number(u.purchase_price) || 0),
-                    selling_price:  Math.round(Number(u.selling_price)  || 0),
+                    selling_price: Math.round(Number(u.selling_price) || 0),
                 })));
             }
         } catch { setUnits([]); }
@@ -186,7 +187,7 @@ export default function ReadyPage() {
     const filtered = useMemo(() => {
         let list = [...units];
         if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
-        if (filterGrade  !== "ALL") list = list.filter(u => u.grade  === filterGrade);
+        if (filterGrade !== "ALL") list = list.filter(u => u.grade === filterGrade);
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(u =>
@@ -206,11 +207,11 @@ export default function ReadyPage() {
     }, [units, filterStatus, filterGrade, search]);
 
     const counts = {
-        all:      units.length,
-        siap:     units.filter(u => u.status === "SIAP_JUAL").length,
+        all: units.length,
+        siap: units.filter(u => u.status === "SIAP_JUAL").length,
         reserved: units.filter(u => u.status === "RESERVED").length,
-        held:     units.filter(u => u.status === "HELD").length,
-        packing:  units.filter(u => u.status === "PACKING").length,
+        held: units.filter(u => u.status === "HELD").length,
+        packing: units.filter(u => u.status === "PACKING").length,
     };
 
     // ── Export Excel ──────────────────────────────────────────────────────────
@@ -219,28 +220,28 @@ export default function ReadyPage() {
         setIsExporting(true);
         try {
             const rows = filtered.map((u, idx) => ({
-                "No":             idx + 1,
-                "Nama Laptop":    u.laptop?.laptop_name  ?? "—",
-                "Brand":          u.laptop?.brand        ?? "—",
-                "CPU":            u.laptop?.cpu          ?? "—",
-                "RAM":            u.laptop?.ram          ?? "—",
-                "Storage":        u.laptop?.storage      ?? "—",
-                "Serial Number":  u.serial_number        ?? "—",
-                "Grade":          `Grade ${u.grade}`,
-                "Harga Beli":     u.purchase_price,
-                "Harga Jual":     u.selling_price,
-                "Status":         STATUS_CONFIG[u.status]?.label ?? u.status,
-                "Catatan":        u.notes                ?? "—",
-                "Tanggal Input":  u.created_at
+                "No": idx + 1,
+                "Nama Laptop": u.laptop?.laptop_name ?? "—",
+                "Brand": u.laptop?.brand ?? "—",
+                "CPU": u.laptop?.cpu ?? "—",
+                "RAM": u.laptop?.ram ?? "—",
+                "Storage": u.laptop?.storage ?? "—",
+                "Serial Number": u.serial_number ?? "—",
+                "Grade": `Grade ${u.grade}`,
+                "Harga Beli": u.purchase_price,
+                "Harga Jual": u.selling_price,
+                "Status": STATUS_CONFIG[u.status]?.label ?? u.status,
+                "Catatan": u.notes ?? "—",
+                "Tanggal Input": u.created_at
                     ? new Date(u.created_at).toLocaleDateString("id-ID", {
-                          day: "2-digit", month: "short", year: "numeric",
-                      })
+                        day: "2-digit", month: "short", year: "numeric",
+                    })
                     : "—",
             }));
 
             const ws = XLSX.utils.json_to_sheet(rows);
             ws["!cols"] = [
-                { wch: 5  }, { wch: 36 }, { wch: 14 }, { wch: 24 },
+                { wch: 5 }, { wch: 36 }, { wch: 14 }, { wch: 24 },
                 { wch: 10 }, { wch: 14 }, { wch: 24 }, { wch: 10 },
                 { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 16 },
             ];
@@ -330,7 +331,7 @@ export default function ReadyPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                         </svg>
                                         <span className="hidden sm:inline">Export Excel</span>
-                                        <span className="sm:hidden">Excel</span>    
+                                        <span className="sm:hidden">Excel</span>
                                     </>
                                 )}
                             </button>
@@ -353,10 +354,10 @@ export default function ReadyPage() {
 
                     {/* ── Stat Cards ─────────────────────────────────────── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit"  value={counts.all}      icon="💻" color="text-gray-900"    bg="bg-white"      bar="bg-gray-800"    />
-                        <StatCard label="Siap Jual"   value={counts.siap}     icon="✅" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
-                        <StatCard label="Dipesan"     value={counts.reserved} icon="🔒" color="text-violet-600"  bg="bg-violet-50"  bar="bg-violet-500"  />
-                        <StatCard label="Diambil"     value={counts.held}     icon="📦" color="text-orange-600"  bg="bg-orange-50"  bar="bg-orange-500"  />
+                        <StatCard label="Total Unit" value={counts.all} icon="💻" color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
+                        <StatCard label="Siap Jual" value={counts.siap} icon="✅" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
+                        <StatCard label="Dipesan" value={counts.reserved} icon="🔒" color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
+                        <StatCard label="Diambil" value={counts.held} icon="📦" color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                     </div>
 
                     {/* ── Filter ─────────────────────────────────────────── */}
@@ -365,11 +366,11 @@ export default function ReadyPage() {
                         <div className="px-4 pt-4 pb-3 border-b border-gray-100">
                             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
                                 {[
-                                    { value: "ALL",       label: "Semua",        count: counts.all,      dot: ""              },
-                                    { value: "SIAP_JUAL", label: "Siap Jual",    count: counts.siap,     dot: "bg-emerald-500"},
-                                    { value: "RESERVED",  label: "Dipesan (DP)", count: counts.reserved, dot: "bg-violet-500" },
-                                    { value: "HELD",      label: "Diambil Dulu", count: counts.held,     dot: "bg-orange-500" },
-                                    { value: "PACKING",   label: "Packing",      count: counts.packing,  dot: "bg-sky-500"    },
+                                    { value: "ALL", label: "Semua", count: counts.all, dot: "" },
+                                    { value: "SIAP_JUAL", label: "Siap Jual", count: counts.siap, dot: "bg-emerald-500" },
+                                    { value: "RESERVED", label: "Dipesan (DP)", count: counts.reserved, dot: "bg-violet-500" },
+                                    { value: "HELD", label: "Diambil Dulu", count: counts.held, dot: "bg-orange-500" },
+                                    { value: "PACKING", label: "Packing", count: counts.packing, dot: "bg-sky-500" },
                                 ].map(opt => {
                                     const isActive = filterStatus === opt.value;
                                     return (
@@ -471,7 +472,7 @@ export default function ReadyPage() {
                                         {filtered.map((unit, idx) => {
                                             const st = STATUS_CONFIG[unit.status];
                                             const isAvailable = unit.status === "SIAP_JUAL";
-                                            const isPending   = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
+                                            const isPending = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
                                             return (
                                                 <tr
                                                     key={unit.id}
@@ -488,9 +489,9 @@ export default function ReadyPage() {
                                                             {unit.laptop?.laptop_name || "—"}
                                                         </p>
                                                         <div className="flex flex-wrap gap-1 mt-1.5">
-                                                            {unit.laptop?.brand   && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.brand}</span>}
-                                                            {unit.laptop?.cpu     && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.cpu}</span>}
-                                                            {unit.laptop?.ram     && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.ram}</span>}
+                                                            {unit.laptop?.brand && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.brand}</span>}
+                                                            {unit.laptop?.cpu && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.cpu}</span>}
+                                                            {unit.laptop?.ram && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.ram}</span>}
                                                         </div>
                                                     </td>
 
@@ -641,19 +642,19 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
 }) {
     const isDP = type === "RESERVED";
     const [form, setForm] = useState({
-        customer_name:    "",
-        customer_phone:   "",
-        company_name:     "Solit",
-        dp_amount:        "",
-        deal_price:       String(unit.selling_price || ""),
-        payment_method:   "TRANSFER",
-        source_platform:  "",
-        notes:            "",
+        customer_name: "",
+        customer_phone: "",
+        company_name: "Solit",
+        dp_amount: "",
+        deal_price: String(unit.selling_price || ""),
+        payment_method: "TRANSFER",
+        source_platform: "",
+        notes: "",
         software_request: "",
-        pickup_method:    "COD",
-        pickup_date:      "",
-        pickup_time:      "",
-        pickup_location:  "",
+        pickup_method: "COD",
+        pickup_date: "",
+        pickup_time: "",
+        pickup_location: "",
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -670,30 +671,30 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
     const handleSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!form.customer_name.trim()) { setError("Nama pelanggan wajib diisi"); return; }
-        if (isDP && !form.dp_amount)    { setError("Jumlah DP wajib diisi"); return; }
-        if (!form.deal_price)           { setError("Harga deal wajib diisi"); return; }
+        if (isDP && !form.dp_amount) { setError("Jumlah DP wajib diisi"); return; }
+        if (!form.deal_price) { setError("Harga deal wajib diisi"); return; }
         setLoading(true); setError("");
         try {
             const res = await fetch("/api/units/reserve", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    unit_id:          unit.id,
+                    unit_id: unit.id,
                     type,
-                    customer_name:    form.customer_name.trim(),
-                    customer_phone:   form.customer_phone.trim() || null,
-                    company_name:     form.company_name.trim()   || null,
-                    dp_amount:        isDP ? Number(form.dp_amount) : undefined,
-                    deal_price:       Number(form.deal_price),
-                    payment_method:   form.payment_method,
-                    source_platform:  form.source_platform || null,
-                    notes:            form.notes           || null,
-                    sales_name:       salesName,
+                    customer_name: form.customer_name.trim(),
+                    customer_phone: form.customer_phone.trim() || null,
+                    company_name: form.company_name.trim() || null,
+                    dp_amount: isDP ? Number(form.dp_amount) : undefined,
+                    deal_price: Number(form.deal_price),
+                    payment_method: form.payment_method,
+                    source_platform: form.source_platform || null,
+                    notes: form.notes || null,
+                    sales_name: salesName,
                     software_request: form.software_request || null,
-                    pickup_method:    form.pickup_method    || null,
-                    pickup_date:      form.pickup_date      || null,
-                    pickup_time:      form.pickup_time      || null,
-                    pickup_location:  form.pickup_location  || null,
+                    pickup_method: form.pickup_method || null,
+                    pickup_date: form.pickup_date || null,
+                    pickup_time: form.pickup_time || null,
+                    pickup_location: form.pickup_location || null,
                 }),
             });
             const result = await res.json();
@@ -864,7 +865,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
 
     const handleConfirm = async () => {
         if (!unit.reserved_invoice) { setError("Invoice tidak ditemukan"); return; }
-        if (!unit.serial_number)    { setError("Serial number tidak ditemukan"); return; }
+        if (!unit.serial_number) { setError("Serial number tidak ditemukan"); return; }
         setLoading(true); setError("");
         try {
             const res = await fetch("/api/units/confirm-payment", {
@@ -872,8 +873,8 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     invoice_number: unit.reserved_invoice,
-                    serial_number:  unit.serial_number,
-                    payment_photo:  paymentProof || null,
+                    serial_number: unit.serial_number,
+                    payment_photo: paymentProof || null,
                 }),
             });
             const result = await res.json();
@@ -884,7 +885,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     };
 
     const statusColor = unit.status === "RESERVED" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-orange-50 text-orange-700 border-orange-200";
-    const statusDot   = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
+    const statusDot = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
     const statusLabel = unit.status === "RESERVED" ? "DP" : "Ambil Dulu";
 
     return (
@@ -914,12 +915,12 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
-                            { label: "Status",        value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
-                            { label: "Invoice",       value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
-                            { label: "Dipesan oleh",  value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
-                            { label: "Laptop",        value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
+                            { label: "Status", value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
+                            { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
+                            { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
+                            { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
                             { label: "Serial Number", value: <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded-md text-gray-800">{unit.serial_number || "—"}</code> },
-                            { label: "Harga Jual",    value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
+                            { label: "Harga Jual", value: <span className="text-sm font-bold text-gray-800">Rp {(unit.selling_price || 0).toLocaleString("id-ID")}</span> },
                         ].map(row => (
                             <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
                                 <span className="text-xs text-gray-400">{row.label}</span>
