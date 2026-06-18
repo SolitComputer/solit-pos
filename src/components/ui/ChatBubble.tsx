@@ -1,12 +1,12 @@
 // src/components/ui/ChatBubble.tsx
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useRef, useState, useCallback, KeyboardEvent } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
 
 const supabase = getSupabaseClient();
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface ChatUser {
   id: string;
   name: string;
@@ -19,6 +19,8 @@ interface Message {
   receiver_id: string;
   content: string;
   is_read: boolean;
+  is_deleted: boolean;
+  edited_at: string | null;
   created_at: string;
 }
 
@@ -42,12 +44,178 @@ const ROLE_LABEL: Record<string, string> = {
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
-
 function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
+  return new Date(iso).toLocaleTimeString("id-ID", {
+    hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta",
+  });
 }
 
+// ─── MessageItem ──────────────────────────────────────────────────────────────
+interface MessageItemProps {
+  msg: Message;
+  isMine: boolean;
+  onEdit: (id: string, newContent: string) => Promise<boolean>;
+  onDelete: (id: string) => void;
+}
+
+function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(msg.content);
+  const [saving, setSaving] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  // Sync content saat berubah dari realtime
+  useEffect(() => {
+    if (!isEditing) setEditContent(msg.content);
+  }, [msg.content, isEditing]);
+
+  // Focus saat masuk mode edit
+  useEffect(() => {
+    if (isEditing) {
+      editRef.current?.focus();
+      editRef.current?.select();
+    }
+  }, [isEditing]);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu]);
+
+  const handleSaveEdit = async () => {
+    const trimmed = editContent.trim();
+    if (!trimmed || trimmed === msg.content) {
+      setIsEditing(false);
+      setEditContent(msg.content);
+      return;
+    }
+    setSaving(true);
+    const ok = await onEdit(msg.id, trimmed);
+    setSaving(false);
+    if (ok) setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); handleSaveEdit(); }
+    if (e.key === "Escape") { setIsEditing(false); setEditContent(msg.content); }
+  };
+
+  // ── Deleted ──
+  if (msg.is_deleted) {
+    return (
+      <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+        <div className="px-3 py-1.5 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 text-[10px] italic">
+          🚫 Pesan dihapus
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex items-end gap-1 group ${isMine ? "justify-end" : "justify-start"}`}
+      onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
+    >
+      {/* Edit mode */}
+      {isEditing ? (
+        <div className={`flex-1 max-w-[85%] rounded-2xl px-3 py-2 ${isMine ? "bg-[#1a1a2e]" : "bg-white border border-gray-200"
+          }`}>
+          <input
+            ref={editRef}
+            value={editContent}
+            onChange={e => setEditContent(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            maxLength={1000}
+            className={`w-full bg-transparent text-xs outline-none ${isMine ? "text-white placeholder:text-white/40" : "text-gray-800"
+              }`}
+          />
+          <div className="flex items-center justify-between mt-1.5 gap-2">
+            <span className={`text-[9px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
+              Enter simpan · Esc batal
+            </span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
+                className={`text-[9px] px-1.5 py-0.5 rounded transition ${isMine ? "text-white/60 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
+                  }`}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving || !editContent.trim()}
+                className={`text-[9px] px-1.5 py-0.5 rounded font-semibold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
+                  }`}
+              >
+                {saving ? "..." : "Simpan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Normal bubble */
+        <div className="relative">
+          <div className={`max-w-[220px] px-3 py-2 ${isMine
+              ? "bg-[#1a1a2e] text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm"
+              : "bg-white text-gray-800 border border-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-sm shadow-sm"
+            }`}>
+            <p className="text-xs leading-relaxed break-words">{msg.content}</p>
+            <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? "text-white/50" : "text-gray-400"}`}>
+              {msg.edited_at && <span className="text-[9px] italic">diedit</span>}
+              <span className="text-[10px]">{formatTime(msg.created_at)}</span>
+              {isMine && <span className="text-[10px]">{msg.is_read ? "✓✓" : "✓"}</span>}
+            </div>
+          </div>
+
+          {/* Context menu */}
+          {showMenu && (
+            <div
+              ref={menuRef}
+              className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[120px] ${isMine ? "right-0" : "left-0"
+                }`}
+            >
+              {/* Edit — hanya sender */}
+              {isMine && (
+                <button
+                  onClick={() => { setIsEditing(true); setShowMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit
+                </button>
+              )}
+              {/* Delete — sender atau receiver */}
+              <button
+                onClick={() => { onDelete(msg.id); setShowMenu(false); }}
+                className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Hapus
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ChatBubble ───────────────────────────────────────────────────────────────
 export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -59,7 +227,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   const inputRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Fetch history
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,11 +238,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     }
   }, [targetUser.id]);
 
-  useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+  useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     if (!minimized) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,32 +247,21 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     }
   }, [messages, minimized]);
 
-  // Count unread when minimized
   useEffect(() => {
     if (minimized) {
-      const newUnread = messages.filter(
-        m => m.sender_id === targetUser.id && !m.is_read
-      ).length;
+      const newUnread = messages.filter(m => m.sender_id === targetUser.id && !m.is_read).length;
       setUnread(newUnread);
     }
   }, [messages, minimized, targetUser.id]);
 
-  // Supabase Realtime subscription
+  // ── Realtime ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel(`chat:${[currentUser.id, targetUser.id].sort().join(":")}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          // Filter: pesan antara dua user ini saja
-          filter: `receiver_id=eq.${currentUser.id}`,
-        },
+      .on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${currentUser.id}` },
         (payload) => {
           const msg = payload.new as Message;
-          // Hanya proses jika dari targetUser
           if (msg.sender_id !== targetUser.id) return;
           setMessages(prev => {
             if (prev.some(m => m.id === msg.id)) return prev;
@@ -117,14 +270,26 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           if (minimized) setUnread(u => u + 1);
         }
       )
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages" },
+        (payload) => {
+          const updated = payload.new as Message;
+          // Hanya update jika pesan ini ada di percakapan ini
+          setMessages(prev =>
+            prev.map(m => m.id === updated.id
+              ? { ...m, content: updated.content, is_deleted: updated.is_deleted, edited_at: updated.edited_at }
+              : m
+            )
+          );
+        }
+      )
       .subscribe();
 
     channelRef.current = channel;
-    return () => {
-      channel.unsubscribe();
-    };
+    return () => { channel.unsubscribe(); };
   }, [currentUser.id, targetUser.id, minimized]);
 
+  // ── Send ──────────────────────────────────────────────────────────────────
   const send = async () => {
     const content = input.trim();
     if (!content || sending) return;
@@ -136,6 +301,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
       receiver_id: targetUser.id,
       content,
       is_read: false,
+      is_deleted: false,
+      edited_at: null,
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
@@ -149,12 +316,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
       });
       const data = await res.json();
       if (data.success) {
-        // Replace optimistic dengan real message
-        setMessages(prev =>
-          prev.map(m => m.id === optimistic.id ? data.message : m)
-        );
+        setMessages(prev => prev.map(m => m.id === optimistic.id ? data.message : m));
       } else {
-        // Rollback
         setMessages(prev => prev.filter(m => m.id !== optimistic.id));
       }
     } catch {
@@ -165,14 +328,48 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const deleteMessage = async (messageId: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
+    try {
+      await fetch(`/api/messages?id=${messageId}`, { method: "DELETE" });
+    } catch {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: false } : m));
     }
   };
 
-  // ── Minimized state (hanya header) ────────────────────────────────────────
+  // ── Edit ──────────────────────────────────────────────────────────────────
+  const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
+    setMessages(prev =>
+      prev.map(m => m.id === messageId
+        ? { ...m, content: newContent, edited_at: new Date().toISOString() }
+        : m
+      )
+    );
+    try {
+      const res = await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: messageId, content: newContent }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        // Rollback
+        await fetchMessages();
+        return false;
+      }
+      return true;
+    } catch {
+      await fetchMessages();
+      return false;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
+  // ── Minimized ─────────────────────────────────────────────────────────────
   if (minimized) {
     return (
       <div
@@ -201,7 +398,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     );
   }
 
-  // ── Expanded state ────────────────────────────────────────────────────────
+  // ── Expanded ──────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col bg-white rounded-t-2xl shadow-2xl border border-gray-200 overflow-hidden"
       style={{ width: 300, height: 400 }}>
@@ -217,7 +414,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           <p className="text-[10px] text-white/50 truncate">{ROLE_LABEL[targetUser.role] ?? targetUser.role}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Minimize */}
           <button
             onClick={e => { e.stopPropagation(); setMinimized(true); }}
             className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 rounded transition"
@@ -227,7 +423,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
             </svg>
           </button>
-          {/* Close */}
           <button
             onClick={e => { e.stopPropagation(); onClose(); }}
             className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 rounded transition"
@@ -240,7 +435,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-gray-50">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -252,30 +447,20 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
             <p className="text-xs text-gray-400">Belum ada pesan.<br />Mulai percakapan!</p>
           </div>
         ) : (
-          messages.map(msg => {
-            const isMine = msg.sender_id === currentUser.id;
-            return (
-              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[75%] ${isMine
-                  ? "bg-[#1a1a2e] text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm"
-                  : "bg-white text-gray-800 border border-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-sm shadow-sm"
-                } px-3 py-2`}>
-                  <p className="text-xs leading-relaxed break-words">{msg.content}</p>
-                  <p className={`text-[10px] mt-1 ${isMine ? "text-white/50" : "text-gray-400"} text-right`}>
-                    {formatTime(msg.created_at)}
-                    {isMine && (
-                      <span className="ml-1">{msg.is_read ? "✓✓" : "✓"}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            );
-          })
+          messages.map(msg => (
+            <MessageItem
+              key={msg.id}
+              msg={msg}
+              isMine={msg.sender_id === currentUser.id}
+              onEdit={editMessage}
+              onDelete={deleteMessage}
+            />
+          ))
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input */}
       <div className="flex-shrink-0 px-3 py-2 bg-white border-t border-gray-100 flex items-center gap-2">
         <input
           ref={inputRef}
@@ -304,11 +489,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   );
 }
 
-// ── ChatManager — mengelola multiple chat windows ─────────────────────────────
-interface ActiveChat {
-  user: ChatUser;
-}
-
+// ─── ChatManager ──────────────────────────────────────────────────────────────
+interface ActiveChat { user: ChatUser; }
 interface ChatManagerProps {
   currentUser: ChatUser;
   activeChats: ActiveChat[];
@@ -317,16 +499,11 @@ interface ChatManagerProps {
 
 export function ChatManager({ currentUser, activeChats, onClose }: ChatManagerProps) {
   if (activeChats.length === 0) return null;
-
   return (
-    // Fixed bottom-right, chats stack dari kanan ke kiri
     <div className="fixed bottom-0 right-4 z-[9999] flex items-end gap-3 pointer-events-none">
       {activeChats.map((chat, idx) => (
-        <div
-          key={chat.user.id}
-          className="pointer-events-auto"
-          style={{ marginRight: idx === 0 ? 0 : undefined }}
-        >
+        <div key={chat.user.id} className="pointer-events-auto"
+          style={{ marginRight: idx === 0 ? 0 : undefined }}>
           <ChatBubble
             currentUser={currentUser}
             targetUser={chat.user}
