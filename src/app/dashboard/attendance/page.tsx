@@ -101,7 +101,7 @@ type SwapDayOff = {
     work_date: string;
     note?: string | null;
 };
-type UserInfo = { id: string; name: string; role: string };
+type UserInfo = { id: string; name: string; role: string; created_at?: string | null };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 type AttendanceDetailItem = {
@@ -228,7 +228,25 @@ function countEffectiveWorkingDays(
     return c;
 }
 
-// Sisa hari kerja dari hari ini sampai akhir bulan
+function countWorkingDaysFrom(
+    year: number,
+    month: number,
+    dayOffDows: Set<number>,
+    offDates: Set<string>,
+    startDate: string,
+    leaveDates?: Set<string>  // ✅ Tambah parameter opsional
+): number {
+    const dim = new Date(year, month + 1, 0).getDate();
+    let c = 0;
+    for (let d = 1; d <= dim; d++) {
+        const dk = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        if (dk < startDate) continue;
+        const dow = new Date(dk + "T12:00:00").getDay();
+        if (!dayOffDows.has(dow) && !offDates.has(dk) && !leaveDates?.has(dk)) c++;
+    }
+    return c;
+}
+
 function getRemainingWorkingDays(year: number, month: number, dayOffDows: Set<number>, offDates: Set<string>): number {
     const todayWIB = getWIBToday();
     const dim = new Date(year, month + 1, 0).getDate();
@@ -255,6 +273,21 @@ function initials(name: string): string {
 }
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
+
+function getUserStartDate(
+    userCreatedAt: string | null | undefined,
+    calYear: number,
+    calMonth: number
+): string {
+    const firstOfMonth = `${calYear}-${pad2(calMonth + 1)}-01`;
+    if (!userCreatedAt) return firstOfMonth;
+
+    const createdWIB = new Date(
+        new Date(userCreatedAt).getTime() + 7 * 60 * 60 * 1000
+    ).toISOString().slice(0, 10);
+
+    return createdWIB > firstOfMonth ? createdWIB : firstOfMonth;
+}
 
 // ─── Modal Shell ──────────────────────────────────────────────────────────────
 function ModalShell({ onClose, headerColor, title, subtitle, children, footer, wide }: {
@@ -1973,6 +2006,159 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
     );
 }
 
+// ─── Modal: Tidak Masuk Hari Ini ──────────────────────────────────────────────
+function AbsentUsersModal({
+    date,
+    absentUsers,
+    isAdmin,
+    onAbsenManual,
+    onClose,
+}: {
+    date: string;
+    absentUsers: {
+        name: string; role: string; userId: string;
+        reason: "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
+        note: string | null;
+        attendanceStatus: "LATE_MORNING" | "POTENTIALLY_LATE" | "NO_RECORD" | "ABSENT_CONFIRMED" | "WITHIN_TIME";
+    }[];
+    isAdmin: boolean;
+    onAbsenManual: (userId: string) => void;
+    onClose: () => void;
+}) {
+    const STATUS_CONFIG = {
+        WITHIN_TIME: {
+            label: "Belum Buka Absen",
+            emoji: "⏰",
+            bg: "bg-blue-50",
+            color: "text-blue-600",
+            border: "border-blue-200",
+            desc: "Waktu absen belum dibuka",
+        },
+        POTENTIALLY_LATE: {
+            label: "Berpotensi Terlambat",
+            emoji: "⚠️",
+            bg: "bg-amber-50",
+            color: "text-amber-600",
+            border: "border-amber-200",
+            desc: "Sudah waktunya absen tapi belum",
+        },
+        LATE_MORNING: {
+            label: "Absen Siang",
+            emoji: "🌤️",
+            bg: "bg-orange-50",
+            color: "text-orange-600",
+            border: "border-orange-200",
+            desc: "Sudah lewat jam tepat waktu, jika absen akan terlambat",
+        },
+        ABSENT_CONFIRMED: {
+            label: "Tidak Hadir",
+            emoji: "🚫",
+            bg: "bg-red-50",
+            color: "text-red-600",
+            border: "border-red-200",
+            desc: "Waktu absen sudah habis",
+        },
+        NO_RECORD: {
+            label: "Tidak Ada Catatan",
+            emoji: "📭",
+            bg: "bg-gray-50",
+            color: "text-gray-500",
+            border: "border-gray-200",
+            desc: "Tidak ada data kehadiran",
+        },
+    };
+
+    const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("id-ID", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric"
+    });
+
+    // Group by status
+    const groups = {
+        ABSENT_CONFIRMED: absentUsers.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED"),
+        LATE_MORNING: absentUsers.filter(u => u.attendanceStatus === "LATE_MORNING"),
+        POTENTIALLY_LATE: absentUsers.filter(u => u.attendanceStatus === "POTENTIALLY_LATE"),
+        WITHIN_TIME: absentUsers.filter(u => u.attendanceStatus === "WITHIN_TIME"),
+        NO_RECORD: absentUsers.filter(u => u.attendanceStatus === "NO_RECORD"),
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">⚠️ Belum Absen</p>
+                        <p className="text-xs text-white/70 mt-1">{dateLabel} · {absentUsers.length} karyawan</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                    {(["ABSENT_CONFIRMED", "LATE_MORNING", "POTENTIALLY_LATE", "WITHIN_TIME", "NO_RECORD"] as const).map(statusKey => {
+                        const group = groups[statusKey];
+                        if (group.length === 0) return null;
+                        const cfg = STATUS_CONFIG[statusKey];
+
+                        return (
+                            <div key={statusKey}>
+                                <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-xl ${cfg.bg} border ${cfg.border}`}>
+                                    <span className="text-sm">{cfg.emoji}</span>
+                                    <div>
+                                        <p className={`text-xs font-bold ${cfg.color}`}>{cfg.label} ({group.length})</p>
+                                        <p className="text-[10px] text-gray-400">{cfg.desc}</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    {group.map(u => (
+                                        <div
+                                            key={u.userId}
+                                            className={`flex items-center justify-between gap-3 bg-white border ${cfg.border} rounded-xl px-3.5 py-3 shadow-sm`}
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0`}>
+                                                    {initials(u.name)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-gray-800 truncate">{u.name}</p>
+                                                    <p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p>
+                                                    {u.note && (
+                                                        <p className="text-[10px] text-blue-500 mt-0.5 truncate">📝 {u.note}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={() => { onAbsenManual(u.userId); onClose(); }}
+                                                    className="flex-shrink-0 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all"
+                                                >
+                                                    ✏️ Absen
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
     const [attendances, setAttendances] = useState<Attendance[]>([]);
@@ -2020,6 +2206,7 @@ export default function AttendanceDashboardPage() {
     const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
+    const [showAbsentPopup, setShowAbsentPopup] = useState(false);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -2427,6 +2614,11 @@ export default function AttendanceDashboardPage() {
         names.forEach(name => {
             const dows = dayOffByName[name] ?? new Set<number>();
             const offs = dateOffByName[name] ?? new Set<string>();
+            const userId = userIdByName[name] ?? "";
+
+            // ✅ Cari created_at user ini
+            const userInfo = allUsers.find(u => u.id === userId);
+            const userStartDate = getUserStartDate(userInfo?.created_at, calYear, calMonth);
 
             let present = 0, late = 0, score = 0;
             const absences: AbsenceItem[] = [];
@@ -2435,6 +2627,11 @@ export default function AttendanceDashboardPage() {
             for (let d = 1; d <= dim; d++) {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
                 if (isCurrentMonth && dk > todayWIB) break;
+
+                if (dk < userStartDate) {
+                    const mr = manualByName[name]?.[dk];
+                    if (!mr) continue;
+                }
                 const dow = new Date(dk + "T12:00:00").getDay();
                 const isDateWork = allDateWorks.some(dw => dw.user_id === userIdByName[name] && dw.work_date === dk);
                 const isWeeklyOff = dows.has(dow) && !isDateWork; // libur mingguan, tapi bukan date_work override
@@ -2456,7 +2653,11 @@ export default function AttendanceDashboardPage() {
             }
 
             const pastWorkdays = present + late + absences.length;
-            const totalWorkdays = countWorkingDays(calYear, calMonth, dows, offs);
+            const leaveDatesForUser = new Set<string>(
+                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
+                    .map(r => r.leave_date)
+            );
+            const totalWorkdays = countWorkingDaysFrom(calYear, calMonth, dows, offs, userStartDate, leaveDatesForUser);
             const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
 
             const resolvedUserId = userIdByName[name] ??
@@ -2488,7 +2689,83 @@ export default function AttendanceDashboardPage() {
 
     const selectedOffDetail = selectedDate ? getOffDetailForDate(selectedDate) : [];
 
-    // ✅ NEW FUNCTION: Generate slip gaji dari data rekapan yang sudah di-calculate
+    const selectedAbsentUsers = useMemo(() => {
+        if (!selectedDate) return [];
+
+        const dow = new Date(selectedDate + "T12:00:00").getDay();
+        type AbsentUserEntry = {
+            name: string;
+            role: string;
+            userId: string;
+            reason: "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
+            note: string | null;
+            attendanceStatus: "LATE_MORNING" | "POTENTIALLY_LATE" | "NO_RECORD" | "ABSENT_CONFIRMED" | "WITHIN_TIME";
+        };
+        const result: AbsentUserEntry[] = [];
+
+        allUsers.forEach(u => {
+            const userStartDate = getUserStartDate(u.created_at, calYear, calMonth);
+            if (selectedDate < userStartDate) return;
+
+            if (isDayOffForUser(u.name, selectedDate)) return;
+
+            const hasAttendance = mergedAttendances.some(a => {
+                const dk = toWIBDateKey(a.check_in_time || a.created_at);
+                return a.user_id === u.id && dk === selectedDate &&
+                    (a.displayStatus === "PRESENT" || a.displayStatus === "LATE");
+            });
+            if (hasAttendance) return;
+
+            const manualRec = manualMap[`${u.id}_${selectedDate}`];
+            if (manualRec && (manualRec.status === "PRESENT" || manualRec.status === "LATE")) return;
+
+            const hasLeave = leaveData.find(ld => ld.user.id === u.id)
+                ?.requests.some(r => r.leave_date === selectedDate);
+            if (hasLeave) return;
+
+            const reason = manualRec?.status as "ABSENT" | "SICK" | "PERMIT" | undefined;
+
+            const nowWIB = new Date(Date.now() + 7 * 60 * 60 * 1000);
+            const todayWIB = nowWIB.toISOString().slice(0, 10);
+            const isToday = selectedDate === todayWIB;
+
+            let attendanceStatus: AbsentUserEntry["attendanceStatus"] = "NO_RECORD";
+
+            if (isToday) {
+                const totalMinNow = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
+                const shift = (u as any).shift ?? "PAGI";
+                const SHIFT_TIMES = {
+                    PAGI: { open: 7 * 60 + 30, late: 8 * 60, close: 12 * 60 },
+                    SORE: { open: 14 * 60, late: 16 * 60, close: 18 * 60 },
+                } as const;
+                const times = SHIFT_TIMES[shift as keyof typeof SHIFT_TIMES] ?? SHIFT_TIMES.PAGI;
+
+                if (totalMinNow < times.open) {
+                    attendanceStatus = "WITHIN_TIME";
+                } else if (totalMinNow > times.close) {
+                    attendanceStatus = "ABSENT_CONFIRMED";
+                } else if (totalMinNow >= times.open && totalMinNow < times.late) {
+                    attendanceStatus = "POTENTIALLY_LATE";
+                } else {
+                    attendanceStatus = "LATE_MORNING";
+                }
+            } else {
+                attendanceStatus = "ABSENT_CONFIRMED";
+            }
+
+            result.push({
+                name: u.name,
+                role: u.role,
+                userId: u.id,
+                reason: reason ?? "ALPHA",
+                note: manualRec?.notes ?? null,
+                attendanceStatus,
+            });
+        });
+
+        return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
+    }, [selectedDate, allUsers, mergedAttendances, manualMap, isDayOffForUser, leaveData, calYear, calMonth]);
+
     const generateSlipFromRecapan = useCallback(async (userStat: typeof userSummary[0]) => {
         try {
             const sal = salaryMap[userStat.userId];
@@ -2746,7 +3023,9 @@ export default function AttendanceDashboardPage() {
                             tabList.push({ id: "salary-slip", label: "📄 Slip Gaji" });
                             tabList.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
                         }
+                        // ✅ User biasa: tampilkan tab gaji sendiri + slip sendiri
                         if (!isAdminRole(role) && !canViewSalary(role)) {
+                            tabList.push({ id: "my-salary" as typeof activeTab, label: "💰 Gaji Saya" });
                             tabList.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
                         }
                         if (isAdminRole(role)) tabList.push({ id: "leave", label: "🌴 Cuti" });
@@ -2811,11 +3090,24 @@ export default function AttendanceDashboardPage() {
                                             const tot = dd.length;
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
                                             const effectiveFilterUser = !canManage && currentUser?.name ? currentUser.name : filterUser;
-                                            const isUserDayOff = effectiveFilterUser !== "Semua" ? isDayOffForUser(effectiveFilterUser, dk) : false;
-                                            const hasAnyDayOff = filterUser === "Semua" ? getOffUsersForDate(dk).length > 0 : false;
+                                            const filteredUserInfo = allUsers.find(u => u.name === effectiveFilterUser);
+                                            const filteredUserStart = getUserStartDate(filteredUserInfo?.created_at, calYear, calMonth);
+                                            const isUserDayOff = effectiveFilterUser !== "Semua"
+                                                ? (dk >= filteredUserStart && isDayOffForUser(effectiveFilterUser, dk))
+                                                : false;
+                                            const hasAnyDayOff = filterUser === "Semua"
+                                                ? getOffUsersForDate(dk).filter(name => {
+                                                    const uInfo = allUsers.find(u => u.name === name);
+                                                    const startDate = getUserStartDate(uInfo?.created_at, calYear, calMonth);
+                                                    return dk >= startDate;
+                                                }).length > 0
+                                                : false;
                                             const hasManual = mc > 0;
                                             return (
-                                                <button key={day} onClick={() => setSelectedDate(p => p === dk ? null : dk)}
+                                                <button key={day} onClick={() => {
+                                                    setShowAbsentPopup(false);
+                                                    setSelectedDate(p => p === dk ? null : dk);
+                                                }}
                                                     className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
                                                     {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
                                                     {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-300 animate-pulse" />}
@@ -2856,6 +3148,14 @@ export default function AttendanceDashboardPage() {
                                             {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">⏰ {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full">✏️ {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
                                             {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 {selectedOffDetail.length} libur</span>}
+                                            {selectedAbsentUsers.length > 0 && (
+                                                <button
+                                                    onClick={() => setShowAbsentPopup(true)}
+                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
+                                                >
+                                                    ⚠️ {selectedAbsentUsers.length} tidak masuk
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -2865,7 +3165,7 @@ export default function AttendanceDashboardPage() {
                                                     ➕ Tambah Manual
                                                 </button>
                                             )}
-                                        <button onClick={() => setSelectedDate(null)} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">
+                                        <button onClick={() => { setSelectedDate(null); setShowAbsentPopup(false); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
                                     </div>
@@ -2894,6 +3194,57 @@ export default function AttendanceDashboardPage() {
                                     </div>
                                 )}
 
+                                {canManage && selectedAbsentUsers.length > 0 && (
+                                    <div className="px-6 pt-3 pb-3 border-b border-gray-50 bg-orange-50/10">
+                                        <button
+                                            onClick={() => setShowAbsentPopup(true)}
+                                            className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-lg">⚠️</span>
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold text-orange-700">
+                                                        {selectedAbsentUsers.length} Karyawan Belum Absen
+                                                    </p>
+                                                    <p className="text-[10px] text-orange-500 mt-0.5">
+                                                        {(() => {
+                                                            const confirmed = selectedAbsentUsers.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED").length;
+                                                            const late = selectedAbsentUsers.filter(u => u.attendanceStatus === "LATE_MORNING").length;
+                                                            const potential = selectedAbsentUsers.filter(u => u.attendanceStatus === "POTENTIALLY_LATE").length;
+                                                            const parts: string[] = [];
+                                                            if (confirmed > 0) parts.push(`${confirmed} tidak hadir`);
+                                                            if (late > 0) parts.push(`${late} absen siang`);
+                                                            if (potential > 0) parts.push(`${potential} berpotensi terlambat`);
+                                                            return parts.join(" · ") || "Klik untuk detail";
+                                                        })()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {/* Mini avatar stack */}
+                                                <div className="flex -space-x-1.5">
+                                                    {selectedAbsentUsers.slice(0, 4).map(u => (
+                                                        <div
+                                                            key={u.userId}
+                                                            className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 border-2 border-white flex items-center justify-center text-white text-[8px] font-black"
+                                                            title={u.name}
+                                                        >
+                                                            {initials(u.name)}
+                                                        </div>
+                                                    ))}
+                                                    {selectedAbsentUsers.length > 4 && (
+                                                        <div className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-gray-500 text-[8px] font-black">
+                                                            +{selectedAbsentUsers.length - 4}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <svg className="w-4 h-4 text-orange-400 group-hover:text-orange-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                </svg>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
 
                                 {selectedAttendances.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-12 px-6">
@@ -3380,6 +3731,14 @@ export default function AttendanceDashboardPage() {
                                                                         {formatRupiah(Math.round(sal.base_salary / u.totalWorkdays))}/hari
                                                                     </span>
                                                                 )}
+                                                                {sal.salary_type === "FIXED" && u.totalWorkdays > 0 && (
+                                                                    <span
+                                                                        className="text-[8px] text-violet-500 font-semibold mt-0.5 whitespace-nowrap"
+                                                                        title={`Jika dihitung dari kehadiran: ${formatPct(u.pct)}% × ${formatRupiah(sal.base_salary)}`}
+                                                                    >
+                                                                        ≈ {formatRupiah(Math.round((sal.base_salary / u.totalWorkdays) * u.score))} jika %
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <span className="text-gray-300 text-xs">—</span>
@@ -3449,17 +3808,20 @@ export default function AttendanceDashboardPage() {
                                                     {/* Kehadiran % */}
                                                     <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"
-                                                                }`}>
+                                                            <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>
                                                                 {formatPct(u.pct)}%
                                                             </span>
                                                             <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
                                                                 <div
-                                                                    className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"
-                                                                        }`}
+                                                                    className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`}
                                                                     style={{ width: `${Math.min(u.pct, 100)}%` }}
                                                                 />
                                                             </div>
+                                                            {salaryMap[u.userId]?.salary_type === "FIXED" && u.totalWorkdays > 0 && (
+                                                                <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                    💰 Tetap
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
 
@@ -3873,6 +4235,149 @@ export default function AttendanceDashboardPage() {
                 </div>
             )}
 
+            {/* ════ TAB GAJI SAYA (non-admin) ════ */}
+            {activeTab === "my-salary" && !canViewSalary(currentUser?.role) && (
+                <div className="space-y-4 px-4 pb-8 max-w-2xl mx-auto">
+                    {/* Info Gaji Saya */}
+                    {(() => {
+                        const mySalary = salaries.find(s => s.user_id === currentUser?.id);
+                        const myStat = userSummary.find(u => u.userId === currentUser?.id);
+
+                        return (
+                            <div className="space-y-4">
+                                {/* Card Gaji Pokok */}
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                    <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5">
+                                        <p className="font-bold text-white text-base">💰 Informasi Gaji</p>
+                                        <p className="text-xs text-white/70 mt-1">
+                                            {MONTH_NAMES[calMonth]} {calYear}
+                                        </p>
+                                    </div>
+
+                                    <div className="p-6 space-y-4">
+                                        {!mySalary ? (
+                                            <div className="text-center py-8">
+                                                <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                                                    <span className="text-2xl opacity-40">💰</span>
+                                                </div>
+                                                <p className="text-sm text-gray-400 font-medium">Belum ada data gaji</p>
+                                                <p className="text-xs text-gray-300 mt-1">Hubungi admin untuk mengatur gaji kamu</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {/* Tipe dan nominal gaji */}
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="bg-gray-50 rounded-2xl p-4">
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Tipe Gaji</p>
+                                                        <span className={`inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full border ${mySalary.salary_type === "FIXED"
+                                                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                                            : "bg-amber-100 text-amber-700 border-amber-200"
+                                                            }`}>
+                                                            {mySalary.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 Persentase Kehadiran"}
+                                                        </span>
+                                                    </div>
+                                                    <div className="bg-gray-50 rounded-2xl p-4">
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Gaji Pokok</p>
+                                                        <p className="text-lg font-black text-gray-800 font-mono">
+                                                            {formatRupiah(mySalary.base_salary)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Persentase kehadiran — selalu ditampilkan */}
+                                                {myStat && (
+                                                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4">
+                                                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
+                                                            📊 Kehadiran Bulan Ini
+                                                        </p>
+                                                        <div className="grid grid-cols-3 gap-3 mb-4">
+                                                            <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                                                                <p className="text-2xl font-black text-emerald-600">{myStat.present}</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">✅ Tepat</p>
+                                                            </div>
+                                                            <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                                                                <p className="text-2xl font-black text-amber-600">{myStat.late}</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">⏰ Terlambat</p>
+                                                            </div>
+                                                            <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                                                                <p className="text-2xl font-black text-red-500">{myStat.absences.length}</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">❌ Tidak Hadir</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Progress bar persentase */}
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className="text-xs font-bold text-gray-600">Persentase Kehadiran</p>
+                                                                <span className={`text-sm font-black ${myStat.pct >= 90 ? "text-emerald-600" : myStat.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>
+                                                                    {formatPct(myStat.pct)}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-700 ${myStat.pct >= 90 ? "bg-gradient-to-r from-emerald-400 to-green-500"
+                                                                        : myStat.pct >= 70 ? "bg-gradient-to-r from-amber-400 to-orange-500"
+                                                                            : "bg-gradient-to-r from-red-400 to-rose-500"
+                                                                        }`}
+                                                                    style={{ width: `${Math.min(myStat.pct, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex justify-between text-[10px] text-gray-400">
+                                                                <span>{myStat.pastWorkdays} hari kerja dari {myStat.totalWorkdays} total</span>
+                                                                <span>Skor: {myStat.score.toFixed(1)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Estimasi gaji bulan ini */}
+                                                {myStat && (
+                                                    <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5">
+                                                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-1">
+                                                            {mySalary.salary_type === "FIXED"
+                                                                ? "💰 Gaji Bulan Ini"
+                                                                : "📊 Estimasi Gaji (berdasarkan kehadiran)"}
+                                                        </p>
+                                                        <p className="text-2xl font-black text-white font-mono">
+                                                            {formatRupiah(
+                                                                mySalary.salary_type === "FIXED"
+                                                                    ? mySalary.base_salary
+                                                                    : myStat.totalWorkdays > 0
+                                                                        ? Math.round((mySalary.base_salary / myStat.totalWorkdays) * myStat.score)
+                                                                        : 0
+                                                            )}
+                                                        </p>
+                                                        {mySalary.salary_type === "FIXED" ? (
+                                                            <p className="text-[11px] text-white/60 mt-1">
+                                                                Gaji penuh · tidak tergantung kehadiran
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-[11px] text-white/60 mt-1">
+                                                                {formatRupiah(mySalary.base_salary)} × {formatPct(myStat.pct)}% kehadiran
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Info tambahan untuk FIXED — tetap tampilkan persentase */}
+                                                {mySalary.salary_type === "FIXED" && myStat && (
+                                                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                                                        <p className="text-[11px] text-blue-700 font-medium">
+                                                            ℹ️ Kamu memiliki gaji tetap — nominal gaji tidak berubah meskipun kehadiran kurang dari 100%.
+                                                            Namun persentase kehadiran kamu tetap dicatat: <strong>{formatPct(myStat.pct)}%</strong>
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+
             {/* ════ TAB SLIP SAYA (non-admin) ════ */}
             {activeTab === "my-slip" && !isAdminRole(currentUser?.role) && (
                 <div className="space-y-4 px-4 pb-8 max-w-3xl mx-auto">
@@ -4153,6 +4658,16 @@ export default function AttendanceDashboardPage() {
                 <AttendanceSummaryDetailModal
                     detail={attendanceSummaryDetail}
                     onClose={() => setAttendanceSummaryDetail(null)}
+                />
+            )}
+
+            {showAbsentPopup && selectedDate && selectedAbsentUsers.length > 0 && (
+                <AbsentUsersModal
+                    date={selectedDate}
+                    absentUsers={selectedAbsentUsers}
+                    isAdmin={isAdmin}
+                    onAbsenManual={(userId) => openAddManual(selectedDate, userId)}
+                    onClose={() => setShowAbsentPopup(false)}
                 />
             )}
             <style jsx global>{`
