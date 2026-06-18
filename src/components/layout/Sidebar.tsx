@@ -526,6 +526,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   // FIX: Hapus duplicate CUSTOMER_SERVICE key, pakai versi lengkap (dengan absensi + SERVICE_MENU)
+  // Cari bagian ini dan ganti:
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -539,14 +540,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },        // ✅ Tambah
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
         { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        // ❌ "Buat Payment" dihapus
       ],
     },
     SERVICE_MENU,
@@ -725,8 +727,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<any>(null);      
-  const [loading, setLoading] = useState(true);    
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
