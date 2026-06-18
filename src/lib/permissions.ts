@@ -1,8 +1,5 @@
 // src/lib/permissions.ts
 
-// ─── Role Types ───────────────────────────────────────────────────────────────
-// src/lib/permissions.ts
-
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -35,8 +32,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   CREW_SALES: "/dashboard",
   ACCOUNTING: "/dashboard",
   PENGELOLA_BARANG: "/dashboard/laptops",
-  TEKNISI: "/dashboard/service/antrian",        // ✅ Teknisi langsung ke antrian
-  KEPALA_TEKNISI: "/dashboard/service/antrian", // ✅ Kepala Teknisi langsung ke antrian
+  TEKNISI: "/dashboard/service/antrian",
+  KEPALA_TEKNISI: "/dashboard/service/antrian",
   PENGANTARAN: "/dashboard",
   MARKETING: "/dashboard/laptops",
   KEBERSIHAN: "/dashboard",
@@ -49,12 +46,13 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ONPOINT: "/dashboard",
   KEPALA_SOTECH: "/dashboard",
   PKL: "/dashboard/laptops/ready",
-  CUSTOMER_SERVICE: "/dashboard/service/antrian", // ✅ CS langsung ke antrian
+  CUSTOMER_SERVICE: "/dashboard/service/antrian",
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
 const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
+// ✅ FIX: Hapus duplikat CUSTOMER_SERVICE
 const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
@@ -62,7 +60,6 @@ const ALL_ROLES: UserRole[] = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL", "CUSTOMER_SERVICE",
-  "CUSTOMER_SERVICE", // ✅ NEW
 ];
 
 const SALES_ACCESS: UserRole[] = [
@@ -73,7 +70,6 @@ const SALES_ACCESS: UserRole[] = [
 const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
 
 // ─── Service Queue Role Groups ────────────────────────────────────────────────
-// Yang bisa MELIHAT semua menu service (antrian, done, history)
 export const SERVICE_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "TEKNISI",
@@ -81,14 +77,12 @@ export const SERVICE_VIEW_ROLES: UserRole[] = [
   "CUSTOMER_SERVICE",
 ];
 
-// Yang bisa BUAT FORMULIR servis
 export const SERVICE_CREATE_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "KEPALA_TEKNISI",
   "CUSTOMER_SERVICE",
 ];
 
-// Yang bisa UPDATE STATUS (done, sedang dikerjakan, dll) — teknisi
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "TEKNISI",
@@ -104,16 +98,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT", "PKL",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL",
   ],
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
-    "TEKNISI", "KEPALA_TEKNISI", "PKL",
-    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
     "TEKNISI", "KEPALA_TEKNISI",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
@@ -132,28 +123,33 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/dashboard/users": [...ALL_ROLES],
   "/dashboard/attendance": [...ALL_ROLES],
-  "/api/messages": [...ALL_ROLES],
+  "/dashboard/attendance/overtime": [...ALL_ROLES],
+
   // ✅ Service Queue Routes
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
-  // Di dalam ROUTE_PERMISSIONS, tambahkan:
-  "/api/group-chat": [...ALL_ROLES],
-  
+
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
+
+  // ─── API Routes ───────────────────────────────────────────────────────────
+  "/api/messages": [...ALL_ROLES],
+  "/api/group-chat": [...ALL_ROLES],
+
+  // ✅ FIX: Tambah push notification route
+  "/api/push/subscribe": [...ALL_ROLES],
+
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG"],
   "/api/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
     "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT", "PKL",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
@@ -180,9 +176,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
-  "/api/units/confirm-payment": [
-    ...FULL_ACCESS, "KEPALA_SALES",
-  ],
+  "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES"],
   "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
   "/api/attendance/salary": [...ALL_ROLES],
@@ -202,7 +196,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
   ],
-  "/dashboard/attendance/overtime": [...ALL_ROLES],
   "/api/attendance": [...ALL_ROLES],
 
   // ✅ Service API Routes
@@ -244,9 +237,7 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING",
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT", "PKL",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL",
   ] as UserRole[],
   CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
   EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
@@ -275,7 +266,6 @@ export const PERMISSIONS = {
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "TEKNISI", "KEPALA_TEKNISI", "PKL",
-    "TEKNISI", "KEPALA_TEKNISI",
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
@@ -284,8 +274,8 @@ export const PERMISSIONS = {
   VIEW_SERVICE: [...SERVICE_VIEW_ROLES] as UserRole[],
   CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-  COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[], // done
-  CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[], // sudah diambil
+  COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
+  CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(

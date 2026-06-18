@@ -9,178 +9,213 @@ const MAX_CONTENT_LENGTH = 2000;
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 100;
 
+const MESSAGE_SELECT = `
+  id,
+  sender_id,
+  sender_name,
+  sender_role,
+  content,
+  reply_to_id,
+  is_deleted,
+  edited_at,
+  created_at,
+  attachment_url,
+  attachment_type,
+  attachment_name,
+  attachment_size,
+  reply_to:reply_to_id (
+    id,
+    sender_name,
+    content,
+    is_deleted,
+    attachment_type
+  )
+` as const;
+
+// ── GET ──────────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
-  const { searchParams } = new URL(req.url);
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), MAX_LIMIT);
-  const before = searchParams.get("before");
+    const { searchParams } = new URL(req.url);
 
-  let query = supabaseAdmin
-    .from("group_messages")
-    .select(`
-      id,
-      sender_id,
-      sender_name,
-      sender_role,
-      content,
-      reply_to_id,
-      is_deleted,
-      created_at,
-      reply_to:reply_to_id (
-        id,
-        sender_name,
-        content,
-        is_deleted
-      )
-    `)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    const singleId = searchParams.get("id");
+    if (singleId) {
+        const { data, error } = await supabaseAdmin
+            .from("group_messages")
+            .select(MESSAGE_SELECT)
+            .eq("id", singleId)
+            .maybeSingle();
 
-  if (before) {
-    query = query.lt("created_at", before);
-  }
+        if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        if (!data) return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
+        return NextResponse.json({ success: true, message: data });
+    }
 
-  const { data, error } = await query;
+    const limit = Math.min(parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT)), MAX_LIMIT);
+    const before = searchParams.get("before");
 
-  if (error) {
-    console.error("[group-chat GET]", error.message);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
+    let query = supabaseAdmin
+        .from("group_messages")
+        .select(MESSAGE_SELECT)
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-  const messages = (data ?? []).reverse();
+    if (before) query = query.lt("created_at", before);
 
-  return NextResponse.json({
-    success: true,
-    messages,
-    has_more: (data ?? []).length === limit,
-  });
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+
+    return NextResponse.json({
+        success: true,
+        messages: (data ?? []).reverse(),
+        has_more: (data ?? []).length === limit,
+    });
 }
 
+// ── POST ─────────────────────────────────────────────────────────────────────
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
-  }
-
-  const { content, reply_to_id } = body;
-
-  if (!content?.trim()) {
-    return NextResponse.json({ success: false, message: "Pesan tidak boleh kosong" }, { status: 400 });
-  }
-  if (content.trim().length > MAX_CONTENT_LENGTH) {
-    return NextResponse.json(
-      { success: false, message: `Pesan terlalu panjang (max ${MAX_CONTENT_LENGTH} karakter)` },
-      { status: 400 }
-    );
-  }
-
-  if (reply_to_id) {
-    const { data: replyMsg } = await supabaseAdmin
-      .from("group_messages")
-      .select("id")
-      .eq("id", reply_to_id)
-      .maybeSingle();
-    if (!replyMsg) {
-      return NextResponse.json({ success: false, message: "Pesan yang direply tidak ditemukan" }, { status: 404 });
-    }
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("group_messages")
-    .insert({
-      sender_id: user.id,
-      sender_name: user.name,
-      sender_role: user.role,
-      content: content.trim(),
-      reply_to_id: reply_to_id ?? null,
-    })
-    .select(`
-      id,
-      sender_id,
-      sender_name,
-      sender_role,
-      content,
-      reply_to_id,
-      is_deleted,
-      created_at,
-      reply_to:reply_to_id (
-        id,
-        sender_name,
-        content,
-        is_deleted
-      )
-    `)
-    .single();
-
-  if (error) {
-    console.error("[group-chat POST]", error.message);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
-
-  // ✅ Log untuk debug production
-  console.log("[group-chat POST] inserted:", data?.id, "by:", user.name);
-
-  // Push notification (non-blocking)
-  const trimmedContent = content.trim();
-  const senderName = user.name;
-  const senderId = user.id;
-
-  Promise.resolve().then(async () => {
+    let body: any;
     try {
-      const { sendPushBroadcast } = await import("@/lib/push-notify");
-      await sendPushBroadcast(senderId, {
-        title: `👥 All Team Solit — ${senderName}`,
-        body: trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent,
-        tag: "group-chat",
-        url: "/dashboard/users",
-        requireInteraction: false,
-      });
-    } catch (err: unknown) {
-      console.error("[push group]", err);
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
-  });
 
-  return NextResponse.json({ success: true, message: data });
+    const {
+        content,
+        reply_to_id,
+        attachment_url,
+        attachment_type,
+        attachment_name,
+        attachment_size,
+    } = body;
+
+    // Wajib ada salah satu: teks atau attachment
+    if (!content?.trim() && !attachment_url) {
+        return NextResponse.json({ success: false, message: "Pesan atau attachment wajib ada" }, { status: 400 });
+    }
+    if (content?.trim() && content.trim().length > MAX_CONTENT_LENGTH) {
+        return NextResponse.json(
+            { success: false, message: `Pesan terlalu panjang (max ${MAX_CONTENT_LENGTH} karakter)` },
+            { status: 400 }
+        );
+    }
+
+    if (reply_to_id) {
+        const { data: replyMsg } = await supabaseAdmin
+            .from("group_messages").select("id").eq("id", reply_to_id).maybeSingle();
+        if (!replyMsg) {
+            return NextResponse.json({ success: false, message: "Pesan yang direply tidak ditemukan" }, { status: 404 });
+        }
+    }
+
+    const { data, error } = await supabaseAdmin
+        .from("group_messages")
+        .insert({
+            sender_id: user.id,
+            sender_name: user.name,
+            sender_role: user.role,
+            content: content?.trim() ?? "",
+            reply_to_id: reply_to_id ?? null,
+            attachment_url: attachment_url ?? null,
+            attachment_type: attachment_type ?? null,
+            attachment_name: attachment_name ?? null,
+            attachment_size: attachment_size ?? null,
+        })
+        .select(MESSAGE_SELECT)
+        .single();
+
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+
+    const trimmedContent = content?.trim() ?? "";
+    const senderName = user.name;
+    const senderId = user.id;
+
+    Promise.resolve().then(async () => {
+        try {
+            const { sendPushBroadcast } = await import("@/lib/push-notify");
+            const pushBody = attachment_type === "image"
+                ? "📷 Mengirim foto"
+                : attachment_type === "file"
+                    ? `📎 ${attachment_name ?? "File"}`
+                    : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
+
+            await sendPushBroadcast(senderId, {
+                title: `👥 All Team Solit — ${senderName}`,
+                body: pushBody,
+                tag: "group-chat",
+                url: "/dashboard/users",
+                requireInteraction: false,
+            });
+        } catch (err: unknown) {
+            console.error("[push group]", err);
+        }
+    });
+
+    return NextResponse.json({ success: true, message: data });
 }
 
+// ── PATCH — edit pesan ────────────────────────────────────────────────────────
+async function patchHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+    let body: any;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
+    }
+
+    const { id, content } = body;
+
+    if (!id) return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
+    if (!content?.trim()) return NextResponse.json({ success: false, message: "Konten tidak boleh kosong" }, { status: 400 });
+    if (content.trim().length > MAX_CONTENT_LENGTH) {
+        return NextResponse.json({ success: false, message: `Pesan terlalu panjang (max ${MAX_CONTENT_LENGTH} karakter)` }, { status: 400 });
+    }
+
+    const { data: msg } = await supabaseAdmin
+        .from("group_messages").select("id, sender_id, is_deleted").eq("id", id).maybeSingle();
+
+    if (!msg) return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
+    if (msg.is_deleted) return NextResponse.json({ success: false, message: "Pesan yang dihapus tidak bisa diedit" }, { status: 400 });
+    if (msg.sender_id !== user.id) return NextResponse.json({ success: false, message: "Hanya pengirim yang bisa mengedit pesan" }, { status: 403 });
+
+    const { data, error } = await supabaseAdmin
+        .from("group_messages")
+        .update({ content: content.trim(), edited_at: new Date().toISOString() })
+        .eq("id", id)
+        .select(MESSAGE_SELECT)
+        .single();
+
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+
+    return NextResponse.json({ success: true, message: data });
+}
+
+// ── DELETE — soft delete ──────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
-  const { searchParams } = new URL(req.url);
-  const messageId = searchParams.get("id");
+    const { searchParams } = new URL(req.url);
+    const messageId = searchParams.get("id");
 
-  if (!messageId) {
-    return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
-  }
+    if (!messageId) return NextResponse.json({ success: false, message: "ID pesan wajib" }, { status: 400 });
 
-  const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
-  const isAdmin = FULL_ACCESS.has(user.role);
+    const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+    const isAdmin = FULL_ACCESS.has(user.role);
 
-  const { data: msg } = await supabaseAdmin
-    .from("group_messages")
-    .select("id, sender_id")
-    .eq("id", messageId)
-    .maybeSingle();
+    const { data: msg } = await supabaseAdmin
+        .from("group_messages").select("id, sender_id").eq("id", messageId).maybeSingle();
 
-  if (!msg) {
-    return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
-  }
+    if (!msg) return NextResponse.json({ success: false, message: "Pesan tidak ditemukan" }, { status: 404 });
+    if (!isAdmin && msg.sender_id !== user.id) {
+        return NextResponse.json({ success: false, message: "Tidak bisa hapus pesan orang lain" }, { status: 403 });
+    }
 
-  if (!isAdmin && msg.sender_id !== user.id) {
-    return NextResponse.json({ success: false, message: "Tidak bisa hapus pesan orang lain" }, { status: 403 });
-  }
+    const { error } = await supabaseAdmin
+        .from("group_messages").update({ is_deleted: true }).eq("id", messageId);
 
-  const { error } = await supabaseAdmin
-    .from("group_messages")
-    .update({ is_deleted: true })
-    .eq("id", messageId);
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-  if (error) {
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
 }
 
-export const GET    = withAuth(getHandler);
-export const POST   = withAuth(postHandler);
+export const GET = withAuth(getHandler);
+export const POST = withAuth(postHandler);
+export const PATCH = withAuth(patchHandler);
 export const DELETE = withAuth(deleteHandler);
