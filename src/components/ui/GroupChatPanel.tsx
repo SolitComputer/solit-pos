@@ -15,6 +15,7 @@ interface ReplyPreview {
     sender_name: string;
     content: string;
     is_deleted: boolean;
+    attachment_type: "image" | "file" | null;
 }
 
 interface GroupMessage {
@@ -27,6 +28,10 @@ interface GroupMessage {
     is_deleted: boolean;
     edited_at: string | null;
     created_at: string;
+    attachment_url: string | null;
+    attachment_type: "image" | "file" | null;
+    attachment_name: string | null;
+    attachment_size: number | null;
     reply_to?: ReplyPreview | null;
 }
 
@@ -98,6 +103,11 @@ function formatDateDivider(iso: string): string {
 function getDateKey(iso: string): string {
     return new Date(iso).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
 }
+function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ name, role, size = 32 }: { name: string; role: string; size?: number }) {
@@ -111,6 +121,132 @@ function Avatar({ name, role, size = 32 }: { name: string; role: string; size?: 
         }}>
             {getInitials(name)}
         </div>
+    );
+}
+
+// ─── Image Lightbox ───────────────────────────────────────────────────────────
+function ImageLightbox({ url, name, onClose }: { url: string; name: string | null; onClose: () => void }) {
+    useEffect(() => {
+        const handler = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", handler);
+        return () => document.removeEventListener("keydown", handler);
+    }, [onClose]);
+
+    return (
+        <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center"
+            style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+            onClick={onClose}
+        >
+            <button
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                onClick={onClose}
+            >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            {name && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-xs font-medium px-3 py-1.5 bg-black/40 rounded-full">
+                    {name}
+                </div>
+            )}
+            <img
+                src={url}
+                alt={name ?? "Foto"}
+                className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            />
+            <a
+                href={url}
+                download={name ?? "foto"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs rounded-full transition"
+                onClick={e => e.stopPropagation()}
+            >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+            </a>
+        </div>
+    );
+}
+
+// ─── AttachmentDisplay ────────────────────────────────────────────────────────
+function AttachmentDisplay({
+    url, type, name, size, isMine,
+}: {
+    url: string;
+    type: "image" | "file";
+    name: string | null;
+    size: number | null;
+    isMine: boolean;
+}) {
+    const [lightbox, setLightbox] = useState(false);
+
+    if (type === "image") {
+        return (
+            <>
+                <div
+                    className="cursor-pointer rounded-xl overflow-hidden"
+                    style={{ maxWidth: 240 }}
+                    onClick={() => setLightbox(true)}
+                >
+                    <img
+                        src={url}
+                        alt={name ?? "Foto"}
+                        className="w-full object-cover hover:opacity-90 transition rounded-xl"
+                        style={{ maxHeight: 220 }}
+                        loading="lazy"
+                    />
+                </div>
+                {lightbox && <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />}
+            </>
+        );
+    }
+
+    // File card
+    const ext = name?.split(".").pop()?.toUpperCase() ?? "FILE";
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={name ?? true}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl no-underline transition ${
+                isMine ? "bg-white/10 hover:bg-white/20" : "bg-gray-100 hover:bg-gray-200"
+            }`}
+            style={{ maxWidth: 240 }}
+            onClick={e => e.stopPropagation()}
+        >
+            <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${
+                isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
+            }`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>{ext.slice(0, 4)}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className={`text-xs font-medium truncate ${isMine ? "text-white" : "text-gray-800"}`}>
+                    {name ?? "File"}
+                </p>
+                {size != null && (
+                    <p className={`text-[10px] mt-0.5 ${isMine ? "text-white/50" : "text-gray-400"}`}>
+                        {formatFileSize(size)}
+                    </p>
+                )}
+            </div>
+            <svg className={`w-4 h-4 flex-shrink-0 ${isMine ? "text-white/60" : "text-gray-400"}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        </a>
     );
 }
 
@@ -174,16 +310,11 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
     };
 
     const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSaveEdit();
-        }
-        if (e.key === "Escape") {
-            setIsEditing(false);
-            setEditContent(msg.content);
-        }
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
+        if (e.key === "Escape") { setIsEditing(false); setEditContent(msg.content); }
     };
 
+    // ── Deleted ──────────────────────────────────────────────────────────────
     if (msg.is_deleted) {
         return (
             <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
@@ -194,10 +325,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                 )}
                 <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
                     {!isMine && (
-                        <span
-                            className="text-[10px] font-semibold mb-0.5 px-1"
-                            style={{ color: getAvatarColor(msg.sender_role) }}
-                        >
+                        <span className="text-[10px] font-semibold mb-0.5 px-1"
+                            style={{ color: getAvatarColor(msg.sender_role) }}>
                             {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
                         </span>
                     )}
@@ -208,6 +337,9 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
             </div>
         );
     }
+
+    const hasAttachment = !!msg.attachment_url && !!msg.attachment_type;
+    const hasContent = !!msg.content;
 
     return (
         <div
@@ -222,10 +354,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
 
             <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
                 {!isMine && (
-                    <span
-                        className="text-[10px] font-semibold mb-0.5 px-1"
-                        style={{ color: getAvatarColor(msg.sender_role) }}
-                    >
+                    <span className="text-[10px] font-semibold mb-0.5 px-1"
+                        style={{ color: getAvatarColor(msg.sender_role) }}>
                         {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
                     </span>
                 )}
@@ -233,8 +363,9 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                 <div className="relative">
                     {/* ── Edit mode ── */}
                     {isEditing ? (
-                        <div className={`rounded-2xl shadow-sm px-3 pt-2 pb-2 min-w-[200px] ${isMine ? "bg-[#1a1a2e] rounded-br-sm" : "bg-white border border-gray-200 rounded-bl-sm"
-                            }`}>
+                        <div className={`rounded-2xl shadow-sm px-3 pt-2 pb-2 min-w-[200px] ${
+                            isMine ? "bg-[#1a1a2e] rounded-br-sm" : "bg-white border border-gray-200 rounded-bl-sm"
+                        }`}>
                             <textarea
                                 ref={editRef}
                                 value={editContent}
@@ -246,8 +377,9 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-gray-800 placeholder:text-gray-400"
-                                    }`}
+                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
+                                    isMine ? "text-white placeholder:text-white/40" : "text-gray-800 placeholder:text-gray-400"
+                                }`}
                                 style={{ minHeight: 22 }}
                             />
                             <div className="flex items-center justify-between mt-2 gap-2">
@@ -257,20 +389,18 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[10px] px-2 py-0.5 rounded-lg transition ${isMine
-                                            ? "text-white/60 hover:bg-white/10 hover:text-white"
-                                            : "text-gray-500 hover:bg-gray-100"
-                                            }`}
+                                        className={`text-[10px] px-2 py-0.5 rounded-lg transition ${
+                                            isMine ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100"
+                                        }`}
                                     >
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${isMine
-                                            ? "bg-white/20 text-white hover:bg-white/30"
-                                            : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
-                                            }`}
+                                        className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${
+                                            isMine ? "bg-white/20 text-white hover:bg-white/30" : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
+                                        }`}
                                     >
                                         {saving ? "..." : "Simpan"}
                                     </button>
@@ -280,33 +410,57 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                     ) : (
                         /* ── Normal bubble ── */
                         <div
-                            className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${isMine
-                                ? "bg-[#1a1a2e] text-white rounded-br-sm"
-                                : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
-                                }`}
+                            className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${
+                                isMine
+                                    ? "bg-[#1a1a2e] text-white rounded-br-sm"
+                                    : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
+                            }`}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
                         >
+                            {/* Reply preview */}
                             {msg.reply_to && (
                                 <div
-                                    className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${isMine
-                                        ? "bg-white/10 border-white/40 text-white/80"
-                                        : "bg-gray-50 border-gray-300 text-gray-600"
-                                        }`}
+                                    className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${
+                                        isMine
+                                            ? "bg-white/10 border-white/40 text-white/80"
+                                            : "bg-gray-50 border-gray-300 text-gray-600"
+                                    }`}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}
                                 >
                                     <p className="font-semibold truncate">{msg.reply_to.sender_name}</p>
                                     <p className="truncate mt-0.5 opacity-80">
-                                        {msg.reply_to.is_deleted ? "🚫 Pesan dihapus" : msg.reply_to.content}
+                                        {msg.reply_to.is_deleted
+                                            ? "🚫 Pesan dihapus"
+                                            : msg.reply_to.attachment_type === "image"
+                                            ? "📷 Foto"
+                                            : msg.reply_to.attachment_type === "file"
+                                            ? "📎 File"
+                                            : msg.reply_to.content}
                                     </p>
                                 </div>
                             )}
 
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                            {/* Attachment */}
+                            {hasAttachment && (
+                                <div className={hasContent ? "mb-2" : ""}>
+                                    <AttachmentDisplay
+                                        url={msg.attachment_url!}
+                                        type={msg.attachment_type!}
+                                        name={msg.attachment_name}
+                                        size={msg.attachment_size}
+                                        isMine={isMine}
+                                    />
+                                </div>
+                            )}
 
+                            {/* Text content */}
+                            {hasContent && (
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                            )}
+
+                            {/* Timestamp */}
                             <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? "text-white/50" : "text-gray-400"}`}>
-                                {msg.edited_at && (
-                                    <span className="text-[9px] italic opacity-70">diedit</span>
-                                )}
+                                {msg.edited_at && <span className="text-[9px] italic opacity-70">diedit</span>}
                                 <span className="text-[10px]">{formatTime(msg.created_at)}</span>
                             </div>
                         </div>
@@ -316,8 +470,9 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                     {showMenu && !isEditing && (
                         <div
                             ref={menuRef}
-                            className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[140px] ${isMine ? "right-0" : "left-0"
-                                }`}
+                            className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[140px] ${
+                                isMine ? "right-0" : "left-0"
+                            }`}
                         >
                             <button
                                 onClick={() => { onReply(msg); setShowMenu(false); }}
@@ -330,7 +485,8 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
                                 Balas
                             </button>
 
-                            {isMine && (
+                            {/* Edit hanya untuk pesan teks (bukan pure attachment) */}
+                            {isMine && hasContent && (
                                 <button
                                     onClick={() => { setIsEditing(true); setShowMenu(false); }}
                                     className="w-full text-left px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-2"
@@ -378,24 +534,225 @@ function MessageBubble({ msg, isMine, isAdmin, onReply, onDelete, onEdit, onScro
     );
 }
 
+// ─── InputArea ────────────────────────────────────────────────────────────────
+interface InputAreaProps {
+    currentUser: CurrentUser;
+    replyTo: GroupMessage | null;
+    onCancelReply: () => void;
+    onSend: (content: string) => Promise<void>;
+    onSendAttachment: (file: File, caption: string) => Promise<void>;
+}
+
+function InputArea({ currentUser, replyTo, onCancelReply, onSend, onSendAttachment }: InputAreaProps) {
+    const [input, setInput] = useState("");
+    const [sending, setSending] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [preview, setPreview] = useState<{
+        url: string; name: string; type: "image" | "file"; size: number;
+    } | null>(null);
+
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setInput(e.target.value);
+        const ta = e.target;
+        ta.style.height = "auto";
+        ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    };
+
+    const resetInput = () => {
+        setInput("");
+        const ta = inputRef.current;
+        if (ta) ta.style.height = "22px";
+    };
+
+    const handleSendText = async () => {
+        if (!input.trim() || sending) return;
+        setSending(true);
+        await onSend(input.trim());
+        resetInput();
+        setSending(false);
+        inputRef.current?.focus();
+    };
+
+    const handleSendFile = async () => {
+        if (!selectedFile || uploading) return;
+        setUploading(true);
+        await onSendAttachment(selectedFile, input.trim());
+        resetInput();
+        cancelPreview();
+        setUploading(false);
+        inputRef.current?.focus();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (preview) handleSendFile();
+            else handleSendText();
+        }
+        if (e.key === "Escape" && replyTo) onCancelReply();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Ukuran file maksimal 5MB");
+            e.target.value = "";
+            return;
+        }
+
+        const isImage = file.type.startsWith("image/");
+        const previewUrl = isImage ? URL.createObjectURL(file) : "";
+        setPreview({ url: previewUrl, name: file.name, type: isImage ? "image" : "file", size: file.size });
+        setSelectedFile(file);
+        e.target.value = "";
+    };
+
+    const cancelPreview = () => {
+        if (preview?.url) URL.revokeObjectURL(preview.url);
+        setPreview(null);
+        setSelectedFile(null);
+    };
+
+    const canSend = preview ? !uploading : (!!input.trim() && !sending);
+    const isLoading = uploading || sending;
+
+    return (
+        <div className="flex-shrink-0 border-t border-gray-100 bg-white">
+            {/* Reply preview */}
+            {replyTo && (
+                <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-100 bg-[#f8f9ff]">
+                    <div className="flex-1 min-w-0 pl-3 border-l-2 border-[#1a1a2e]">
+                        <p className="text-[10px] font-bold text-[#1a1a2e]">{replyTo.sender_name}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">
+                            {replyTo.attachment_type === "image" ? "📷 Foto"
+                                : replyTo.attachment_type === "file" ? "📎 File"
+                                : replyTo.content}
+                        </p>
+                    </div>
+                    <button onClick={onCancelReply}
+                        className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition flex-shrink-0">
+                        <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            {/* File preview sebelum kirim */}
+            {preview && (
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <div className="flex items-center gap-3">
+                        {preview.type === "image" ? (
+                            <img src={preview.url} alt="preview"
+                                className="w-14 h-14 object-cover rounded-xl flex-shrink-0 border border-gray-200" />
+                        ) : (
+                            <div className="w-14 h-14 bg-[#1a1a2e] rounded-xl flex flex-col items-center justify-center flex-shrink-0 gap-1">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span className="text-white text-[8px] font-bold">
+                                    {preview.name.split(".").pop()?.toUpperCase()}
+                                </span>
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-800 truncate">{preview.name}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">{formatFileSize(preview.size)}</p>
+                        </div>
+                        <button onClick={cancelPreview}
+                            className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition flex-shrink-0">
+                            <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Input row */}
+            <div className="flex items-end gap-3 px-4 py-3">
+                <div className="flex-shrink-0 self-end mb-1">
+                    <Avatar name={currentUser.name} role={currentUser.role} size={32} />
+                </div>
+
+                <div className="flex-1 flex items-end gap-2 bg-gray-100 rounded-2xl px-3 py-2 min-h-[42px]">
+                    {/* Attach button */}
+                    <button
+                        onClick={() => fileRef.current?.click()}
+                        disabled={isLoading}
+                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-[#1a1a2e] transition flex-shrink-0 disabled:opacity-40"
+                        title="Lampirkan file / foto"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                    </button>
+
+                    <textarea
+                        ref={inputRef}
+                        value={input}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        placeholder={preview ? "Tambah caption (opsional)..." : "Tulis pesan ke All Team Solit..."}
+                        maxLength={2000}
+                        rows={1}
+                        disabled={isLoading}
+                        className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 resize-none outline-none leading-relaxed max-h-[120px] min-h-[22px] disabled:opacity-50"
+                        style={{ height: "22px" }}
+                    />
+                    {input.length > 1800 && (
+                        <span className="text-[10px] text-gray-400 self-end flex-shrink-0">{input.length}/2000</span>
+                    )}
+                </div>
+
+                {/* Send button */}
+                <button
+                    onClick={preview ? handleSendFile : handleSendText}
+                    disabled={!canSend}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition self-end disabled:opacity-40"
+                    style={{ background: canSend ? "#1a1a2e" : "#e5e7eb" }}
+                >
+                    {isLoading ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                        <svg className="w-4 h-4" fill="none"
+                            stroke={canSend ? "white" : "#9ca3af"} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                    )}
+                </button>
+
+                <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
+            </div>
+        </div>
+    );
+}
+
 // ─── Main GroupChatPanel ──────────────────────────────────────────────────────
 export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [messages, setMessages] = useState<GroupMessage[]>([]);
-    const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(false);
-    const [sending, setSending] = useState(false);
     const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
     const [unread, setUnread] = useState(0);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
 
     const bottomRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLTextAreaElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
 
+    // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchMessages = useCallback(async () => {
         setLoading(true);
         try {
@@ -417,10 +774,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const res = await fetch(`/api/group-chat?id=${encodeURIComponent(id)}`);
             const data = await res.json();
             if (data.success && data.message) return data.message as GroupMessage;
-        } catch { /* fallback ke raw payload */ }
+        } catch { /* fallback */ }
         return null;
     }, []);
 
+    // ── Load more ─────────────────────────────────────────────────────────────
     const loadMore = useCallback(async () => {
         if (!hasMore || loadingMore || messages.length === 0) return;
         setLoadingMore(true);
@@ -444,6 +802,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [hasMore, loadingMore, messages]);
 
+    // ── Scroll effects ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!loading && messages.length > 0) {
             bottomRef.current?.scrollIntoView({ behavior: "auto" });
@@ -459,10 +818,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 bottomRef.current?.scrollIntoView({ behavior: "smooth" });
                 setUnread(0);
             } else {
-                const newUnreadCount = messages
-                    .slice(prevMsgCount.current)
+                const newUnread = messages.slice(prevMsgCount.current)
                     .filter(m => m.sender_id !== currentUser.id).length;
-                if (newUnreadCount > 0) setUnread(u => u + newUnreadCount);
+                if (newUnread > 0) setUnread(u => u + newUnread);
             }
         }
         prevMsgCount.current = messages.length;
@@ -476,6 +834,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         if (el.scrollTop < 80 && hasMore && !loadingMore) loadMore();
     }, [hasMore, loadingMore, loadMore]);
 
+    // ── Realtime ──────────────────────────────────────────────────────────────
     useEffect(() => {
         const channel = supabase
             .channel(`group-chat-${Math.random().toString(36).slice(2, 7)}`, {
@@ -499,12 +858,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     const updated = payload.new as GroupMessage;
                     setMessages(prev =>
                         prev.map(m => m.id === updated.id
-                            ? {
-                                ...m,
-                                content: updated.content,
-                                is_deleted: updated.is_deleted,
-                                edited_at: updated.edited_at,
-                            }
+                            ? { ...m, content: updated.content, is_deleted: updated.is_deleted, edited_at: updated.edited_at }
                             : m
                         )
                     );
@@ -520,11 +874,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return () => { channel.unsubscribe(); };
     }, [fetchSingleMessage]);
 
-    const send = async () => {
-        const content = input.trim();
-        if (!content || sending) return;
+    // ── Send text ─────────────────────────────────────────────────────────────
+    const send = useCallback(async (content: string) => {
+        if (!content.trim()) return;
 
-        setSending(true);
         const tempId = `temp-${Date.now()}`;
         const optimistic: GroupMessage = {
             id: tempId,
@@ -536,13 +889,16 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             is_deleted: false,
             edited_at: null,
             created_at: new Date().toISOString(),
+            attachment_url: null,
+            attachment_type: null,
+            attachment_name: null,
+            attachment_size: null,
             reply_to: replyTo
-                ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted }
+                ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted, attachment_type: replyTo.attachment_type }
                 : null,
         };
 
         setMessages(prev => [...prev, optimistic]);
-        setInput("");
         setReplyTo(null);
 
         try {
@@ -559,12 +915,83 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             }
         } catch {
             setMessages(prev => prev.filter(m => m.id !== tempId));
-        } finally {
-            setSending(false);
-            inputRef.current?.focus();
         }
-    };
+    }, [currentUser, replyTo]);
 
+    // ── Send attachment ───────────────────────────────────────────────────────
+    const sendAttachment = useCallback(async (file: File, caption: string) => {
+        const tempId = `temp-${Date.now()}`;
+        const isImage = file.type.startsWith("image/");
+        const previewUrl = isImage ? URL.createObjectURL(file) : null;
+
+        const optimistic: GroupMessage = {
+            id: tempId,
+            sender_id: currentUser.id,
+            sender_name: currentUser.name,
+            sender_role: currentUser.role,
+            content: caption,
+            reply_to_id: replyTo?.id ?? null,
+            is_deleted: false,
+            edited_at: null,
+            created_at: new Date().toISOString(),
+            attachment_url: previewUrl,
+            attachment_type: isImage ? "image" : "file",
+            attachment_name: file.name,
+            attachment_size: file.size,
+            reply_to: replyTo
+                ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted, attachment_type: replyTo.attachment_type }
+                : null,
+        };
+
+        setMessages(prev => [...prev, optimistic]);
+        setReplyTo(null);
+
+        try {
+            // 1. Upload file
+            const formData = new FormData();
+            formData.append("file", file);
+            const uploadRes = await fetch("/api/group-chat/upload", {
+                method: "POST",
+                body: formData,
+            });
+            const uploadData = await uploadRes.json();
+
+            if (!uploadData.success) {
+                setMessages(prev => prev.filter(m => m.id !== tempId));
+                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                alert(uploadData.message ?? "Upload gagal");
+                return;
+            }
+
+            // 2. Kirim pesan dengan URL attachment
+            const msgRes = await fetch("/api/group-chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: caption,
+                    reply_to_id: replyTo?.id ?? null,
+                    attachment_url: uploadData.url,
+                    attachment_type: uploadData.type,
+                    attachment_name: uploadData.name,
+                    attachment_size: uploadData.size,
+                }),
+            });
+            const msgData = await msgRes.json();
+
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+            if (msgData.success) {
+                setMessages(prev => prev.map(m => m.id === tempId ? msgData.message : m));
+            } else {
+                setMessages(prev => prev.filter(m => m.id !== tempId));
+            }
+        } catch {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        }
+    }, [currentUser, replyTo]);
+
+    // ── Delete ────────────────────────────────────────────────────────────────
     const deleteMessage = async (messageId: string) => {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
         try {
@@ -574,6 +1001,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     };
 
+    // ── Edit ──────────────────────────────────────────────────────────────────
     const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
         setMessages(prev =>
             prev.map(m => m.id === messageId
@@ -590,21 +1018,18 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const data = await res.json();
             if (!data.success) {
                 const original = await fetchSingleMessage(messageId);
-                if (original) {
-                    setMessages(prev => prev.map(m => m.id === messageId ? original : m));
-                }
+                if (original) setMessages(prev => prev.map(m => m.id === messageId ? original : m));
                 return false;
             }
             return true;
         } catch {
             const original = await fetchSingleMessage(messageId);
-            if (original) {
-                setMessages(prev => prev.map(m => m.id === messageId ? original : m));
-            }
+            if (original) setMessages(prev => prev.map(m => m.id === messageId ? original : m));
             return false;
         }
     };
 
+    // ── Scroll to reply ───────────────────────────────────────────────────────
     const scrollToReply = (id: string) => {
         const el = document.getElementById(`msg-${id}`);
         if (el) {
@@ -612,18 +1037,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             el.classList.add("highlight-msg");
             setTimeout(() => el.classList.remove("highlight-msg"), 1500);
         }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-        if (e.key === "Escape" && replyTo) setReplyTo(null);
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
-        const ta = e.target;
-        ta.style.height = "auto";
-        ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
     };
 
     // ── Group by date ─────────────────────────────────────────────────────────
@@ -639,6 +1052,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return acc;
     }, []);
 
+    // ─── Render ───────────────────────────────────────────────────────────────
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
@@ -760,63 +1174,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     </div>
                 )}
 
-                {/* Reply preview */}
-                {replyTo && (
-                    <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 border-t border-gray-100"
-                        style={{ background: "#f8f9ff" }}>
-                        <div className="flex-1 min-w-0 pl-3 border-l-2 border-[#1a1a2e]">
-                            <p className="text-[10px] font-bold text-[#1a1a2e]">{replyTo.sender_name}</p>
-                            <p className="text-xs text-gray-500 truncate mt-0.5">{replyTo.content}</p>
-                        </div>
-                        <button onClick={() => setReplyTo(null)}
-                            className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition flex-shrink-0">
-                            <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                )}
-
-                {/* Input */}
-                <div className="flex-shrink-0 flex items-end gap-3 px-4 py-3 border-t border-gray-100 bg-white">
-                    <div className="flex-shrink-0 self-end mb-1">
-                        <Avatar name={currentUser.name} role={currentUser.role} size={32} />
-                    </div>
-                    <div className="flex-1 flex items-end gap-2 bg-gray-100 rounded-2xl px-3 py-2 min-h-[42px]">
-                        <textarea
-                            ref={inputRef}
-                            value={input}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Tulis pesan ke All Team Solit..."
-                            maxLength={2000}
-                            rows={1}
-                            className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 resize-none outline-none leading-relaxed max-h-[120px] min-h-[22px]"
-                            style={{ height: "22px" }}
-                        />
-                        {input.length > 1800 && (
-                            <span className="text-[10px] text-gray-400 self-end flex-shrink-0">
-                                {input.length}/2000
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        onClick={send}
-                        disabled={!input.trim() || sending}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition self-end disabled:opacity-40"
-                        style={{ background: input.trim() ? "#1a1a2e" : "#e5e7eb" }}
-                    >
-                        {sending ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                            <svg className="w-4 h-4" fill="none"
-                                stroke={input.trim() ? "white" : "#9ca3af"} viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                            </svg>
-                        )}
-                    </button>
-                </div>
+                {/* Input Area (includes reply preview) */}
+                <InputArea
+                    currentUser={currentUser}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
+                    onSend={send}
+                    onSendAttachment={sendAttachment}
+                />
             </div>
 
             <style jsx global>{`
