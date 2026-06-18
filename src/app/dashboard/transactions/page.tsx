@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { createPortal } from "react-dom";
+import ExcelJS from "exceljs";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
@@ -67,11 +68,9 @@ const statusMap: Record<string, string> = {
   PACKING: "bg-purple-100 text-purple-800",
 };
 
-// Tampilkan tanggal saja: "08 Jun 26"
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
 
-// Tampilkan tanggal + jam: "08 Jun 26, 20:35"
 const formatDateShort = (date: string) => {
   const d = new Date(date);
   const datePart = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
@@ -79,7 +78,6 @@ const formatDateShort = (date: string) => {
   return `${datePart}, ${timePart}`;
 };
 
-// Tampilkan full datetime untuk detail
 const formatDateTime = (date: string) =>
   new Date(date).toLocaleDateString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
@@ -88,7 +86,6 @@ const formatDateTime = (date: string) =>
 
 function getPaymentStyle(method: string): { text: string; icon: React.ReactNode; bg: string } {
   const m = (method ?? "").toUpperCase();
-
   const hasCash = m.includes("TUNAI") || m.includes("CASH");
   const hasTransfer = m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI");
 
@@ -104,7 +101,6 @@ function getPaymentStyle(method: string): { text: string; icon: React.ReactNode;
       ),
     };
   }
-
   if (hasCash) return { text: "💰 Tunai", bg: "emerald", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg> };
   if (hasTransfer) return { text: "🏦 Transfer", bg: "blue", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 014-4h14" /></svg> };
   if (m.includes("QRIS") || m.includes("QR")) return { text: "📱 QRIS", bg: "purple", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /></svg> };
@@ -134,11 +130,9 @@ function SkeletonPulse({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
 
-// Skeleton untuk mobile card
 function MobileCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 space-y-1.5">
@@ -149,7 +143,6 @@ function MobileCardSkeleton() {
         </div>
         <SkeletonPulse className="h-3 w-28" />
       </div>
-      {/* Content */}
       <div className="px-4 py-3 space-y-3">
         <div className="flex items-center justify-between">
           <SkeletonPulse className="h-3 w-20" />
@@ -168,7 +161,6 @@ function MobileCardSkeleton() {
         </div>
         <SkeletonPulse className="h-10 rounded-lg" />
       </div>
-      {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-100">
         <SkeletonPulse className="h-9 w-full rounded-lg mb-2" />
         <div className="grid grid-cols-3 gap-2">
@@ -181,7 +173,6 @@ function MobileCardSkeleton() {
   );
 }
 
-// Skeleton untuk desktop table rows
 function TableRowSkeleton() {
   return (
     <tr className="border-b border-gray-100">
@@ -192,11 +183,7 @@ function TableRowSkeleton() {
           <SkeletonPulse className="h-3 w-20" />
         </div>
       </td>
-      <td className="px-3 py-3">
-        <div className="space-y-1">
-          <SkeletonPulse className="h-3 w-24" />
-        </div>
-      </td>
+      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-24" /></div></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-20" /></td>
       <td className="px-3 py-3">
         <div className="space-y-1">
@@ -247,74 +234,46 @@ function DesktopSkeletonTable() {
           <thead>
             <tr className="border-b border-gray-300 bg-gray-100">
               {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "SN", "Harga", "Margin", "Metode", "Sumber", "Aksi"].map((h) => (
-                <th key={h} className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
-                  {h}
-                </th>
+                <th key={h} className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <TableRowSkeleton key={i} />
-            ))}
+            {Array.from({ length: 8 }).map((_, i) => (<TableRowSkeleton key={i} />))}
           </tbody>
         </table>
       </div>
-      <div className="text-center text-xs text-gray-400 py-2 border-t border-gray-200 bg-gray-50">
-        ← Scroll untuk melihat lebih banyak kolom →
-      </div>
+      <div className="text-center text-xs text-gray-400 py-2 border-t border-gray-200 bg-gray-50">← Scroll untuk melihat lebih banyak kolom →</div>
     </div>
   );
 }
 
 function SerialNumberList({
-  serials,
-  maxVisible = 3,
-  align = "start",
-  size = "sm",
-  emptyDash = true,
+  serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true,
 }: {
-  serials: string[];
-  maxVisible?: number;
-  align?: "start" | "end";
-  size?: "sm" | "md";
-  emptyDash?: boolean;
+  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-
-  if (serials.length === 0) {
-    return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
-  }
+  if (serials.length === 0) return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
 
   const visible = expanded ? serials : serials.slice(0, maxVisible);
   const hidden = serials.length - maxVisible;
-  const badge =
-    size === "md"
-      ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
-      : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
+  const badge = size === "md"
+    ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
+    : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
 
   return (
     <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
-      {visible.map((sn, i) => (
-        <span key={i} className={badge}>{sn}</span>
-      ))}
-
+      {visible.map((sn, i) => <span key={i} className={badge}>{sn}</span>)}
       {!expanded && hidden > 0 && (
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(true); }}
-          className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100 transition whitespace-nowrap"
-        >
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(true); }}
+          className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100 transition whitespace-nowrap">
           +{hidden} lagi
         </button>
       )}
-
       {expanded && serials.length > maxVisible && (
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(false); }}
-          className="text-[9px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-200 transition whitespace-nowrap"
-        >
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(false); }}
+          className="text-[9px] font-bold text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-200 transition whitespace-nowrap">
           Tutup
         </button>
       )}
@@ -362,8 +321,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const payStyle = getPaymentStyle(item.payment_method ?? "");
   const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
   const customerTypeBadge = getCustomerTypeBadge(item.customer_type ?? "");
-
-  // Format jam dari created_at
   const timeStr = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
   return (
@@ -379,55 +336,36 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             {STATUS_LABEL[item.status] ?? item.status}
           </span>
         </div>
-        {/* Tanggal + Jam */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-500 font-medium">
-            📅 {formatDate(item.created_at)}
-          </span>
+          <span className="text-[11px] text-gray-500 font-medium">📅 {formatDate(item.created_at)}</span>
           <span className="text-gray-300">·</span>
-          <span className="text-[11px] text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded-md">
-            🕐 {timeStr}
-          </span>
+          <span className="text-[11px] text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded-md">🕐 {timeStr}</span>
         </div>
-        {item.customer_phone && (
-          <p className="text-xs text-gray-600 font-semibold mt-1.5">📱 {item.customer_phone}</p>
-        )}
+        {item.customer_phone && <p className="text-xs text-gray-600 font-semibold mt-1.5">📱 {item.customer_phone}</p>}
       </div>
 
       {/* Content */}
       <div className="px-4 py-3 space-y-3">
-        {/* Source Platform */}
         {item.source_platform && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-gray-500">Platform</span>
-            <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[10px] ${platformBadge.color}`}>
-              {platformBadge.text}
-            </span>
+            <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[10px] ${platformBadge.color}`}>{platformBadge.text}</span>
           </div>
         )}
-
-        {/* Customer Type */}
         {item.customer_type && item.customer_type !== "UMUM" && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <p className="text-xs font-bold text-amber-900">
-              {customerTypeBadge.icon} {customerTypeBadge.text}
-            </p>
+            <p className="text-xs font-bold text-amber-900">{customerTypeBadge.icon} {customerTypeBadge.text}</p>
           </div>
         )}
-
-        {/* Sales Info */}
         {item.sales_name && (
           <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
             <span className="text-xs font-bold text-gray-900 flex-1">👤 {item.sales_name}</span>
             {item.employee_role && (
-              <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap">
-                {item.employee_role}
-              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap">{item.employee_role}</span>
             )}
           </div>
         )}
 
-        {/* Laptop Info */}
         {/* Laptop Info */}
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
@@ -447,16 +385,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                         {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
                       </div>
                       {g.serial_numbers?.length > 0 && (
-                        <div className="mt-1.5">
-                          <SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} />
-                        </div>
+                        <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>
                       )}
                     </div>
                   ))}
                 </div>
               );
             }
-            // Single laptop — tampilan lama
             return (
               <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
                 <p className="text-xs font-bold text-gray-900 leading-snug">{item.laptop_name || "—"}</p>
@@ -483,25 +418,15 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2.5 border border-blue-200">
             <p className="text-[10px] text-blue-600 font-semibold mb-1">💰 Harga Jual</p>
-            <p className="text-sm font-bold text-blue-900 truncate">
-              Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
-            </p>
+            <p className="text-sm font-bold text-blue-900 truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
           </div>
           {item.other !== undefined && item.other !== null && (
-            <div className={`bg-gradient-to-br rounded-lg p-2.5 border ${item.other > 0
-              ? "from-emerald-50 to-emerald-100 border-emerald-200"
-              : item.other < 0
-                ? "from-red-50 to-red-100 border-red-200"
-                : "from-gray-50 to-gray-100 border-gray-200"
-              }`}>
-              <p className={`text-[10px] font-semibold mb-1 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-600"
-                }`}>
+            <div className={`bg-gradient-to-br rounded-lg p-2.5 border ${item.other > 0 ? "from-emerald-50 to-emerald-100 border-emerald-200" : item.other < 0 ? "from-red-50 to-red-100 border-red-200" : "from-gray-50 to-gray-100 border-gray-200"}`}>
+              <p className={`text-[10px] font-semibold mb-1 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-600"}`}>
                 {item.other > 0 ? "📈 Profit" : item.other < 0 ? "📉 Loss" : "➖ Break Even"}
               </p>
-              <p className={`text-sm font-bold truncate ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"
-                }`}>
-                {item.other > 0 ? "+" : ""}
-                {item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
+              <p className={`text-sm font-bold truncate ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"}`}>
+                {item.other > 0 ? "+" : ""}{item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
               </p>
             </div>
           )}
@@ -524,8 +449,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             </div>
             {(() => {
               const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-                ? item.serial_numbers
-                : item.serial_number ? [item.serial_number] : [];
+                ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
               if (sns.length === 0) return null;
               return (
                 <div className="flex justify-between gap-2">
@@ -542,68 +466,37 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         )}
 
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition"
-          >
+          <button onClick={() => setShowDetails(!showDetails)} className="h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
             {showDetails ? "Sembunyikan" : "Info"} Detail
           </button>
-          <button
-            onClick={() => onRowClick?.(item)}
-            className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition"
-          >
+          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition">
             🔍 Lihat Laptop
           </button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           {item.payment_photo && (
-            <button
-              onClick={() => onPhotoClick(item.payment_photo)}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
-              title="Bukti pembayaran"
-            >
-              <span className="text-lg">📸</span>
-              <span className="text-[9px] font-semibold">Bukti</span>
+            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition" title="Bukti pembayaran">
+              <span className="text-lg">📸</span><span className="text-[9px] font-semibold">Bukti</span>
             </button>
           )}
           {canEditTransaction && (
-            <a
-              href={`/payment/${item.invoice_number}`}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition"
-              title="Edit transaksi"
-            >
-              <span className="text-lg">✏️</span>
-              <span className="text-[9px] font-semibold">Edit</span>
+            <a href={`/payment/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition" title="Edit transaksi">
+              <span className="text-lg">✏️</span><span className="text-[9px] font-semibold">Edit</span>
             </a>
           )}
           {isPending && canEditTransaction && (
-            <button
-              onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition"
-              title="Konfirmasi lunas"
-            >
-              <span className="text-lg">✅</span>
-              <span className="text-[9px] font-semibold">Lunas</span>
+            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition" title="Konfirmasi lunas">
+              <span className="text-lg">✅</span><span className="text-[9px] font-semibold">Lunas</span>
             </button>
           )}
           {canRestoreTransaction && item.status === "PAID" && (
-            <button
-              onClick={() => setShowRestoreModal(true)}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
-              title="Restore transaksi"
-            >
-              <span className="text-lg">↩️</span>
-              <span className="text-[9px] font-semibold">Restore</span>
+            <button onClick={() => setShowRestoreModal(true)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition" title="Restore transaksi">
+              <span className="text-lg">↩️</span><span className="text-[9px] font-semibold">Restore</span>
             </button>
           )}
-          <a
-            href={`/receipt/${item.invoice_number}`}
-            className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
-            title="Lihat receipt"
-          >
-            <span className="text-lg">📄</span>
-            <span className="text-[9px] font-semibold">Receipt</span>
+          <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="Lihat receipt">
+            <span className="text-lg">📄</span><span className="text-[9px] font-semibold">Receipt</span>
           </a>
         </div>
       </div>
@@ -614,9 +507,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
           <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4">
-              <p className="font-semibold text-white text-sm">Restore Transaksi</p>
-            </div>
+            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
             <div className="p-5">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
                 <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
@@ -636,16 +527,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
           <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-green-700 px-5 py-4">
-              <p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p>
-            </div>
+            <div className="bg-green-700 px-5 py-4"><p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p></div>
             <div className="p-5 space-y-4">
               {item.status === "RESERVED" && (
                 <input type="text" value={confirmSN} onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }} placeholder="Masukkan SN..." className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition" autoFocus />
               )}
-              {confirmError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>
-              )}
+              {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>}
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
               <button onClick={() => { setShowConfirmModal(false); setConfirmError(""); }} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
@@ -662,22 +549,17 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
 function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
   if (item.status !== "PAID") return null;
-
   if (item.notes?.includes("[ORIG:RESERVED]")) return "RESERVED";
   if (item.notes?.includes("[ORIG:HELD]")) return "HELD";
-
   if (item.dp_amount && Number(item.dp_amount) > 0) return "RESERVED";
-
   if (item.paid_at && item.created_at && !item.is_ecommerce) {
     const diffMs = new Date(item.paid_at).getTime() - new Date(item.created_at).getTime();
-    const diffMinutes = diffMs / (1000 * 60);
-    if (diffMinutes > 5) return "HELD";
+    if (diffMs / (1000 * 60) > 5) return "HELD";
   }
-
   return null;
 }
 
-// ─── TRANSACTION TABLE (Desktop View) ────────────────────────────────────
+// ─── TRANSACTION TABLE ────────────────────────────────────────────────
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
@@ -685,7 +567,6 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
         <table className="w-full border-collapse" style={{ minWidth: "1440px" }}>
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50">
-              {/* Fixed column widths untuk konsistensi */}
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & waktu</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
@@ -702,51 +583,31 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
           </thead>
           <tbody className="divide-y divide-gray-100">
             {paginatedTransactions.map((item: any) => (
-              <TransactionTableRow
-                key={item.id}
-                item={item}
-                onPhotoClick={onPhotoClick}
-                canEditTransaction={canEditTransaction}
-                canRestoreTransaction={canRestoreTransaction}
-                canSeeFinancials={canSeeFinancials}
-                onRestored={onRestored}
-                onRowClick={onRowClick}
-              />
+              <TransactionTableRow key={item.id} item={item} onPhotoClick={onPhotoClick} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onRestored={onRestored} onRowClick={onRowClick} />
             ))}
           </tbody>
         </table>
       </div>
-      <div className="text-center text-[11px] text-gray-400 py-2 border-t border-gray-100 bg-gray-50">
-        ← Geser untuk melihat lebih banyak kolom →
-      </div>
+      <div className="text-center text-[11px] text-gray-400 py-2 border-t border-gray-100 bg-gray-50">← Geser untuk melihat lebih banyak kolom →</div>
     </div>
   );
 }
 
 function StatusBadge({ item }: { item: any }) {
   const originalStatus = getOriginalStatus(item);
-
   if (originalStatus) {
-    // Sudah lunas tapi dulunya DP/Ambil Dulu
     return (
       <div className="flex items-center gap-1 flex-wrap">
-        {/* Badge status asal */}
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg font-bold text-[10px] whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
-          }`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg font-bold text-[10px] whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
           {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
         </span>
-        {/* Badge lunas */}
         <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold text-[10px] whitespace-nowrap bg-green-100 text-green-700 border border-green-200">
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
           Lunas
         </span>
       </div>
     );
   }
-
-  // Status biasa
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
       {STATUS_LABEL[item.status] ?? item.status}
@@ -756,24 +617,19 @@ function StatusBadge({ item }: { item: any }) {
 
 function StatusBadgeMobile({ item }: { item: any }) {
   const originalStatus = getOriginalStatus(item);
-
   if (originalStatus) {
     return (
       <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
-          }`}>
+        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
           {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
         </span>
         <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5 whitespace-nowrap">
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
           Lunas
         </span>
       </div>
     );
   }
-
   return (
     <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
       {STATUS_LABEL[item.status] ?? item.status}
@@ -781,7 +637,7 @@ function StatusBadgeMobile({ item }: { item: any }) {
   );
 }
 
-// ─── TABLE ROW COMPONENT ────────────────────────────────────
+// ─── TABLE ROW ────────────────────────────────────────────────────────
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -820,40 +676,23 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
 
   const payStyle = getPaymentStyle(item.payment_method ?? "");
   const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
-
-  // Format tanggal dan jam secara terpisah untuk kolom Nota
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <>
-      <tr
-        className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer"
-        onClick={() => onRowClick?.(item)}
-      >
-        {/* Status */}
-        <td className="px-3 py-2.5">
-          <StatusBadge item={item} />
-        </td>
-
-        {/* Nota + Tanggal + Jam */}
+      <tr className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer" onClick={() => onRowClick?.(item)}>
+        <td className="px-3 py-2.5"><StatusBadge item={item} /></td>
         <td className="px-3 py-2.5">
           <div className="space-y-0.5">
-            <div className="text-[11px] font-bold text-gray-800 font-mono tracking-wide leading-tight">
-              {item.invoice_number}
-            </div>
+            <div className="text-[11px] font-bold text-gray-800 font-mono tracking-wide leading-tight">{item.invoice_number}</div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-gray-400">{datePart}</span>
               <span className="text-gray-300">·</span>
-              {/* Jam dengan badge supaya standout */}
-              <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
-                {timePart}
-              </span>
+              <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{timePart}</span>
             </div>
           </div>
         </td>
-
-        {/* Customer */}
         <td className="px-3 py-2.5">
           <div className="space-y-0.5">
             <div className="text-[11px] font-bold text-gray-900 leading-tight">{item.customer_name}</div>
@@ -864,45 +703,26 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             )}
           </div>
         </td>
-
-        {/* Kontak */}
         <td className="px-3 py-2.5">
-          {item.customer_phone
-            ? <span className="text-[10px] font-medium text-gray-600">📱 {item.customer_phone}</span>
-            : <span className="text-[10px] text-gray-300">—</span>
-          }
+          {item.customer_phone ? <span className="text-[10px] font-medium text-gray-600">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* Sales */}
         <td className="px-3 py-2.5">
           {item.sales_name ? (
             <div className="space-y-0.5">
               <div className="text-[10px] font-bold text-gray-800 leading-tight">{item.sales_name}</div>
-              {item.employee_role && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] bg-blue-100 text-blue-700 font-bold whitespace-nowrap">
-                  {item.employee_role}
-                </span>
-              )}
+              {item.employee_role && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] bg-blue-100 text-blue-700 font-bold whitespace-nowrap">{item.employee_role}</span>}
             </div>
-          ) : (
-            <span className="text-[10px] text-gray-300">—</span>
-          )}
+          ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* Laptop */}
-        {/* Laptop */}
         <td className="px-3 py-2.5">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
             if (grouped.length > 1) {
-              // Multi laptop — tampilkan semua nama
               return (
                 <div className="space-y-1">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx} className="flex items-start gap-1.5">
-                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">
-                        {g.unit_count}x
-                      </span>
+                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
                       <div className="min-w-0">
                         <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
                         <div className="flex gap-0.5 flex-wrap mt-0.5">
@@ -915,12 +735,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 </div>
               );
             }
-            // Single laptop — tampilan lama
             return (
               <div className="space-y-0.5">
-                <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>
-                  {item.laptop_name || "—"}
-                </div>
+                <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
                 {(item.cpu || item.ram || item.storage || item.vga) && (
                   <div className="flex items-center gap-1 flex-wrap">
                     {item.cpu && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.cpu}</span>}
@@ -933,136 +750,69 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             );
           })()}
         </td>
-
-        {/* Serial Number */}
         <td className="px-3 py-2.5">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
             if (grouped.length > 1) {
-              // Multi laptop — tampilkan SN per grup
               return (
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx} className="space-y-0.5">
-                      {g.serial_numbers?.length > 0 ? (
-                        <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" />
-                      ) : (
-                        <span className="text-[9px] text-gray-300">—</span>
-                      )}
+                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
                 </div>
               );
             }
-            // Single — tampilan lama
-            const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-              ? item.serial_numbers
-              : item.serial_number ? [item.serial_number] : [];
+            const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-
-        {/* Harga Jual */}
         <td className="px-3 py-2.5 text-right">
-          <span className="text-[11px] font-bold text-gray-900 font-mono">
-            Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}
-          </span>
+          <span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
-
-        {/* Margin */}
         <td className="px-3 py-2.5 text-right">
           {item.other !== undefined && item.other !== null ? (
-            <div className="space-y-0.5">
-              <span className={`text-[11px] font-bold font-mono ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"
-                }`}>
-                {item.other > 0 ? "+" : ""}
-                {item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
-              </span>
-            </div>
-          ) : (
-            <span className="text-[10px] text-gray-300">—</span>
-          )}
+            <span className={`text-[11px] font-bold font-mono ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"}`}>
+              {item.other > 0 ? "+" : ""}{item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
+            </span>
+          ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* Metode Pembayaran */}
         <td className="px-3 py-2.5 text-center">
           <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
             {payStyle.icon}
-            <span className="text-[9px] font-bold text-gray-700">
-              {payStyle.text.replace(/^[^\s]+ /, "")}
-            </span>
+            <span className="text-[9px] font-bold text-gray-700">{payStyle.text.replace(/^[^\s]+ /, "")}</span>
           </div>
         </td>
-
-        {/* Sumber */}
         <td className="px-3 py-2.5 text-center">
           {item.source_platform ? (
-            <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>
-              {platformBadge.text.replace(/^[^\s]+ /, "")}
-            </span>
-          ) : (
-            <span className="text-[10px] text-gray-300">—</span>
-          )}
+            <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
+          ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* Aksi */}
         <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center gap-0.5">
             {item.payment_photo && (
-              <button
-                onClick={() => onPhotoClick(item.payment_photo)}
-                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-150"
-                title="Bukti pembayaran"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
+              <button onClick={() => onPhotoClick(item.payment_photo)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-150" title="Bukti pembayaran">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
               </button>
             )}
             {canEditTransaction && (
-              <a
-                href={`/payment/${item.invoice_number}`}
-                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all duration-150"
-                title="Edit"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
+              <a href={`/payment/${item.invoice_number}`} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all duration-150" title="Edit">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </a>
             )}
             {isPending && canEditTransaction && (
-              <button
-                onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }}
-                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-150"
-                title="Konfirmasi lunas"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-150" title="Konfirmasi lunas">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
             {canRestoreTransaction && item.status === "PAID" && (
-              <button
-                onClick={() => setShowRestoreModal(true)}
-                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150"
-                title="Restore"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
+              <button onClick={() => setShowRestoreModal(true)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150" title="Restore">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
               </button>
             )}
-            <a
-              href={`/receipt/${item.invoice_number}`}
-              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-150"
-              title="Receipt"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+            <a href={`/receipt/${item.invoice_number}`} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-150" title="Receipt">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </a>
           </div>
         </td>
@@ -1074,9 +824,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
           <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4">
-              <p className="font-semibold text-white text-sm">Restore Transaksi</p>
-            </div>
+            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
             <div className="p-5">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
                 <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
@@ -1096,16 +844,12 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
           <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-green-700 px-5 py-4">
-              <p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p>
-            </div>
+            <div className="bg-green-700 px-5 py-4"><p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p></div>
             <div className="p-5 space-y-4">
               {item.status === "RESERVED" && (
                 <input type="text" value={confirmSN} onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }} placeholder="Masukkan SN..." className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition" autoFocus />
               )}
-              {confirmError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>
-              )}
+              {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>}
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
               <button onClick={() => { setShowConfirmModal(false); setConfirmError(""); }} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
@@ -1120,31 +864,19 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   );
 }
 
-// ─── TRANSACTION DETAIL MODAL ──────────────────────────────────────────
-function TransactionDetailModal({
-  item,
-  onClose,
-  canSeeFinancials,
-}: {
-  item: any;
-  onClose: () => void;
-  canSeeFinancials: boolean;
-}) {
+// ─── TRANSACTION DETAIL MODAL ─────────────────────────────────────────
+function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any; onClose: () => void; canSeeFinancials: boolean }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
-    document.body.style.overflow = "hidden";        // ← lock scroll background
-    return () => {
-      window.removeEventListener("keydown", h);
-      document.body.style.overflow = "";            // ← restore saat ditutup
-    };
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", h); document.body.style.overflow = ""; };
   }, [onClose]);
 
   const payStyle = getPaymentStyle(item.payment_method ?? "");
   const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
   const grouped: any[] = item.grouped_items ?? [];
   const isMulti = grouped.length > 1;
-
   const totalDeal = Number(item.deal_price ?? item.amount ?? 0);
   const totalMargin = Number(item.other ?? 0);
 
@@ -1152,37 +884,22 @@ function TransactionDetailModal({
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
-
-        {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between flex-shrink-0 bg-gradient-to-r from-gray-50 to-white">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-                {STATUS_LABEL[item.status] ?? item.status}
-              </span>
-              {isMulti && (
-                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">
-                  {grouped.length} Laptop
-                </span>
-              )}
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>{STATUS_LABEL[item.status] ?? item.status}</span>
+              {isMulti && <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">{grouped.length} Laptop</span>}
             </div>
             <h2 className="font-bold text-gray-800 text-base">{item.customer_name}</h2>
             <p className="text-xs text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
             <p className="text-xs text-gray-400 mt-0.5">📅 {formatDateShort(item.created_at)}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-
-          {/* Customer + Sales */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Customer</p>
@@ -1199,21 +916,14 @@ function TransactionDetailModal({
               {item.sales_name ? (
                 <>
                   <p className="text-sm font-bold text-gray-800">{item.sales_name}</p>
-                  {item.employee_role && (
-                    <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                      {item.employee_role}
-                    </span>
-                  )}
+                  {item.employee_role && <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}
                 </>
               ) : <p className="text-sm text-gray-300">—</p>}
             </div>
           </div>
 
-          {/* Grouped Laptop Items */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-              💻 {isMulti ? `Detail Laptop (${grouped.length} item)` : "Detail Laptop"}
-            </p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💻 {isMulti ? `Detail Laptop (${grouped.length} item)` : "Detail Laptop"}</p>
             <div className="space-y-2">
               {grouped.length > 0 ? grouped.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -1227,13 +937,8 @@ function TransactionDetailModal({
                         {g.vga && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-semibold border border-purple-200">{g.vga}</span>}
                       </div>
                     </div>
-                    {isMulti && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0">
-                        {g.unit_count}x
-                      </span>
-                    )}
+                    {isMulti && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0">{g.unit_count}x</span>}
                   </div>
-
                   {g.serial_numbers?.length > 0 && (
                     <div className="px-3.5 py-2 border-b border-gray-100">
                       <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Serial Number</p>
@@ -1244,20 +949,15 @@ function TransactionDetailModal({
                       </div>
                     </div>
                   )}
-
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
                       <div>
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Deal</p>
-                        <p className="text-xs font-bold text-blue-700 font-mono">
-                          Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}
-                        </p>
+                        <p className="text-xs font-bold text-blue-700 font-mono">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p>
                       </div>
                       <div>
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Modal</p>
-                        <p className="text-xs font-bold text-gray-700 font-mono">
-                          Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}
-                        </p>
+                        <p className="text-xs font-bold text-gray-700 font-mono">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
                       </div>
                       <div>
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Margin</p>
@@ -1271,17 +971,12 @@ function TransactionDetailModal({
               )) : (
                 <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
                   <p className="text-sm font-bold text-gray-800">{item.laptop_name || "—"}</p>
-                  {item.serial_number && (
-                    <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded mt-1.5 inline-block">
-                      {item.serial_number}
-                    </span>
-                  )}
+                  {item.serial_number && <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded mt-1.5 inline-block">{item.serial_number}</span>}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Payment Summary */}
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💰 Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 space-y-2.5">
@@ -1310,15 +1005,12 @@ function TransactionDetailModal({
               {item.source_platform && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Platform</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${platformBadge.color}`}>
-                    {platformBadge.text}
-                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${platformBadge.color}`}>{platformBadge.text}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Notes */}
           {item.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
               <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">Catatan</p>
@@ -1327,31 +1019,26 @@ function TransactionDetailModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
-          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">
-            📄 Receipt
-          </a>
-          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition">
-            ✏️ Edit
-          </a>
+          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">📄 Receipt</a>
+          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition">✏️ Edit</a>
         </div>
       </div>
     </div>
   );
 
-  // Render via portal ke body → lepas dari ancestor ber-transform / z-index sidebar
   if (typeof document === "undefined") return null;
   return createPortal(modalContent, document.body);
 }
 
+// ─── MAIN PAGE ────────────────────────────────────────────────────────
 export default function Page() {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false); // ← state loading export
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
@@ -1373,14 +1060,11 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then(r => r.json())
-      .then(r => setUserRole(r.user?.role ?? null))
-      .catch(() => setUserRole(null));
+    fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
   }, []);
 
-  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
-  const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
+  const canEditTransaction   = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
+  const canSeeFinancials     = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -1398,8 +1082,6 @@ export default function Page() {
     }
   };
 
-
-
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions];
     if (search.trim()) {
@@ -1413,14 +1095,8 @@ export default function Page() {
     }
     if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
     if (customerType !== "ALL") filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
-    if (dateFrom) {
-      const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((item) => new Date(item.created_at) >= from);
-    }
-    if (dateTo) {
-      const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((item) => new Date(item.created_at) <= to);
-    }
+    if (dateFrom) { const from = new Date(dateFrom); from.setHours(0, 0, 0, 0); filtered = filtered.filter((item) => new Date(item.created_at) >= from); }
+    if (dateTo)   { const to   = new Date(dateTo);   to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
     if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
     if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
     filtered.sort((a, b) => {
@@ -1455,19 +1131,255 @@ export default function Page() {
     setPaymentMethod("ALL"); setSourcePlatform("ALL");
   };
 
+  // ─── EXPORT EXCEL ──────────────────────────────────────────────────
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Solit POS";
+      wb.created = new Date();
+
+      const ws = wb.addWorksheet("Transaksi", {
+        views: [{ state: "frozen", ySplit: 1 }],
+        pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+      });
+
+      // ── Definisi kolom ──────────────────────────────────────────
+      const COL_DEFS = [
+        { header: "No. Invoice",   key: "invoice",   width: 24 },
+        { header: "Tanggal",       key: "tanggal",   width: 14 },
+        { header: "Jumlah Unit",   key: "qty",       width: 13 },
+        { header: "Laptop",        key: "laptop",    width: 34 },
+        { header: "CPU",           key: "cpu",       width: 22 },
+        { header: "RAM",           key: "ram",       width: 10 },
+        { header: "Storage",       key: "storage",   width: 13 },
+        { header: "Metode Bayar",  key: "metode",    width: 18 },
+        { header: "Harga Modal",   key: "modal",     width: 22 },
+        { header: "Harga Jual",    key: "jual",      width: 22 },
+        { header: "Nama Customer", key: "customer",  width: 24 },
+        { header: "No. HP",        key: "hp",        width: 18 },
+        { header: "Platform",      key: "platform",  width: 15 },
+        { header: "Serial Number", key: "sn",        width: 30 },
+        { header: "Catatan",       key: "catatan",   width: 32 },
+      ];
+
+      ws.columns = COL_DEFS;
+
+      // ── Fetch detail modal per transaksi dari API ───────────────
+      type DetailCache = {
+        purchase_price_total: number;
+        grouped_items?: Array<{ laptop_name: string; purchase_price_total: number; margin: number }>;
+      };
+
+      const detailCache = new Map<string, DetailCache>();
+
+      if (canSeeFinancials) {
+        await Promise.allSettled(
+          filteredTransactions.map(async (item) => {
+            try {
+              const res = await fetch(`/api/transaction/${item.invoice_number}`);
+              if (!res.ok) return;
+              const result = await res.json();
+              if (!result.success || !result.data) return;
+              const d = result.data;
+              detailCache.set(item.invoice_number, {
+                purchase_price_total: Number(d.purchase_price_total ?? d.inventory_price ?? 0),
+                grouped_items: Array.isArray(d.grouped_items) ? d.grouped_items : undefined,
+              });
+            } catch { /* skip */ }
+          })
+        );
+      }
+
+      // ── Flatten data → tableRows (array of array) ───────────────
+      const LEFT_KEYS = new Set(["invoice", "tanggal"]);
+      const CURR_KEYS = new Set(["modal", "jual"]);
+      const NUM_KEYS  = new Set(["qty"]);
+
+      const tableRows: (string | number)[][] = [];
+
+      for (const item of filteredTransactions) {
+        const grouped: any[] = item.grouped_items ?? [];
+        const isMulti = grouped.length > 1;
+        const cached  = detailCache.get(item.invoice_number);
+
+        const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+        });
+
+        if (isMulti) {
+          const cachedGroupMap = new Map<string, number>();
+          cached?.grouped_items?.forEach((cg) => {
+            if (cg.laptop_name) cachedGroupMap.set(cg.laptop_name, cg.purchase_price_total);
+          });
+
+          for (const g of grouped) {
+            const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
+            const modal = canSeeFinancials
+              ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0))
+              : 0;
+
+            tableRows.push([
+              item.invoice_number ?? "",
+              tanggal,
+              Number(g.unit_count ?? 1),
+              g.laptop_name ?? "",
+              g.cpu ?? "",
+              g.ram ?? "",
+              g.storage ?? "",
+              item.payment_method ?? "",
+              modal,
+              Number(g.allocated_deal_price ?? 0),
+              item.customer_name ?? "",
+              item.customer_phone ?? "",
+              item.source_platform ?? "",
+              sns.join(", "),
+              item.notes ?? "",
+            ]);
+          }
+        } else {
+          const sns: string[] =
+            Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+              ? item.serial_numbers
+              : item.serial_number ? [item.serial_number] : [];
+
+          const modal = canSeeFinancials
+            ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0))
+            : 0;
+
+          tableRows.push([
+            item.invoice_number ?? "",
+            tanggal,
+            1,
+            item.laptop_name ?? "",
+            item.cpu ?? "",
+            item.ram ?? "",
+            item.storage ?? "",
+            item.payment_method ?? "",
+            modal,
+            Number(item.deal_price ?? item.amount ?? 0),
+            item.customer_name ?? "",
+            item.customer_phone ?? "",
+            item.source_platform ?? "",
+            sns.join(", "),
+            item.notes ?? "",
+          ]);
+        }
+      }
+
+      // ── Tambah Excel Table (dengan filter dropdown) ─────────────
+      if (tableRows.length > 0) {
+        ws.addTable({
+          name: "TabelTransaksi",
+          ref:  "A1",
+          headerRow:  true,
+          totalsRow:  false,
+          style: {
+            theme:          "TableStyleMedium7", // hijau
+            showRowStripes: true,
+          },
+          columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
+          rows: tableRows,
+        });
+      } else {
+        // Data kosong — tulis header manual
+        const hRow = ws.getRow(1);
+        hRow.height = 30;
+        COL_DEFS.forEach((col, ci) => {
+          const cell = hRow.getCell(ci + 1);
+          cell.value = col.header;
+          cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+          cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+        });
+      }
+
+      // ── Override style header (baris 1) ────────────────────────
+      const headerRow = ws.getRow(1);
+      headerRow.height = 30;
+      headerRow.eachCell((cell, colNum) => {
+        const key = COL_DEFS[colNum - 1]?.key ?? "";
+        cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+        cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+        cell.alignment = {
+          horizontal: LEFT_KEYS.has(key) ? "left" : "center",
+          vertical: "middle",
+        };
+        cell.border = {
+          top:    { style: "thin",   color: { argb: "FFCBD5E1" } },
+          left:   { style: "thin",   color: { argb: "FFCBD5E1" } },
+          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+          right:  { style: "thin",   color: { argb: "FFCBD5E1" } },
+        };
+      });
+
+      // ── Style data rows + format Rupiah ────────────────────────
+      // addTable tidak apply numFmt — set manual
+      tableRows.forEach((_, idx) => {
+        const rowNum = idx + 2;
+        const row    = ws.getRow(rowNum);
+        row.height   = 22;
+
+        row.eachCell((cell, colNum) => {
+          const key = COL_DEFS[colNum - 1]?.key ?? "";
+          cell.font = { size: 10, name: "Arial", color: { argb: "FF111827" } };
+          cell.alignment = {
+            horizontal: LEFT_KEYS.has(key) ? "left" : "center",
+            vertical:   "middle",
+            wrapText:   false,
+          };
+          cell.border = {
+            top:    { style: "hair", color: { argb: "FFCBD5E1" } },
+            left:   { style: "hair", color: { argb: "FFCBD5E1" } },
+            bottom: { style: "hair", color: { argb: "FFCBD5E1" } },
+            right:  { style: "hair", color: { argb: "FFCBD5E1" } },
+          };
+          if (CURR_KEYS.has(key)) cell.numFmt = '"Rp "#,##0';
+          if (NUM_KEYS.has(key))  cell.numFmt = "0";
+        });
+      });
+
+      // ── Set lebar kolom (addTable reset width) ─────────────────
+      COL_DEFS.forEach((col, idx) => {
+        ws.getColumn(idx + 1).width = col.width;
+      });
+
+      // ── Export ke file ─────────────────────────────────────────
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob   = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const link   = document.createElement("a");
+      link.href    = URL.createObjectURL(blob);
+      const dateStr = new Date()
+        .toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
+        .replace(/\//g, "-");
+      link.download = `Transaksi_Solit_${dateStr}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+    } catch (err) {
+      console.error("Export error:", err);
+      alert("Gagal export Excel. Silakan coba lagi.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
       {detailItem && (
-        <TransactionDetailModal
-          item={detailItem}
-          onClose={() => setDetailItem(null)}
-          canSeeFinancials={canSeeFinancials}
-        />
+        <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} />
       )}
 
       <div className={`${isMobile ? "px-4" : "max-w-[1600px] mx-auto px-6"} py-6 space-y-5`}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1.5">
@@ -1476,45 +1388,67 @@ export default function Page() {
             </div>
             <p className="text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
           </div>
-          {!isLoading && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200">
-              <span className="text-sm font-bold text-gray-900">📊 {filteredTransactions.length}</span>
-            </div>
-          )}
+
+          <div className="flex items-center gap-2">
+            {!isLoading && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200">
+                <span className="text-sm font-bold text-gray-900">📊 {filteredTransactions.length}</span>
+              </div>
+            )}
+            {/* ── Tombol Export Excel ── */}
+            {!isLoading && filteredTransactions.length > 0 && (
+              <button
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-emerald-200 rounded-lg text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition group disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Export ke Excel"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="hidden sm:inline">Mengekspor...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <polyline points="8 13 12 17 16 13" />
+                      <line x1="12" y1="17" x2="12" y2="11" />
+                    </svg>
+                    <span className="hidden sm:inline">Export Excel</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Search + Filter Card */}
+        {/* ── Search + Filter ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <input
-                type="text"
-                placeholder="Cari nota, customer, WA, laptop..."
+              <input type="text" placeholder="Cari nota, customer, WA, laptop..."
                 className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+                value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <button
-              onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50"
-            >
+            <button onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {sortOrder === "newest"
                   ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
-                  : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>
-                }
+                  : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>}
               </svg>
               <span className="hidden sm:inline text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
             </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
-            >
+            <button onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
@@ -1529,59 +1463,40 @@ export default function Page() {
 
           {showFilters && (
             <div className="pt-3 border-t border-gray-100 space-y-4">
-
-              {/* Filter: Status */}
+              {/* Status */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Status Transaksi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                   {["ALL", "PAID", "RESERVED", "PENDING", "CANCELLED"].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStatus(s)}
-                      className={`h-8 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                        }`}
-                    >
+                    <button key={s} onClick={() => setStatus(s)}
+                      className={`h-8 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {s === "ALL" ? "Semua" : s === "RESERVED" ? "DP" : STATUS_LABEL[s] ?? s}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Filter: Tanggal */}
+              {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Dari</label>
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Sampai</label>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      min={dateFrom || undefined}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
+                    <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                  <button
-                    onClick={() => { setDateFrom(""); setDateTo(""); }}
-                    className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition"
-                  >
-                    ✕ Hapus filter tanggal
-                  </button>
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">✕ Hapus filter tanggal</button>
                 )}
               </div>
 
-              {/* Filter: Sumber Platform */}
+              {/* Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Sumber / Platform</label>
@@ -1590,14 +1505,8 @@ export default function Page() {
                       const badge = p !== "ALL" ? getSourcePlatformBadge(p as string) : null;
                       const isActive = sourcePlatform === p;
                       return (
-                        <button
-                          key={p as string}
-                          onClick={() => setSourcePlatform(p as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive
-                            ? "bg-gray-800 text-white border-gray-800"
-                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                            }`}
-                        >
+                        <button key={p as string} onClick={() => setSourcePlatform(p as string)}
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {p === "ALL" ? "Semua" : badge?.text ?? (p as string)}
                         </button>
                       );
@@ -1606,7 +1515,7 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Filter: Metode Pembayaran */}
+              {/* Metode Bayar */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Metode Pembayaran</label>
@@ -1615,14 +1524,8 @@ export default function Page() {
                       const style = m !== "ALL" ? getPaymentStyle(m as string) : null;
                       const isActive = paymentMethod === m;
                       return (
-                        <button
-                          key={m as string}
-                          onClick={() => setPaymentMethod(m as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive
-                            ? "bg-gray-800 text-white border-gray-800"
-                            : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                            }`}
-                        >
+                        <button key={m as string} onClick={() => setPaymentMethod(m as string)}
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {m === "ALL" ? "Semua" : style?.text ?? (m as string)}
                         </button>
                       );
@@ -1631,12 +1534,8 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Reset */}
               {hasActiveFilter && (
-                <button
-                  onClick={resetFilters}
-                  className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium"
-                >
+                <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium">
                   ✕ Reset semua filter
                 </button>
               )}
@@ -1644,54 +1543,30 @@ export default function Page() {
           )}
         </div>
 
-        {/* Content */}
+        {/* ── Content ── */}
         {isLoading ? (
           isMobile ? <MobileSkeletonList /> : <DesktopSkeletonTable />
         ) : paginatedTransactions.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <div className="text-5xl mb-4 opacity-40">🔍</div>
             <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi ditemukan</p>
-            {hasActiveFilter && (
-              <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">
-                Reset filter
-              </button>
-            )}
+            {hasActiveFilter && <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">Reset filter</button>}
           </div>
         ) : isMobile ? (
           <div className="space-y-2">
             {paginatedTransactions.map((item) => (
-              <TransactionCard
-                key={item.id}
-                item={item}
-                onPhotoClick={setPhotoModal}
-                canEditTransaction={canEditTransaction}
-                canSeeFinancials={canSeeFinancials}
-                canRestoreTransaction={canRestoreTransaction}
-                onRestored={() => fetchTransactions()}
-                onRowClick={setDetailItem}
-              />
+              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials} canRestoreTransaction={canRestoreTransaction} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
             ))}
           </div>
         ) : (
-          <TransactionTable
-            paginatedTransactions={paginatedTransactions}
-            canEditTransaction={canEditTransaction}
-            canRestoreTransaction={canRestoreTransaction}
-            canSeeFinancials={canSeeFinancials}
-            onPhotoClick={setPhotoModal}
-            onRestored={() => fetchTransactions()}
-            onRowClick={setDetailItem}
-          />
+          <TransactionTable paginatedTransactions={paginatedTransactions} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onPhotoClick={setPhotoModal} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
         )}
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         {!isLoading && filteredTransactions.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
-            >
+            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
               Sebelumnya
             </button>
@@ -1700,11 +1575,8 @@ export default function Page() {
               <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{currentPage}</span>
               <span className="text-xs text-gray-400">dari {totalPages}</span>
             </div>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
-            >
+            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
               Selanjutnya
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </button>

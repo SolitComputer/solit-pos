@@ -32,17 +32,94 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
 
-    const { data, error } = await supabase
+    // ── Ambil transaksi utama ──────────────────────────────────────────
+    const { data: tx, error } = await supabase
       .from("transactions")
       .select("*")
       .eq("invoice_number", invoice)
       .single();
 
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 404 });
+    if (error || !tx) {
+      return NextResponse.json({ success: false, message: error?.message ?? "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, data });
+    // ── Enrich grouped_items dengan purchase_price dari laptop_units ──
+    // unit_ids adalah array UUID unit yang terlibat di transaksi ini
+    const unitIds: string[] = Array.isArray(tx.unit_ids)
+      ? tx.unit_ids.filter(Boolean)
+      : tx.unit_id
+        ? [tx.unit_id]
+        : [];
+
+    if (unitIds.length > 0) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number, purchase_price, laptop_id, laptop:laptops(laptop_name, cpu, ram, storage)")
+        .in("id", unitIds);
+
+      if (units && units.length > 0) {
+        // Rebuild grouped_items dengan purchase_price
+        const enriched = (tx.grouped_items ?? []).map((g: any) => {
+          // Match berdasarkan laptop_name atau serial_numbers
+          const matchingUnits = units.filter((u: any) => {
+            const snsInGroup: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
+            return snsInGroup.includes(u.serial_number) ||
+              (u.laptop as any)?.laptop_name === g.laptop_name;
+          });
+
+          const purchase_price_total = matchingUnits.reduce(
+            (sum: number, u: any) => sum + Number(u.purchase_price ?? 0),
+            0
+          );
+
+          return {
+            ...g,
+            purchase_price_total,
+            // Hitung margin per grup
+            margin: Number(g.allocated_deal_price ?? 0) - purchase_price_total,
+          };
+        });
+
+        // Kalau tidak ada grouped_items (single laptop), inject langsung ke tx
+        if (enriched.length === 0 && units.length > 0) {
+          const totalModal = units.reduce(
+            (sum: number, u: any) => sum + Number(u.purchase_price ?? 0),
+            0
+          );
+          return NextResponse.json({
+            success: true,
+            data: {
+              ...tx,
+              purchase_price_total: totalModal,
+              inventory_price: totalModal, // alias
+              other: Number(tx.deal_price ?? tx.amount ?? 0) - totalModal,
+            },
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            ...tx,
+            grouped_items: enriched,
+            // Total modal semua unit
+            purchase_price_total: enriched.reduce(
+              (s: number, g: any) => s + Number(g.purchase_price_total ?? 0),
+              0
+            ),
+          },
+        });
+      }
+    }
+
+    // Fallback: return as-is dengan inventory_price sebagai modal
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...tx,
+        purchase_price_total: Number(tx.inventory_price ?? 0),
+      },
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, message: String(error) }, { status: 500 });
