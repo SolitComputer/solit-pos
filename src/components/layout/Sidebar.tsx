@@ -152,8 +152,8 @@ const Icons = {
 
 // ── Shared items ──────────────────────────────────────────────────────────────
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
-const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
-const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
+const ITEM_LEMBUR: MenuItem  = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
+const ITEM_USERS: MenuItem   = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -162,38 +162,38 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI,
     ITEM_LEMBUR,
-    { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-    { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-    { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-    { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+    { name: "Log Aktivitas",    href: "/dashboard/activity-log", icon: Icons.log },
+    { name: "Log Login",        href: "/dashboard/login-logs",   icon: Icons.loginLog },
+    { name: "Laporan Keuangan", href: "/dashboard/reports",      icon: Icons.reports },
+    { name: "Manajemen User",   href: "/dashboard/users",        icon: Icons.users },
   ],
 };
 
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-    { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+    { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
+    { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+    { name: "Laptop Minus",     href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
   ],
 };
 
 const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
-    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-    { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-    { name: "Scanner", href: "/scan", icon: Icons.scanner },
+    { name: "Buat Payment",    href: "/payment/create",          icon: Icons.payment },
+    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders",icon: Icons.pendingOrders },
+    { name: "Riwayat Transaksi",href: "/dashboard/transactions", icon: Icons.riwayat },
+    { name: "Scanner",         href: "/scan",                    icon: Icons.scanner },
   ],
 };
 
 const SERVICE_MENU: MenuGroup = {
   label: "Servis",
   items: [
-    { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
-    { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
+    { name: "Antrian",        href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
+    { name: "Selesai (Done)", href: "/dashboard/service/done",    icon: Icons.serviceDone },
     { name: "Riwayat Servis", href: "/dashboard/service/history", icon: Icons.serviceHistory },
   ],
 };
@@ -212,8 +212,8 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-    { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+    { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
+    { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
   ],
 };
@@ -221,61 +221,53 @@ const SALES_INVENTARIS: MenuGroup = {
 const SALES_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
-    { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-    { name: "Scanner", href: "/scan", icon: Icons.scanner },
+    { name: "Riwayat",         href: "/dashboard/transactions",  icon: Icons.riwayat },
+    { name: "Buat Payment",    href: "/payment/create",          icon: Icons.payment },
+    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders",icon: Icons.pendingOrders },
+    { name: "Scanner",         href: "/scan",                    icon: Icons.scanner },
   ],
 };
 
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── Full access ───────────────────────────────────────────────────────────
-  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
-
-  PROGRAMMER: [
+  ADMIN:       [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
+  PROGRAMMER:  [
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        { name: "Dashboard",        href: "/dashboard",              icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Log Aktivitas",    href: "/dashboard/activity-log", icon: Icons.log },
+        { name: "Log Login",        href: "/dashboard/login-logs",   icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports",      icon: Icons.reports },
+        { name: "Manajemen User",   href: "/dashboard/users",        icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
   ],
-
   ASISTEN_CEO: [
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        { name: "Dashboard",        href: "/dashboard",              icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Log Aktivitas",    href: "/dashboard/activity-log", icon: Icons.log },
+        { name: "Log Login",        href: "/dashboard/login-logs",   icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports",      icon: Icons.reports },
+        { name: "Manajemen User",   href: "/dashboard/users",        icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
   ],
 
   // ── Sales family ──────────────────────────────────────────────────────────
-  KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_SALES:  [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  CREW_SALES:    [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  PENGANTARAN:   [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  SOTECH:        [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_ONPOINT:[SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  ONPOINT:       [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
 
   // ── Teknisi family ────────────────────────────────────────────────────────
@@ -284,24 +276,20 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",  href: "/dashboard/laptops",       icon: Icons.laptop },
+        { name: "Garansi",      href: "/dashboard/warranty",      icon: Icons.garansi },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -312,18 +300,16 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
+        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        { name: "Laptop Minus",     href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     SERVICE_MENU,
@@ -339,15 +325,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop", href: "/dashboard/laptops",  icon: Icons.laptop },
+        { name: "Garansi",     href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
     {
       label: "Transaksi",
       items: [
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+        { name: "Riwayat",         href: "/dashboard/transactions",  icon: Icons.riwayat },
+        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders",icon: Icons.pendingOrders },
       ],
     },
   ],
@@ -356,19 +342,18 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        { name: "Laptop Minus",     href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -382,7 +367,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -392,17 +377,16 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Dashboard", href: "/dashboard",              icon: Icons.dashboard },
+        { name: "Riwayat",   href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -413,8 +397,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
+        { name: "Garansi",          href: "/dashboard/warranty",      icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -422,7 +406,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi",
       items: [
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Laporan Keuangan",  href: "/dashboard/reports",      icon: Icons.reports },
       ],
     },
   ],
@@ -432,23 +416,19 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
@@ -457,27 +437,22 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
-  // FIX: Hapus duplicate items property, pakai yang lengkap (dengan ITEM_USERS)
   KONTEN: [
     {
       label: "Overview",
@@ -486,28 +461,32 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
 
   // ── PKL ───────────────────────────────────────────────────────────────────
+  // ✅ PKL: Absensi ada, tapi TIDAK ada Management User dan TIDAK ada Chat
   PKL: [
     {
       label: "Overview",
-      items: [ITEM_USERS],
+      items: [
+        // ✅ Absensi ada — PKL bisa lihat absensi sesama PKL
+        ITEM_ABSENSI,
+        // ❌ ITEM_USERS dihapus — PKL tidak boleh akses Management User
+        // ❌ Chat tidak ada — PKL tidak boleh akses Group Chat
+      ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Data Laptop",      href: "/dashboard/laptops",       icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -525,15 +504,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // FIX: Hapus duplicate CUSTOMER_SERVICE key, pakai versi lengkap (dengan absensi + SERVICE_MENU)
+  // ── Customer Service ──────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
       ],
     },
     {
@@ -546,7 +523,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi",
       items: [
         { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
+        { name: "Scanner",      href: "/scan",           icon: Icons.scanner },
       ],
     },
     SERVICE_MENU,
@@ -555,28 +532,29 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 // ── Role meta (badge label & color) ──────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
-  ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
-  KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
-  CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
-  ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
-  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
-  TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
-  KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
-  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
-  MARKETING: { label: "Marketing", className: "bg-pink-50 text-pink-700" },
-  KEBERSIHAN: { label: "Kebersihan", className: "bg-cyan-50 text-cyan-700" },
-  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700" },
-  PROGRAMMER: { label: "Programmer", className: "bg-indigo-50 text-indigo-700" },
-  SOTECH: { label: "Sotech", className: "bg-lime-50 text-lime-700" },
-  ASISTEN_CEO: { label: "Asisten CEO", className: "bg-purple-50 text-purple-700" },
-  PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
+  ADMIN:                  { label: "Admin / CEO",           className: "bg-violet-50 text-violet-700" },
+  KEPALA_SALES:           { label: "Kepala Sales",           className: "bg-emerald-50 text-emerald-700" },
+  CREW_SALES:             { label: "Crew Sales",             className: "bg-sky-50 text-sky-700" },
+  ACCOUNTING:             { label: "Accounting",             className: "bg-amber-50 text-amber-700" },
+  PENGELOLA_BARANG:       { label: "Pengelola Barang",       className: "bg-blue-50 text-blue-700" },
+  TEKNISI:                { label: "Teknisi",                className: "bg-orange-50 text-orange-700" },
+  KEPALA_TEKNISI:         { label: "Kepala Teknisi",         className: "bg-red-50 text-red-700" },
+  PENGANTARAN:            { label: "Pengantaran",            className: "bg-teal-50 text-teal-700" },
+  MARKETING:              { label: "Marketing",              className: "bg-pink-50 text-pink-700" },
+  KEBERSIHAN:             { label: "Kebersihan",             className: "bg-cyan-50 text-cyan-700" },
+  KEPALA_MARKETING:       { label: "Kepala Marketing",       className: "bg-rose-50 text-rose-700" },
+  PROGRAMMER:             { label: "Programmer",             className: "bg-indigo-50 text-indigo-700" },
+  SOTECH:                 { label: "Sotech",                 className: "bg-lime-50 text-lime-700" },
+  ASISTEN_CEO:            { label: "Asisten CEO",            className: "bg-purple-50 text-purple-700" },
+  PENYEDIA_BARANG:        { label: "Penyedia Barang",        className: "bg-yellow-50 text-yellow-700" },
   KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
-  KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
-  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
-  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
-  KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
-  PKL: { label: "PKL", className: "bg-slate-100 text-slate-600" },
-  CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
+  KONTEN:                 { label: "Konten",                 className: "bg-fuchsia-50 text-fuchsia-700" },
+  KEPALA_ONPOINT:         { label: "Kepala Onpoint",         className: "bg-green-50 text-green-700" },
+  ONPOINT:                { label: "Onpoint",                className: "bg-emerald-50 text-emerald-700" },
+  KEPALA_SOTECH:          { label: "Kepala Sotech",          className: "bg-lime-50 text-lime-700" },
+  // ✅ PKL: badge amber supaya mudah dibedakan
+  PKL:                    { label: "PKL",                    className: "bg-amber-50 text-amber-700" },
+  CUSTOMER_SERVICE:       { label: "Customer Service",       className: "bg-sky-50 text-sky-700" },
 };
 
 function getInitials(name: string): string {
@@ -591,7 +569,7 @@ function NavItem({ item, isActive, onClick }: {
       className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
         ? "bg-[#1a1a2e] text-white shadow-sm"
         : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-        }`}>
+      }`}>
       <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
       </span>
@@ -725,10 +703,10 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<any>(null);      
-  const [loading, setLoading] = useState(true);    
-  const [open, setOpen] = useState(false);
-  const hasFetched = useRef(false);
+  const [user, setUser]       = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen]       = useState(false);
+  const hasFetched            = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

@@ -7,7 +7,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
 import { canManageAttendance } from "@/lib/permissions";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+function isPKLRole(role?: string): boolean {
+    if (!role) return false;
+    return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
+}
+
 type Attendance = {
     id: string;
     user_id?: string;
@@ -2429,6 +2433,8 @@ export default function AttendanceDashboardPage() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
     const [showAbsentPopup, setShowAbsentPopup] = useState(false);
+    const [pklFilterMode, setPklFilterMode] = useState(false);
+    const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -2756,10 +2762,20 @@ export default function AttendanceDashboardPage() {
 
     const byDate = useMemo(() => {
         const m: Record<string, Attendance[]> = {};
-        const filtered = filterUser === "Semua" ? mergedAttendances : mergedAttendances.filter(a => a.user_name === filterUser);
+
+        let filtered = filterUser === "Semua" ? mergedAttendances : mergedAttendances.filter(a => a.user_name === filterUser);
+
+        if (isAdminRole(currentUser?.role) && filterUser === "Semua" && calendarPklFilter !== "all") {
+            filtered = filtered.filter(a => {
+                const uInfo = allUsers.find(u => u.name === a.user_name);
+                if (calendarPklFilter === "pkl") return uInfo ? isPKLRole(uInfo.role) : false;
+                return uInfo ? !isPKLRole(uInfo.role) : true;
+            });
+        }
+
         filtered.forEach(a => { const k = toWIBDateKey(a.check_in_time || a.created_at); if (!m[k]) m[k] = []; m[k].push(a); });
         return m;
-    }, [mergedAttendances, filterUser]);
+    }, [mergedAttendances, filterUser, currentUser?.role, calendarPklFilter, allUsers]);
 
     const calDays = useMemo(() => {
         const fd = new Date(calYear, calMonth, 1).getDay(), dim = new Date(calYear, calMonth + 1, 0).getDate();
@@ -3233,30 +3249,30 @@ export default function AttendanceDashboardPage() {
                     ))}
                 </div>
 
+                {/* ✅ Tab bar — computed di luar JSX */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
                     {(() => {
                         const role = currentUser?.role;
-                        const tabList: { id: typeof activeTab; label: string }[] = [
+                        const tabs: { id: typeof activeTab; label: string }[] = [
                             { id: "calendar", label: "📅 Kalender" },
                         ];
-                        if (canManage) tabList.push({ id: "summary", label: "📊 Ringkasan" });
+                        if (canManage) tabs.push({ id: "summary", label: "📊 Ringkasan" });
                         if (canViewSalary(role)) {
-                            tabList.push({ id: "salary", label: "💰 Rekap Gaji" });
-                            tabList.push({ id: "salary-slip", label: "📄 Slip Gaji" });
-                            tabList.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
+                            tabs.push({ id: "salary", label: "💰 Rekap Gaji" });
+                            tabs.push({ id: "salary-slip", label: "📄 Slip Gaji" });
+                            tabs.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
                         }
-                        // ✅ User biasa: tampilkan tab gaji sendiri + slip sendiri
-                        if (!isAdminRole(role) && !canViewSalary(role)) {
-                            tabList.push({ id: "my-salary" as typeof activeTab, label: "💰 Gaji Saya" });
-                            tabList.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
+                        if (!isAdminRole(role) && !canViewSalary(role) && !isPKLRole(role)) {
+                            tabs.push({ id: "my-salary" as typeof activeTab, label: "💰 Gaji Saya" });
+                            tabs.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
                         }
-                        if (isAdminRole(role)) tabList.push({ id: "leave", label: "🌴 Cuti" });
-
-                        return tabList.map(t => (
+                        if (isAdminRole(role)) tabs.push({ id: "leave", label: "🌴 Cuti" });
+                        return tabs.map(t => (
                             <button key={t.id} onClick={() => setActiveTab(t.id)}
                                 className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
                                     ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
-                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                    }`}>
                                 {t.label}
                             </button>
                         ));
@@ -3266,12 +3282,70 @@ export default function AttendanceDashboardPage() {
                 {/* ── Filter ── */}
                 {canManage && activeTab === "calendar" && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">🎯 Filter Karyawan</p>
+                        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">🎯 Filter Karyawan</p>
+                            {isAdmin && (
+                                <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
+                                    <button
+                                        onClick={() => { setCalendarPklFilter("karyawan"); setFilterUser("Semua"); }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${calendarPklFilter === "karyawan"
+                                            ? "bg-white text-gray-800 shadow-sm"
+                                            : "text-gray-400 hover:text-gray-600"
+                                            }`}
+                                    >
+                                        👥 Karyawan
+                                    </button>
+                                    <button
+                                        onClick={() => { setCalendarPklFilter("pkl"); setFilterUser("Semua"); }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${calendarPklFilter === "pkl"
+                                            ? "bg-amber-500 text-white shadow-sm"
+                                            : "text-gray-400 hover:text-amber-600"
+                                            }`}
+                                    >
+                                        🎓 PKL
+                                    </button>
+                                    <button
+                                        onClick={() => { setCalendarPklFilter("all"); setFilterUser("Semua"); }}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${calendarPklFilter === "all"
+                                            ? "bg-[#1a1a2e] text-white shadow-sm"
+                                            : "text-gray-400 hover:text-gray-600"
+                                            }`}
+                                    >
+                                        🌐 Semua
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                            <button onClick={() => setFilterUser("Semua")} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>Semua</button>
-                            {uniqueUsers.map(n => (
-                                <button key={n} onClick={() => setFilterUser(n)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>{n}</button>
-                            ))}
+                            <button
+                                onClick={() => setFilterUser("Semua")}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === "Semua"
+                                    ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105"
+                                    : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                                    }`}
+                            >
+                                Semua
+                            </button>
+                            {uniqueUsers
+                                .filter(n => {
+                                    if (!isAdmin || calendarPklFilter === "all") return true;
+                                    const uInfo = allUsers.find(u => u.name === n);
+                                    if (calendarPklFilter === "pkl") return uInfo ? isPKLRole(uInfo.role) : false;
+                                    return uInfo ? !isPKLRole(uInfo.role) : true; // "karyawan"
+                                })
+                                .map(n => (
+                                    <button
+                                        key={n}
+                                        onClick={() => setFilterUser(n)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterUser === n
+                                            ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md scale-105"
+                                            : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        {n}
+                                    </button>
+                                ))
+                            }
                         </div>
                     </div>
                 )}
@@ -3663,14 +3737,31 @@ export default function AttendanceDashboardPage() {
                                     <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
                                 </p>
                             </div>
-                            <button
-                                onClick={() => openAddManual()}
-                                disabled={usersLoading}
-                                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
-                            >
-                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
-                            </button>                            </div>
-
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {isAdmin && (
+                                    <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
+                                        <button
+                                            onClick={() => setPklFilterMode(false)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!pklFilterMode ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                                                }`}
+                                        >
+                                            👥 Karyawan
+                                        </button>
+                                        <button
+                                            onClick={() => setPklFilterMode(true)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${pklFilterMode ? "bg-amber-500 text-white shadow-sm" : "text-gray-400 hover:text-amber-600"
+                                                }`}
+                                        >
+                                            🎓 PKL
+                                        </button>
+                                    </div>
+                                )}
+                                <button onClick={() => openAddManual()} disabled={usersLoading}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60">
+                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                </button>
+                            </div>
+                        </div>
                         {loading ? (
                             <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                         ) : (
@@ -3696,12 +3787,20 @@ export default function AttendanceDashboardPage() {
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
                                         {(isAdmin
-                                            ? userSummary
+                                            ? (pklFilterMode
+                                                ? userSummary.filter(u => {
+                                                    const uInfo = allUsers.find(au => au.id === u.userId);
+                                                    return uInfo ? isPKLRole(uInfo.role) : false;
+                                                })
+                                                : userSummary.filter(u => {
+                                                    const uInfo = allUsers.find(au => au.id === u.userId);
+                                                    return uInfo ? !isPKLRole(uInfo.role) : true;
+                                                })
+                                            )
                                             : canManage
                                                 ? userSummary.filter(u => allUsers.some(au => au.id === u.userId))
                                                 : userSummary.filter(u => u.userId === currentUser?.id)
                                         ).map((u, i) => {
-                                            // ✅ absent = hari kerja yang sudah lewat dikurangi yang sudah hadir
                                             const absent = u.absences.length;
                                             const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
                                             const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
@@ -3898,235 +3997,240 @@ export default function AttendanceDashboardPage() {
                                     </thead>
 
                                     <tbody className="divide-y divide-gray-300">
-                                        {userSummary.map(u => {
-                                            const sal = salaryMap[u.userId];
-                                            const allow = allowanceMap[u.userId];
-                                            const overtime = overtimeTotal[u.userId] || 0;
+                                        {userSummary
+                                            .filter(u => {
+                                                const uInfo = allUsers.find(au => au.id === u.userId);
+                                                return uInfo ? !isPKLRole(uInfo.role) : true;
+                                            })
+                                            .map(u => {
+                                                const sal = salaryMap[u.userId];
+                                                const allow = allowanceMap[u.userId];
+                                                const overtime = overtimeTotal[u.userId] || 0;
 
-                                            // Hitung gaji pokok
-                                            const salaryIncome =
-                                                sal && sal.salary_type === "FIXED"
-                                                    ? sal.base_salary
-                                                    : sal && u.totalWorkdays > 0
-                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                        : 0;
+                                                // Hitung gaji pokok
+                                                const salaryIncome =
+                                                    sal && sal.salary_type === "FIXED"
+                                                        ? sal.base_salary
+                                                        : sal && u.totalWorkdays > 0
+                                                            ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
+                                                            : 0;
 
-                                            // Tunjangan (disesuaikan % kehadiran)
-                                            const allowanceWife =
-                                                Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
-                                            const allowanceChild =
-                                                Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
+                                                // Tunjangan (disesuaikan % kehadiran)
+                                                const allowanceWife =
+                                                    Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
+                                                const allowanceChild =
+                                                    Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
 
-                                            // Potongan (langsung)
-                                            const deductionLoan = allow?.deduction_loan || 0;
-                                            const deductionPension = allow?.deduction_pension || 0;
+                                                // Potongan (langsung)
+                                                const deductionLoan = allow?.deduction_loan || 0;
+                                                const deductionPension = allow?.deduction_pension || 0;
 
-                                            // Total
-                                            const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
-                                            const totalDeduction = deductionLoan + deductionPension;
-                                            const netSalary = grossIncome - totalDeduction;
+                                                // Total
+                                                const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
+                                                const totalDeduction = deductionLoan + deductionPension;
+                                                const netSalary = grossIncome - totalDeduction;
 
-                                            return (
-                                                <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
-                                                    <td className="px-4 py-4 border-r-2 border-gray-200">
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
-                                                                {initials(u.name)}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
-                                                                <span className="text-[10px] text-gray-400">
-                                                                    {sal ? (sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen") : "—"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {sal ? (
-                                                            <div className="flex flex-col items-center gap-0.5">
-                                                                <span className="font-mono font-bold text-gray-800 text-xs">
-                                                                    {formatRupiah(sal.base_salary)}
-                                                                </span>
-                                                                {sal.salary_type === "PERCENTAGE" && (
-                                                                    <span className="text-[8px] text-gray-400">
-                                                                        {formatRupiah(Math.round(sal.base_salary / u.totalWorkdays))}/hari
+                                                return (
+                                                    <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
+                                                        <td className="px-4 py-4 border-r-2 border-gray-200">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">
+                                                                    {initials(u.name)}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
+                                                                    <span className="text-[10px] text-gray-400">
+                                                                        {sal ? (sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen") : "—"}
                                                                     </span>
-                                                                )}
-                                                                {sal.salary_type === "FIXED" && u.totalWorkdays > 0 && (
-                                                                    <span
-                                                                        className="text-[8px] text-violet-500 font-semibold mt-0.5 whitespace-nowrap"
-                                                                        title={`Jika dihitung dari kehadiran: ${formatPct(u.pct)}% × ${formatRupiah(sal.base_salary)}`}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {sal ? (
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="font-mono font-bold text-gray-800 text-xs">
+                                                                        {formatRupiah(sal.base_salary)}
+                                                                    </span>
+                                                                    {sal.salary_type === "PERCENTAGE" && (
+                                                                        <span className="text-[8px] text-gray-400">
+                                                                            {formatRupiah(Math.round(sal.base_salary / u.totalWorkdays))}/hari
+                                                                        </span>
+                                                                    )}
+                                                                    {sal.salary_type === "FIXED" && u.totalWorkdays > 0 && (
+                                                                        <span
+                                                                            className="text-[8px] text-violet-500 font-semibold mt-0.5 whitespace-nowrap"
+                                                                            title={`Jika dihitung dari kehadiran: ${formatPct(u.pct)}% × ${formatRupiah(sal.base_salary)}`}
+                                                                        >
+                                                                            ≈ {formatRupiah(Math.round((sal.base_salary / u.totalWorkdays) * u.score))} jika %
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Tunjangan Istri */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {allow?.allowance_wife ? (
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                                                        {formatRupiah(allowanceWife)}
+                                                                    </span>
+                                                                    <button
+                                                                        onClick={() => setEditAllowanceUser({
+                                                                            userId: u.userId,
+                                                                            userName: u.name,
+                                                                            currentAllowance: allow,
+                                                                        })}
+                                                                        className="text-[8px] text-blue-500 hover:text-blue-700 font-semibold cursor-pointer"
+                                                                        title="Edit tunjangan"
                                                                     >
-                                                                        ≈ {formatRupiah(Math.round((sal.base_salary / u.totalWorkdays) * u.score))} jika %
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Tunjangan Istri */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {allow?.allowance_wife ? (
-                                                            <div className="flex flex-col items-center gap-0.5">
-                                                                <span className="font-mono font-bold text-emerald-700 text-xs">
-                                                                    {formatRupiah(allowanceWife)}
-                                                                </span>
+                                                                        {formatRupiah(allow.allowance_wife)}
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
                                                                 <button
                                                                     onClick={() => setEditAllowanceUser({
                                                                         userId: u.userId,
                                                                         userName: u.name,
                                                                         currentAllowance: allow,
                                                                     })}
-                                                                    className="text-[8px] text-blue-500 hover:text-blue-700 font-semibold cursor-pointer"
-                                                                    title="Edit tunjangan"
+                                                                    className="text-[9px] text-gray-400 hover:text-blue-500 font-semibold cursor-pointer"
                                                                 >
-                                                                    {formatRupiah(allow.allowance_wife)}
+                                                                    Atur →
+                                                                </button>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Tunjangan Anak */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {allow?.allowance_child ? (
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                                                        {formatRupiah(allowanceChild)}
+                                                                    </span>
+                                                                    <span className="text-[8px] text-gray-400">
+                                                                        {formatRupiah(allow.allowance_child)}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Lemburan */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {overtime > 0 ? (
+                                                                <span className="font-mono font-bold text-orange-600 text-xs">
+                                                                    {formatRupiah(overtime)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Kehadiran % */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>
+                                                                    {formatPct(u.pct)}%
+                                                                </span>
+                                                                <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`}
+                                                                        style={{ width: `${Math.min(u.pct, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                {salaryMap[u.userId]?.salary_type === "FIXED" && u.totalWorkdays > 0 && (
+                                                                    <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                        💰 Tetap
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+
+                                                        {/* POTONGAN */}
+                                                        {/* Kasbon */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {deductionLoan > 0 ? (
+                                                                <span className="font-mono font-bold text-red-600 text-xs">
+                                                                    -{formatRupiah(deductionLoan)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Pensiun */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            {deductionPension > 0 ? (
+                                                                <span className="font-mono font-bold text-red-600 text-xs">
+                                                                    -{formatRupiah(deductionPension)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-xs">—</span>
+                                                            )}
+                                                        </td>
+
+                                                        {/* TOTAL */}
+                                                        {/* Gross */}
+                                                        <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className="font-black text-blue-600 text-sm">
+                                                                    {formatRupiah(grossIncome)}
+                                                                </span>
+                                                                <span className="text-[8px] text-gray-400">bruto</span>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* Net (dengan highlight) */}
+                                                        <td className="px-3 py-4 text-right">
+                                                            <div className="inline-flex flex-col items-end gap-0.5 bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-lg px-2 py-1">
+                                                                <span className="font-black text-emerald-700 text-sm">
+                                                                    {formatRupiah(netSalary)}
+                                                                </span>
+                                                                <span className="text-[8px] text-emerald-600 font-semibold">bersih</span>
+                                                            </div>
+                                                        </td>
+
+                                                        {/* Aksi */}
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                                                                {/* ✅ NEW: Tombol Generate Slip dari rekapan gaji */}
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                        const success = await generateSlipFromRecapan(u);
+                                                                        if (success) {
+                                                                            // Refresh list slip gaji
+                                                                            fetchSalarySlips(calYear, calMonth);
+                                                                            alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
+                                                                        }
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
+                                                                    title={`Generate slip gaji ${u.name} dari rekapan bulan ini`}
+                                                                >
+                                                                    📄 Slip
+                                                                </button>
+                                                                {/* Tombol Edit Tunjangan */}
+                                                                <button
+                                                                    onClick={() => setEditAllowanceUser({
+                                                                        userId: u.userId,
+                                                                        userName: u.name,
+                                                                        currentAllowance: allow,
+                                                                    })}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
+                                                                    title="Edit tunjangan & potongan"
+                                                                >
+                                                                    💜 Tunjangan
                                                                 </button>
                                                             </div>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => setEditAllowanceUser({
-                                                                    userId: u.userId,
-                                                                    userName: u.name,
-                                                                    currentAllowance: allow,
-                                                                })}
-                                                                className="text-[9px] text-gray-400 hover:text-blue-500 font-semibold cursor-pointer"
-                                                            >
-                                                                Atur →
-                                                            </button>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Tunjangan Anak */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {allow?.allowance_child ? (
-                                                            <div className="flex flex-col items-center gap-0.5">
-                                                                <span className="font-mono font-bold text-emerald-700 text-xs">
-                                                                    {formatRupiah(allowanceChild)}
-                                                                </span>
-                                                                <span className="text-[8px] text-gray-400">
-                                                                    {formatRupiah(allow.allowance_child)}
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Lemburan */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {overtime > 0 ? (
-                                                            <span className="font-mono font-bold text-orange-600 text-xs">
-                                                                {formatRupiah(overtime)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Kehadiran % */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span className={`text-sm font-black ${u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500"}`}>
-                                                                {formatPct(u.pct)}%
-                                                            </span>
-                                                            <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                                                <div
-                                                                    className={`h-full rounded-full ${u.pct >= 90 ? "bg-emerald-400" : u.pct >= 70 ? "bg-amber-400" : "bg-red-400"}`}
-                                                                    style={{ width: `${Math.min(u.pct, 100)}%` }}
-                                                                />
-                                                            </div>
-                                                            {salaryMap[u.userId]?.salary_type === "FIXED" && u.totalWorkdays > 0 && (
-                                                                <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                                                    💰 Tetap
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    {/* POTONGAN */}
-                                                    {/* Kasbon */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {deductionLoan > 0 ? (
-                                                            <span className="font-mono font-bold text-red-600 text-xs">
-                                                                -{formatRupiah(deductionLoan)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Pensiun */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        {deductionPension > 0 ? (
-                                                            <span className="font-mono font-bold text-red-600 text-xs">
-                                                                -{formatRupiah(deductionPension)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* TOTAL */}
-                                                    {/* Gross */}
-                                                    <td className="px-3 py-4 text-center border-r-2 border-gray-200">
-                                                        <div className="flex flex-col items-center gap-0.5">
-                                                            <span className="font-black text-blue-600 text-sm">
-                                                                {formatRupiah(grossIncome)}
-                                                            </span>
-                                                            <span className="text-[8px] text-gray-400">bruto</span>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Net (dengan highlight) */}
-                                                    <td className="px-3 py-4 text-right">
-                                                        <div className="inline-flex flex-col items-end gap-0.5 bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-lg px-2 py-1">
-                                                            <span className="font-black text-emerald-700 text-sm">
-                                                                {formatRupiah(netSalary)}
-                                                            </span>
-                                                            <span className="text-[8px] text-emerald-600 font-semibold">bersih</span>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Aksi */}
-                                                    <td className="px-4 py-4 text-center">
-                                                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                                                            {/* ✅ NEW: Tombol Generate Slip dari rekapan gaji */}
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
-                                                                    const success = await generateSlipFromRecapan(u);
-                                                                    if (success) {
-                                                                        // Refresh list slip gaji
-                                                                        fetchSalarySlips(calYear, calMonth);
-                                                                        alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
-                                                                    }
-                                                                }}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
-                                                                title={`Generate slip gaji ${u.name} dari rekapan bulan ini`}
-                                                            >
-                                                                📄 Slip
-                                                            </button>
-                                                            {/* Tombol Edit Tunjangan */}
-                                                            <button
-                                                                onClick={() => setEditAllowanceUser({
-                                                                    userId: u.userId,
-                                                                    userName: u.name,
-                                                                    currentAllowance: allow,
-                                                                })}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
-                                                                title="Edit tunjangan & potongan"
-                                                            >
-                                                                💜 Tunjangan
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                     </tbody>
 
                                     {/* Footer Total */}
@@ -4138,7 +4242,10 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => {
+                                                        userSummary.filter(u => {
+                                                            const uInfo = allUsers.find(au => au.id === u.userId);
+                                                            return uInfo ? !isPKLRole(uInfo.role) : true;
+                                                        }).reduce((sum, u) => {
                                                             const sal = salaryMap[u.userId];
                                                             return (
                                                                 sum +
@@ -4290,31 +4397,33 @@ export default function AttendanceDashboardPage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {leaveData.map(ld => (
-                                                <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
-                                                            <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
-                                                    <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                    <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
-                                                    <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
-                                                    <td className="px-4 py-4">
-                                                        {ld.requests.length > 0 ? (
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {ld.requests.map(r => (
-                                                                    <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                        🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
-                                                                    </span>
-                                                                ))}
+                                            {leaveData
+                                                .filter(ld => !isPKLRole(ld.user.role))
+                                                .map(ld => (
+                                                    <tr key={ld.user.id} className="hover:bg-gray-50/60 transition-colors duration-200">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 shadow-md">{initials(ld.user.name)}</div>
+                                                                <div><span className="font-bold text-gray-800 block">{ld.user.name}</span><span className="text-[10px] text-gray-400">{ld.user.role.replace(/_/g, " ")}</span></div>
                                                             </div>
-                                                        ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                        </td>
+                                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-100 text-teal-700 text-sm font-black border border-teal-200">{ld.balance.quota}</span></td>
+                                                        <td className="px-4 py-4 text-center">{ld.balance.carried_over > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-700 text-sm font-black border border-blue-200">+{ld.balance.carried_over}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                        <td className="px-4 py-4 text-center">{ld.balance.used > 0 ? <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-700 text-sm font-black border border-orange-200">{ld.balance.used}</span> : <span className="text-gray-200 text-sm font-black">—</span>}</td>
+                                                        <td className="px-4 py-4 text-center"><span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-black border ${ld.available > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>{ld.available}</span></td>
+                                                        <td className="px-4 py-4">
+                                                            {ld.requests.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    {ld.requests.map(r => (
+                                                                        <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
+                                                                            🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : <span className="text-[10px] text-gray-300 font-bold">Tidak ada cuti bulan ini</span>}
+                                                        </td>
+                                                    </tr>
+                                                ))}
                                         </tbody>
                                     </table>
                                 </div>

@@ -191,6 +191,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
+  if (user.role === "PKL" && PKL_BLOCKED_ROUTES.some(r => pathname.startsWith(r))) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
