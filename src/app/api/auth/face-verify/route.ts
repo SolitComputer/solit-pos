@@ -59,16 +59,18 @@ export async function POST(request: Request) {
     const todayDowCheck = nowWIBCheck.getUTCDay();
     const todayDateCheck = nowWIBCheck.toISOString().slice(0, 10);
 
-    const [{ data: weeklyOffCheck }, { data: specificOffCheck }, { data: dateWorkCheck }] = await Promise.all([
+    const [{ data: weeklyOffCheck }, { data: specificOffCheck }, { data: dateWorkCheck }, { data: monthlyOffCheck }] = await Promise.all([
       supabaseAdmin.from("user_day_off").select("id")
         .eq("user_id", user.id).eq("day_of_week", todayDowCheck).maybeSingle(),
       supabaseAdmin.from("user_date_off").select("id")
         .eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
-      supabaseAdmin.from("user_date_work").select("id")           // ← TAMBAH
+      supabaseAdmin.from("user_date_work").select("id")
         .eq("user_id", user.id).eq("work_date", todayDateCheck).maybeSingle(),
+      supabaseAdmin.from("user_monthly_off").select("id")
+        .eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
     ]);
 
-    if ((weeklyOffCheck || specificOffCheck) && !dateWorkCheck) {
+    if (Boolean(monthlyOffCheck) || ((weeklyOffCheck || specificOffCheck) && !dateWorkCheck)) {
       return NextResponse.json(
         {
           success: false,
