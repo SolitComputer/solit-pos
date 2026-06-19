@@ -2,7 +2,7 @@
 // src/components/layout/Sidebar.tsx
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { UserRole } from "@/lib/auth";
 
@@ -162,10 +162,10 @@ const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance",
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
 const ITEM_PKL_REPORT: MenuItem = {
-    name: "Laporan Kerja PKL",
-    href: "/dashboard/pkl-reports",
-    icon: Icons.pklReport,
-  };
+  name: "Laporan Kerja PKL",
+  href: "/dashboard/pkl-reports",
+  icon: Icons.pklReport,
+};
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -211,7 +211,6 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
-// SALES family overview
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
@@ -244,7 +243,6 @@ const SALES_TRANSAKSI: MenuGroup = {
 
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  // ── Full access ───────────────────────────────────────────────────────────
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
   PROGRAMMER: [
     {
@@ -274,8 +272,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
   ],
-
-  // ── Sales family ──────────────────────────────────────────────────────────
   KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
@@ -283,8 +279,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-
-  // ── Teknisi family ────────────────────────────────────────────────────────
   TEKNISI: [
     {
       label: "Overview",
@@ -308,7 +302,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
-
   KEPALA_TEKNISI: [
     {
       label: "Overview",
@@ -329,8 +322,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
-
-  // ── Lainnya ───────────────────────────────────────────────────────────────
   ACCOUNTING: [
     SALES_OVERVIEW([
       { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -351,7 +342,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-
   PENGELOLA_BARANG: [
     {
       label: "Overview",
@@ -372,7 +362,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
-
   MARKETING: [
     {
       label: "Overview",
@@ -386,7 +375,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-
   KEBERSIHAN: [
     {
       label: "Overview",
@@ -405,7 +393,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-
   KEPALA_MARKETING: [
     SALES_OVERVIEW([ITEM_USERS]),
     {
@@ -424,7 +411,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-
   PENYEDIA_BARANG: [
     {
       label: "Overview",
@@ -445,7 +431,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-
   KEPALA_PENYEDIA_BARANG: [
     {
       label: "Overview",
@@ -466,7 +451,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-
   KONTEN: [
     {
       label: "Overview",
@@ -484,17 +468,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-
-  // ── PKL ───────────────────────────────────────────────────────────────────
-  // ✅ PKL: Absensi ada, tapi TIDAK ada Management User dan TIDAK ada Chat
   PKL: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI,
-        // ❌ ITEM_USERS dihapus — PKL tidak boleh akses Management User
-        // ❌ Chat tidak ada — PKL tidak boleh akses Group Chat
         ITEM_PKL_REPORT,
       ],
     },
@@ -518,7 +497,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -530,7 +508,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },        // ✅ Tambah
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
@@ -545,7 +523,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 };
 
-// ── Role meta (badge label & color) ──────────────────────────────────────────
+// ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
@@ -567,7 +545,6 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
   ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
-  // ✅ PKL: badge amber supaya mudah dibedakan
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
 };
@@ -580,11 +557,15 @@ function NavItem({ item, isActive, onClick }: {
   item: MenuItem; isActive: boolean; onClick?: () => void;
 }) {
   return (
-    <Link href={item.href} onClick={onClick}
-      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
-        ? "bg-[#1a1a2e] text-white shadow-sm"
-        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-        }`}>
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${
+        isActive
+          ? "bg-[#1a1a2e] text-white shadow-sm"
+          : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+      }`}
+    >
       <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
       </span>
@@ -600,22 +581,47 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
   const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
 
+  // ── Preserve scroll position nav saat navigasi ────────────────────────────
+  const navRef = useRef<HTMLElement>(null);
+  const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(scrollKey);
+    if (saved) el.scrollTop = parseInt(saved, 10);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // sengaja kosong — hanya restore saat pertama mount
+
+  const handleNavScroll = useCallback(() => {
+    const el = navRef.current;
+    if (el) sessionStorage.setItem(scrollKey, String(el.scrollTop));
+  }, [scrollKey]);
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-      {/* Logo + User */}
+
+      {/* ── Logo + User ── */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
-              <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <img
+                src="/assets/solit03.jpeg"
+                alt="Solit"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
             </div>
             <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
           </div>
           {onClose && (
-            <button onClick={onClose}
+            <button
+              onClick={onClose}
               className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-              aria-label="Tutup sidebar">
+              aria-label="Tutup sidebar"
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -650,15 +656,21 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
 
       <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
 
-      {/* Nav */}
+      {/* ── Nav ── */}
       <nav
+        ref={navRef}
+        onScroll={handleNavScroll}
         className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-3"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+        style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
+      >
         {loading ? (
           <div className="space-y-1 pt-1">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
-                style={{ animationDelay: `${i * 40}ms` }} />
+              <div
+                key={i}
+                className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
+                style={{ animationDelay: `${i * 40}ms` }}
+              />
             ))}
           </div>
         ) : (
@@ -704,10 +716,12 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
         )}
       </nav>
 
-      {/* Logout */}
+      {/* ── Logout ── */}
       <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
-        <button onClick={onLogout}
-          className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all">
+        <button
+          onClick={onLogout}
+          className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+        >
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           <span>Keluar</span>
         </button>
@@ -763,12 +777,17 @@ export default function Sidebar() {
 
   const contentProps = { user, loading, groups, pathname, onLogout: handleLogout };
 
+  // Suppress unused warning — mounted dipakai untuk hydration safety
+  void mounted;
+
   return (
     <>
+      {/* Mobile toggle button */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
-        aria-label="Buka menu">
+        aria-label="Buka menu"
+      >
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
@@ -776,17 +795,25 @@ export default function Sidebar() {
         </svg>
       </button>
 
+      {/* Mobile overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
+      {/* Mobile sidebar */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>
 
+      {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
         <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} />
       </aside>

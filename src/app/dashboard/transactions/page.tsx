@@ -1035,7 +1035,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
 export default function Page() {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false); // ← state loading export
+  const [isExporting, setIsExporting] = useState(false);
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -1063,8 +1063,8 @@ export default function Page() {
     fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
   }, []);
 
-  const canEditTransaction   = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
-  const canSeeFinancials     = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
+  const canEditTransaction    = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
+  const canSeeFinancials      = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -1084,25 +1084,50 @@ export default function Page() {
 
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions];
+
     if (search.trim()) {
       const term = search.toLowerCase();
-      filtered = filtered.filter((item) =>
-        item.invoice_number?.toLowerCase().includes(term) ||
-        item.customer_name?.toLowerCase().includes(term) ||
-        item.customer_phone?.toLowerCase().includes(term) ||
-        item.laptop_name?.toLowerCase().includes(term)
-      );
+      filtered = filtered.filter((item) => {
+        // Field-field existing
+        if (item.invoice_number?.toLowerCase().includes(term)) return true;
+        if (item.customer_name?.toLowerCase().includes(term)) return true;
+        if (item.customer_phone?.toLowerCase().includes(term)) return true;
+        if (item.laptop_name?.toLowerCase().includes(term)) return true;
+
+        // ── Serial Number ──────────────────────────────────────────────
+        // 1. serial_number (string tunggal, format lama)
+        if (item.serial_number?.toLowerCase().includes(term)) return true;
+
+        // 2. serial_numbers (array, transaksi single-unit baru)
+        if (Array.isArray(item.serial_numbers)) {
+          if (item.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
+        }
+
+        // 3. grouped_items[].serial_numbers (transaksi multi-unit)
+        if (Array.isArray(item.grouped_items)) {
+          for (const g of item.grouped_items) {
+            if (Array.isArray(g.serial_numbers)) {
+              if (g.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
+            }
+          }
+        }
+
+        return false;
+      });
     }
+
     if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
     if (customerType !== "ALL") filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
     if (dateFrom) { const from = new Date(dateFrom); from.setHours(0, 0, 0, 0); filtered = filtered.filter((item) => new Date(item.created_at) >= from); }
     if (dateTo)   { const to   = new Date(dateTo);   to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
     if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
     if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
+
     filtered.sort((a, b) => {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       return sortOrder === "newest" ? diff : -diff;
     });
+
     return filtered;
   }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
 
@@ -1277,7 +1302,7 @@ export default function Page() {
           headerRow:  true,
           totalsRow:  false,
           style: {
-            theme:          "TableStyleMedium7", // hijau
+            theme:          "TableStyleMedium7",
             showRowStripes: true,
           },
           columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
@@ -1316,7 +1341,6 @@ export default function Page() {
       });
 
       // ── Style data rows + format Rupiah ────────────────────────
-      // addTable tidak apply numFmt — set manual
       tableRows.forEach((_, idx) => {
         const rowNum = idx + 2;
         const row    = ws.getRow(rowNum);
@@ -1395,7 +1419,6 @@ export default function Page() {
                 <span className="text-sm font-bold text-gray-900">📊 {filteredTransactions.length}</span>
               </div>
             )}
-            {/* ── Tombol Export Excel ── */}
             {!isLoading && filteredTransactions.length > 0 && (
               <button
                 onClick={handleExportExcel}
@@ -1434,7 +1457,7 @@ export default function Page() {
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <input type="text" placeholder="Cari nota, customer, WA, laptop..."
+              <input type="text" placeholder="Cari nota, customer, WA, laptop, SN..."
                 className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
