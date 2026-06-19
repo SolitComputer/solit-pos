@@ -29,6 +29,7 @@ interface Laptop {
     qty: number;
     stok_tersedia: number;
     stok_minus: number;
+    terjual: number;
     status: string;
     ready_to_sell: boolean;
     notes: string;
@@ -253,13 +254,12 @@ function DeleteConfirmModal({
                             value={inputName}
                             onChange={e => setInputName(e.target.value)}
                             placeholder="Ketik nama laptop di atas..."
-                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                inputName.length > 0
-                                    ? isMatch
-                                        ? "border-green-400 focus:ring-green-200 bg-green-50/30"
-                                        : "border-red-300 focus:ring-red-200"
-                                    : "border-gray-200 focus:ring-gray-200"
-                            }`}
+                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
+                                ? isMatch
+                                    ? "border-green-400 focus:ring-green-200 bg-green-50/30"
+                                    : "border-red-300 focus:ring-red-200"
+                                : "border-gray-200 focus:ring-gray-200"
+                                }`}
                             autoFocus
                         />
                         {inputName.length > 0 && !isMatch && (
@@ -364,6 +364,7 @@ export default function Page() {
                 qty: (l.laptop_units || []).length,
                 stok_tersedia: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
                 stok_minus: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length,
+                terjual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SOLD").length,
             }));
             setLaptops(normalized);
         } catch {
@@ -605,6 +606,7 @@ export default function Page() {
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalStok = filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
+    const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
     return (
         <>
@@ -700,7 +702,20 @@ export default function Page() {
                         </div>
 
                         {/* ── STAT CARDS ─────────────────────────────────── */}
-                        <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
+                        {/* ── STAT CARDS ─────────────────────────────────── */}
+                        <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
+                            {canViewTotalStok && (
+                                <StatCard
+                                    label="Stok Awal"
+                                    value={`${totalStok} unit`}
+                                    accent="bg-gray-700"
+                                    icon={
+                                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
+                                    }
+                                />
+                            )}
                             <StatCard
                                 label="Siap Jual"
                                 value={`${totalSiapJual} unit`}
@@ -713,24 +728,24 @@ export default function Page() {
                             />
                             {canViewTotalStok && (
                                 <StatCard
-                                    label="Total Stok"
-                                    value={`${totalStok} unit`}
-                                    accent="bg-gray-700"
+                                    label="Minus"
+                                    value={`${totalMinus} unit`}
+                                    accent="bg-red-500"
                                     icon={
-                                        <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                                         </svg>
                                     }
                                 />
                             )}
                             {canViewTotalStok && (
                                 <StatCard
-                                    label="Stok Minus"
-                                    value={`${totalMinus} unit`}
-                                    accent="bg-red-500"
+                                    label="Terjual"
+                                    value={`${totalTerjual} unit`}
+                                    accent="bg-blue-500"
                                     icon={
-                                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                     }
                                 />
@@ -849,16 +864,15 @@ export default function Page() {
                                                 <Th>GPU</Th>
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
+                                                {canViewTotalStok && <Th right>Stok Awal</Th>}
                                                 <Th right>Siap Jual</Th>
-                                                {canViewTotalStok && <Th right>Total Stok</Th>}
                                                 {canViewTotalStok && <Th right>Minus</Th>}
-                                                <Th>Status</Th>
+                                                {canViewTotalStok && <Th right>Terjual</Th>}
                                                 <Th right>Aksi</Th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filteredLaptops.map((item, idx) => {
-                                                const s = STATUS_STYLE[item.status];
                                                 return (
                                                     <tr
                                                         key={item.id}
@@ -903,15 +917,6 @@ export default function Page() {
                                                                 {fmt(item.selling_price)}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${
-                                                                (item.stok_tersedia ?? 0) === 0
-                                                                    ? "bg-red-50 text-red-500 ring-1 ring-red-200"
-                                                                    : "bg-green-50 text-green-700 ring-1 ring-green-200"
-                                                            }`}>
-                                                                {item.stok_tersedia ?? 0}
-                                                            </span>
-                                                        </td>
                                                         {canViewTotalStok && (
                                                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                                 <span className={`text-sm font-semibold tabular-nums ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
@@ -919,6 +924,14 @@ export default function Page() {
                                                                 </span>
                                                             </td>
                                                         )}
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stok_tersedia ?? 0) === 0
+                                                                ? "bg-red-50 text-red-500 ring-1 ring-red-200"
+                                                                : "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                                                }`}>
+                                                                {item.stok_tersedia ?? 0}
+                                                            </span>
+                                                        </td>
                                                         {canViewTotalStok && (
                                                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                                 <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
@@ -926,16 +939,16 @@ export default function Page() {
                                                                 </span>
                                                             </td>
                                                         )}
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            {s ? (
-                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${s.badge}`}>
-                                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                                    {s.label}
+                                                        {canViewTotalStok && (
+                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                                <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0
+                                                                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                                                                    : "text-gray-200"
+                                                                    }`}>
+                                                                    {item.terjual ?? 0}
                                                                 </span>
-                                                            ) : (
-                                                                <span className="text-gray-400 text-xs">{item.status}</span>
-                                                            )}
-                                                        </td>
+                                                            </td>
+                                                        )}
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                             <div className="flex items-center justify-end gap-1">
                                                                 {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
@@ -983,7 +996,6 @@ export default function Page() {
                                         </tbody>
                                     </table>
                                 </div>
-
                                 {/* Table Footer */}
                                 <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
                                     <p className="text-xs text-gray-400 font-medium">
@@ -992,17 +1004,17 @@ export default function Page() {
                                             <span className="text-gray-400 ml-1">dari {laptops.length}</span>
                                         )}
                                     </p>
-                                    <div className="flex items-center gap-1 flex-wrap">
-                                        <FooterStat label="Siap Jual" value={`${totalSiapJual} unit`} color="text-green-700" />
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {canViewTotalStok && (
+                                            <FooterStat label="Stok Awal" value={totalStok} dot="bg-gray-400" color="text-gray-800" />
+                                        )}
+                                        <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
                                         {canViewTotalStok && (
                                             <>
-                                                <div className="w-px h-6 bg-gray-200 mx-1" />
-                                                <FooterStat label="Total Stok" value={`${totalStok} unit`} color="text-gray-700" />
-                                                <div className="w-px h-6 bg-gray-200 mx-1" />
-                                                <FooterStat label="Minus" value={`${totalMinus} unit`} color="text-red-500" />
+                                                <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
+                                                <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500" color="text-blue-600" />
                                             </>
                                         )}
-
                                     </div>
                                 </div>
                             </div>
@@ -1257,7 +1269,7 @@ export default function Page() {
                         }}
                     />
                 )}
-            </DashboardLayout>
+            </DashboardLayout >
         </>
     );
 }
@@ -1348,11 +1360,13 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
     );
 }
 
-function FooterStat({ label, value, color }: { label: string; value: string; color: string }) {
+function FooterStat({ label, value, dot, color }: { label: string; value: number; dot: string; color: string }) {
     return (
-        <div className="text-right px-1">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-            <p className={`text-xs font-black tabular-nums ${color}`}>{value}</p>
+        <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-xl pl-2.5 pr-3 py-1.5 shadow-sm">
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
+            <span className="text-[10px] font-medium text-gray-300">unit</span>
         </div>
     );
 }
@@ -1387,7 +1401,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga", "Siap", "Stok", "−", "Status", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga", "Stok Awal", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1436,7 +1450,7 @@ function ModalDetailSkeleton() {
                 </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {[1,2,3,4,5].map(i => (
+                {[1, 2, 3, 4, 5].map(i => (
                     <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                         <Shimmer w={40} h={9} className="mb-1.5" />
                         <Shimmer w="80%" h={13} />
