@@ -59,37 +59,40 @@ const ROLE_ICON: Record<string, string> = {
   CUSTOMER_SERVICE: "🎧",
 };
 
-const ROLE_BADGE: Record<string, string> = {
-  ADMIN: "bg-violet-100 text-violet-700 border-violet-200",
-  PROGRAMMER: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  ASISTEN_CEO: "bg-purple-100 text-purple-700 border-purple-200",
-  KEPALA_SALES: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  KEPALA_MARKETING: "bg-rose-100 text-rose-700 border-rose-200",
-  KEPALA_TEKNISI: "bg-red-100 text-red-700 border-red-200",
-  CREW_SALES: "bg-sky-100 text-sky-700 border-sky-200",
-  SOTECH: "bg-lime-100 text-lime-700 border-lime-200",
-  ACCOUNTING: "bg-amber-100 text-amber-700 border-amber-200",
-  PENGELOLA_BARANG: "bg-blue-100 text-blue-700 border-blue-200",
-  TEKNISI: "bg-orange-100 text-orange-700 border-orange-200",
-  PENGANTARAN: "bg-teal-100 text-teal-700 border-teal-200",
-  MARKETING: "bg-pink-100 text-pink-700 border-pink-200",
-  KEBERSIHAN: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  PENYEDIA_BARANG: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  KEPALA_PENYEDIA_BARANG: "bg-orange-100 text-orange-700 border-orange-200",
-  KONTEN: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200",
-  KEPALA_ONPOINT: "bg-green-100 text-green-700 border-green-200",
-  ONPOINT: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  KEPALA_SOTECH: "bg-lime-100 text-lime-700 border-lime-200",
-  PKL: "bg-slate-100 text-slate-600 border-slate-200",
-  CUSTOMER_SERVICE: "bg-sky-100 text-sky-700 border-sky-200",
+const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+  ADMIN: { bg: "#f3f0ff", text: "#6d28d9", border: "#ddd6fe" },
+  PROGRAMMER: { bg: "#eef2ff", text: "#4338ca", border: "#c7d2fe" },
+  ASISTEN_CEO: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
+  KEPALA_SALES: { bg: "#ecfdf5", text: "#059669", border: "#a7f3d0" },
+  KEPALA_MARKETING: { bg: "#fff1f2", text: "#be123c", border: "#fecdd3" },
+  KEPALA_TEKNISI: { bg: "#fff1f2", text: "#b91c1c", border: "#fecaca" },
+  CREW_SALES: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+  SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
+  ACCOUNTING: { bg: "#fffbeb", text: "#92400e", border: "#fde68a" },
+  PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  TEKNISI: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
+  PENGANTARAN: { bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
+  MARKETING: { bg: "#fdf2f8", text: "#9d174d", border: "#fbcfe8" },
+  KEBERSIHAN: { bg: "#ecfeff", text: "#0e7490", border: "#a5f3fc" },
+  PENYEDIA_BARANG: { bg: "#fefce8", text: "#854d0e", border: "#fef08a" },
+  KEPALA_PENYEDIA_BARANG: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
+  KONTEN: { bg: "#fdf4ff", text: "#86198f", border: "#f0abfc" },
+  KEPALA_ONPOINT: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
+  ONPOINT: { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
+  KEPALA_SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
+  PKL: { bg: "#f8fafc", text: "#475569", border: "#cbd5e1" },
+  CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
 };
 
-// Accent color for stat cards left border
-const STAT_ACCENT: Record<string, string> = {
-  "Total User": "border-l-slate-400",
-  "Akses Penuh": "border-l-violet-400",
-  "Wajah Terdaftar": "border-l-emerald-400",
-  "Belum Set PW": "border-l-amber-400",
+const ROLE_AVATAR_COLOR: Record<string, string> = {
+  ADMIN: "#7c3aed", PROGRAMMER: "#4f46e5", ASISTEN_CEO: "#9333ea",
+  KEPALA_SALES: "#059669", KEPALA_MARKETING: "#e11d48", KEPALA_TEKNISI: "#dc2626",
+  CREW_SALES: "#0284c7", SOTECH: "#65a30d", ACCOUNTING: "#d97706",
+  PENGELOLA_BARANG: "#2563eb", TEKNISI: "#ea580c", PENGANTARAN: "#0d9488",
+  MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
+  PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
+  KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
+  KEPALA_SOTECH: "#4d7c0f", PKL: "#475569", CUSTOMER_SERVICE: "#0369a1",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -98,22 +101,30 @@ const KEPALA_ROLES = new Set([
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
 ]);
 
+function getInitials(name: string) {
+  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+function getAvatarColor(role: string) {
+  return ROLE_AVATAR_COLOR[role] ?? "#6b7280";
+}
+
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium flex items-center gap-3 animate-slideIn border ${
-      type === "ok"
-        ? "bg-white text-gray-700 border-gray-200"
-        : "bg-white text-red-600 border-red-200"
-    }`}>
+    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok"
+        ? "bg-white text-slate-700 border border-slate-100"
+        : "bg-white text-red-600 border border-red-100"
+      }`}
+      style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}>
       {type === "ok"
-        ? <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
-        : <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </div>
+        ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0" style={{ boxShadow: "0 2px 8px rgba(16,185,129,0.35)" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
+        : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0" style={{ boxShadow: "0 2px 8px rgba(239,68,68,0.35)" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
       }
       {msg}
     </div>
@@ -126,7 +137,8 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition"
+      className="w-full h-10 border rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 transition"
+      style={{ borderColor: "#e2e8f0" }}
     >
       <optgroup label="— Akses Penuh —">
         {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
@@ -163,6 +175,77 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+// ── Modal Shell ───────────────────────────────────────────────────────────────
+function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn"
+        style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.2)" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Header ──────────────────────────────────────────────────────────────
+function ModalHeader({ title, subtitle, icon, onClose }: {
+  title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
+}) {
+  return (
+    <div className="relative px-6 py-5 flex items-center justify-between overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%)",
+      }} />
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
+        backgroundSize: "24px 24px",
+      }} />
+      <div className="flex items-center gap-3 z-10">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
+          {icon}
+        </div>
+        <div>
+          <p className="font-bold text-white text-sm tracking-tight">{title}</p>
+          <p className="text-[10.5px] mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
+        </div>
+      </div>
+      <button onClick={onClose}
+        className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10"
+        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+      {/* Accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
+    </div>
+  );
+}
+
+// ── Field ────────────────────────────────────────────────────────────────────
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-[10.5px] font-bold mb-1.5 block uppercase tracking-widest" style={{ color: "#94a3b8" }}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className="w-full h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2"
+      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
+    />
+  );
+}
+
 // ── CreateUserModal ────────────────────────────────────────────────────────────
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
@@ -189,90 +272,90 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-bold text-white text-sm">Tambah User Baru</p>
-              <p className="text-xs text-slate-400 mt-0.5">Admin membuat akun, user set password sendiri</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/20 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
+    <ModalShell onClose={onClose}>
+      <ModalHeader
+        title="Tambah User Baru"
+        subtitle="Admin membuat akun, user set password sendiri"
+        onClose={onClose}
+        icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
+      />
 
-        <div className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {error}
+      <div className="p-6 space-y-4">
+        {error && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
+            style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {error}
+          </div>
+        )}
+        <Field label="Nama Lengkap">
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
+        </Field>
+        <Field label="Nomor WhatsApp">
+          <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
+          <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
+        </Field>
+        <Field label="Role">
+          <RoleSelect value={role} onChange={setRole} />
+          {FULL_ACCESS_ROLES.has(role) && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
+              ⚠️ Role ini memiliki akses penuh ke semua fitur
             </div>
           )}
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nama Lengkap</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso"
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e]/30 transition" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nomor WhatsApp</label>
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789"
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e]/30 transition" />
-            <p className="text-[10px] text-gray-400 mt-1.5">Digunakan sebagai username login</p>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Role</label>
-            <RoleSelect value={role} onChange={setRole} />
-            {FULL_ACCESS_ROLES.has(role) && (
-              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1 bg-violet-50 px-2.5 py-1.5 rounded-lg border border-violet-100">
-                ⚠️ Role ini memiliki akses penuh ke semua fitur
-              </p>
-            )}
-            {role === "PKL" && (
-              <p className="text-[10px] text-slate-600 mt-1.5 flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                🎓 Akses terbatas: lihat laptop, buat payment, scanner
-              </p>
-            )}
-            {role === "CUSTOMER_SERVICE" && (
-              <p className="text-[10px] text-sky-600 mt-1.5 flex items-center gap-1 bg-sky-50 px-2.5 py-1.5 rounded-lg border border-sky-100">
-                🎧 Akses layanan pelanggan — konfigurasi lanjut menyusul
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Shift Kerja</label>
-            <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setShift(s)}
-                  className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"}`}>
-                  {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
-                </button>
-              ))}
+          {role === "PKL" && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#475569" }}>
+              🎓 Akses terbatas: lihat laptop, buat payment, scanner
             </div>
-            <p className="text-[10px] text-gray-400 mt-1.5">{shift === "PAGI" ? "07.30 – 12.00 WIB" : "14.00 – 18.00 WIB"}</p>
+          )}
+          {role === "CUSTOMER_SERVICE" && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+              style={{ background: "#f0f9ff", border: "1px solid #bae6fd", color: "#0369a1" }}>
+              🎧 Akses layanan pelanggan — konfigurasi lanjut menyusul
+            </div>
+          )}
+        </Field>
+        <Field label="Shift Kerja">
+          <div className="flex gap-2">
+            {(["PAGI", "SORE"] as const).map(s => (
+              <button key={s} type="button" onClick={() => setShift(s)}
+                className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all"
+                style={shift === s
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }
+                }>
+                {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
+              </button>
+            ))}
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
-            <p className="text-[11px] text-amber-700 font-semibold">ℹ️ Cara kerja</p>
-            <p className="text-[10px] text-amber-600 mt-1 leading-relaxed">Setelah akun dibuat, user login pertama kali dengan nomor WA ini. Sistem akan meminta mereka membuat password sendiri.</p>
-          </div>
-        </div>
-
-        <div className="px-6 pb-6 flex gap-3 border-t border-gray-100 pt-4">
-          <button onClick={onClose} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-          <button onClick={save} disabled={saving} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
-            {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Membuat...</> : "✅ Buat Akun"}
-          </button>
+          <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>{shift === "PAGI" ? "07.30 – 12.00 WIB" : "14.00 – 18.00 WIB"}</p>
+        </Field>
+        <div className="px-4 py-3.5 rounded-2xl"
+          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+          <p className="text-[11px] font-bold" style={{ color: "#92400e" }}>ℹ️ Cara kerja</p>
+          <p className="text-[10.5px] mt-1 leading-relaxed" style={{ color: "#a16207" }}>
+            Setelah akun dibuat, user login pertama kali dengan nomor WA ini. Sistem akan meminta mereka membuat password sendiri.
+          </p>
         </div>
       </div>
-    </div>
+
+      <div className="px-6 pb-6 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:scale-[1.01]"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          Batal
+        </button>
+        <button onClick={save} disabled={saving}
+          className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.01] disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          {saving
+            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
+            : "✅ Buat Akun"
+          }
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -300,77 +383,80 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white text-sm font-bold">
-              {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
-            </div>
-            <div>
-              <p className="font-bold text-white text-sm">Edit User</p>
-              <p className="text-xs text-slate-400 mt-0.5">{user.name}</p>
-            </div>
+    <ModalShell onClose={onClose}>
+      <ModalHeader
+        title="Edit User"
+        subtitle={user.name}
+        onClose={onClose}
+        icon={
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
+            style={{ background: `${getAvatarColor(user.role)}cc` }}>
+            {getInitials(user.name)}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/20 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
+        }
+      />
 
-        <div className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {error}
+      <div className="p-6 space-y-4">
+        {error && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
+            style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {error}
+          </div>
+        )}
+        <Field label="Nama">
+          <Input value={name} onChange={e => setName(e.target.value)} />
+        </Field>
+        <Field label="Nomor WhatsApp">
+          <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} />
+        </Field>
+        <Field label="Role">
+          <RoleSelect value={role} onChange={setRole} />
+          {FULL_ACCESS_ROLES.has(role) && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
+              ⚠️ Role ini memiliki akses penuh ke semua fitur
             </div>
           )}
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nama</label>
-            <input value={name} onChange={e => setName(e.target.value)}
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e]/30 transition" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nomor WhatsApp</label>
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-              className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e]/30 transition" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Role</label>
-            <RoleSelect value={role} onChange={setRole} />
-            {FULL_ACCESS_ROLES.has(role) && (
-              <p className="text-[10px] text-violet-600 mt-1.5 flex items-center gap-1 bg-violet-50 px-2.5 py-1.5 rounded-lg border border-violet-100">
-                ⚠️ Role ini memiliki akses penuh ke semua fitur
-              </p>
-            )}
-            {role === "PKL" && (
-              <p className="text-[10px] text-slate-600 mt-1.5 flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                🎓 Akses terbatas: lihat laptop, buat payment, scanner
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Shift</label>
-            <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setShift(s)}
-                  className={`flex-1 h-10 rounded-xl text-xs font-semibold border transition ${shift === s ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"}`}>
-                  {s === "PAGI" ? "🌅" : "🌆"} {s}
-                </button>
-              ))}
+          {role === "PKL" && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#475569" }}>
+              🎓 Akses terbatas: lihat laptop, buat payment, scanner
             </div>
+          )}
+        </Field>
+        <Field label="Shift">
+          <div className="flex gap-2">
+            {(["PAGI", "SORE"] as const).map(s => (
+              <button key={s} type="button" onClick={() => setShift(s)}
+                className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all"
+                style={shift === s
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }
+                }>
+                {s === "PAGI" ? "🌅" : "🌆"} {s}
+              </button>
+            ))}
           </div>
-        </div>
-
-        <div className="px-6 pb-6 flex gap-3 border-t border-gray-100 pt-4">
-          <button onClick={onClose} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-          <button onClick={save} disabled={saving} className="flex-1 h-10 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
-            {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan Perubahan"}
-          </button>
-        </div>
+        </Field>
       </div>
-    </div>
+
+      <div className="px-6 pb-6 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
+        <button onClick={onClose}
+          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          Batal
+        </button>
+        <button onClick={save} disabled={saving}
+          className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          {saving
+            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
+            : "💾 Simpan Perubahan"
+          }
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -380,27 +466,41 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-scaleIn">
-        <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">🚪</span>
+      <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.2)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl"
+          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+          🚪
         </div>
-        <h3 className="font-bold text-gray-800 text-center text-base mb-1">Paksa Logout {user.name}?</h3>
-        <p className="text-sm text-gray-500 text-center mb-1">Session aktif user ini akan diakhiri.</p>
-        <p className="text-[11px] text-gray-400 text-center mb-5">User akan di-redirect ke halaman login saat membuka/reload halaman.</p>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${FULL_ACCESS_ROLES.has(user.role) ? "bg-violet-600" : "bg-[#1a1a2e]"}`}>
-            {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+        <h3 className="font-black text-slate-800 text-center text-base mb-1.5">Paksa Logout {user.name}?</h3>
+        <p className="text-sm text-slate-500 text-center mb-1">Session aktif user ini akan diakhiri.</p>
+        <p className="text-[11px] text-slate-400 text-center mb-5">User akan di-redirect ke halaman login saat membuka atau reload halaman.</p>
+
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-5"
+          style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black flex-shrink-0"
+            style={{ background: getAvatarColor(user.role), boxShadow: `0 2px 8px ${getAvatarColor(user.role)}55` }}>
+            {getInitials(user.name)}
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-800">{user.name}</p>
-            <p className="text-[11px] text-gray-400">{ROLE_LABEL[user.role] ?? user.role} · {user.shift}</p>
+            <p className="text-sm font-bold text-slate-800">{user.name}</p>
+            <p className="text-[11px] text-slate-400">{ROLE_LABEL[user.role] ?? user.role} · {user.shift}</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
-          <button onClick={onConfirm} disabled={loading} className="flex-1 h-10 bg-orange-500 text-white rounded-xl text-sm font-semibold hover:bg-orange-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Proses...</> : "🚪 Ya, Logout"}
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.35)" }}>
+            {loading
+              ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Proses...</>
+              : "🚪 Ya, Logout"
+            }
           </button>
         </div>
       </div>
@@ -408,20 +508,39 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
-// ── ActionButton helper ────────────────────────────────────────────────────────
+// ── ActionButton ──────────────────────────────────────────────────────────────
 function ActionBtn({
-  onClick, title, colorClass, children,
+  onClick, title, bg, color, children,
 }: {
-  onClick: () => void; title: string; colorClass: string; children: React.ReactNode;
+  onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`w-8 h-8 flex items-center justify-center rounded-lg transition ${colorClass}`}
+      className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110"
+      style={{ background: bg, color: color }}
     >
       {children}
     </button>
+  );
+}
+
+// ── Stat Card ──────────────────────────────────────────────────────────────────
+function StatCard({ icon, value, label, sub, accent }: {
+  icon: string; value: number; label: string; sub: string; accent: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-4 relative overflow-hidden"
+      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
+      <div className="flex items-start justify-between mb-3 pl-2">
+        <span className="text-xl">{icon}</span>
+        <span className="text-2xl font-black" style={{ color: "#0f172a" }}>{value}</span>
+      </div>
+      <p className="text-[11px] font-bold pl-2" style={{ color: "#64748b" }}>{label}</p>
+      <p className="text-[10px] mt-0.5 pl-2" style={{ color: "#94a3b8" }}>{sub}</p>
+    </div>
   );
 }
 
@@ -538,18 +657,25 @@ export default function UsersPage() {
       {/* ── Modals ── */}
       {isAdmin && confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmReset(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-scaleIn">
-            <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">😶</span>
+          <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} onClick={() => setConfirmReset(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+            style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.2)" }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl"
+              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>
+              😶
             </div>
-            <h3 className="font-bold text-gray-800 text-center text-base mb-1">Reset Wajah {confirmReset.name}?</h3>
-            <p className="text-sm text-gray-500 text-center mb-5">User harus scan ulang wajah saat login berikutnya.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirmReset(null)} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
+            <h3 className="font-black text-slate-800 text-center text-base mb-1.5">Reset Wajah {confirmReset.name}?</h3>
+            <p className="text-sm text-slate-500 text-center mb-6">User harus scan ulang wajah saat login berikutnya.</p>
+            <div className="flex gap-2.5">
+              <button onClick={() => setConfirmReset(null)}
+                className="flex-1 h-10 rounded-xl text-sm font-semibold"
+                style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
               <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
-                className="flex-1 h-10 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                {resetting === confirmReset.id ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                className="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.35)" }}>
+                {resetting === confirmReset.id
+                  ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                  : null}
                 Ya, Reset
               </button>
             </div>
@@ -568,33 +694,33 @@ export default function UsersPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
 
-        {/* ── Header ── */}
+        {/* ── Page Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }}>
+                <svg className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Manajemen User</h1>
+              <div>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">Manajemen User</h1>
+                <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                  {isAdmin
+                    ? "Kelola akun, role, shift, dan wajah karyawan"
+                    : isKepala ? "Lihat detail dan chat dengan anggota tim"
+                      : "Lihat dan chat dengan rekan kerja"}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1.5 ml-10.5">
-              {isAdmin
-                ? "Kelola akun, role, shift, dan wajah karyawan"
-                : isKepala
-                  ? "Lihat detail dan chat dengan anggota tim"
-                  : "Lihat dan chat dengan rekan kerja"
-              }
-            </p>
           </div>
 
-          {/* Header Actions */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => { if (currentUserInfo) setShowGroupChat(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 active:scale-95 transition shadow-sm"
-            >
+              className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95"
+              style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
@@ -603,7 +729,8 @@ export default function UsersPage() {
             </button>
             {isAdmin && (
               <button onClick={() => setShowCreate(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] active:scale-95 transition shadow-sm">
+                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95"
+                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -613,24 +740,19 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* ── Stat Cards — admin only ── */}
+        {/* ── Stat Cards ── */}
         {!loading && isAdmin && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: "Total User", value: users.length, icon: "👥", color: "text-gray-800", sub: "terdaftar" },
-              { label: "Akses Penuh", value: fullAccess, icon: "🔑", color: "text-violet-700", sub: "admin & programmer" },
-              { label: "Wajah Terdaftar", value: enrolled, icon: "😊", color: "text-emerald-700", sub: "dari " + users.length + " user" },
-              { label: "Belum Set PW", value: pwNotSet, icon: "⚠️", color: pwNotSet > 0 ? "text-amber-700" : "text-gray-400", sub: pwNotSet > 0 ? "perlu perhatian" : "semua aman" },
-            ].map(c => (
-              <div key={c.label} className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 border-l-4 ${STAT_ACCENT[c.label]}`}>
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-xl">{c.icon}</span>
-                  <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
-                </div>
-                <p className="text-[11px] font-semibold text-gray-500">{c.label}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{c.sub}</p>
-              </div>
-            ))}
+            <StatCard icon="👥" value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+            <StatCard icon="🔑" value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
+            <StatCard icon="😊" value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
+            <StatCard
+              icon="⚠️"
+              value={pwNotSet}
+              label="Belum Set PW"
+              sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
+              accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"}
+            />
           </div>
         )}
 
@@ -639,13 +761,13 @@ export default function UsersPage() {
           {/* ── Left Column ── */}
           <div className="flex-1 min-w-0 space-y-3">
 
-            {/* Filter & Search Bar */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 pt-4 pb-3 space-y-3">
-                {/* Search + Sort */}
+            {/* Filter & Search */}
+            <div className="bg-white rounded-2xl overflow-hidden"
+              style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+              <div className="px-4 pt-4 pb-3.5 space-y-3">
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1 min-w-0">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
@@ -653,18 +775,19 @@ export default function UsersPage() {
                       placeholder="Cari nama atau nomor..."
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:bg-white transition"
+                      className="w-full h-9 rounded-xl pl-9 pr-3 text-xs font-medium focus:outline-none focus:ring-2 transition"
+                      style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
                     />
                     {search && (
-                      <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:scale-110">
+                        <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     )}
                   </div>
                   <button
                     onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                    className="h-9 px-3.5 rounded-xl text-[10px] font-bold bg-[#1a1a2e] text-white hover:bg-[#16213e] transition whitespace-nowrap flex-shrink-0 flex items-center gap-1.5"
-                  >
+                    className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white transition-all hover:scale-[1.02] flex-shrink-0 flex items-center gap-1.5"
+                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.3)" }}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortOrder === "asc" ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4" : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
                     </svg>
@@ -678,12 +801,11 @@ export default function UsersPage() {
                     <button
                       key={r}
                       onClick={() => setFilterRole(r)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex-shrink-0 border ${
-                        filterRole === r
-                          ? "bg-[#1a1a2e] text-white border-[#1a1a2e]"
-                          : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                      }`}
-                    >
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0"
+                      style={filterRole === r
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }
+                        : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
+                      }>
                       {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                     </button>
                   ))}
@@ -692,19 +814,22 @@ export default function UsersPage() {
             </div>
 
             {/* User List */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl overflow-hidden"
+              style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+
               {/* List Header */}
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full bg-[#1a1a2e]" />
-                  <p className="text-[11px] font-semibold text-gray-600">
+              <div className="px-5 py-3.5 flex items-center justify-between"
+                style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                  <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
                     {filtered.length === users.length
                       ? `${users.length} karyawan`
                       : `${filtered.length} dari ${users.length} karyawan`}
                   </p>
                 </div>
                 {isAdmin && (
-                  <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                  <div className="flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
                     <span className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full bg-emerald-400" />
                       Wajah terdaftar
@@ -717,199 +842,196 @@ export default function UsersPage() {
                 )}
               </div>
 
-              {/* Loading Skeleton */}
+              {/* Loading */}
               {loading ? (
-                <div className="divide-y divide-gray-100">
+                <div style={{ borderTop: "none" }}>
                   {Array(6).fill(0).map((_, i) => (
-                    <div key={i} className="px-4 py-3.5 flex items-center gap-3 animate-pulse">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0" />
+                    <div key={i} className="px-5 py-3.5 flex items-center gap-3 animate-pulse"
+                      style={{ borderBottom: "1px solid #f8f8fc" }}>
+                      <div className="w-11 h-11 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <div className="h-3 bg-gray-200 rounded-full w-28" />
-                          <div className="h-3 bg-gray-100 rounded-full w-16" />
+                          <div className="h-3 rounded-full w-28" style={{ background: "#e2e8f0" }} />
+                          <div className="h-3 rounded-full w-16" style={{ background: "#f1f5f9" }} />
                         </div>
-                        <div className="h-2.5 bg-gray-100 rounded-full w-32" />
+                        <div className="h-2.5 rounded-full w-36" style={{ background: "#f1f5f9" }} />
                       </div>
                     </div>
                   ))}
                 </div>
 
               ) : filtered.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="text-center py-20">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                    style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
+                    <svg className="w-7 h-7" style={{ color: "#c7d2fe" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
-                  <p className="text-gray-500 text-sm font-medium">Tidak ada user ditemukan</p>
-                  <p className="text-gray-400 text-xs mt-1">Coba ubah filter atau kata kunci pencarian</p>
+                  <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
+                  <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
                   {(search || filterRole !== "Semua") && (
                     <button onClick={() => { setSearch(""); setFilterRole("Semua"); }}
-                      className="mt-3 text-xs text-[#1a1a2e] font-semibold underline underline-offset-2 hover:opacity-70 transition">
+                      className="mt-4 text-xs font-bold transition-all hover:opacity-70"
+                      style={{ color: "#6366f1" }}>
                       Reset filter
                     </button>
                   )}
                 </div>
 
               ) : (
-                <div className="divide-y divide-gray-50 overflow-y-auto max-h-[calc(100vh-340px)]">
-                  {filtered.map(user => (
-                    <div key={user.id} className="px-4 py-3 hover:bg-gray-50/70 transition group">
-                      <div className="flex items-center gap-3">
+                <div className="overflow-y-auto max-h-[calc(100vh-340px)]">
+                  {filtered.map(user => {
+                    const avatarColor = getAvatarColor(user.role);
+                    const badgeStyle = ROLE_BADGE_STYLE[user.role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+                    const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
 
-                        {/* Avatar */}
-                        <div className="relative flex-shrink-0">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm ${
-                            FULL_ACCESS_ROLES.has(user.role)
-                              ? "bg-gradient-to-br from-violet-500 to-purple-700"
-                              : (isAdmin && user.face_embedding)
-                                ? "bg-gradient-to-br from-[#1a1a2e] to-[#2d2d5e]"
-                                : "bg-gradient-to-br from-gray-400 to-gray-500"
-                          }`}>
-                            {user.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
-                          </div>
-                          {isAdmin && user.face_embedding && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-white flex items-center justify-center shadow-sm">
-                              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    return (
+                      <div key={user.id} className="px-5 py-3.5 transition-all group cursor-default hover:bg-slate-50/60"
+                        style={{ borderBottom: "1px solid #f5f5fb" }}>
+                        <div className="flex items-center gap-3">
+
+                          {/* Avatar */}
+                          <div className="relative flex-shrink-0">
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-xs font-black"
+                              style={{
+                                background: isFullAccess
+                                  ? `linear-gradient(135deg, #7c3aed, #6d28d9)`
+                                  : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
+                                boxShadow: `0 3px 10px ${avatarColor}40`,
+                              }}>
+                              {getInitials(user.name)}
                             </div>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm font-semibold text-gray-800 truncate leading-tight">{user.name}</span>
-
-                            {/* Role badge */}
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${ROLE_BADGE[user.role] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                              {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
-                            </span>
-
-                            {/* Shift — admin & kepala */}
-                            {(isAdmin || isKepala) && user.shift && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border flex-shrink-0 ${
-                                user.shift === "PAGI"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                                  : "bg-blue-50 text-blue-700 border-blue-200"
-                              }`}>
-                                {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
-                              </span>
-                            )}
-
-                            {/* Status badges — admin only */}
-                            {isAdmin && !user.password_set && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-600 border border-orange-200 font-semibold flex-shrink-0">
-                                🔑 Belum PW
-                              </span>
-                            )}
-                            {isAdmin && user.force_logout_at && (
-                              <span
-                                className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200 font-semibold flex-shrink-0"
-                                title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}
-                              >
-                                🚪 Forced Out
-                              </span>
+                            {isAdmin && user.face_embedding && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
+                                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                              </div>
                             )}
                           </div>
 
-                          {/* Phone — admin & kepala */}
-                          {(isAdmin || isKepala) && (
-                            <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-                              {user.phone_number
-                                ? <span className="flex items-center gap-1">
-                                    <svg className="w-2.5 h-2.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-bold truncate leading-tight" style={{ color: "#0f172a" }}>
+                                {user.name}
+                              </span>
+
+                              {/* Role badge */}
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                style={{ background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}` }}>
+                                {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
+                              </span>
+
+                              {/* Shift */}
+                              {(isAdmin || isKepala) && user.shift && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                  style={user.shift === "PAGI"
+                                    ? { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }
+                                    : { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }
+                                  }>
+                                  {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
+                                </span>
+                              )}
+
+                              {/* Belum PW */}
+                              {isAdmin && !user.password_set && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                  style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
+                                  🔑 Belum PW
+                                </span>
+                              )}
+                              {/* Force logout */}
+                              {isAdmin && user.force_logout_at && (
+                                <span
+                                  className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                  style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}
+                                  title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}>
+                                  🚪 Forced Out
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Phone */}
+                            {(isAdmin || isKepala) && (
+                              <p className="text-[11px] mt-0.5 truncate flex items-center gap-1" style={{ color: "#94a3b8" }}>
+                                {user.phone_number
+                                  ? <>
+                                    <svg className="w-2.5 h-2.5 flex-shrink-0" style={{ color: "#c7d2fe" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                     </svg>
-                                    {user.phone_number}
-                                  </span>
-                                : isAdmin
-                                  ? <span className="text-orange-400 italic">Nomor belum diset</span>
-                                  : null
-                              }
-                            </p>
-                          )}
+                                    <span className="font-medium">{user.phone_number}</span>
+                                  </>
+                                  : isAdmin ? <span className="italic text-orange-400">Nomor belum diset</span> : null
+                                }
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-150">
+
+                            {currentUserInfo && user.id !== currentUserInfo.id && (
+                              <ActionBtn
+                                onClick={() => openChat(user)}
+                                title={`Chat dengan ${user.name}`}
+                                bg="#eff6ff"
+                                color="#3b82f6">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                              </ActionBtn>
+                            )}
+                            {isAdmin && (
+                              <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </ActionBtn>
+                            )}
+                            {isAdmin && user.face_embedding && (
+                              <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                              </ActionBtn>
+                            )}
+                            {isAdmin && (
+                              <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                              </ActionBtn>
+                            )}
+                          </div>
+
                         </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
-
-                          {/* Chat — semua user kecuali diri sendiri */}
-                          {currentUserInfo && user.id !== currentUserInfo.id && (
-                            <ActionBtn
-                              onClick={() => openChat(user)}
-                              title={`Chat dengan ${user.name}`}
-                              colorClass="text-blue-400 hover:text-blue-600 hover:bg-blue-50"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                              </svg>
-                            </ActionBtn>
-                          )}
-
-                          {/* Edit — admin only */}
-                          {isAdmin && (
-                            <ActionBtn
-                              onClick={() => setEditUser(user)}
-                              title="Edit user"
-                              colorClass="text-gray-400 hover:text-gray-700 hover:bg-gray-100"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </ActionBtn>
-                          )}
-
-                          {/* Reset wajah — admin only */}
-                          {isAdmin && user.face_embedding && (
-                            <ActionBtn
-                              onClick={() => setConfirmReset(user)}
-                              title="Reset wajah"
-                              colorClass="text-red-400 hover:text-red-600 hover:bg-red-50"
-                            >
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                              </svg>
-                            </ActionBtn>
-                          )}
-
-                          {/* Paksa logout — admin only */}
-                          {isAdmin && (
-                            <ActionBtn
-                              onClick={() => setConfirmLogoutUser(user)}
-                              title={`Paksa logout ${user.name}`}
-                              colorClass="text-orange-400 hover:text-orange-600 hover:bg-orange-50"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                              </svg>
-                            </ActionBtn>
-                          )}
-                        </div>
-
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Right Column — admin & kepala ── */}
+          {/* ── Right Column ── */}
           {showOnlinePanel && (
             <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
               {isAdmin && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-blue-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg className="w-3.5 h-3.5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
+                  style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ background: "#dbeafe" }}>
+                    <svg className="w-4 h-4" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
-                    <p className="text-[11px] text-blue-600 mt-0.5 leading-relaxed">
+                    <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
+                    <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
                       Session diakhiri otomatis setiap 03:00 WIB. Gunakan tombol 🚪 untuk paksa logout manual.
                     </p>
                   </div>
@@ -925,15 +1047,17 @@ export default function UsersPage() {
           <div className="lg:hidden space-y-3">
             <OnlineUsersPanel />
             {isAdmin && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-blue-200 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3.5 h-3.5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
+                style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: "#dbeafe" }}>
+                  <svg className="w-3.5 h-3.5" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-blue-700">Auto-logout 03:00 WIB</p>
-                  <p className="text-[11px] text-blue-600 mt-0.5">Session diakhiri otomatis setiap 03:00 WIB. Gunakan 🚪 untuk paksa logout manual.</p>
+                  <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
+                  <p className="text-[10.5px] mt-0.5" style={{ color: "#3b82f6" }}>Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.</p>
                 </div>
               </div>
             )}

@@ -255,8 +255,8 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     return (
         <a href={url} target="_blank" rel="noopener noreferrer" download={name ?? ""}
             className={`flex items-center gap-3 px-3 py-2.5 no-underline transition-all hover:scale-[1.01] ${isMine
-                    ? "bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10"
-                    : "bg-white rounded-2xl border border-slate-100 hover:bg-slate-50"
+                ? "bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10"
+                : "bg-white rounded-2xl border border-slate-100 hover:bg-slate-50"
                 }`}
             style={{ maxWidth: 240 }}
             onClick={e => e.stopPropagation()}>
