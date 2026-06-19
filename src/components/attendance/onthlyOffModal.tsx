@@ -1,19 +1,14 @@
-// src/components/attendance/MonthlyOffModal.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type UserInfo = {
-  id: string;
-  name: string;
-  role: string;
-};
+type UserInfo = { id: string; name: string; role: string };
 
 type MonthlyOff = {
   id: string;
   user_id: string;
-  off_date: string;    // "YYYY-MM-DD"
+  off_date: string;
   year: number;
   month: number;
   notes: string | null;
@@ -21,10 +16,18 @@ type MonthlyOff = {
   users?: { id: string; name: string; role: string };
 };
 
+type DateOff = { id: string; user_id: string; off_date: string; notes?: string | null };
+type DateWork = { id: string; user_id: string; work_date: string; note?: string | null };
+
+type SwapMode = {
+  weeklyDate: string;  // tanggal mingguan asal yang diklik
+  dow: number;         // day-of-week aslinya
+};
+
 type Props = {
-  users: UserInfo[];           // bawahan yang boleh dikelola actor
+  users: UserInfo[];
   calYear: number;
-  calMonth: number;            // 0-based
+  calMonth: number;   // 0-based
   onClose: () => void;
   onSaved: () => void;
 };
@@ -32,14 +35,13 @@ type Props = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_OFF = 4;
 const MONTH_NAMES = [
-  "Januari","Februari","Maret","April","Mei","Juni",
-  "Juli","Agustus","September","Oktober","November","Desember",
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
-const DAY_SHORT = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
-const DAY_FULL  = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+const DAY_SHORT = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
-
 function initials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase();
 }
@@ -47,29 +49,44 @@ function initials(name: string) {
 // ─── MonthlyOffModal ──────────────────────────────────────────────────────────
 export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: Props) {
   const [selectedUserId, setSelectedUserId] = useState<string>(users[0]?.id ?? "");
-  const [monthlyOffs, setMonthlyOffs]       = useState<MonthlyOff[]>([]);
-  const [loading, setLoading]               = useState(false);
-  const [saving, setSaving]                 = useState<string | null>(null); // off_date yang sedang disimpan
-  const [deleting, setDeleting]             = useState<string | null>(null);
-  const [error, setError]                   = useState("");
-  const [noteInput, setNoteInput]           = useState("");
+  const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
+  const [weeklyOffs, setWeeklyOffs] = useState<{ user_id: string; day_of_week: number }[]>([]);
+  const [dateOffs, setDateOffs] = useState<DateOff[]>([]);
+  const [dateWorks, setDateWorks] = useState<DateWork[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [noteInput, setNoteInput] = useState("");
 
-  // Tahun & bulan API (1-based month)
-  const apiYear  = calYear;
+  // ── Swap mode state ────────────────────────────────────────────────────────
+  // null = mode normal; ada object = sedang pilih pengganti
+  const [swapMode, setSwapMode] = useState<SwapMode | null>(null);
+
+  const apiYear = calYear;
   const apiMonth = calMonth + 1;
 
-  // ── Fetch libur bulan ini untuk semua bawahan ─────────────────────────────
+  // ── Fetch semua data ───────────────────────────────────────────────────────
   const fetchOffs = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res  = await fetch(`/api/attendance/monthly-off?year=${apiYear}&month=${apiMonth}`);
-      const data = await res.json();
-      if (data.success) {
-        setMonthlyOffs(data.data ?? []);
-      } else {
-        setError(data.message ?? "Gagal memuat data libur");
-      }
+      const [moRes, woRes, doRes, dwRes] = await Promise.all([
+        fetch(`/api/attendance/monthly-off?year=${apiYear}&month=${apiMonth}`),
+        fetch(`/api/attendance/day-off`),
+        fetch(`/api/attendance/date-off?year=${apiYear}&month=${apiMonth}`),
+        fetch(`/api/attendance/date-work?year=${apiYear}&month=${apiMonth}`),
+      ]);
+      const [moData, woData, doData, dwData] = await Promise.all([
+        moRes.json(), woRes.json(), doRes.json(), dwRes.json(),
+      ]);
+
+      if (moData.success) setMonthlyOffs(moData.data ?? []);
+      else setError(moData.message ?? "Gagal memuat data libur");
+
+      setWeeklyOffs(woData.success ? (woData.data ?? []) : []);
+      setDateOffs(doData.success ? (doData.data ?? []) : []);
+      setDateWorks(dwData.success ? (dwData.data ?? []) : []);
     } catch {
       setError("Gagal memuat data libur");
     } finally {
@@ -79,87 +96,198 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
 
   useEffect(() => { fetchOffs(); }, [fetchOffs]);
 
-  // ── Libur untuk user yang sedang dipilih ─────────────────────────────────
+  // Reset swap mode ketika ganti user
+  useEffect(() => { setSwapMode(null); setError(""); }, [selectedUserId]);
+
+  // ── Derived data untuk user yang dipilih ──────────────────────────────────
   const userOffs = useMemo(
     () => monthlyOffs.filter(o => o.user_id === selectedUserId),
     [monthlyOffs, selectedUserId]
   );
 
-  const usedCount      = userOffs.length;
+  const usedCount = userOffs.length;
   const remainingCount = MAX_OFF - usedCount;
-  const offDateSet     = useMemo(() => new Set(userOffs.map(o => o.off_date)), [userOffs]);
+  const offDateSet = useMemo(() => new Set(userOffs.map(o => o.off_date)), [userOffs]);
 
-  // ── Generate kalender ─────────────────────────────────────────────────────
+  // DOW yang libur mingguan untuk user ini
+  const refWeeklyDows = useMemo(
+    () => new Set(weeklyOffs.filter(w => w.user_id === selectedUserId).map(w => w.day_of_week)),
+    [weeklyOffs, selectedUserId]
+  );
+
+  // Tanggal yang sudah di-date_off (dari tukar libur lama, bukan monthly_off)
+  const refDateOffSet = useMemo(
+    () => new Set(dateOffs.filter(d => d.user_id === selectedUserId).map(d => d.off_date)),
+    [dateOffs, selectedUserId]
+  );
+
+  // Tanggal yang sudah di-override jadi hari kerja (date_work)
+  // → artinya libur mingguan di tanggal ini sudah "ditukar"
+  const dateWorkSet = useMemo(
+    () => new Set(dateWorks.filter(d => d.user_id === selectedUserId).map(d => d.work_date)),
+    [dateWorks, selectedUserId]
+  );
+
+  // Cari pasangan swap: dari note "[SWAP] Pengganti: YYYY-MM-DD" atau "[SWAP:YYYY-MM-DD]"
+  // Kita pakai note untuk resolve pasangan swap (no extra column needed)
+  const swapPairMap = useMemo(() => {
+    // Map: weekly_date → replacement_date
+    const map: Record<string, string> = {};
+    dateWorks
+      .filter(d => d.user_id === selectedUserId)
+      .forEach(dw => {
+        const note = dw.note ?? "";
+        // Format 1: "[SWAP] Pengganti: 2025-06-03"
+        const m1 = note.match(/\[SWAP\] Pengganti: (\d{4}-\d{2}-\d{2})/);
+        // Format 2: "[SWAP:2025-06-03]"
+        const m2 = note.match(/\[SWAP:(\d{4}-\d{2}-\d{2})\]/);
+        const replacementDate = m1?.[1] ?? m2?.[1];
+        if (replacementDate) {
+          map[dw.work_date] = replacementDate;
+        }
+      });
+    return map;
+  }, [dateWorks, selectedUserId]);
+
+  // ── Generate kalender ──────────────────────────────────────────────────────
   const calDays = useMemo(() => {
     const firstDow = new Date(calYear, calMonth, 1).getDay();
-    const dim      = new Date(calYear, calMonth + 1, 0).getDate();
+    const dim = new Date(calYear, calMonth + 1, 0).getDate();
     const cells: (number | null)[] = [];
     for (let i = 0; i < firstDow; i++) cells.push(null);
     for (let d = 1; d <= dim; d++) cells.push(d);
     return cells;
   }, [calYear, calMonth]);
 
-  const nowWIB      = new Date(Date.now() + 7 * 3600_000);
-  const isPastMonth = false; 
-  const todayStr    = nowWIB.toISOString().slice(0, 10);
+  const todayStr = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
 
-  // ── Toggle tanggal ────────────────────────────────────────────────────────
-  const toggleDate = async (dateStr: string) => {
-    if (isPastMonth) return;
+  // ── Handler klik tanggal ───────────────────────────────────────────────────
+  const handleDateClick = async (dateStr: string, dow: number) => {
     if (saving || deleting) return;
-
     setError("");
 
-    if (offDateSet.has(dateStr)) {
-      // Hapus libur
-      const record = userOffs.find(o => o.off_date === dateStr);
-      if (!record) return;
-
-      setDeleting(dateStr);
-      try {
-        const res  = await fetch(`/api/attendance/monthly-off?id=${record.id}`, { method: "DELETE" });
-        const data = await res.json();
-        if (!data.success) {
-          setError(data.message ?? "Gagal menghapus libur");
-        } else {
-          await fetchOffs();
-          onSaved();
-        }
-      } catch {
-        setError("Gagal menghapus libur");
-      } finally {
-        setDeleting(null);
+    // ── Sedang dalam swap mode — pilih hari pengganti ────────────────────────
+    if (swapMode) {
+      // Batalkan jika klik tanggal yang sama dengan asal
+      if (dateStr === swapMode.weeklyDate) {
+        setSwapMode(null);
+        return;
       }
-    } else {
-      // Tambah libur
-      if (remainingCount <= 0) {
-        setError(`${selectedUser?.name ?? "User"} sudah memiliki ${MAX_OFF} hari libur bulan ini. Hapus salah satu untuk mengganti.`);
+      // Tidak bisa pilih hari yang sudah libur (monthly, date_off, atau weekly tanpa date_work)
+      if (offDateSet.has(dateStr) || refDateOffSet.has(dateStr)) {
+        setError("Hari pengganti tidak boleh yang sudah terdaftar sebagai libur.");
+        return;
+      }
+      const isWeeklyNoWork = refWeeklyDows.has(dow) && !dateWorkSet.has(dateStr);
+      if (isWeeklyNoWork) {
+        setError("Hari pengganti tidak boleh hari libur mingguan lain.");
         return;
       }
 
       setSaving(dateStr);
       try {
-        const res  = await fetch("/api/attendance/monthly-off", {
+        const res = await fetch("/api/attendance/monthly-off", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            mode: "swap",
             user_id: selectedUserId,
-            off_date: dateStr,
+            weekly_date: swapMode.weeklyDate,
+            replacement_date: dateStr,
             notes: noteInput || null,
           }),
         });
         const data = await res.json();
         if (!data.success) {
-          setError(data.message ?? "Gagal menyimpan libur");
+          setError(data.message ?? "Gagal menyimpan tukar libur");
         } else {
+          setSwapMode(null);
+          setNoteInput("");
           await fetchOffs();
           onSaved();
         }
       } catch {
-        setError("Gagal menyimpan libur");
+        setError("Gagal menyimpan tukar libur");
       } finally {
         setSaving(null);
       }
+      return;
+    }
+
+    // ── Mode normal ──────────────────────────────────────────────────────────
+
+    // Klik hari mingguan yang sudah di-swap (date_work ada) → rollback swap
+    const isSwappedWeekly = refWeeklyDows.has(dow) && dateWorkSet.has(dateStr);
+    if (isSwappedWeekly) {
+      const replacementDate = swapPairMap[dateStr];
+      if (!replacementDate) {
+        setError("Tidak bisa menemukan pasangan swap untuk di-undo. Cek data secara manual.");
+        return;
+      }
+      setDeleting(dateStr);
+      try {
+        const res = await fetch(
+          `/api/attendance/monthly-off?user_id=${selectedUserId}&weekly_date=${dateStr}&replacement_date=${replacementDate}`,
+          { method: "DELETE" }
+        );
+        const data = await res.json();
+        if (!data.success) setError(data.message ?? "Gagal membatalkan tukar libur");
+        else { await fetchOffs(); onSaved(); }
+      } catch {
+        setError("Gagal membatalkan tukar libur");
+      } finally {
+        setDeleting(null);
+      }
+      return;
+    }
+
+    // Klik hari mingguan yang belum ditukar → masuk swap mode
+    const isWeeklyUnswapped = refWeeklyDows.has(dow) && !dateWorkSet.has(dateStr);
+    if (isWeeklyUnswapped) {
+      setSwapMode({ weeklyDate: dateStr, dow });
+      return;
+    }
+
+    // Klik monthly_off yang sudah ada → hapus
+    if (offDateSet.has(dateStr)) {
+      const record = userOffs.find(o => o.off_date === dateStr);
+      if (!record) return;
+      setDeleting(dateStr);
+      try {
+        const res = await fetch(`/api/attendance/monthly-off?id=${record.id}`, { method: "DELETE" });
+        const data = await res.json();
+        if (!data.success) setError(data.message ?? "Gagal menghapus libur");
+        else { await fetchOffs(); onSaved(); }
+      } catch {
+        setError("Gagal menghapus libur");
+      } finally {
+        setDeleting(null);
+      }
+      return;
+    }
+
+    // Klik hari kosong → tambah monthly_off
+    if (remainingCount <= 0) {
+      setError(`${selectedUser?.name ?? "User"} sudah memiliki ${MAX_OFF} hari libur bulan ini.`);
+      return;
+    }
+    // Jangan tambah ke hari yang sudah date_off (tukar libur lama)
+    if (refDateOffSet.has(dateStr)) return;
+
+    setSaving(dateStr);
+    try {
+      const res = await fetch("/api/attendance/monthly-off", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: selectedUserId, off_date: dateStr, notes: noteInput || null }),
+      });
+      const data = await res.json();
+      if (!data.success) setError(data.message ?? "Gagal menyimpan libur");
+      else { setNoteInput(""); await fetchOffs(); onSaved(); }
+    } catch {
+      setError("Gagal menyimpan libur");
+    } finally {
+      setSaving(null);
     }
   };
 
@@ -171,12 +299,12 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
           <div>
             <p className="font-bold text-white text-base">📅 Atur Hari Libur</p>
             <p className="text-xs text-white/70 mt-1">
-              {MONTH_NAMES[calMonth]} {calYear} · Maksimal {MAX_OFF} hari libur per orang
+              {MONTH_NAMES[calMonth]} {calYear} · Maks. {MAX_OFF} hari libur per orang
             </p>
           </div>
           <button
@@ -201,33 +329,28 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
             ) : (
               <div className="flex flex-wrap gap-2">
                 {users.map(u => {
-                  const offs     = monthlyOffs.filter(o => o.user_id === u.id);
-                  const count    = offs.length;
+                  const count = monthlyOffs.filter(o => o.user_id === u.id).length;
                   const isActive = u.id === selectedUserId;
                   return (
                     <button
                       key={u.id}
                       onClick={() => { setSelectedUserId(u.id); setError(""); }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                        isActive
-                          ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${isActive
+                        ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
-                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${
-                        isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-                      }`}>
+                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        }`}>
                         {initials(u.name)}
                       </span>
                       <span>{u.name}</span>
-                      {/* Quota badge */}
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
-                        count >= MAX_OFF
-                          ? "bg-red-500 text-white"
-                          : count > 0
-                            ? (isActive ? "bg-white/30 text-white" : "bg-blue-100 text-blue-700")
-                            : (isActive ? "bg-white/20 text-white/60" : "bg-gray-100 text-gray-400")
-                      }`}>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${count >= MAX_OFF
+                        ? "bg-red-500 text-white"
+                        : count > 0
+                          ? (isActive ? "bg-white/30 text-white" : "bg-blue-100 text-blue-700")
+                          : (isActive ? "bg-white/20 text-white/60" : "bg-gray-100 text-gray-400")
+                        }`}>
                         {count}/{MAX_OFF}
                       </span>
                     </button>
@@ -237,23 +360,38 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
             )}
           </div>
 
-          {/* ── Error / Info ────────────────────────────────────────────────── */}
-          <div className="px-6 pt-4">
+          {/* ── Swap mode banner ──────────────────────────────────────────── */}
+          {swapMode && (
+            <div className="mx-6 mt-4 bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🔄</span>
+                <div>
+                  <p className="text-xs font-bold text-amber-800">Mode Tukar Libur Aktif</p>
+                  <p className="text-[11px] text-amber-600 mt-0.5">
+                    Dari: <span className="font-bold">{DAY_FULL[swapMode.dow]}, {new Date(swapMode.weeklyDate + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</span>
+                    {" "}→ Klik hari pengganti di kalender
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setSwapMode(null); setError(""); }}
+                className="text-amber-600 hover:text-amber-800 text-xs font-bold bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
+              >
+                Batal
+              </button>
+            </div>
+          )}
+
+          {/* ── Error ──────────────────────────────────────────────────────── */}
+          <div className="px-6 pt-3">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2 mb-3">
                 <span>⚠️</span>{error}
               </div>
             )}
-
-            {isPastMonth && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-4 py-3 rounded-xl flex items-center gap-2 mb-3">
-                <span>🔒</span>
-                <span>Bulan yang sudah lewat tidak bisa diedit. Libur hanya bisa diubah untuk bulan ini atau ke depan.</span>
-              </div>
-            )}
           </div>
 
-          {/* ── Kalender + Info ─────────────────────────────────────────────── */}
+          {/* ── Kalender ────────────────────────────────────────────────────── */}
           {selectedUser && (
             <div className="px-6 pb-5 flex-1">
 
@@ -268,50 +406,45 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                     <p className="text-[10px] text-gray-400">{selectedUser.role.replace(/_/g, " ")}</p>
                   </div>
                 </div>
-
-                {/* Quota bar */}
                 <div className="flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1">
                     {Array.from({ length: MAX_OFF }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-all ${
-                          i < usedCount
-                            ? "bg-red-500 border-red-500 text-white"
-                            : "bg-gray-100 border-gray-200 text-gray-300"
-                        }`}
+                        className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-all ${i < usedCount
+                          ? "bg-red-500 border-red-500 text-white"
+                          : "bg-gray-100 border-gray-200 text-gray-300"
+                          }`}
                       >
                         {i < usedCount ? "✕" : ""}
                       </div>
                     ))}
                   </div>
-                  <p className={`text-[10px] font-bold ${
-                    remainingCount === 0 ? "text-red-500" : remainingCount === 1 ? "text-amber-500" : "text-emerald-600"
-                  }`}>
-                    {remainingCount === 0
-                      ? "Kuota penuh"
-                      : `Sisa ${remainingCount} hari`}
+                  <p className={`text-[10px] font-bold ${remainingCount === 0 ? "text-red-500" : remainingCount === 1 ? "text-amber-500" : "text-emerald-600"
+                    }`}>
+                    {remainingCount === 0 ? "Kuota penuh" : `Sisa ${remainingCount} hari`}
                   </p>
                 </div>
               </div>
 
               {/* Catatan opsional */}
-              {!isPastMonth && (
-                <div className="mb-4">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                    Catatan <span className="text-gray-300 font-normal normal-case">(opsional, untuk libur baru)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={noteInput}
-                    onChange={e => setNoteInput(e.target.value)}
-                    placeholder="e.g. Libur lebaran, izin keluarga..."
-                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
-                  />
-                </div>
-              )}
+              <div className="mb-4">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  Catatan{" "}
+                  <span className="text-gray-300 font-normal normal-case">
+                    {swapMode ? "(opsional, untuk tukar libur ini)" : "(opsional, untuk libur baru)"}
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={noteInput}
+                  onChange={e => setNoteInput(e.target.value)}
+                  placeholder={swapMode ? "e.g. Izin keluarga..." : "e.g. Libur lebaran..."}
+                  className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all"
+                />
+              </div>
 
-              {/* Kalender */}
+              {/* Kalender grid */}
               {loading ? (
                 <div className="grid grid-cols-7 gap-1.5">
                   {Array(35).fill(0).map((_, i) => (
@@ -334,60 +467,98 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                     {calDays.map((day, idx) => {
                       if (day === null) return <div key={`e-${idx}`} />;
 
-                      const dk         = `${calYear}-${pad2(calMonth + 1)}-${pad2(day)}`;
-                      const isOff      = offDateSet.has(dk);
-                      const isToday    = dk === todayStr;
-                      const isSaving   = saving === dk;
-                      const isDeleting = deleting === dk;
-                      const isPast     = false; // tanggal lampau kini boleh di-set libur (pencatatan historis)
-                      const isBusy     = isSaving || isDeleting;
-                      // Tidak bisa tambah jika: kuota penuh DAN tanggal ini bukan libur
-                      const canAdd     = !isOff && remainingCount > 0 && !isPastMonth && !isPast;
-                      const canRemove  = isOff && !isPastMonth;
-                      const clickable  = (canAdd || canRemove) && !isBusy;
-
+                      const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(day)}`;
                       const dow = new Date(dk + "T12:00:00").getDay();
+
+                      const isOff = offDateSet.has(dk);
+                      const isDateOffRef = refDateOffSet.has(dk);
+                      const isWeeklyDay = refWeeklyDows.has(dow);
+                      const isSwapped = isWeeklyDay && dateWorkSet.has(dk);
+                      const isWeeklyActive = isWeeklyDay && !isSwapped;
+                      const isToday = dk === todayStr;
+                      const isBusy = saving === dk || deleting === dk;
+                      const isSwapSource = swapMode?.weeklyDate === dk;
+
+                      const isSwapTarget = swapMode !== null
+                        && dk !== swapMode.weeklyDate
+                        && !isOff
+                        && !isDateOffRef
+                        && !isWeeklyActive;
+                      const isReplacementOff = isDateOffRef
+                        && (dateOffs.find(d => d.user_id === selectedUserId && d.off_date === dk)?.notes ?? "").includes("[SWAP]");
+
+                      const clickable = !isBusy && (
+                        (isOff && !swapMode) ||
+                        (isSwapped && !swapMode) ||
+                        (isWeeklyActive && !swapMode) ||
+                        (swapMode !== null && isSwapTarget) ||
+                        (!swapMode && !isOff && !isWeeklyActive && !isDateOffRef && remainingCount > 0)
+                      );
+
 
                       return (
                         <button
                           key={day}
-                          onClick={() => clickable && toggleDate(dk)}
-                          disabled={!clickable}
+                          onClick={() => clickable && handleDateClick(dk, dow)}
+                          disabled={!clickable || isBusy}
                           title={
-                            isOff
-                              ? `Klik untuk hapus libur ${dk}`
-                              : isPast
-                                ? "Tidak bisa set libur untuk tanggal lampau"
-                                : isPastMonth
-                                  ? "Bulan sudah lewat"
-                                  : remainingCount <= 0
-                                    ? "Kuota libur sudah penuh"
-                                    : `Klik untuk set libur ${dk}`
+                            isBusy ? "Loading..."
+                              : isSwapSource ? "Tanggal asal tukar — klik Batal untuk membatalkan"
+                                : isSwapped ? `Sudah ditukar (klik untuk undo swap ke ${swapPairMap[dk] ?? "?"})`
+                                  : isWeeklyActive && !swapMode ? "Libur Mingguan — klik untuk tukar ke hari lain"
+                                    : isWeeklyActive && swapMode ? "Tidak bisa pilih hari libur mingguan sebagai pengganti"
+                                      : isOff ? `Klik untuk hapus libur ${dk}`
+                                        : isDateOffRef ? (isReplacementOff ? "Hari pengganti tukar libur (read-only)" : "Libur Tukar (dari menu lain) — read-only")
+                                          : swapMode ? `Klik untuk set sebagai hari pengganti`
+                                            : remainingCount <= 0 ? "Kuota libur penuh"
+                                              : `Klik untuk set libur ${dk}`
                           }
                           className={`
-                            relative flex flex-col items-center justify-center h-11 rounded-xl text-xs font-bold transition-all duration-200
-                            ${isBusy ? "opacity-50 cursor-wait" : ""}
-                            ${isOff
-                              ? "bg-red-500 text-white shadow-md scale-105 ring-2 ring-red-300"
-                              : isToday
-                                ? "bg-blue-50 text-blue-600 ring-1 ring-blue-200"
-                                : isPast || isPastMonth
-                                  ? "bg-gray-50 text-gray-200 cursor-not-allowed"
-                                  : !canAdd
-                                    ? "bg-gray-50 text-gray-300 cursor-not-allowed"
-                                    : dow === 0 || dow === 6
-                                      ? "bg-orange-50 text-orange-400 hover:bg-orange-100 hover:scale-105 cursor-pointer"
-                                      : "bg-white text-gray-700 border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 hover:scale-105 cursor-pointer"
+    relative flex flex-col items-center justify-center h-11 rounded-xl text-xs font-bold transition-all duration-200
+    ${isBusy ? "opacity-50 cursor-wait" : ""}
+    ${isSwapSource
+                              ? "bg-amber-400 text-white shadow-md scale-105 ring-2 ring-amber-300 animate-pulse cursor-default"
+                              : isSwapped
+                                ? "bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200 hover:scale-105 cursor-pointer"
+                                : isOff
+                                  ? "bg-red-500 text-white shadow-md scale-105 ring-2 ring-red-300 hover:bg-red-600 cursor-pointer"
+                                  : isReplacementOff
+                                    ? "bg-purple-100 text-purple-600 border border-purple-300 cursor-default"
+                                    : isDateOffRef
+                                      ? "bg-indigo-50 text-indigo-500 border border-indigo-200 cursor-default"
+                                      : isWeeklyActive
+                                        ? swapMode
+                                          // Saat swap mode, hari weekly lain tidak bisa dipilih → dim
+                                          ? "bg-indigo-50 text-indigo-300 border border-indigo-100 cursor-not-allowed opacity-40"
+                                          // Normal: weekly bisa diklik untuk swap
+                                          : "bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 hover:scale-105 cursor-pointer"
+                                        : swapMode && isSwapTarget
+                                          // Swap mode: highlight semua hari yang bisa jadi pengganti
+                                          ? dow === 0 || dow === 6
+                                            ? "bg-orange-50 text-orange-500 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 hover:scale-105 cursor-pointer ring-1 ring-amber-300"
+                                            : "bg-amber-50 text-gray-700 border border-amber-300 hover:bg-amber-100 hover:text-amber-800 hover:scale-105 cursor-pointer ring-1 ring-amber-300"
+                                          : isToday
+                                            ? "bg-blue-50 text-blue-600 ring-1 ring-blue-200 hover:bg-blue-100 hover:scale-105 cursor-pointer"
+                                            : !clickable
+                                              ? "bg-gray-50 text-gray-300 cursor-not-allowed"
+                                              : dow === 0 || dow === 6
+                                                ? "bg-orange-50 text-orange-400 hover:bg-orange-100 hover:scale-105 cursor-pointer"
+                                                : "bg-white text-gray-700 border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 hover:scale-105 cursor-pointer"
                             }
-                          `}
+  `}
                         >
                           {isBusy ? (
                             <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <>
-                              <span className={isOff ? "text-white font-black" : ""}>{day}</span>
+                              <span className={isOff || isSwapSource ? "font-black" : ""}>{day}</span>
+                              {isSwapSource && <span className="text-[8px] mt-0.5 text-white/90 font-normal leading-none">asal</span>}
+                              {isSwapped && <span className="text-[8px] mt-0.5 text-emerald-500 font-normal leading-none">masuk</span>}
                               {isOff && <span className="text-[8px] mt-0.5 text-white/70 font-normal leading-none">libur</span>}
-                              {isToday && !isOff && (
+                              {isReplacementOff && <span className="text-[8px] mt-0.5 text-purple-500 font-normal leading-none">pengganti</span>}
+                              {isDateOffRef && !isReplacementOff && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none">tukar</span>}
+                              {isWeeklyActive && !swapMode && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none">↔ tukar?</span>}
+                              {isToday && !isOff && !isWeeklyActive && !isSwapSource && (
                                 <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
                               )}
                             </>
@@ -407,13 +578,10 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {[...userOffs].sort((a, b) => a.off_date.localeCompare(b.off_date)).map(o => {
-                      const d   = new Date(o.off_date + "T12:00:00");
+                      const d = new Date(o.off_date + "T12:00:00");
                       const dow = d.getDay();
                       return (
-                        <div
-                          key={o.id}
-                          className="inline-flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl pl-2.5 pr-3 py-2 shadow-sm"
-                        >
+                        <div key={o.id} className="inline-flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl pl-2.5 pr-3 py-2 shadow-sm">
                           <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
                             {pad2(d.getDate())}
                           </div>
@@ -421,20 +589,76 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                             <p className="text-[11px] font-bold text-gray-700">
                               {DAY_FULL[dow]}, {d.toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
                             </p>
-                            {o.notes && (
-                              <p className="text-[9px] text-gray-400 truncate max-w-[120px]">{o.notes}</p>
-                            )}
+                            {o.notes && <p className="text-[9px] text-gray-400 truncate max-w-[120px]">{o.notes}</p>}
                           </div>
-                          {!isPastMonth && (
-                            <button
-                              onClick={() => toggleDate(o.off_date)}
-                              disabled={!!deleting || !!saving}
-                              className="w-5 h-5 flex items-center justify-center rounded-full text-red-400 hover:bg-red-200 hover:text-red-700 transition-all text-xs font-black disabled:opacity-40"
-                              title="Hapus hari libur ini"
-                            >
-                              ×
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDateClick(o.off_date, dow)}
+                            disabled={!!deleting || !!saving}
+                            className="w-5 h-5 flex items-center justify-center rounded-full text-red-400 hover:bg-red-200 hover:text-red-700 transition-all text-xs font-black disabled:opacity-40"
+                            title="Hapus hari libur ini"
+                          >×</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Daftar swap aktif */}
+              {Object.keys(swapPairMap).length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">
+                    Tukar Libur Aktif ({Object.keys(swapPairMap).length})
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {Object.entries(swapPairMap).map(([weeklyDate, replacementDate]) => {
+                      const wd = new Date(weeklyDate + "T12:00:00");
+                      const rd = new Date(replacementDate + "T12:00:00");
+                      return (
+                        <div key={weeklyDate} className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 shadow-sm">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-[10px] font-black flex-shrink-0">
+                              {pad2(wd.getDate())}
+                            </div>
+                            <div className="text-[11px] leading-tight min-w-0">
+                              <p className="font-bold text-gray-500 line-through truncate">
+                                {DAY_FULL[wd.getDay()]}, {wd.toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
+                              </p>
+                              <p className="text-[9px] text-gray-400">masuk (libur dialihkan)</p>
+                            </div>
+                            <span className="text-gray-300 font-bold mx-1">→</span>
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
+                              {pad2(rd.getDate())}
+                            </div>
+                            <div className="text-[11px] leading-tight min-w-0">
+                              <p className="font-bold text-gray-700 truncate">
+                                {DAY_FULL[rd.getDay()]}, {rd.toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
+                              </p>
+                              <p className="text-[9px] text-gray-400">hari libur pengganti</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              setDeleting(weeklyDate);
+                              setError("");
+                              try {
+                                const res = await fetch(
+                                  `/api/attendance/monthly-off?user_id=${selectedUserId}&weekly_date=${weeklyDate}&replacement_date=${replacementDate}`,
+                                  { method: "DELETE" }
+                                );
+                                const data = await res.json();
+                                if (!data.success) setError(data.message ?? "Gagal undo swap");
+                                else { await fetchOffs(); onSaved(); }
+                              } catch {
+                                setError("Gagal undo swap");
+                              } finally {
+                                setDeleting(null);
+                              }
+                            }}
+                            disabled={!!deleting || !!saving}
+                            className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-emerald-400 hover:bg-emerald-200 hover:text-emerald-700 transition-all text-sm font-black disabled:opacity-40 ml-1"
+                            title="Batalkan tukar libur ini"
+                          >×</button>
                         </div>
                       );
                     })}
@@ -445,17 +669,23 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
           )}
         </div>
 
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        {/* ── Footer ──────────────────────────────────────────────────────── */}
         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-white/95">
           <div className="flex items-center gap-4 flex-wrap text-[10px] text-gray-400 mb-3">
             <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-red-500 inline-block" /> Hari libur (klik untuk hapus)
+              <span className="w-4 h-4 rounded bg-red-500 inline-block" /> Hari libur
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-white border border-gray-200 inline-block" /> Hari kerja (klik untuk libur)
+              <span className="w-4 h-4 rounded bg-indigo-50 border border-indigo-200 inline-block" /> Libur mingguan (klik untuk tukar)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-orange-50 border border-orange-200 inline-block" /> Akhir pekan
+              <span className="w-4 h-4 rounded bg-emerald-100 border border-emerald-300 inline-block" /> Sudah ditukar → jadi masuk
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 rounded bg-purple-100 border border-purple-300 inline-block" /> Hari pengganti aktif
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 rounded bg-amber-400 inline-block" /> Sedang dipilih sebagai asal tukar
             </span>
           </div>
           <button

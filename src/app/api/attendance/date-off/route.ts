@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { isFullAccess, isDivisionHead, getSubordinateRoles, isSubordinate } from "@/lib/permissions";
+import { isFullAccess, isDivisionHead, getSubordinateRoles, isSubordinate, DIVISION_MAP  } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
+
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,63 +18,51 @@ export async function GET(request: Request) {
     const year = searchParams.get("year");
     const month = searchParams.get("month");
 
-    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
-
-    let q = supabase
-      .from("user_date_off")
-      .select("id, user_id, off_date, note, created_at")
-      .order("off_date", { ascending: true });
-
-    if (!canManage) {
-      // Karyawan biasa: hanya miliknya
-      q = q.eq("user_id", user.id);
-    } else if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
-      // Kepala divisi: hanya tampilkan data milik anggota divisinya
-      // Kita filter di aplikasi setelah join users
-    }
-    // Full access: tidak filter — ambil semua
+    let query = supabase
+      .from("user_date_work")
+      .select(`
+        id,
+        user_id,
+        work_date,
+        note,
+        created_at,
+        users!user_date_work_user_id_fkey (id, name, role)
+      `)
+      .order("work_date", { ascending: true });
 
     if (year && month) {
-      const paddedMonth = String(month).padStart(2, "0");
-      const from = `${year}-${paddedMonth}-01`;
-      const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      const to = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
-      q = q.gte("off_date", from).lte("off_date", to);
+      const y = parseInt(year);
+      const m = parseInt(month);
+      const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m, 0);
+      const lastDayStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+      query = query.gte("work_date", firstDay).lte("work_date", lastDayStr);
     }
 
-    const { data: dateOffData, error } = await q;
+    // ── FIXED: scope by role ──────────────────────────────────────────────────
+    if (isFullAccess(user.role)) {
+      // Bisa lihat semua — tidak perlu filter tambahan
+    } else if (isDivisionHead(user.role)) {
+      // Kepala divisi: lihat milik sendiri + bawahan
+      const subordinateRoles = DIVISION_MAP[user.role] ?? [];
+      const { data: subordinateUsers } = await supabase
+        .from("users")
+        .select("id")
+        .in("role", subordinateRoles as string[]);
+      const subordinateIds = (subordinateUsers ?? []).map((u: any) => u.id);
+      // Include diri sendiri juga
+      query = query.in("user_id", [user.id, ...subordinateIds]);
+    } else {
+      // User biasa: hanya milik sendiri
+      query = query.eq("user_id", user.id);
+    }
+
+    const { data, error } = await query;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-    if (!dateOffData || dateOffData.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    // Ambil user info
-    const userIds = [...new Set(dateOffData.map((d: any) => d.user_id))];
-    const { data: usersData } = await supabase
-      .from("users")
-      .select("id, name, role")
-      .in("id", userIds);
-
-    const usersMap: Record<string, { id: string; name: string; role: string }> = {};
-    (usersData || []).forEach((u: any) => { usersMap[u.id] = u; });
-
-    let combined = dateOffData.map((d: any) => ({
-      ...d,
-      users: usersMap[d.user_id] || null,
-    }));
-
-    // Untuk kepala divisi non-full-access: filter hanya anggota divisinya
-    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
-      const subordinateRoles = getSubordinateRoles(user.role);
-      combined = combined.filter((d: any) =>
-        d.users && subordinateRoles.includes(d.users.role)
-      );
-    }
-
-    return NextResponse.json({ success: true, data: combined });
-  } catch {
-    return NextResponse.json({ success: false }, { status: 500 });
+    return NextResponse.json({ success: true, data: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
 }
 
@@ -123,10 +112,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("user_date_off")
-      .upsert({
-        user_id,
-        off_date,
-        note: notes || null,
+      .upsert({ user_id, off_date, note: notes || null,
         created_by: user.id,
       }, { onConflict: "user_id,off_date" })
       .select()
