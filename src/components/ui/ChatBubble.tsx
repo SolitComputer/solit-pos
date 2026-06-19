@@ -58,7 +58,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ─── Logo Solit (dengan fallback initials) ────────────────────────────────────
+// ─── Logo Solit ────────────────────────────────────────────────────────────────
 function SolitLogo({ size = 38, radius = 12 }: { size?: number; radius?: number }) {
   const [imgError, setImgError] = useState(false);
   if (imgError) {
@@ -100,11 +100,12 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
   return (
     <div
       className="fixed inset-0 z-[99999] flex items-center justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+      style={{ backgroundColor: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)" }}
       onClick={onClose}
     >
       <button
-        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+        className="absolute top-5 right-5 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
+        style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
         onClick={onClose}
       >
         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,14 +113,16 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
         </svg>
       </button>
       {name && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-xs font-medium px-3 py-1.5 bg-black/40 rounded-full">
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 text-white/60 text-xs font-medium px-4 py-2"
+          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 100 }}>
           {name}
         </div>
       )}
       <img
         src={url}
         alt={name ?? "Foto"}
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+        className="max-w-[88vw] max-h-[88vh] object-contain shadow-2xl"
+        style={{ borderRadius: 20 }}
         onClick={e => e.stopPropagation()}
       />
       <a
@@ -127,7 +130,8 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
         download={name ?? "foto"}
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs rounded-full transition"
+        className="absolute bottom-7 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2.5 text-white text-xs font-semibold transition-all hover:scale-105"
+        style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 100 }}
         onClick={e => e.stopPropagation()}
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,14 +160,14 @@ function AttachmentDisplay({
     return (
       <>
         <div
-          className="cursor-pointer overflow-hidden"
+          className="cursor-pointer overflow-hidden transition-all hover:opacity-95 hover:scale-[1.01]"
           style={{ maxWidth: 180, borderRadius: 12 }}
           onClick={() => setLightbox(true)}
         >
           <img
             src={url}
             alt={name ?? "Foto"}
-            className="w-full object-cover hover:opacity-90 transition"
+            className="w-full object-cover"
             style={{ maxHeight: 180, borderRadius: 12 }}
             loading="lazy"
           />
@@ -180,17 +184,16 @@ function AttachmentDisplay({
       target="_blank"
       rel="noopener noreferrer"
       download={name ?? ""}
-      className={`flex items-center gap-2.5 px-2.5 py-2 no-underline transition ${
-        isMine
-          ? "bg-white/10 hover:bg-white/15 rounded-xl"
-          : "bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl"
-      }`}
+      className={`flex items-center gap-2.5 px-2.5 py-2 no-underline transition-all hover:scale-[1.01] ${isMine
+          ? "bg-white/10 hover:bg-white/15 rounded-xl border border-white/10"
+          : "bg-white rounded-xl border border-slate-100 hover:bg-slate-50"
+        }`}
       style={{ maxWidth: 200 }}
       onClick={e => e.stopPropagation()}
     >
-      <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8px] font-bold gap-0.5 ${
-        isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
-      }`}>
+      <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8px] font-black gap-0.5 ${isMine ? "bg-white/20 text-white" : "text-white"
+        }`}
+        style={!isMine ? { background: "linear-gradient(135deg, #4f46e5, #7c3aed)" } : undefined}>
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -198,16 +201,16 @@ function AttachmentDisplay({
         <span>{ext.slice(0, 4)}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-[10px] font-semibold truncate ${isMine ? "text-white" : "text-gray-800"}`}>
+        <p className={`text-[10px] font-semibold truncate ${isMine ? "text-white" : "text-slate-800"}`}>
           {name ?? "File"}
         </p>
         {size != null && (
-          <p className={`text-[9px] mt-0.5 ${isMine ? "text-white/50" : "text-gray-400"}`}>
+          <p className={`text-[9px] mt-0.5 ${isMine ? "text-white/50" : "text-slate-400"}`}>
             {formatFileSize(size)}
           </p>
         )}
       </div>
-      <svg className={`w-3.5 h-3.5 flex-shrink-0 ${isMine ? "text-white/60" : "text-gray-400"}`}
+      <svg className={`w-3.5 h-3.5 flex-shrink-0 ${isMine ? "text-white/50" : "text-slate-400"}`}
         fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
           d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -276,9 +279,10 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
   if (msg.is_deleted) {
     return (
       <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-        <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-400 text-[10px] italic"
-          style={{ borderRadius: 10 }}>
-          🚫 Pesan dihapus
+        <div className="px-3 py-1.5 text-slate-400 text-[10px] italic flex items-center gap-1.5"
+          style={{ background: "#f1f5f9", border: "1px solid #e8ecf0", borderRadius: 10 }}>
+          <span style={{ opacity: 0.6 }}>🚫</span>
+          <span>Pesan dihapus</span>
         </div>
       </div>
     );
@@ -292,15 +296,16 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
       className={`flex items-end gap-1.5 group ${isMine ? "justify-end" : "justify-start"}`}
       onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
     >
-      {/* Avatar mini kotak untuk pesan theirs */}
+      {/* Avatar for received messages */}
       {!isMine && (
         <div
-          className="flex items-center justify-center text-[7px] font-black text-white flex-shrink-0"
+          className="flex items-center justify-center text-[7.5px] font-black text-white flex-shrink-0"
           style={{
             width: 22, height: 22,
             borderRadius: 8,
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
             marginBottom: 2,
+            boxShadow: "0 2px 8px rgba(79,70,229,0.3)",
           }}
         >
           {getInitials(msg.sender_id)}
@@ -310,10 +315,15 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
       {/* Edit mode */}
       {isEditing ? (
         <div
-          className={`flex-1 max-w-[85%] px-3 py-2 ${
-            isMine ? "bg-[#1e1b4b]" : "bg-white border border-slate-200"
-          }`}
-          style={{ borderRadius: 14 }}
+          className={`flex-1 max-w-[85%] px-3.5 py-2.5`}
+          style={{
+            borderRadius: 14,
+            background: isMine
+              ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)"
+              : "#fff",
+            border: isMine ? "none" : "1px solid #e2e8f0",
+            boxShadow: isMine ? "0 4px 16px rgba(30,27,75,0.3)" : "0 2px 10px rgba(0,0,0,0.05)",
+          }}
         >
           <input
             ref={editRef}
@@ -321,29 +331,26 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
             onChange={e => setEditContent(e.target.value)}
             onKeyDown={handleEditKeyDown}
             maxLength={1000}
-            className={`w-full bg-transparent text-xs outline-none ${
-              isMine ? "text-white placeholder:text-white/40" : "text-gray-800"
-            }`}
+            className={`w-full bg-transparent text-xs outline-none font-medium ${isMine ? "text-white placeholder:text-white/40" : "text-slate-800"
+              }`}
           />
-          <div className="flex items-center justify-between mt-2 gap-2">
-            <span className={`text-[9px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
+          <div className="flex items-center justify-between mt-2.5 gap-2">
+            <span className={`text-[9px] ${isMine ? "text-white/35" : "text-slate-400"}`}>
               Enter simpan · Esc batal
             </span>
             <div className="flex gap-1.5">
               <button
                 onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                className={`text-[9px] px-2 py-1 transition ${
-                  isMine ? "text-white/60 hover:bg-white/10 rounded-lg" : "text-gray-500 hover:bg-gray-100 rounded-lg"
-                }`}
+                className={`text-[9px] px-2.5 py-1 transition font-medium rounded-lg ${isMine ? "text-white/60 hover:bg-white/10" : "text-slate-500 hover:bg-slate-100"
+                  }`}
               >
                 Batal
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={saving || !editContent.trim()}
-                className={`text-[9px] px-2 py-1 rounded-lg font-semibold transition disabled:opacity-40 ${
-                  isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
-                }`}
+                className={`text-[9px] px-3 py-1 rounded-lg font-bold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-indigo-600 text-white"
+                  }`}
               >
                 {saving ? "..." : "Simpan"}
               </button>
@@ -354,19 +361,17 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
         /* Normal bubble */
         <div className="relative">
           <div
-            className={`max-w-[220px] px-3 py-2 ${
-              isMine
-                ? "text-white"
-                : "bg-white text-gray-800 border border-slate-200"
-            }`}
+            className="max-w-[220px] px-3 py-2 transition-all"
             style={{
-              borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+              borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
               background: isMine
-                ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)"
-                : undefined,
+                ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)"
+                : "#fff",
+              border: isMine ? "none" : "1px solid #e8ecf0",
               boxShadow: isMine
-                ? "0 2px 12px rgba(30,27,75,0.35)"
-                : "0 1px 4px rgba(0,0,0,0.06)",
+                ? "0 4px 16px rgba(30,27,75,0.35)"
+                : "0 2px 10px rgba(0,0,0,0.05)",
+              color: isMine ? "#fff" : "#1e293b",
             }}
           >
             {/* Attachment */}
@@ -384,17 +389,17 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
 
             {/* Text */}
             {hasContent && (
-              <p className="text-xs leading-relaxed break-words">{msg.content}</p>
+              <p className="text-xs leading-relaxed break-words font-medium">{msg.content}</p>
             )}
 
             {/* Timestamp + status */}
-            <div className={`flex items-center justify-end gap-1 mt-1 ${
-              isMine ? "text-white/40" : "text-slate-400"
-            }`}>
-              {msg.edited_at && <span className="text-[9px] italic">diedit</span>}
+            <div className="flex items-center justify-end gap-1 mt-1.5"
+              style={{ color: isMine ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>
+              {msg.edited_at && <span className="text-[8.5px] italic">diedit ·</span>}
               <span className="text-[9px]">{formatTime(msg.created_at)}</span>
               {isMine && (
-                <span className={`text-[10px] ${msg.is_read ? "text-blue-300" : "text-white/40"}`}>
+                <span className="text-[10px]"
+                  style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
                   {msg.is_read ? "✓✓" : "✓"}
                 </span>
               )}
@@ -405,19 +410,18 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
           {showMenu && (
             <div
               ref={menuRef}
-              className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1 min-w-[135px] ${
-                isMine ? "right-0" : "left-0"
-              }`}
+              className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1.5 min-w-[145px] ${isMine ? "right-0" : "left-0"
+                }`}
               style={{
-                borderRadius: 16,
-                border: "0.5px solid #e2e8f0",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+                borderRadius: 18,
+                border: "1px solid #f0f0f5",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.05)",
               }}
             >
               {isMine && hasContent && (
                 <button
                   onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                  className="w-full text-left px-3.5 py-2 text-[11px] text-indigo-600 hover:bg-indigo-50 flex items-center gap-2.5 transition"
+                  className="w-full text-left px-4 py-2.5 text-[11px] text-indigo-600 hover:bg-indigo-50 flex items-center gap-2.5 transition font-semibold"
                 >
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -426,9 +430,12 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
                   Edit pesan
                 </button>
               )}
+              {isMine && hasContent && (
+                <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
+              )}
               <button
                 onClick={() => { onDelete(msg.id); setShowMenu(false); }}
-                className="w-full text-left px-3.5 py-2 text-[11px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition"
+                className="w-full text-left px-4 py-2.5 text-[11px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition font-semibold"
               >
                 <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -710,21 +717,23 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   if (minimized) {
     return (
       <div
-        className="flex items-center gap-2 text-white rounded-full px-2.5 py-2 cursor-pointer hover:scale-[1.03] transition-transform select-none"
+        className="flex items-center gap-2 text-white rounded-full px-2.5 py-1.5 cursor-pointer select-none transition-all hover:scale-[1.02]"
         style={{
-          background: "#0d0d1a",
-          minWidth: 155,
-          maxWidth: 220,
-          boxShadow: "0 6px 24px rgba(13,13,26,0.55), 0 2px 8px rgba(0,0,0,0.2)",
+          background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
+          minWidth: 160, maxWidth: 230,
+          boxShadow: "0 8px 28px rgba(13,13,26,0.5), 0 2px 8px rgba(0,0,0,0.2)",
+          border: "1px solid rgba(255,255,255,0.08)",
         }}
         onClick={() => { setMinimized(false); setUnread(0); }}
       >
-        {/* Logo Solit */}
+        {/* Logo */}
         <div className="relative flex-shrink-0">
-          <SolitLogo size={30} radius={10} />
+          <div style={{ borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+            <SolitLogo size={30} radius={10} />
+          </div>
           <div
-            className="absolute -bottom-px -right-px w-[9px] h-[9px] rounded-full bg-emerald-400"
-            style={{ border: "1.5px solid #0d0d1a" }}
+            className="absolute rounded-full bg-emerald-400"
+            style={{ bottom: -1, right: -1, width: 9, height: 9, border: "1.5px solid #0f0c29" }}
           />
         </div>
         <span className="text-[11px] font-bold truncate flex-1">{targetUser.name.split(" ")[0]}</span>
@@ -733,7 +742,9 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
             className="text-white text-[8px] font-black flex items-center justify-center flex-shrink-0"
             style={{
               minWidth: 18, height: 18, borderRadius: 9,
-              background: "#ef4444", padding: "0 4px",
+              background: "linear-gradient(135deg, #ef4444, #dc2626)",
+              padding: "0 4px",
+              boxShadow: "0 2px 8px rgba(239,68,68,0.4)",
             }}
           >
             {unread > 9 ? "9+" : unread}
@@ -741,7 +752,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         )}
         <button
           onClick={e => { e.stopPropagation(); onClose(); }}
-          className="w-5 h-5 flex items-center justify-center text-white/40 hover:text-white transition flex-shrink-0"
+          className="w-5 h-5 flex items-center justify-center transition-all hover:scale-110"
+          style={{ color: "rgba(255,255,255,0.4)" }}
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -756,60 +768,48 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     <div
       className="flex flex-col overflow-hidden"
       style={{
-        width: 300,
-        height: preview ? 460 : 400,
-        borderRadius: "20px 20px 0 0",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.1)",
-        background: "#f8fafc",
+        width: 310,
+        height: preview ? 475 : 415,
+        borderRadius: "22px 22px 0 0",
+        boxShadow: "0 24px 72px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
+        background: "#f7f8fc",
+        border: "1px solid rgba(255,255,255,0.9)",
+        borderBottom: "none",
+        transition: "height 0.2s ease",
       }}
     >
       {/* ── Header ── */}
       <div
-        className="px-3 py-2.5 flex items-center gap-2.5 flex-shrink-0 cursor-pointer relative overflow-hidden"
-        style={{ background: "#0d0d1a" }}
+        className="px-3.5 py-3 flex items-center gap-2.5 flex-shrink-0 cursor-pointer relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}
         onClick={() => setMinimized(true)}
       >
-        {/* Subtle decorative orbs */}
-        <div
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            top: -24, right: -24, width: 80, height: 80,
-            background: "rgba(99,102,241,0.08)",
-          }}
-        />
-        <div
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            bottom: -28, left: 32, width: 72, height: 72,
-            background: "rgba(139,92,246,0.05)",
-          }}
-        />
+        {/* Background decorations */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 15% 80%, rgba(139,92,246,0.08) 0%, transparent 50%)",
+        }} />
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }} />
 
-        {/* Logo Solit */}
+        {/* Logo */}
         <div className="relative flex-shrink-0 z-10">
-          <div style={{ borderRadius: 12, border: "2px solid rgba(255,255,255,0.12)", overflow: "hidden" }}>
-            <SolitLogo size={38} radius={10} />
+          <div style={{ borderRadius: 13, border: "2px solid rgba(255,255,255,0.12)", overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+            <SolitLogo size={38} radius={11} />
           </div>
-          {/* Online dot */}
           <div
             className="absolute rounded-full bg-emerald-400"
-            style={{
-              bottom: -1, right: -1,
-              width: 11, height: 11,
-              border: "2px solid #0d0d1a",
-            }}
+            style={{ bottom: -1, right: -1, width: 11, height: 11, border: "2px solid #0f0c29" }}
           />
         </div>
 
         <div className="flex-1 min-w-0 z-10">
-          <p className="text-[12px] font-bold text-white truncate tracking-tight">{targetUser.name}</p>
-          <p className="flex items-center gap-1 mt-0.5">
-            <span
-              className="rounded-full bg-emerald-400"
-              style={{ width: 5, height: 5, display: "inline-block" }}
-            />
-            <span className="text-[9.5px] text-white/45 truncate">
-              {ROLE_LABEL[targetUser.role] ?? targetUser.role} · Online
+          <p className="text-[12.5px] font-bold text-white truncate tracking-tight">{targetUser.name}</p>
+          <p className="flex items-center gap-1.5 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+            <span className="text-[9.5px] truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
+              {ROLE_LABEL[targetUser.role] ?? targetUser.role}
             </span>
           </p>
         </div>
@@ -817,7 +817,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         <div className="flex items-center gap-1 flex-shrink-0 z-10">
           <button
             onClick={e => { e.stopPropagation(); setMinimized(true); }}
-            className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition"
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition-all hover:scale-110"
+            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.45)" }}
             title="Kecilkan"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -826,7 +827,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           </button>
           <button
             onClick={e => { e.stopPropagation(); onClose(); }}
-            className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition"
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition-all hover:scale-110"
+            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.45)" }}
             title="Tutup"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -836,21 +838,21 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         </div>
       </div>
 
-      {/* ── Thin accent line bawah header ── */}
-      <div style={{ height: 1, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, transparent 100%)", opacity: 0.5 }} />
+      {/* Accent line */}
+      <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
 
       {/* ── Messages ── */}
       <div
-        className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5"
-        style={{ background: "#f8fafc" }}
+        className="flex-1 overflow-y-auto px-3.5 py-3 space-y-1.5"
+        style={{ background: "#f7f8fc" }}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div
               className="rounded-full animate-spin"
               style={{
-                width: 20, height: 20,
-                border: "2.5px solid #e2e8f0",
+                width: 22, height: 22,
+                border: "2.5px solid #e8ecf5",
                 borderTopColor: "#6366f1",
               }}
             />
@@ -860,11 +862,11 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
             <div
               className="flex items-center justify-center"
               style={{
-                width: 52, height: 52, borderRadius: 16,
+                width: 56, height: 56, borderRadius: 18,
                 background: "#fff",
-                border: "0.5px solid #e2e8f0",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                fontSize: 24,
+                border: "1px solid #ebebf5",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                fontSize: 26,
               }}
             >
               💬
@@ -887,23 +889,24 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         <div ref={bottomRef} />
       </div>
 
-      {/* ── File preview sebelum kirim ── */}
+      {/* ── File preview ── */}
       {preview && (
-        <div className="flex-shrink-0 px-3 py-2.5 bg-white" style={{ borderTop: "0.5px solid #e2e8f0" }}>
-          <div className="flex items-center gap-2.5">
+        <div className="flex-shrink-0 px-3 py-2.5 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
+          <div className="flex items-center gap-2.5 p-2 rounded-2xl"
+            style={{ background: "#f5f7ff", border: "1px solid #e8ecff" }}>
             {preview.type === "image" ? (
               <img
                 src={preview.url}
                 alt="preview"
                 className="object-cover flex-shrink-0"
-                style={{ width: 44, height: 44, borderRadius: 10, border: "0.5px solid #e2e8f0" }}
+                style={{ width: 44, height: 44, borderRadius: 10, border: "1px solid #e0e0f5" }}
               />
             ) : (
               <div
                 className="flex flex-col items-center justify-center flex-shrink-0 gap-0.5"
                 style={{
                   width: 44, height: 44, borderRadius: 10,
-                  background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+                  background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
                 }}
               >
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -921,8 +924,8 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
             </div>
             <button
               onClick={cancelPreview}
-              className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
-              style={{ width: 22, height: 22, borderRadius: "50%", background: "#f1f5f9", border: "none" }}
+              className="flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
+              style={{ width: 22, height: 22, borderRadius: "50%", background: "#e2e8f0" }}
             >
               <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -934,19 +937,24 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
 
       {/* ── Input area ── */}
       <div
-        className="flex-shrink-0 flex items-center gap-1.5"
+        className="flex-shrink-0 flex items-center gap-2"
         style={{
-          padding: "8px 10px",
+          padding: "10px 12px",
           background: "#fff",
-          borderTop: "0.5px solid #e2e8f0",
+          borderTop: "1px solid #f0f0f8",
         }}
       >
         {/* Attach */}
         <button
           onClick={() => fileRef.current?.click()}
           disabled={isLoading}
-          className="flex items-center justify-center transition flex-shrink-0 disabled:opacity-40 hover:bg-slate-100"
-          style={{ width: 30, height: 30, borderRadius: 10, border: "none", background: "#f1f5f9", color: "#64748b" }}
+          className="flex items-center justify-center transition-all flex-shrink-0 disabled:opacity-40 hover:scale-110"
+          style={{
+            width: 32, height: 32, borderRadius: 10,
+            background: "#f0f2ff",
+            border: "1px solid #e0e4ff",
+            color: "#818cf8",
+          }}
           title="Lampirkan file / foto"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -964,14 +972,14 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           placeholder={preview ? "Caption (opsional)..." : "Tulis pesan..."}
           maxLength={1000}
           disabled={isLoading}
-          className="flex-1 outline-none transition disabled:opacity-50"
+          className="flex-1 outline-none font-medium disabled:opacity-50"
           style={{
-            height: 32,
+            height: 34,
             borderRadius: 20,
-            border: "0.5px solid #e2e8f0",
-            background: "#f8fafc",
-            padding: "0 12px",
-            fontSize: 11,
+            border: "1.5px solid #e8ecff",
+            background: "#f5f7ff",
+            padding: "0 13px",
+            fontSize: 11.5,
             color: "#334155",
           }}
         />
@@ -980,13 +988,13 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         <button
           onClick={preview ? sendAttachment : send}
           disabled={!canSend}
-          className="flex items-center justify-center text-white disabled:opacity-40 transition hover:scale-105 flex-shrink-0"
+          className="flex items-center justify-center text-white disabled:opacity-40 transition-all hover:scale-110 active:scale-95 flex-shrink-0"
           style={{
-            width: 32, height: 32, borderRadius: "50%", border: "none",
+            width: 34, height: 34, borderRadius: "50%",
             background: canSend
-              ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)"
-              : "#cbd5e1",
-            boxShadow: canSend ? "0 2px 10px rgba(30,27,75,0.4)" : "none",
+              ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
+              : "#e2e8f0",
+            boxShadow: canSend ? "0 3px 12px rgba(79,70,229,0.4)" : "none",
           }}
         >
           {isLoading ? (
@@ -1001,7 +1009,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
             />
           ) : (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           )}
         </button>

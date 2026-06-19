@@ -175,9 +175,10 @@ function Avatar({ name, role, size = 32 }: { name: string; role: string; size?: 
         <div style={{
             width: size, height: size,
             backgroundColor: getAvatarColor(role),
-            borderRadius: Math.round(size * 0.28),
+            borderRadius: Math.round(size * 0.35),
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "white", fontSize: size * 0.33, fontWeight: 700, flexShrink: 0,
+            color: "white", fontSize: size * 0.33, fontWeight: 800, flexShrink: 0,
+            boxShadow: `0 2px 8px ${getAvatarColor(role)}55`,
         }}>
             {getInitials(name)}
         </div>
@@ -194,25 +195,29 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
 
     return (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center"
-            style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+            style={{ backgroundColor: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)" }}
             onClick={onClose}>
             <button
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+                className="absolute top-5 right-5 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
                 onClick={onClose}>
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
             {name && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-xs font-medium px-3 py-1.5 bg-black/40 rounded-full">
+                <div className="absolute top-5 left-1/2 -translate-x-1/2 text-white/60 text-xs font-medium px-4 py-2"
+                    style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 100 }}>
                     {name}
                 </div>
             )}
             <img src={url} alt={name ?? "Foto"}
-                className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                className="max-w-[88vw] max-h-[88vh] object-contain shadow-2xl"
+                style={{ borderRadius: 20 }}
                 onClick={e => e.stopPropagation()} />
             <a href={url} download={name ?? "foto"} target="_blank" rel="noopener noreferrer"
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs rounded-full transition"
+                className="absolute bottom-7 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2.5 text-white text-xs font-semibold transition-all hover:scale-105"
+                style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 100 }}
                 onClick={e => e.stopPropagation()}>
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -233,12 +238,12 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     if (type === "image") {
         return (
             <>
-                <div className="cursor-pointer overflow-hidden"
-                    style={{ maxWidth: 240, borderRadius: 12 }}
+                <div className="cursor-pointer overflow-hidden transition-all hover:opacity-95 hover:scale-[1.01]"
+                    style={{ maxWidth: 240, borderRadius: 14 }}
                     onClick={() => setLightbox(true)}>
                     <img src={url} alt={name ?? "Foto"}
-                        className="w-full object-cover hover:opacity-90 transition"
-                        style={{ maxHeight: 220, borderRadius: 12 }}
+                        className="w-full object-cover"
+                        style={{ maxHeight: 220, borderRadius: 14 }}
                         loading="lazy" />
                 </div>
                 {lightbox && <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />}
@@ -249,16 +254,15 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     const ext = name?.split(".").pop()?.toUpperCase() ?? "FILE";
     return (
         <a href={url} target="_blank" rel="noopener noreferrer" download={name ?? ""}
-            className={`flex items-center gap-2.5 px-3 py-2.5 no-underline transition ${
-                isMine
-                    ? "bg-white/10 hover:bg-white/15 rounded-xl"
-                    : "bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl"
-            }`}
+            className={`flex items-center gap-3 px-3 py-2.5 no-underline transition-all hover:scale-[1.01] ${isMine
+                    ? "bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10"
+                    : "bg-white rounded-2xl border border-slate-100 hover:bg-slate-50"
+                }`}
             style={{ maxWidth: 240 }}
             onClick={e => e.stopPropagation()}>
-            <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${
-                isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
-            }`}>
+            <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8.5px] font-black gap-0.5 ${isMine ? "bg-white/20 text-white" : "text-white"
+                }`}
+                style={!isMine ? { background: "linear-gradient(135deg, #4f46e5, #7c3aed)" } : undefined}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -266,16 +270,16 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
                 <span>{ext.slice(0, 4)}</span>
             </div>
             <div className="flex-1 min-w-0">
-                <p className={`text-xs font-semibold truncate ${isMine ? "text-white" : "text-gray-800"}`}>
+                <p className={`text-xs font-semibold truncate ${isMine ? "text-white" : "text-slate-800"}`}>
                     {name ?? "File"}
                 </p>
                 {size != null && (
-                    <p className={`text-[10px] mt-0.5 ${isMine ? "text-white/50" : "text-gray-400"}`}>
+                    <p className={`text-[10px] mt-0.5 ${isMine ? "text-white/50" : "text-slate-400"}`}>
                         {formatFileSize(size)}
                     </p>
                 )}
             </div>
-            <svg className={`w-4 h-4 flex-shrink-0 ${isMine ? "text-white/60" : "text-gray-400"}`}
+            <svg className={`w-4 h-4 flex-shrink-0 ${isMine ? "text-white/50" : "text-slate-400"}`}
                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -359,9 +363,10 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                             {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
                         </span>
                     )}
-                    <div className="px-3 py-1.5 text-slate-400 text-xs italic"
-                        style={{ background: "#f1f5f9", border: "0.5px solid #e2e8f0", borderRadius: 10 }}>
-                        🚫 menghapus pesan ini
+                    <div className="px-3 py-2 text-slate-400 text-xs italic flex items-center gap-1.5"
+                        style={{ background: "#f1f5f9", border: "1px solid #e8ecf0", borderRadius: 12 }}>
+                        <span style={{ opacity: 0.6 }}>🚫</span>
+                        <span>Pesan dihapus</span>
                     </div>
                 </div>
             </div>
@@ -372,28 +377,31 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
     const hasContent = !!msg.content;
 
     return (
-        <div id={`msg-${msg.id}`} className={`flex gap-2 group ${isMine ? "justify-end" : "justify-start"}`}>
+        <div id={`msg-${msg.id}`} className={`flex gap-2.5 group ${isMine ? "justify-end" : "justify-start"}`}>
             {!isMine && (
                 <div className="flex-shrink-0 self-end mb-1">
                     <Avatar name={msg.sender_name} role={msg.sender_role} size={30} />
                 </div>
             )}
 
-            <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
-                {/* Sender label untuk theirs */}
+            <div className={`flex flex-col max-w-[70%] ${isMine ? "items-end" : "items-start"}`}>
+                {/* Sender label */}
                 {!isMine && (
-                    <span className="text-[9.5px] font-bold mb-1 px-1"
+                    <span className="text-[9.5px] font-bold mb-1.5 px-1 tracking-wide"
                         style={{ color: getAvatarColor(msg.sender_role) }}>
-                        {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
+                        {msg.sender_name}
+                        <span className="font-normal text-slate-400 ml-1">· {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}</span>
                     </span>
                 )}
 
                 <div className="relative">
                     {isEditing ? (
-                        <div className={`px-3 pt-2.5 pb-2 min-w-[200px] ${isMine ? "text-white" : "bg-white border border-slate-200 text-gray-800"}`}
+                        <div className={`px-3.5 pt-3 pb-2.5 min-w-[220px]`}
                             style={{
-                                borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
-                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : undefined,
+                                borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
+                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
+                                border: isMine ? "none" : "1px solid #e2e8f0",
+                                boxShadow: isMine ? "0 4px 20px rgba(30,27,75,0.35)" : "0 2px 12px rgba(0,0,0,0.06)",
                             }}>
                             <textarea
                                 ref={editRef}
@@ -406,29 +414,26 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
-                                    isMine ? "text-white placeholder:text-white/40" : "text-gray-800"
-                                }`}
+                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-slate-800"
+                                    }`}
                                 style={{ minHeight: 22 }}
                             />
-                            <div className="flex items-center justify-between mt-2 gap-2">
-                                <span className={`text-[9px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
+                            <div className="flex items-center justify-between mt-2.5 gap-2">
+                                <span className={`text-[9px] ${isMine ? "text-white/35" : "text-slate-400"}`}>
                                     Enter simpan · Esc batal
                                 </span>
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[9px] px-2 py-1 rounded-lg transition ${
-                                            isMine ? "text-white/60 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
-                                        }`}>
+                                        className={`text-[10px] px-2.5 py-1 rounded-lg transition font-medium ${isMine ? "text-white/60 hover:bg-white/10" : "text-slate-500 hover:bg-slate-100"
+                                            }`}>
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[9px] px-2.5 py-1 rounded-lg font-semibold transition disabled:opacity-40 ${
-                                            isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
-                                        }`}>
+                                        className={`text-[10px] px-3 py-1 rounded-lg font-bold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-indigo-600 text-white"
+                                            }`}>
                                         {saving ? "..." : "Simpan"}
                                     </button>
                                 </div>
@@ -436,32 +441,36 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                         </div>
                     ) : (
                         <div
-                            className={`relative px-3 py-2.5 cursor-pointer select-text ${
-                                isMine ? "text-white" : "bg-white text-gray-800 border border-slate-200"
-                            }`}
+                            className={`relative px-3.5 py-2.5 cursor-pointer select-text transition-all`}
                             style={{
-                                borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
-                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : undefined,
-                                boxShadow: isMine ? "0 2px 12px rgba(30,27,75,0.3)" : "0 1px 4px rgba(0,0,0,0.06)",
+                                borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
+                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
+                                border: isMine ? "none" : "1px solid #e8ecf0",
+                                boxShadow: isMine ? "0 4px 20px rgba(30,27,75,0.3)" : "0 2px 10px rgba(0,0,0,0.05)",
+                                color: isMine ? "#fff" : "#1e293b",
                             }}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
 
                             {/* Reply preview */}
                             {msg.reply_to && (
                                 <div
-                                    className={`mb-2 px-2.5 py-1.5 cursor-pointer text-[10px] border-l-2 ${
-                                        isMine
-                                            ? "bg-white/10 border-white/35 text-white/75"
-                                            : "bg-slate-50 border-indigo-300 text-slate-600"
-                                    }`}
-                                    style={{ borderRadius: 8 }}
+                                    className="mb-2.5 px-2.5 py-1.5 cursor-pointer text-[10px]"
+                                    style={{
+                                        borderRadius: 10,
+                                        borderLeft: `2.5px solid ${isMine ? "rgba(255,255,255,0.4)" : "#6366f1"}`,
+                                        background: isMine ? "rgba(255,255,255,0.08)" : "#f5f7ff",
+                                    }}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}>
-                                    <p className="font-bold truncate text-[9.5px]">{msg.reply_to.sender_name}</p>
-                                    <p className="truncate mt-0.5 opacity-75 text-[9px]">
+                                    <p className="font-bold truncate text-[9.5px]"
+                                        style={{ color: isMine ? "rgba(255,255,255,0.8)" : "#6366f1" }}>
+                                        {msg.reply_to.sender_name}
+                                    </p>
+                                    <p className="truncate mt-0.5 text-[9px]"
+                                        style={{ color: isMine ? "rgba(255,255,255,0.5)" : "#94a3b8" }}>
                                         {msg.reply_to.is_deleted ? "🚫 Pesan dihapus"
                                             : msg.reply_to.attachment_type === "image" ? "📷 Foto"
-                                            : msg.reply_to.attachment_type === "file" ? "📎 File"
-                                            : msg.reply_to.content}
+                                                : msg.reply_to.attachment_type === "file" ? "📎 File"
+                                                    : msg.reply_to.content}
                                     </p>
                                 </div>
                             )}
@@ -487,10 +496,9 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                             )}
 
                             {/* Timestamp */}
-                            <div className={`flex items-center justify-end gap-1 mt-1.5 ${
-                                isMine ? "text-white/40" : "text-slate-400"
-                            }`}>
-                                {msg.edited_at && <span className="text-[9px] italic">diedit</span>}
+                            <div className="flex items-center justify-end gap-1 mt-1.5"
+                                style={{ color: isMine ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>
+                                {msg.edited_at && <span className="text-[9px] italic">diedit ·</span>}
                                 <span className="text-[9.5px]">{formatTime(msg.created_at)}</span>
                             </div>
                         </div>
@@ -500,44 +508,49 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                     {showMenu && !isEditing && (
                         <div
                             ref={menuRef}
-                            className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1 min-w-[145px] ${
-                                isMine ? "right-0" : "left-0"
-                            }`}
+                            className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1.5 min-w-[155px] ${isMine ? "right-0" : "left-0"
+                                }`}
                             style={{
-                                borderRadius: 16,
-                                border: "0.5px solid #e2e8f0",
-                                boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+                                borderRadius: 18,
+                                border: "1px solid #f0f0f5",
+                                boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
                             }}>
                             <button
                                 onClick={() => { onReply(msg); setShowMenu(false); }}
-                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition">
-                                <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition font-medium">
+                                <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                 </svg>
                                 Balas
                             </button>
                             {isMine && hasContent && (
-                                <button
-                                    onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-2.5 transition">
-                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                    Edit pesan
-                                </button>
+                                <>
+                                    <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
+                                    <button
+                                        onClick={() => { setIsEditing(true); setShowMenu(false); }}
+                                        className="w-full text-left px-4 py-2.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-3 transition font-medium">
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit pesan
+                                    </button>
+                                </>
                             )}
                             {(isMine || isAdmin) && (
-                                <button
-                                    onClick={() => { onDelete(msg.id); setShowMenu(false); }}
-                                    className="w-full text-left px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition">
-                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    Hapus pesan
-                                </button>
+                                <>
+                                    <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
+                                    <button
+                                        onClick={() => { onDelete(msg.id); setShowMenu(false); }}
+                                        className="w-full text-left px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-3 transition font-medium">
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Hapus pesan
+                                    </button>
+                                </>
                             )}
                         </div>
                     )}
@@ -546,13 +559,13 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
 
             {/* Quick reply button on hover */}
             {!isEditing && (
-                <div className={`opacity-0 group-hover:opacity-100 flex items-center self-end mb-1 transition-opacity ${isMine ? "order-first" : ""}`}>
+                <div className={`opacity-0 group-hover:opacity-100 flex items-center self-end mb-1 transition-all duration-150 ${isMine ? "order-first" : ""}`}>
                     <button
                         onClick={() => onReply(msg)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center transition hover:scale-110"
-                        style={{ background: "#fff", border: "0.5px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
+                        className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:bg-indigo-50"
+                        style={{ background: "#fff", border: "1px solid #e8ecf0", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
                         title="Balas">
-                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                         </svg>
@@ -584,31 +597,30 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
     if (totalItems === 0) return null;
 
     return (
-        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white overflow-hidden z-50"
+        <div className="absolute bottom-full left-0 mb-3 w-64 bg-white overflow-hidden z-50"
             style={{
-                borderRadius: 16,
-                border: "0.5px solid #e2e8f0",
-                boxShadow: "0 12px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+                borderRadius: 18,
+                border: "1px solid #ebebf5",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
             }}>
             {/* Header */}
-            <div className="px-3 py-2 flex items-center gap-2"
-                style={{ borderBottom: "0.5px solid #f1f5f9", background: "#fafbff" }}>
-                <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention</span>
+            <div className="px-4 py-2.5 flex items-center gap-2"
+                style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
+                <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention Anggota</span>
             </div>
             <div className="max-h-52 overflow-y-auto">
                 {showSemua && (
                     <button
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${
-                            selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"
+                            }`}
                         onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}>
                         <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
-                            style={{ borderRadius: 8, background: "#fef3c7" }}>
-                            <span className="text-amber-500 font-black text-sm">@</span>
+                            style={{ borderRadius: 10, background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
+                            <span className="text-amber-600 font-black text-sm">@</span>
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs font-semibold text-gray-800">semua</p>
-                            <p className="text-[10px] text-gray-400">Mention seluruh anggota</p>
+                            <p className="text-xs font-bold text-slate-800">semua</p>
+                            <p className="text-[9.5px] text-slate-400 mt-0.5">Mention seluruh anggota</p>
                         </div>
                     </button>
                 )}
@@ -617,20 +629,19 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                     return (
                         <button
                             key={user.id}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${
-                                selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"
-                            }`}
+                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"
+                                }`}
                             onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}>
                             <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
-                                style={{ backgroundColor: getAvatarColor(user.role), borderRadius: 8 }}>
+                                style={{ backgroundColor: getAvatarColor(user.role), borderRadius: 10 }}>
                                 {getInitials(user.name)}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold text-gray-800 truncate">{user.name}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{ROLE_LABEL[user.role] ?? user.role}</p>
+                                <p className="text-xs font-semibold text-slate-800 truncate">{user.name}</p>
+                                <p className="text-[9.5px] text-slate-400 truncate mt-0.5">{ROLE_LABEL[user.role] ?? user.role}</p>
                             </div>
                             {selectedIndex === idx && (
-                                <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
                             )}
@@ -798,23 +809,23 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const isLoading = uploading || sending;
 
     return (
-        <div className="flex-shrink-0 bg-white" style={{ borderTop: "0.5px solid #e2e8f0" }}>
+        <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
 
             {/* Reply preview */}
             {replyTo && (
-                <div className="flex items-center gap-3 px-5 py-2.5"
-                    style={{ borderBottom: "0.5px solid #e2e8f0", background: "#f8fafc" }}>
-                    <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "2.5px solid #6366f1" }}>
-                        <p className="text-[10px] font-black text-indigo-600">{replyTo.sender_name}</p>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                <div className="flex items-center gap-3 px-5 py-3"
+                    style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
+                    <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "3px solid #6366f1" }}>
+                        <p className="text-[10px] font-black text-indigo-500 mb-0.5">{replyTo.sender_name}</p>
+                        <p className="text-xs text-slate-500 truncate">
                             {replyTo.attachment_type === "image" ? "📷 Foto"
                                 : replyTo.attachment_type === "file" ? "📎 File"
                                     : replyTo.content}
                         </p>
                     </div>
                     <button onClick={onCancelReply}
-                        className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
-                        style={{ width: 24, height: 24, borderRadius: "50%", background: "#f1f5f9", border: "none" }}>
+                        className="flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 hover:bg-slate-200"
+                        style={{ width: 26, height: 26, borderRadius: "50%", background: "#f1f5f9" }}>
                         <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -824,14 +835,15 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
 
             {/* File preview */}
             {preview && (
-                <div className="px-4 py-3" style={{ borderBottom: "0.5px solid #e2e8f0" }}>
-                    <div className="flex items-center gap-3">
+                <div className="px-4 py-3" style={{ borderBottom: "1px solid #f0f0f8" }}>
+                    <div className="flex items-center gap-3 p-2.5 rounded-2xl"
+                        style={{ background: "#f5f7ff", border: "1px solid #e8ecff" }}>
                         {preview.type === "image" ? (
                             <img src={preview.url} alt="preview" className="object-cover flex-shrink-0"
-                                style={{ width: 52, height: 52, borderRadius: 12, border: "0.5px solid #e2e8f0" }} />
+                                style={{ width: 52, height: 52, borderRadius: 12, border: "1px solid #e0e0f0" }} />
                         ) : (
                             <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1"
-                                style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(135deg, #1e1b4b, #312e81)" }}>
+                                style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -846,8 +858,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                             <p className="text-[10px] text-slate-400 mt-0.5">{formatFileSize(preview.size)}</p>
                         </div>
                         <button onClick={cancelPreview}
-                            className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
-                            style={{ width: 24, height: 24, borderRadius: "50%", background: "#f1f5f9", border: "none" }}>
+                            className="flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 hover:bg-slate-200"
+                            style={{ width: 24, height: 24, borderRadius: "50%", background: "#e2e8f0" }}>
                             <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -857,18 +869,19 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
             )}
 
             {/* Input row */}
-            <div className="flex items-end gap-3 px-4 py-3">
+            <div className="flex items-end gap-3 px-4 py-3.5">
                 <div className="flex-shrink-0 self-end mb-1">
                     <Avatar name={currentUser.name} role={currentUser.role} size={32} />
                 </div>
 
                 <div className="flex-1 flex items-end gap-2 relative"
                     style={{
-                        background: "#f8fafc",
-                        border: "0.5px solid #e2e8f0",
-                        borderRadius: 20,
-                        padding: "8px 12px",
-                        minHeight: 42,
+                        background: "#f5f7ff",
+                        border: "1.5px solid #e8ecff",
+                        borderRadius: 22,
+                        padding: "9px 14px",
+                        minHeight: 44,
+                        transition: "border-color 0.15s",
                     }}>
                     {mentionActive && (
                         <MentionDropdown
@@ -883,7 +896,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     <button
                         onClick={() => fileRef.current?.click()}
                         disabled={isLoading}
-                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center text-slate-400 hover:text-indigo-500 transition flex-shrink-0 disabled:opacity-40"
+                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 disabled:opacity-40"
+                        style={{ color: "#818cf8" }}
                         title="Lampirkan file / foto">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -897,7 +911,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
                         onBlur={() => { setTimeout(() => setMentionActive(false), 150); }}
-                        placeholder={preview ? "Tambah caption (opsional)..." : "Tulis pesan... ketik @ untuk mention"}
+                        placeholder={preview ? "Tambah caption..." : "Tulis pesan... ketik @ untuk mention"}
                         maxLength={2000}
                         rows={1}
                         disabled={isLoading}
@@ -913,20 +927,21 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                 <button
                     onClick={preview ? handleSendFile : handleSendText}
                     disabled={!canSend}
-                    className="flex items-center justify-center flex-shrink-0 text-white transition self-end disabled:opacity-40 hover:scale-105"
+                    className="flex items-center justify-center flex-shrink-0 text-white transition-all self-end disabled:opacity-40 hover:scale-105 active:scale-95"
                     style={{
-                        width: 42, height: 42,
-                        borderRadius: 13,
-                        border: "none",
-                        background: canSend ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : "#cbd5e1",
-                        boxShadow: canSend ? "0 3px 12px rgba(30,27,75,0.4)" : "none",
+                        width: 44, height: 44,
+                        borderRadius: 14,
+                        background: canSend
+                            ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
+                            : "#e2e8f0",
+                        boxShadow: canSend ? "0 4px 16px rgba(79,70,229,0.4)" : "none",
                     }}>
                     {isLoading ? (
                         <div className="animate-spin"
                             style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
                     ) : (
                         <svg className="w-4 h-4" fill="none" stroke={canSend ? "white" : "#94a3b8"} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
                                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                     )}
@@ -1244,47 +1259,58 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-            style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(0,0,0,0.7)" }}>
+            style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)" }}>
             <div
-                className="relative flex flex-col bg-white overflow-hidden"
+                className="relative flex flex-col overflow-hidden"
                 style={{
                     width: "min(900px, 100%)",
-                    height: "min(760px, 95vh)",
-                    borderRadius: 22,
-                    boxShadow: "0 32px 100px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.1)",
+                    height: "min(780px, 95vh)",
+                    borderRadius: 26,
+                    background: "#fff",
+                    boxShadow: "0 40px 120px rgba(10,8,30,0.3), 0 4px 20px rgba(0,0,0,0.08)",
+                    border: "1px solid rgba(255,255,255,0.8)",
                 }}>
 
                 {/* ── Header ── */}
                 <div
-                    className="flex-shrink-0 flex items-center gap-3 px-5 py-4 relative overflow-hidden"
-                    style={{ background: "#0d0d1a" }}>
-                    {/* Decorative orbs */}
-                    <div className="absolute rounded-full pointer-events-none"
-                        style={{ top: -30, right: -30, width: 120, height: 120, background: "rgba(99,102,241,0.08)" }} />
-                    <div className="absolute rounded-full pointer-events-none"
-                        style={{ bottom: -40, left: 80, width: 100, height: 100, background: "rgba(139,92,246,0.05)" }} />
-                    <div className="absolute rounded-full pointer-events-none"
-                        style={{ top: -10, left: "40%", width: 60, height: 60, background: "rgba(99,102,241,0.04)" }} />
+                    className="flex-shrink-0 flex items-center gap-3.5 px-6 py-4 relative overflow-hidden"
+                    style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
+
+                    {/* Background mesh pattern */}
+                    <div className="absolute inset-0 pointer-events-none" style={{
+                        backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.1) 0%, transparent 50%)",
+                    }} />
+                    {/* Subtle grid */}
+                    <div className="absolute inset-0 pointer-events-none" style={{
+                        backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+                        backgroundSize: "32px 32px",
+                    }} />
 
                     {/* Logo */}
-                    <div className="relative flex-shrink-0 z-10"
-                        style={{ border: "2px solid rgba(255,255,255,0.12)", borderRadius: 14, overflow: "hidden" }}>
-                        <SolitLogo size={46} radius={12} />
+                    <div className="relative flex-shrink-0 z-10">
+                        <div style={{ border: "2px solid rgba(255,255,255,0.15)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>
+                            <SolitLogo size={48} radius={14} />
+                        </div>
+                        {/* Online indicator */}
+                        <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center"
+                            style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }}>
+                        </div>
                     </div>
 
                     <div className="flex-1 min-w-0 z-10">
-                        <h2 className="text-[13px] font-black text-white tracking-tight">All Team Solit 💬</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-black text-white tracking-tight">All Team Solit</h2>
+                            <span style={{ fontSize: 14 }}>💬</span>
+                        </div>
                         <div className="flex items-center gap-2 mt-1">
-                            {/* Animated green dot */}
                             <span className="relative flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
                             </span>
-                            <span className="text-[9.5px] text-white/45">Grup chat seluruh tim</span>
-                            {/* Online badge */}
+                            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
                             {onlineCount > 0 && (
-                                <span className="text-[9px] font-semibold text-emerald-400 px-2 py-0.5"
-                                    style={{ background: "rgba(16,185,129,0.12)", border: "0.5px solid rgba(16,185,129,0.25)", borderRadius: 20 }}>
+                                <span className="text-[9px] font-bold text-emerald-400 px-2 py-0.5"
+                                    style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
                                     {onlineCount} online
                                 </span>
                             )}
@@ -1293,36 +1319,41 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     <button
                         onClick={onClose}
-                        className="w-9 h-9 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition flex-shrink-0 z-10"
-                        style={{ borderRadius: 10 }}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        className="w-9 h-9 flex items-center justify-center transition-all hover:scale-105 flex-shrink-0 z-10"
+                        style={{
+                            borderRadius: 12,
+                            background: "rgba(255,255,255,0.07)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            color: "rgba(255,255,255,0.5)",
+                        }}>
+                        <svg className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
                 {/* Accent line */}
-                <div style={{ height: 1, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 60%, transparent 100%)", opacity: 0.6 }} />
+                <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
 
                 {/* ── Messages ── */}
                 <div
                     ref={messagesRef}
                     onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto px-5 py-4 space-y-1"
-                    style={{ background: "#f8fafc" }}>
+                    className="flex-1 overflow-y-auto px-6 py-5 space-y-1"
+                    style={{ background: "#f7f8fc" }}>
 
                     {loadingMore && (
-                        <div className="flex justify-center py-2">
+                        <div className="flex justify-center py-3">
                             <div className="animate-spin rounded-full"
-                                style={{ width: 20, height: 20, border: "2.5px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                                style={{ width: 20, height: 20, border: "2.5px solid #e8ecf5", borderTopColor: "#6366f1" }} />
                         </div>
                     )}
 
                     {hasMore && !loadingMore && (
                         <div className="flex justify-center py-2">
                             <button onClick={loadMore}
-                                className="text-[11px] text-indigo-600 hover:text-indigo-700 transition px-4 py-1.5 bg-white hover:bg-indigo-50 font-medium"
-                                style={{ border: "0.5px solid #e2e8f0", borderRadius: 20 }}>
+                                className="text-[11px] text-indigo-600 hover:text-indigo-700 transition-all px-5 py-2 font-semibold hover:scale-105"
+                                style={{ background: "#fff", border: "1px solid #e0e4f5", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
                                 ↑ Muat pesan lebih lama
                             </button>
                         </div>
@@ -1331,13 +1362,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3">
                             <div className="animate-spin rounded-full"
-                                style={{ width: 28, height: 28, border: "2.5px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                                style={{ width: 30, height: 30, border: "3px solid #e8ecf5", borderTopColor: "#6366f1" }} />
                             <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
                         </div>
                     ) : messages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                             <div className="flex items-center justify-center text-4xl"
-                                style={{ width: 72, height: 72, borderRadius: 22, background: "#fff", border: "0.5px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+                                style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
                                 👋
                             </div>
                             <div>
@@ -1349,10 +1380,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         groupedMessages.map((group: DateGroup) => (
                             <Fragment key={group.dateKey}>
                                 {/* Date pill */}
-                                <div className="flex items-center justify-center py-3">
-                                    <div className="text-slate-400 text-[9.5px] font-semibold px-3 py-1 bg-white"
-                                        style={{ borderRadius: 20, border: "0.5px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                                        {group.dateLabel}
+                                <div className="flex items-center justify-center py-4">
+                                    <div className="flex items-center gap-3">
+                                        <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #d1d5f5)" }} />
+                                        <div className="text-slate-400 text-[9.5px] font-semibold px-3.5 py-1.5 bg-white"
+                                            style={{ borderRadius: 100, border: "1px solid #ebebf5", boxShadow: "0 2px 6px rgba(0,0,0,0.04)", letterSpacing: "0.03em" }}>
+                                            {group.dateLabel}
+                                        </div>
+                                        <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #d1d5f5, transparent)" }} />
                                     </div>
                                 </div>
                                 {group.msgs.map((msg: GroupMessage, idx: number) => {
@@ -1360,7 +1395,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     const prevMsg = group.msgs[idx - 1];
                                     const isNewSender = !prevMsg || prevMsg.sender_id !== msg.sender_id;
                                     return (
-                                        <div key={msg.id} className={isNewSender ? "mt-3" : "mt-0.5"}>
+                                        <div key={msg.id} className={isNewSender ? "mt-4" : "mt-0.5"}>
                                             <MessageBubble
                                                 msg={msg}
                                                 isMine={isMine}
@@ -1382,12 +1417,17 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                 {/* Scroll to bottom */}
                 {isScrolledUp && (
-                    <div className="absolute bottom-24 right-5 z-10">
+                    <div className="absolute bottom-24 right-6 z-10">
                         <button
                             onClick={() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); setUnread(0); }}
-                            className="relative w-10 h-10 bg-white flex items-center justify-center hover:bg-slate-50 transition"
-                            style={{ borderRadius: "50%", border: "0.5px solid #e2e8f0", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>
-                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            className="relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
+                            style={{
+                                borderRadius: "50%",
+                                background: "#fff",
+                                border: "1px solid #e8ecf5",
+                                boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
+                            }}>
+                            <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
                             {unread > 0 && (
@@ -1398,6 +1438,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                         borderRadius: 9,
                                         background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
                                         padding: "0 4px",
+                                        boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
                                     }}>
                                     {unread > 9 ? "9+" : unread}
                                 </span>
@@ -1419,12 +1460,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             <style jsx global>{`
                 @keyframes highlightMsg {
                     0%   { background-color: transparent; }
-                    25%  { background-color: rgba(99, 102, 241, 0.12); }
+                    25%  { background-color: rgba(99, 102, 241, 0.1); }
                     100% { background-color: transparent; }
                 }
                 .highlight-msg {
                     animation: highlightMsg 1.5s ease-out;
-                    border-radius: 14px;
+                    border-radius: 18px;
                 }
             `}</style>
         </div>
