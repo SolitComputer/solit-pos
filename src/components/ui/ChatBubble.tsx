@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { useEffect, useRef, useState, useCallback, KeyboardEvent } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
@@ -58,6 +58,37 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ─── Logo Solit (dengan fallback initials) ────────────────────────────────────
+function SolitLogo({ size = 38, radius = 12 }: { size?: number; radius?: number }) {
+  const [imgError, setImgError] = useState(false);
+  if (imgError) {
+    return (
+      <div
+        className="flex items-center justify-center font-black text-white"
+        style={{
+          width: size, height: size, borderRadius: radius,
+          background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          fontSize: size * 0.24,
+          letterSpacing: "0.5px",
+        }}
+      >
+        S03
+      </div>
+    );
+  }
+  return (
+    <img
+      src="/assets/solit03.jpeg"
+      alt="Solit 03"
+      onError={() => setImgError(true)}
+      style={{
+        width: size, height: size, borderRadius: radius,
+        objectFit: "cover", display: "block",
+      }}
+    />
+  );
+}
+
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ url, name, onClose }: { url: string; name: string | null; onClose: () => void }) {
   useEffect(() => {
@@ -88,7 +119,7 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
       <img
         src={url}
         alt={name ?? "Foto"}
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
         onClick={e => e.stopPropagation()}
       />
       <a
@@ -125,15 +156,15 @@ function AttachmentDisplay({
     return (
       <>
         <div
-          className="cursor-pointer rounded-xl overflow-hidden"
-          style={{ maxWidth: 180 }}
+          className="cursor-pointer overflow-hidden"
+          style={{ maxWidth: 180, borderRadius: 12 }}
           onClick={() => setLightbox(true)}
         >
           <img
             src={url}
             alt={name ?? "Foto"}
-            className="w-full object-cover hover:opacity-90 transition rounded-xl"
-            style={{ maxHeight: 180 }}
+            className="w-full object-cover hover:opacity-90 transition"
+            style={{ maxHeight: 180, borderRadius: 12 }}
             loading="lazy"
           />
         </div>
@@ -148,15 +179,17 @@ function AttachmentDisplay({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      download={name ?? true}
-      className={`flex items-center gap-2 px-2.5 py-2 rounded-xl no-underline transition ${
-        isMine ? "bg-white/10 hover:bg-white/20" : "bg-gray-100 hover:bg-gray-200"
+      download={name ?? ""}
+      className={`flex items-center gap-2.5 px-2.5 py-2 no-underline transition ${
+        isMine
+          ? "bg-white/10 hover:bg-white/15 rounded-xl"
+          : "bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl"
       }`}
       style={{ maxWidth: 200 }}
       onClick={e => e.stopPropagation()}
     >
-      <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0 text-[8px] font-bold gap-0.5 ${
-        isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
+      <div className={`w-9 h-9 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8px] font-bold gap-0.5 ${
+        isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
       }`}>
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -165,7 +198,7 @@ function AttachmentDisplay({
         <span>{ext.slice(0, 4)}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-[10px] font-medium truncate ${isMine ? "text-white" : "text-gray-800"}`}>
+        <p className={`text-[10px] font-semibold truncate ${isMine ? "text-white" : "text-gray-800"}`}>
           {name ?? "File"}
         </p>
         {size != null && (
@@ -243,7 +276,8 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
   if (msg.is_deleted) {
     return (
       <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-        <div className="px-3 py-1.5 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 text-[10px] italic">
+        <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-400 text-[10px] italic"
+          style={{ borderRadius: 10 }}>
           🚫 Pesan dihapus
         </div>
       </div>
@@ -255,14 +289,32 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
 
   return (
     <div
-      className={`flex items-end gap-1 group ${isMine ? "justify-end" : "justify-start"}`}
+      className={`flex items-end gap-1.5 group ${isMine ? "justify-end" : "justify-start"}`}
       onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
     >
+      {/* Avatar mini kotak untuk pesan theirs */}
+      {!isMine && (
+        <div
+          className="flex items-center justify-center text-[7px] font-black text-white flex-shrink-0"
+          style={{
+            width: 22, height: 22,
+            borderRadius: 8,
+            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            marginBottom: 2,
+          }}
+        >
+          {getInitials(msg.sender_id)}
+        </div>
+      )}
+
       {/* Edit mode */}
       {isEditing ? (
-        <div className={`flex-1 max-w-[85%] rounded-2xl px-3 py-2 ${
-          isMine ? "bg-[#1a1a2e]" : "bg-white border border-gray-200"
-        }`}>
+        <div
+          className={`flex-1 max-w-[85%] px-3 py-2 ${
+            isMine ? "bg-[#1e1b4b]" : "bg-white border border-slate-200"
+          }`}
+          style={{ borderRadius: 14 }}
+        >
           <input
             ref={editRef}
             value={editContent}
@@ -273,15 +325,15 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
               isMine ? "text-white placeholder:text-white/40" : "text-gray-800"
             }`}
           />
-          <div className="flex items-center justify-between mt-1.5 gap-2">
+          <div className="flex items-center justify-between mt-2 gap-2">
             <span className={`text-[9px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
               Enter simpan · Esc batal
             </span>
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <button
                 onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                className={`text-[9px] px-1.5 py-0.5 rounded transition ${
-                  isMine ? "text-white/60 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
+                className={`text-[9px] px-2 py-1 transition ${
+                  isMine ? "text-white/60 hover:bg-white/10 rounded-lg" : "text-gray-500 hover:bg-gray-100 rounded-lg"
                 }`}
               >
                 Batal
@@ -289,8 +341,8 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
               <button
                 onClick={handleSaveEdit}
                 disabled={saving || !editContent.trim()}
-                className={`text-[9px] px-1.5 py-0.5 rounded font-semibold transition disabled:opacity-40 ${
-                  isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
+                className={`text-[9px] px-2 py-1 rounded-lg font-semibold transition disabled:opacity-40 ${
+                  isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
                 }`}
               >
                 {saving ? "..." : "Simpan"}
@@ -301,11 +353,22 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
       ) : (
         /* Normal bubble */
         <div className="relative">
-          <div className={`max-w-[220px] px-3 py-2 ${
-            isMine
-              ? "bg-[#1a1a2e] text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm"
-              : "bg-white text-gray-800 border border-gray-200 rounded-t-2xl rounded-br-2xl rounded-bl-sm shadow-sm"
-          }`}>
+          <div
+            className={`max-w-[220px] px-3 py-2 ${
+              isMine
+                ? "text-white"
+                : "bg-white text-gray-800 border border-slate-200"
+            }`}
+            style={{
+              borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+              background: isMine
+                ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)"
+                : undefined,
+              boxShadow: isMine
+                ? "0 2px 12px rgba(30,27,75,0.35)"
+                : "0 1px 4px rgba(0,0,0,0.06)",
+            }}
+          >
             {/* Attachment */}
             {hasAttachment && (
               <div className={hasContent ? "mb-1.5" : ""}>
@@ -324,11 +387,17 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
               <p className="text-xs leading-relaxed break-words">{msg.content}</p>
             )}
 
-            {/* Timestamp */}
-            <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? "text-white/50" : "text-gray-400"}`}>
+            {/* Timestamp + status */}
+            <div className={`flex items-center justify-end gap-1 mt-1 ${
+              isMine ? "text-white/40" : "text-slate-400"
+            }`}>
               {msg.edited_at && <span className="text-[9px] italic">diedit</span>}
-              <span className="text-[10px]">{formatTime(msg.created_at)}</span>
-              {isMine && <span className="text-[10px]">{msg.is_read ? "✓✓" : "✓"}</span>}
+              <span className="text-[9px]">{formatTime(msg.created_at)}</span>
+              {isMine && (
+                <span className={`text-[10px] ${msg.is_read ? "text-blue-300" : "text-white/40"}`}>
+                  {msg.is_read ? "✓✓" : "✓"}
+                </span>
+              )}
             </div>
           </div>
 
@@ -336,33 +405,36 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: MessageItemProps) {
           {showMenu && (
             <div
               ref={menuRef}
-              className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[120px] ${
+              className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1 min-w-[135px] ${
                 isMine ? "right-0" : "left-0"
               }`}
+              style={{
+                borderRadius: 16,
+                border: "0.5px solid #e2e8f0",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+              }}
             >
-              {/* Edit — hanya sender, hanya pesan teks */}
               {isMine && hasContent && (
                 <button
                   onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+                  className="w-full text-left px-3.5 py-2 text-[11px] text-indigo-600 hover:bg-indigo-50 flex items-center gap-2.5 transition"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  Edit
+                  Edit pesan
                 </button>
               )}
-              {/* Delete — sender atau receiver */}
               <button
                 onClick={() => { onDelete(msg.id); setShowMenu(false); }}
-                className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2"
+                className="w-full text-left px-3.5 py-2 text-[11px] text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                Hapus
+                Hapus pesan
               </button>
             </div>
           )}
@@ -456,7 +528,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 5 * 1024 * 1024) {
       alert("Ukuran file maksimal 5MB");
       e.target.value = "";
@@ -467,7 +538,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
       e.target.value = "";
       return;
     }
-
     const isImage = file.type.startsWith("image/");
     const previewUrl = isImage ? URL.createObjectURL(file) : "";
     setPreview({ url: previewUrl, name: file.name, type: isImage ? "image" : "file", size: file.size });
@@ -485,7 +555,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   const send = async () => {
     const content = input.trim();
     if (!content || sending) return;
-
     setSending(true);
     const optimistic: Message = {
       id: `temp-${Date.now()}`,
@@ -503,7 +572,6 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
     };
     setMessages(prev => [...prev, optimistic]);
     setInput("");
-
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
@@ -527,12 +595,10 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   // ── Send attachment ───────────────────────────────────────────────────────
   const sendAttachment = async () => {
     if (!selectedFile || uploading) return;
-
     const tempId = `temp-${Date.now()}`;
     const isImage = selectedFile.type.startsWith("image/");
     const previewUrl = preview?.url ?? null;
     const caption = input.trim();
-
     const optimistic: Message = {
       id: tempId,
       sender_id: currentUser.id,
@@ -547,14 +613,11 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
       attachment_name: selectedFile.name,
       attachment_size: selectedFile.size,
     };
-
     setMessages(prev => [...prev, optimistic]);
     setInput("");
     cancelPreview();
     setUploading(true);
-
     try {
-      // 1. Upload file
       const formData = new FormData();
       formData.append("file", selectedFile);
       const uploadRes = await fetch("/api/messages/upload", {
@@ -562,15 +625,12 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         body: formData,
       });
       const uploadData = await uploadRes.json();
-
       if (!uploadData.success) {
         setMessages(prev => prev.filter(m => m.id !== tempId));
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         alert(uploadData.message ?? "Upload gagal");
         return;
       }
-
-      // 2. Kirim pesan dengan URL attachment
       const msgRes = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -584,9 +644,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         }),
       });
       const msgData = await msgRes.json();
-
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-
       if (msgData.success) {
         setMessages(prev => prev.map(m => m.id === tempId ? msgData.message : m));
       } else {
@@ -648,26 +706,42 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
   const isLoading = sending || uploading;
   const canSend = preview ? !uploading : (!!input.trim() && !sending);
 
-  // ── Minimized ─────────────────────────────────────────────────────────────
+  // ── Minimized pill ────────────────────────────────────────────────────────
   if (minimized) {
     return (
       <div
-        className="flex items-center gap-2 bg-[#1a1a2e] text-white rounded-full px-3 py-2 shadow-2xl cursor-pointer hover:bg-[#16213e] transition select-none"
+        className="flex items-center gap-2 text-white rounded-full px-2.5 py-2 cursor-pointer hover:scale-[1.03] transition-transform select-none"
+        style={{
+          background: "#0d0d1a",
+          minWidth: 155,
+          maxWidth: 220,
+          boxShadow: "0 6px 24px rgba(13,13,26,0.55), 0 2px 8px rgba(0,0,0,0.2)",
+        }}
         onClick={() => { setMinimized(false); setUnread(0); }}
-        style={{ minWidth: 160, maxWidth: 220 }}
       >
-        <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold flex-shrink-0">
-          {getInitials(targetUser.name)}
+        {/* Logo Solit */}
+        <div className="relative flex-shrink-0">
+          <SolitLogo size={30} radius={10} />
+          <div
+            className="absolute -bottom-px -right-px w-[9px] h-[9px] rounded-full bg-emerald-400"
+            style={{ border: "1.5px solid #0d0d1a" }}
+          />
         </div>
-        <span className="text-xs font-semibold truncate flex-1">{targetUser.name.split(" ")[0]}</span>
+        <span className="text-[11px] font-bold truncate flex-1">{targetUser.name.split(" ")[0]}</span>
         {unread > 0 && (
-          <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+          <span
+            className="text-white text-[8px] font-black flex items-center justify-center flex-shrink-0"
+            style={{
+              minWidth: 18, height: 18, borderRadius: 9,
+              background: "#ef4444", padding: "0 4px",
+            }}
+          >
             {unread > 9 ? "9+" : unread}
           </span>
         )}
         <button
           onClick={e => { e.stopPropagation(); onClose(); }}
-          className="w-5 h-5 flex items-center justify-center text-white/60 hover:text-white transition flex-shrink-0"
+          className="w-5 h-5 flex items-center justify-center text-white/40 hover:text-white transition flex-shrink-0"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -679,23 +753,71 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
 
   // ── Expanded ──────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col bg-white rounded-t-2xl shadow-2xl border border-gray-200 overflow-hidden"
-      style={{ width: 300, height: preview ? 460 : 400 }}>
+    <div
+      className="flex flex-col overflow-hidden"
+      style={{
+        width: 300,
+        height: preview ? 460 : 400,
+        borderRadius: "20px 20px 0 0",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.1)",
+        background: "#f8fafc",
+      }}
+    >
+      {/* ── Header ── */}
+      <div
+        className="px-3 py-2.5 flex items-center gap-2.5 flex-shrink-0 cursor-pointer relative overflow-hidden"
+        style={{ background: "#0d0d1a" }}
+        onClick={() => setMinimized(true)}
+      >
+        {/* Subtle decorative orbs */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            top: -24, right: -24, width: 80, height: 80,
+            background: "rgba(99,102,241,0.08)",
+          }}
+        />
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            bottom: -28, left: 32, width: 72, height: 72,
+            background: "rgba(139,92,246,0.05)",
+          }}
+        />
 
-      {/* Header */}
-      <div className="bg-[#1a1a2e] px-3 py-2.5 flex items-center gap-2 flex-shrink-0 cursor-pointer"
-        onClick={() => setMinimized(true)}>
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-          {getInitials(targetUser.name)}
+        {/* Logo Solit */}
+        <div className="relative flex-shrink-0 z-10">
+          <div style={{ borderRadius: 12, border: "2px solid rgba(255,255,255,0.12)", overflow: "hidden" }}>
+            <SolitLogo size={38} radius={10} />
+          </div>
+          {/* Online dot */}
+          <div
+            className="absolute rounded-full bg-emerald-400"
+            style={{
+              bottom: -1, right: -1,
+              width: 11, height: 11,
+              border: "2px solid #0d0d1a",
+            }}
+          />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-white truncate">{targetUser.name}</p>
-          <p className="text-[10px] text-white/50 truncate">{ROLE_LABEL[targetUser.role] ?? targetUser.role}</p>
+
+        <div className="flex-1 min-w-0 z-10">
+          <p className="text-[12px] font-bold text-white truncate tracking-tight">{targetUser.name}</p>
+          <p className="flex items-center gap-1 mt-0.5">
+            <span
+              className="rounded-full bg-emerald-400"
+              style={{ width: 5, height: 5, display: "inline-block" }}
+            />
+            <span className="text-[9.5px] text-white/45 truncate">
+              {ROLE_LABEL[targetUser.role] ?? targetUser.role} · Online
+            </span>
+          </p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+
+        <div className="flex items-center gap-1 flex-shrink-0 z-10">
           <button
             onClick={e => { e.stopPropagation(); setMinimized(true); }}
-            className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 rounded transition"
+            className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition"
             title="Kecilkan"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -704,7 +826,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           </button>
           <button
             onClick={e => { e.stopPropagation(); onClose(); }}
-            className="w-6 h-6 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 rounded transition"
+            className="w-7 h-7 flex items-center justify-center text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition"
             title="Tutup"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -714,16 +836,42 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-gray-50">
+      {/* ── Thin accent line bawah header ── */}
+      <div style={{ height: 1, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, transparent 100%)", opacity: 0.5 }} />
+
+      {/* ── Messages ── */}
+      <div
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5"
+        style={{ background: "#f8fafc" }}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="w-5 h-5 border-2 border-gray-300 border-t-[#1a1a2e] rounded-full animate-spin" />
+            <div
+              className="rounded-full animate-spin"
+              style={{
+                width: 20, height: 20,
+                border: "2.5px solid #e2e8f0",
+                borderTopColor: "#6366f1",
+              }}
+            />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-            <span className="text-2xl">💬</span>
-            <p className="text-xs text-gray-400">Belum ada pesan.<br />Mulai percakapan!</p>
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 52, height: 52, borderRadius: 16,
+                background: "#fff",
+                border: "0.5px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                fontSize: 24,
+              }}
+            >
+              💬
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Belum ada pesan.<br />Mulai percakapan!
+            </p>
           </div>
         ) : (
           messages.map(msg => (
@@ -739,15 +887,25 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         <div ref={bottomRef} />
       </div>
 
-      {/* File preview sebelum kirim */}
+      {/* ── File preview sebelum kirim ── */}
       {preview && (
-        <div className="flex-shrink-0 px-3 py-2.5 border-t border-gray-100 bg-gray-50">
+        <div className="flex-shrink-0 px-3 py-2.5 bg-white" style={{ borderTop: "0.5px solid #e2e8f0" }}>
           <div className="flex items-center gap-2.5">
             {preview.type === "image" ? (
-              <img src={preview.url} alt="preview"
-                className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-gray-200" />
+              <img
+                src={preview.url}
+                alt="preview"
+                className="object-cover flex-shrink-0"
+                style={{ width: 44, height: 44, borderRadius: 10, border: "0.5px solid #e2e8f0" }}
+              />
             ) : (
-              <div className="w-12 h-12 bg-[#1a1a2e] rounded-lg flex flex-col items-center justify-center flex-shrink-0 gap-0.5">
+              <div
+                className="flex flex-col items-center justify-center flex-shrink-0 gap-0.5"
+                style={{
+                  width: 44, height: 44, borderRadius: 10,
+                  background: "linear-gradient(135deg, #1e1b4b, #312e81)",
+                }}
+              >
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -758,12 +916,15 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-gray-800 truncate">{preview.name}</p>
-              <p className="text-[9px] text-gray-400 mt-0.5">{formatFileSize(preview.size)}</p>
+              <p className="text-[10px] font-semibold text-slate-800 truncate">{preview.name}</p>
+              <p className="text-[9px] text-slate-400 mt-0.5">{formatFileSize(preview.size)}</p>
             </div>
-            <button onClick={cancelPreview}
-              className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition flex-shrink-0">
-              <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button
+              onClick={cancelPreview}
+              className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
+              style={{ width: 22, height: 22, borderRadius: "50%", background: "#f1f5f9", border: "none" }}
+            >
+              <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -771,13 +932,21 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
         </div>
       )}
 
-      {/* Input */}
-      <div className="flex-shrink-0 px-3 py-2 bg-white border-t border-gray-100 flex items-center gap-2">
-        {/* Attach button */}
+      {/* ── Input area ── */}
+      <div
+        className="flex-shrink-0 flex items-center gap-1.5"
+        style={{
+          padding: "8px 10px",
+          background: "#fff",
+          borderTop: "0.5px solid #e2e8f0",
+        }}
+      >
+        {/* Attach */}
         <button
           onClick={() => fileRef.current?.click()}
           disabled={isLoading}
-          className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-[#1a1a2e] transition flex-shrink-0 disabled:opacity-40"
+          className="flex items-center justify-center transition flex-shrink-0 disabled:opacity-40 hover:bg-slate-100"
+          style={{ width: 30, height: 30, borderRadius: 10, border: "none", background: "#f1f5f9", color: "#64748b" }}
           title="Lampirkan file / foto"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -786,6 +955,7 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           </svg>
         </button>
 
+        {/* Input */}
         <input
           ref={inputRef}
           value={input}
@@ -794,16 +964,41 @@ export function ChatBubble({ currentUser, targetUser, onClose }: ChatBubbleProps
           placeholder={preview ? "Caption (opsional)..." : "Tulis pesan..."}
           maxLength={1000}
           disabled={isLoading}
-          className="flex-1 text-xs bg-gray-100 rounded-full px-3 py-2 outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition placeholder:text-gray-400 disabled:opacity-50"
+          className="flex-1 outline-none transition disabled:opacity-50"
+          style={{
+            height: 32,
+            borderRadius: 20,
+            border: "0.5px solid #e2e8f0",
+            background: "#f8fafc",
+            padding: "0 12px",
+            fontSize: 11,
+            color: "#334155",
+          }}
         />
 
+        {/* Send */}
         <button
           onClick={preview ? sendAttachment : send}
           disabled={!canSend}
-          className="w-8 h-8 bg-[#1a1a2e] text-white rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-[#16213e] transition flex-shrink-0"
+          className="flex items-center justify-center text-white disabled:opacity-40 transition hover:scale-105 flex-shrink-0"
+          style={{
+            width: 32, height: 32, borderRadius: "50%", border: "none",
+            background: canSend
+              ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)"
+              : "#cbd5e1",
+            boxShadow: canSend ? "0 2px 10px rgba(30,27,75,0.4)" : "none",
+          }}
         >
           {isLoading ? (
-            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div
+              className="animate-spin"
+              style={{
+                width: 14, height: 14,
+                border: "2px solid rgba(255,255,255,0.3)",
+                borderTopColor: "white",
+                borderRadius: "50%",
+              }}
+            />
           ) : (
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
