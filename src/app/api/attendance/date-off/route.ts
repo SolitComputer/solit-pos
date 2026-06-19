@@ -15,50 +15,45 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get("year");
+    const year  = searchParams.get("year");
     const month = searchParams.get("month");
 
+    // ← Gunakan select tanpa FK join dulu (lebih aman, hindari FK name salah)
     let query = supabase
-      .from("user_date_work")
-      .select(`
-        id,
-        user_id,
-        work_date,
-        note,
-        created_at,
-        users!user_date_work_user_id_fkey (id, name, role)
-      `)
-      .order("work_date", { ascending: true });
+      .from("user_date_off")
+      .select("id, user_id, off_date, note, notes, swap_group_id, created_at")
+      .order("off_date", { ascending: true });
 
+    // Filter by bulan jika ada
     if (year && month) {
       const y = parseInt(year);
       const m = parseInt(month);
-      const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
-      const lastDay = new Date(y, m, 0);
+      const firstDay   = `${y}-${String(m).padStart(2, "0")}-01`;
+      const lastDay    = new Date(y, m, 0);
       const lastDayStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
-      query = query.gte("work_date", firstDay).lte("work_date", lastDayStr);
+      query = query.gte("off_date", firstDay).lte("off_date", lastDayStr);
     }
 
-    // ── FIXED: scope by role ──────────────────────────────────────────────────
+    // Scope by role
     if (isFullAccess(user.role)) {
-      // Bisa lihat semua — tidak perlu filter tambahan
+      // lihat semua, tidak perlu filter
     } else if (isDivisionHead(user.role)) {
-      // Kepala divisi: lihat milik sendiri + bawahan
       const subordinateRoles = DIVISION_MAP[user.role] ?? [];
-      const { data: subordinateUsers } = await supabase
+      const { data: subUsers } = await supabase
         .from("users")
         .select("id")
         .in("role", subordinateRoles as string[]);
-      const subordinateIds = (subordinateUsers ?? []).map((u: any) => u.id);
-      // Include diri sendiri juga
-      query = query.in("user_id", [user.id, ...subordinateIds]);
+      const subIds = (subUsers ?? []).map((u: any) => u.id);
+      query = query.in("user_id", [user.id, ...subIds]);
     } else {
-      // User biasa: hanya milik sendiri
       query = query.eq("user_id", user.id);
     }
 
     const { data, error } = await query;
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    if (error) {
+      console.error("[date-off GET]", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (err: any) {
