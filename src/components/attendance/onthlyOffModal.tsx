@@ -484,8 +484,9 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                         && !isOff
                         && !isDateOffRef
                         && !isWeeklyActive;
-                      const isReplacementOff = isDateOffRef
-                        && (dateOffs.find(d => d.user_id === selectedUserId && d.off_date === dk)?.notes ?? "").includes("[SWAP]");
+                      const dateOffRecord = dateOffs.find(d => d.user_id === selectedUserId && d.off_date === dk);
+                      const dateOffNoteText = dateOffRecord?.notes ?? (dateOffRecord as any)?.note ?? "";
+                      const isReplacementOff = isDateOffRef && dateOffNoteText.includes("[SWAP]");
 
                       const clickable = !isBusy && (
                         (isOff && !swapMode) ||
@@ -514,26 +515,23 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                                               : `Klik untuk set libur ${dk}`
                           }
                           className={`
-    relative flex flex-col items-center justify-center h-11 rounded-xl text-xs font-bold transition-all duration-200
-    ${isBusy ? "opacity-50 cursor-wait" : ""}
-    ${isSwapSource
+  relative flex flex-col items-center justify-center h-11 rounded-xl text-xs font-bold transition-all duration-200
+  ${isBusy ? "opacity-50 cursor-wait" : ""}
+  ${isSwapSource
                               ? "bg-amber-400 text-white shadow-md scale-105 ring-2 ring-amber-300 animate-pulse cursor-default"
                               : isSwapped
-                                ? "bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200 hover:scale-105 cursor-pointer"
+                                ? "bg-white text-gray-700 border border-gray-200 cursor-default"
                                 : isOff
                                   ? "bg-red-500 text-white shadow-md scale-105 ring-2 ring-red-300 hover:bg-red-600 cursor-pointer"
                                   : isReplacementOff
-                                    ? "bg-purple-100 text-purple-600 border border-purple-300 cursor-default"
+                                    ? "bg-red-400 text-white shadow-sm scale-[1.02] ring-1 ring-red-200 cursor-default"
                                     : isDateOffRef
                                       ? "bg-indigo-50 text-indigo-500 border border-indigo-200 cursor-default"
                                       : isWeeklyActive
                                         ? swapMode
-                                          // Saat swap mode, hari weekly lain tidak bisa dipilih → dim
                                           ? "bg-indigo-50 text-indigo-300 border border-indigo-100 cursor-not-allowed opacity-40"
-                                          // Normal: weekly bisa diklik untuk swap
                                           : "bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-300 hover:scale-105 cursor-pointer"
                                         : swapMode && isSwapTarget
-                                          // Swap mode: highlight semua hari yang bisa jadi pengganti
                                           ? dow === 0 || dow === 6
                                             ? "bg-orange-50 text-orange-500 border border-amber-300 hover:bg-amber-100 hover:text-amber-700 hover:scale-105 cursor-pointer ring-1 ring-amber-300"
                                             : "bg-amber-50 text-gray-700 border border-amber-300 hover:bg-amber-100 hover:text-amber-800 hover:scale-105 cursor-pointer ring-1 ring-amber-300"
@@ -545,20 +543,20 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                                                 ? "bg-orange-50 text-orange-400 hover:bg-orange-100 hover:scale-105 cursor-pointer"
                                                 : "bg-white text-gray-700 border border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 hover:scale-105 cursor-pointer"
                             }
-  `}
+`}
                         >
                           {isBusy ? (
                             <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <>
-                              <span className={isOff || isSwapSource ? "font-black" : ""}>{day}</span>
+                              <span className={isOff || isSwapSource || isReplacementOff ? "font-black" : ""}>{day}</span>
                               {isSwapSource && <span className="text-[8px] mt-0.5 text-white/90 font-normal leading-none">asal</span>}
-                              {isSwapped && <span className="text-[8px] mt-0.5 text-emerald-500 font-normal leading-none">masuk</span>}
+                              {isSwapped && <span className="text-[8px] mt-0.5 text-gray-400 font-normal leading-none">masuk</span>}
                               {isOff && <span className="text-[8px] mt-0.5 text-white/70 font-normal leading-none">libur</span>}
-                              {isReplacementOff && <span className="text-[8px] mt-0.5 text-purple-500 font-normal leading-none">pengganti</span>}
+                              {isReplacementOff && <span className="text-[8px] mt-0.5 text-white/80 font-normal leading-none">pengganti</span>}
                               {isDateOffRef && !isReplacementOff && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none">tukar</span>}
                               {isWeeklyActive && !swapMode && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none">↔ tukar?</span>}
-                              {isToday && !isOff && !isWeeklyActive && !isSwapSource && (
+                              {isToday && !isOff && !isWeeklyActive && !isSwapSource && !isReplacementOff && (
                                 <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
                               )}
                             </>
@@ -670,30 +668,22 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-white/95">
-          <div className="flex items-center gap-4 flex-wrap text-[10px] text-gray-400 mb-3">
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-red-500 inline-block" /> Hari libur
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-indigo-50 border border-indigo-200 inline-block" /> Libur mingguan (klik untuk tukar)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-emerald-100 border border-emerald-300 inline-block" /> Sudah ditukar → jadi masuk
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-purple-100 border border-purple-300 inline-block" /> Hari pengganti aktif
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded bg-amber-400 inline-block" /> Sedang dipilih sebagai asal tukar
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all duration-200"
-          >
-            Tutup
-          </button>
+        <div className="flex items-center gap-4 flex-wrap text-[10px] text-gray-400 mb-3">
+          <span className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-red-500 inline-block" /> Hari libur bulanan
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-red-400 inline-block" /> Libur pengganti (dari tukar)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-indigo-50 border border-indigo-200 inline-block" /> Libur mingguan (klik untuk tukar)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-white border border-gray-200 inline-block" /> Sudah ditukar → jadi masuk
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded bg-amber-400 inline-block" /> Sedang dipilih sebagai asal tukar
+          </span>
         </div>
       </div>
     </div>

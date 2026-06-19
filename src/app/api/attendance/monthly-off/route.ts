@@ -123,12 +123,13 @@ export async function POST(request: Request) {
         );
       }
 
-      const weeklyObj      = new Date(weekly_date + "T12:00:00");
+      const weeklyObj = new Date(weekly_date + "T12:00:00");
       const replacementObj = new Date(replacement_date + "T12:00:00");
       if (isNaN(weeklyObj.getTime()) || isNaN(replacementObj.getTime())) {
         return NextResponse.json({ success: false, message: "Format tanggal tidak valid" }, { status: 400 });
       }
 
+      // Cek permission
       const { data: targetUser } = await supabase
         .from("users").select("id, name, role").eq("id", user_id).maybeSingle();
       if (!targetUser) {
@@ -168,11 +169,32 @@ export async function POST(request: Request) {
         );
       }
 
-      // Step 1: Insert date_work
+      // Cek replacement_date belum jadi date_off lain
+      const { data: existingDateOff } = await supabase
+        .from("user_date_off")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("off_date", replacement_date)
+        .maybeSingle();
+
+      if (existingDateOff) {
+        return NextResponse.json(
+          { success: false, message: `Tanggal pengganti ${replacement_date} sudah terdaftar sebagai libur lain` },
+          { status: 409 }
+        );
+      }
+
+      // ── Step 1: Insert date_work ─────────────────────────────────────────────
       const workNote = `[SWAP] Pengganti: ${replacement_date}${notes ? ` — ${notes}` : ""}`;
+
       const { error: workError } = await supabase
         .from("user_date_work")
-        .insert({ user_id, work_date: weekly_date, note: workNote, created_by: user.id });
+        .insert({
+          user_id,
+          work_date: weekly_date,
+          note: workNote,
+          created_by: user.id,
+        });
 
       if (workError) {
         if (workError.code === "23505") {
@@ -184,9 +206,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: workError.message }, { status: 500 });
       }
 
-      // Step 2: Insert date_off (tabel user_date_off, bukan user_monthly_off)
-      const replacementYear  = replacementObj.getFullYear();
-      const replacementMonth = replacementObj.getMonth() + 1;
+      // ── Step 2: Insert date_off ──────────────────────────────────────────────
       const dateOffNote = `[SWAP] Dari: ${weekly_date}${notes ? ` — ${notes}` : ""}`;
 
       const { error: dateOffError } = await supabase
@@ -194,10 +214,9 @@ export async function POST(request: Request) {
         .insert({
           user_id,
           off_date: replacement_date,
-          year: replacementYear,
-          month: replacementMonth,
           notes: dateOffNote,
-          set_by: user.id,
+          created_by: user.id,
+          swap_group_id: `swap_${user_id}_${weekly_date}`,
         });
 
       if (dateOffError) {
@@ -240,7 +259,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const year  = dateObj.getFullYear();
+    const year = dateObj.getFullYear();
     const month = dateObj.getMonth() + 1;
 
     const { data: targetUser, error: userError } = await supabase
