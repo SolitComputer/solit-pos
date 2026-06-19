@@ -29,11 +29,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-// PUT — update repair_status dan repair_notes
+// PUT — update repair_status, repair_notes, analisa, progress_pengerjaan, status
 async function putHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { unit_id, repair_status, repair_notes, status } = body;
+    const { unit_id, repair_status, repair_notes, status, analisa, progress_pengerjaan } = body;
 
     if (!unit_id) {
       return NextResponse.json(
@@ -43,9 +43,11 @@ async function putHandler(req: NextRequest, ctx: any, user: AuthUser) {
     }
 
     const updateData: Record<string, any> = {};
-    if (repair_status !== undefined) updateData.repair_status = repair_status;
-    if (repair_notes  !== undefined) updateData.repair_notes  = repair_notes;
-    if (status        !== undefined) updateData.status        = status;
+    if (repair_status       !== undefined) updateData.repair_status       = repair_status;
+    if (repair_notes        !== undefined) updateData.repair_notes        = repair_notes;
+    if (status              !== undefined) updateData.status              = status;
+    if (analisa             !== undefined) updateData.analisa             = analisa;
+    if (progress_pengerjaan !== undefined) updateData.progress_pengerjaan = progress_pengerjaan;
 
     const { data, error } = await supabase
       .from("laptop_units")

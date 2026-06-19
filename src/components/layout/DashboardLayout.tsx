@@ -65,13 +65,6 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
-
-      {/*
-        ❌ ChatManager DIHAPUS dari sini
-        ✅ Dipindah ke src/app/dashboard/layout.tsx
-        karena DashboardLayout di-render ulang setiap navigasi (dipanggil dari tiap page)
-        sedangkan app/dashboard/layout.tsx hanya mount SEKALI selama di /dashboard/*
-      */}
     </div>
   );
 }
