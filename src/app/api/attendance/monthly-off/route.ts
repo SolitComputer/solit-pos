@@ -146,22 +146,6 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    // ── Lock bulan yang sudah lewat ───────────────────────────────────────────
-    // Cek: tanggal off_date harus di bulan yang SAMA atau BERIKUTNYA dari sekarang
-    const nowWIB = new Date(Date.now() + 7 * 3600_000);
-    const currentYear  = nowWIB.getFullYear();
-    const currentMonth = nowWIB.getMonth() + 1;
-
-    const targetYearMonth  = year * 100 + month;
-    const currentYearMonth = currentYear * 100 + currentMonth;
-
-    if (targetYearMonth < currentYearMonth) {
-      return NextResponse.json({
-        success: false,
-        message: `Tidak bisa mengatur libur untuk bulan yang sudah lewat (${month}/${year}). Hanya bisa set libur bulan ini atau ke depan.`,
-      }, { status: 400 });
-    }
-
     // ── Cek sudah ada di bulan ini berapa libur ───────────────────────────────
     const { data: existing, error: countError } = await supabase
       .from("user_monthly_off")
@@ -263,17 +247,6 @@ export async function DELETE(request: Request) {
         success: false,
         message: "Kamu tidak punya akses untuk menghapus libur karyawan ini",
       }, { status: 403 });
-    }
-
-    const nowWIB = new Date(Date.now() + 7 * 3600_000);
-    const currentYearMonth = nowWIB.getFullYear() * 100 + (nowWIB.getMonth() + 1);
-    const recordYearMonth  = record.year * 100 + record.month;
-
-    if (recordYearMonth < currentYearMonth) {
-      return NextResponse.json({
-        success: false,
-        message: "Tidak bisa menghapus libur bulan yang sudah lewat",
-      }, { status: 400 });
     }
 
     const { error } = await supabase

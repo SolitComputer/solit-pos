@@ -99,12 +99,9 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
     return cells;
   }, [calYear, calMonth]);
 
-  // Lock: bulan lalu tidak bisa diedit
-  const nowWIB         = new Date(Date.now() + 7 * 3600_000);
-  const currentYM      = nowWIB.getFullYear() * 100 + (nowWIB.getMonth() + 1);
-  const targetYM       = calYear * 100 + apiMonth;
-  const isPastMonth    = targetYM < currentYM;
-  const todayStr       = nowWIB.toISOString().slice(0, 10);
+  const nowWIB      = new Date(Date.now() + 7 * 3600_000);
+  const isPastMonth = false; 
+  const todayStr    = nowWIB.toISOString().slice(0, 10);
 
   // ── Toggle tanggal ────────────────────────────────────────────────────────
   const toggleDate = async (dateStr: string) => {
@@ -342,7 +339,7 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                       const isToday    = dk === todayStr;
                       const isSaving   = saving === dk;
                       const isDeleting = deleting === dk;
-                      const isPast     = dk < todayStr && !isOff; // tanggal lalu yang belum di-set libur → tidak bisa diset
+                      const isPast     = false; // tanggal lampau kini boleh di-set libur (pencatatan historis)
                       const isBusy     = isSaving || isDeleting;
                       // Tidak bisa tambah jika: kuota penuh DAN tanggal ini bukan libur
                       const canAdd     = !isOff && remainingCount > 0 && !isPastMonth && !isPast;

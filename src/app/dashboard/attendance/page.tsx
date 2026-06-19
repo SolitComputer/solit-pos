@@ -2932,48 +2932,57 @@ export default function AttendanceDashboardPage() {
             const userInfo = allUsers.find(u => u.id === userId);
             const userStartDate = getUserStartDate(userInfo?.created_at, calYear, calMonth);
 
+            // Tanggal cuti user ini → diperlakukan sebagai hari libur (tidak dihitung kewajiban hadir)
+            const userLeaveSet = new Set<string>(
+                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
+                    .map(r => r.leave_date)
+            );
+
             let present = 0, late = 0, score = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
+            let totalWorkdays = 0; // total hari kerja sebulan (rule SAMA dengan loop evaluasi)
+            let pastWorkdays = 0;  // hari kerja yang sudah lewat / hari ini
 
             for (let d = 1; d <= dim; d++) {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
-                if (isCurrentMonth && dk > todayWIB) break;
 
-                if (dk < userStartDate) {
-                    const mr = manualByName[name]?.[dk];
-                    if (!mr) continue;
-                }
+                // Lewati tanggal sebelum user bergabung (kecuali ada absen manual di tanggal itu)
+                const beforeStart = dk < userStartDate;
+                const hasManual = !!manualByName[name]?.[dk];
+                if (beforeStart && !hasManual) continue;
+
                 const dow = new Date(dk + "T12:00:00").getDay();
-                const isMonthlyOff = monthlyOffByName[name]?.has(dk) ?? false;
-                if (isMonthlyOff) { offDates.push(dk); continue; }
-                const isDateWork = allDateWorks.some(dw => dw.user_id === userIdByName[name] && dw.work_date === dk);
-                const isWeeklyOff = dows.has(dow) && !isDateWork;
-                if ((isWeeklyOff || offs.has(dk)) && !isDateWork) { offDates.push(dk); continue; }
 
+                // ── Penentuan hari libur dengan rule TERPADU ──
+                // date_work (tukar libur masuk) menang: hari itu jadi hari KERJA walau libur mingguan
+                const isDateWork = allDateWorks.some(dw => dw.user_id === userId && dw.work_date === dk);
+                const isMonthlyOff = monthlyOffByName[name]?.has(dk) ?? false;
+                const isWeeklyOff = dows.has(dow) && !isDateWork;
+                const isDateOff = offs.has(dk) && !isDateWork;
+                const isLeave = userLeaveSet.has(dk);
+                const isOffDay = isMonthlyOff || isWeeklyOff || isDateOff || isLeave;
+
+                const isPastOrToday = !(isCurrentMonth && dk > todayWIB);
+
+                if (isOffDay) {
+                    if (isPastOrToday) offDates.push(dk);
+                    continue;                            
+                }
+
+                totalWorkdays++;                  
+                if (!isPastOrToday) continue;     
+
+                pastWorkdays++;
                 const eff = effByName[name]?.[dk];
                 if (eff === "PRESENT") { present++; score += 1; }
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
                     const mr = manualByName[name]?.[dk];
-                    const hasLeaveToday = leaveData.find(ld => ld.user.id === userIdByName[name])?.requests.some(r => r.leave_date === dk);
-
-                    if (!hasLeaveToday) {
-                        absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
-                    } else {
-                        offDates.push(dk);
-                    }
+                    absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
                 }
             }
 
-            const pastWorkdays = present + late + absences.length;
-            const leaveDatesForUser = new Set<string>(
-                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
-                    .map(r => r.leave_date)
-            );
-            const monthlyOffSet = monthlyOffByName[name] ?? new Set<string>();
-            const offsWithMonthly = new Set<string>([...offs, ...monthlyOffSet]);
-            const totalWorkdays = countWorkingDaysFrom(calYear, calMonth, dows, offsWithMonthly, userStartDate, leaveDatesForUser);
             const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
 
             const resolvedUserId = userIdByName[name] ??
