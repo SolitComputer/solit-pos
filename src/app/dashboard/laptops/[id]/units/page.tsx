@@ -736,16 +736,16 @@ export default function UnitsPage() {
         setShowForm(true);
     };
 
-    // ── FIX: Semua status bisa diedit — SOLD default ke BELUM_SIAP supaya user aktif memilih ──
+    // ── FIX: openEdit — hanya 2 status: SOLD dan BELUM_SIAP
+    // SIAP_JUAL dan SERVICE → default ke BELUM_SIAP
+    // SOLD → preserve SOLD
     const openEdit = (unit: LaptopUnit) => {
         setEditingUnit(unit);
-        // SOLD → default BELUM_SIAP (user harus aktif memilih status baru)
-        // SIAP_JUAL, BELUM_SIAP, SERVICE → preserve status asli
         const editableStatus =
-            unit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
-                unit.status === "SERVICE" ? "SERVICE" :
-                    unit.status === "BELUM_SIAP" ? "BELUM_SIAP" :
-                        "BELUM_SIAP"; // SOLD → BELUM_SIAP sebagai default
+            unit.status === "SOLD" ? "SOLD" :
+                unit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
+                    "BELUM_SIAP";
+
         setFormData({
             serial_number: unit.serial_number,
             grade: unit.grade,
@@ -1144,9 +1144,7 @@ export default function UnitsPage() {
                 </div>
             </main>
 
-            {/* ═══════════════════════════════════════════════════════
-                FORM MODAL
-            ═══════════════════════════════════════════════════════ */}
+            {/* FORM MODAL */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeForm} />
@@ -1220,19 +1218,40 @@ export default function UnitsPage() {
                                     </div>
                                 )}
 
-                                {/* ── Status — 3 pilihan untuk semua unit (termasuk yang sebelumnya SOLD) ── */}
+                                {/* ── Status — 3 pilihan: Terjual, Siap Jual, Belum Siap Jual ── */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-2">
                                         Status <span className="text-red-400">*</span>
                                     </label>
                                     <div className="grid grid-cols-3 gap-2">
+                                        {/* Terjual */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, status: "SOLD" }))}
+                                            className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "SOLD"
+                                                ? "border-gray-500 bg-gray-100 shadow-sm"
+                                                : "border-gray-200 bg-white hover:border-gray-300"
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SOLD" ? "bg-gray-500" : "bg-gray-300"
+                                                    }`} />
+                                                <p className={`text-xs font-bold ${formData.status === "SOLD" ? "text-gray-700" : "text-gray-500"
+                                                    }`}>Terjual</p>
+                                            </div>
+                                            <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "SOLD" ? "text-gray-500" : "text-gray-400"
+                                                }`}>
+                                                Sudah terjual
+                                            </p>
+                                        </button>
+
                                         {/* Siap Jual */}
                                         <button
                                             type="button"
                                             onClick={() => setFormData(prev => ({ ...prev, status: "SIAP_JUAL" }))}
                                             className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "SIAP_JUAL"
-                                                    ? "border-emerald-500 bg-emerald-50 shadow-sm"
-                                                    : "border-gray-200 bg-white hover:border-gray-300"
+                                                ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                                                : "border-gray-200 bg-white hover:border-gray-300"
                                                 }`}
                                         >
                                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1247,13 +1266,13 @@ export default function UnitsPage() {
                                             </p>
                                         </button>
 
-                                        {/* Belum Siap */}
+                                        {/* Belum Siap Jual */}
                                         <button
                                             type="button"
                                             onClick={() => setFormData(prev => ({ ...prev, status: "BELUM_SIAP" }))}
                                             className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "BELUM_SIAP"
-                                                    ? "border-amber-500 bg-amber-50 shadow-sm"
-                                                    : "border-gray-200 bg-white hover:border-gray-300"
+                                                ? "border-amber-500 bg-amber-50 shadow-sm"
+                                                : "border-gray-200 bg-white hover:border-gray-300"
                                                 }`}
                                         >
                                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1265,27 +1284,6 @@ export default function UnitsPage() {
                                             <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "BELUM_SIAP" ? "text-amber-500" : "text-gray-400"
                                                 }`}>
                                                 Beri keterangan
-                                            </p>
-                                        </button>
-
-                                        {/* Service */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "SERVICE" }))}
-                                            className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "SERVICE"
-                                                    ? "border-blue-500 bg-blue-50 shadow-sm"
-                                                    : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SERVICE" ? "bg-blue-500" : "bg-gray-300"
-                                                    }`} />
-                                                <p className={`text-xs font-bold ${formData.status === "SERVICE" ? "text-blue-700" : "text-gray-600"
-                                                    }`}>Service</p>
-                                            </div>
-                                            <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "SERVICE" ? "text-blue-500" : "text-gray-400"
-                                                }`}>
-                                                Sedang servis
                                             </p>
                                         </button>
                                     </div>
@@ -1316,6 +1314,20 @@ export default function UnitsPage() {
                                                 );
                                             })}
                                         </div>
+                                        {/* Catatan kondisi untuk Siap Jual */}
+                                        <div className="mt-3">
+                                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                                Catatan Kondisi
+                                                <span className="text-gray-400 font-normal ml-1">(opsional)</span>
+                                            </label>
+                                            <input
+                                                name="condition_note"
+                                                placeholder="Kondisi fisik unit, misal: mulus, ada goresan tipis..."
+                                                value={formData.condition_note}
+                                                onChange={handleChange}
+                                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                            />
+                                        </div>
                                     </div>
                                 ) : formData.status === "BELUM_SIAP" ? (
                                     <div>
@@ -1338,43 +1350,15 @@ export default function UnitsPage() {
                                             Unit tidak akan muncul di daftar siap jual
                                         </p>
                                     </div>
-                                ) : formData.status === "SERVICE" ? (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                            Keterangan Service
-                                            <span className="text-gray-400 font-normal ml-1">(opsional)</span>
-                                        </label>
-                                        <textarea
-                                            name="condition_note"
-                                            placeholder="Contoh: ganti layar, keyboard rusak, baterai bocor..."
-                                            value={formData.condition_note}
-                                            onChange={handleChange}
-                                            rows={3}
-                                            className="w-full border border-blue-200 rounded-xl px-3 py-2.5 text-sm bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 focus:bg-white transition resize-none placeholder:text-gray-400"
-                                        />
-                                        <p className="text-[10px] text-blue-600 mt-1 flex items-center gap-1">
-                                            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                ) : (
+                                    /* SOLD — info box */
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                                            <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            Unit sedang dalam proses perbaikan
+                                            Status Terjual — hanya harga modal dan harga jual yang bisa diubah.
                                         </p>
-                                    </div>
-                                ) : null}
-
-                                {/* Catatan Kondisi — hanya tampil untuk Siap Jual */}
-                                {formData.status === "SIAP_JUAL" && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                            Catatan Kondisi
-                                            <span className="text-gray-400 font-normal ml-1">(opsional)</span>
-                                        </label>
-                                        <input
-                                            name="condition_note"
-                                            placeholder="Kondisi fisik unit, misal: mulus, ada goresan tipis..."
-                                            value={formData.condition_note}
-                                            onChange={handleChange}
-                                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
-                                        />
                                     </div>
                                 )}
 
