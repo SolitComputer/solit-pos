@@ -115,14 +115,15 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ─── Render teks dengan highlight @mention ────────────────────────────────────
+// ─── Mention highlight ────────────────────────────────────────────────────────
 function renderTextWithMentions(text: string, currentUserId?: string, currentUserName?: string) {
-    // Match @semua atau @NamaLengkap (huruf, spasi, titik)
     const parts = text.split(/(@semua|@[A-Za-z][A-Za-z\s.]*)/g);
     return parts.map((part, i) => {
         if (part === "@semua") {
             return (
-                <span key={i} className="inline-flex items-center px-1 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-xs">
+                <span key={i}
+                    className="inline-flex items-center px-1.5 py-0.5 font-semibold text-xs"
+                    style={{ background: "#fef3c7", color: "#b45309", borderRadius: 5 }}>
                     @semua
                 </span>
             );
@@ -131,13 +132,13 @@ function renderTextWithMentions(text: string, currentUserId?: string, currentUse
             const mentionName = part.slice(1).trim();
             const isMe = currentUserName && mentionName.toLowerCase() === currentUserName.toLowerCase();
             return (
-                <span
-                    key={i}
-                    className={`inline-flex items-center px-1 py-0.5 rounded-md font-semibold text-xs ${isMe
-                        ? "bg-blue-200 text-blue-800"
-                        : "bg-[#1a1a2e]/10 text-[#1a1a2e]"
-                        }`}
-                >
+                <span key={i}
+                    className="inline-flex items-center px-1.5 py-0.5 font-semibold text-xs"
+                    style={{
+                        background: isMe ? "#eef2ff" : "#f1f5f9",
+                        color: isMe ? "#4338ca" : "#475569",
+                        borderRadius: 5,
+                    }}>
                     {part}
                 </span>
             );
@@ -146,15 +147,37 @@ function renderTextWithMentions(text: string, currentUserId?: string, currentUse
     });
 }
 
+// ─── Logo Solit ───────────────────────────────────────────────────────────────
+function SolitLogo({ size = 44, radius = 12 }: { size?: number; radius?: number }) {
+    const [imgError, setImgError] = useState(false);
+    if (imgError) {
+        return (
+            <div className="flex items-center justify-center font-black text-white"
+                style={{
+                    width: size, height: size, borderRadius: radius,
+                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    fontSize: size * 0.22, letterSpacing: "0.5px",
+                }}>
+                S03
+            </div>
+        );
+    }
+    return (
+        <img src="/assets/solit03.jpeg" alt="Solit 03"
+            onError={() => setImgError(true)}
+            style={{ width: size, height: size, borderRadius: radius, objectFit: "cover", display: "block" }} />
+    );
+}
+
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ name, role, size = 32 }: { name: string; role: string; size?: number }) {
     return (
         <div style={{
             width: size, height: size,
             backgroundColor: getAvatarColor(role),
-            borderRadius: 8,
+            borderRadius: Math.round(size * 0.28),
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "white", fontSize: size * 0.35, fontWeight: 700, flexShrink: 0,
+            color: "white", fontSize: size * 0.33, fontWeight: 700, flexShrink: 0,
         }}>
             {getInitials(name)}
         </div>
@@ -170,15 +193,12 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
     }, [onClose]);
 
     return (
-        <div
-            className="fixed inset-0 z-[99999] flex items-center justify-center"
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center"
             style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
-            onClick={onClose}
-        >
+            onClick={onClose}>
             <button
                 className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
-                onClick={onClose}
-            >
+                onClick={onClose}>
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -188,20 +208,12 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
                     {name}
                 </div>
             )}
-            <img
-                src={url}
-                alt={name ?? "Foto"}
-                className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
-                onClick={e => e.stopPropagation()}
-            />
-            <a
-                href={url}
-                download={name ?? "foto"}
-                target="_blank"
-                rel="noopener noreferrer"
+            <img src={url} alt={name ?? "Foto"}
+                className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
+                onClick={e => e.stopPropagation()} />
+            <a href={url} download={name ?? "foto"} target="_blank" rel="noopener noreferrer"
                 className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs rounded-full transition"
-                onClick={e => e.stopPropagation()}
-            >
+                onClick={e => e.stopPropagation()}>
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -213,32 +225,21 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
 }
 
 // ─── AttachmentDisplay ────────────────────────────────────────────────────────
-function AttachmentDisplay({
-    url, type, name, size, isMine,
-}: {
-    url: string;
-    type: "image" | "file";
-    name: string | null;
-    size: number | null;
-    isMine: boolean;
+function AttachmentDisplay({ url, type, name, size, isMine }: {
+    url: string; type: "image" | "file"; name: string | null; size: number | null; isMine: boolean;
 }) {
     const [lightbox, setLightbox] = useState(false);
 
     if (type === "image") {
         return (
             <>
-                <div
-                    className="cursor-pointer rounded-xl overflow-hidden"
-                    style={{ maxWidth: 240 }}
-                    onClick={() => setLightbox(true)}
-                >
-                    <img
-                        src={url}
-                        alt={name ?? "Foto"}
-                        className="w-full object-cover hover:opacity-90 transition rounded-xl"
-                        style={{ maxHeight: 220 }}
-                        loading="lazy"
-                    />
+                <div className="cursor-pointer overflow-hidden"
+                    style={{ maxWidth: 240, borderRadius: 12 }}
+                    onClick={() => setLightbox(true)}>
+                    <img src={url} alt={name ?? "Foto"}
+                        className="w-full object-cover hover:opacity-90 transition"
+                        style={{ maxHeight: 220, borderRadius: 12 }}
+                        loading="lazy" />
                 </div>
                 {lightbox && <ImageLightbox url={url} name={name} onClose={() => setLightbox(false)} />}
             </>
@@ -247,18 +248,17 @@ function AttachmentDisplay({
 
     const ext = name?.split(".").pop()?.toUpperCase() ?? "FILE";
     return (
-        <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            download={name ?? true}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl no-underline transition ${isMine ? "bg-white/10 hover:bg-white/20" : "bg-gray-100 hover:bg-gray-200"
-                }`}
+        <a href={url} target="_blank" rel="noopener noreferrer" download={name ?? ""}
+            className={`flex items-center gap-2.5 px-3 py-2.5 no-underline transition ${
+                isMine
+                    ? "bg-white/10 hover:bg-white/15 rounded-xl"
+                    : "bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl"
+            }`}
             style={{ maxWidth: 240 }}
-            onClick={e => e.stopPropagation()}
-        >
-            <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${isMine ? "bg-white/20 text-white" : "bg-[#1a1a2e] text-white"
-                }`}>
+            onClick={e => e.stopPropagation()}>
+            <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[9px] font-bold gap-0.5 ${
+                isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
+            }`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -266,7 +266,7 @@ function AttachmentDisplay({
                 <span>{ext.slice(0, 4)}</span>
             </div>
             <div className="flex-1 min-w-0">
-                <p className={`text-xs font-medium truncate ${isMine ? "text-white" : "text-gray-800"}`}>
+                <p className={`text-xs font-semibold truncate ${isMine ? "text-white" : "text-gray-800"}`}>
                     {name ?? "File"}
                 </p>
                 {size != null && (
@@ -323,9 +323,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
     useEffect(() => {
         if (!showMenu) return;
         const handler = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setShowMenu(false);
-            }
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
@@ -333,11 +331,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
 
     const handleSaveEdit = async () => {
         const trimmed = editContent.trim();
-        if (!trimmed || trimmed === msg.content) {
-            setIsEditing(false);
-            setEditContent(msg.content);
-            return;
-        }
+        if (!trimmed || trimmed === msg.content) { setIsEditing(false); setEditContent(msg.content); return; }
         setSaving(true);
         const ok = await onEdit(msg.id, trimmed);
         setSaving(false);
@@ -349,6 +343,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
         if (e.key === "Escape") { setIsEditing(false); setEditContent(msg.content); }
     };
 
+    // ── Deleted ──
     if (msg.is_deleted) {
         return (
             <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
@@ -359,12 +354,13 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                 )}
                 <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
                     {!isMine && (
-                        <span className="text-[10px] font-semibold mb-0.5 px-1"
+                        <span className="text-[9.5px] font-bold mb-1 px-1"
                             style={{ color: getAvatarColor(msg.sender_role) }}>
                             {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
                         </span>
                     )}
-                    <div className="px-3 py-2 rounded-2xl bg-gray-100 border border-gray-200 text-gray-400 text-xs italic">
+                    <div className="px-3 py-1.5 text-slate-400 text-xs italic"
+                        style={{ background: "#f1f5f9", border: "0.5px solid #e2e8f0", borderRadius: 10 }}>
                         🚫 menghapus pesan ini
                     </div>
                 </div>
@@ -376,10 +372,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
     const hasContent = !!msg.content;
 
     return (
-        <div
-            id={`msg-${msg.id}`}
-            className={`flex gap-2 group ${isMine ? "justify-end" : "justify-start"}`}
-        >
+        <div id={`msg-${msg.id}`} className={`flex gap-2 group ${isMine ? "justify-end" : "justify-start"}`}>
             {!isMine && (
                 <div className="flex-shrink-0 self-end mb-1">
                     <Avatar name={msg.sender_name} role={msg.sender_role} size={30} />
@@ -387,8 +380,9 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
             )}
 
             <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
+                {/* Sender label untuk theirs */}
                 {!isMine && (
-                    <span className="text-[10px] font-semibold mb-0.5 px-1"
+                    <span className="text-[9.5px] font-bold mb-1 px-1"
                         style={{ color: getAvatarColor(msg.sender_role) }}>
                         {msg.sender_name} · {ROLE_LABEL[msg.sender_role] ?? msg.sender_role}
                     </span>
@@ -396,8 +390,11 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
 
                 <div className="relative">
                     {isEditing ? (
-                        <div className={`rounded-2xl shadow-sm px-3 pt-2 pb-2 min-w-[200px] ${isMine ? "bg-[#1a1a2e] rounded-br-sm" : "bg-white border border-gray-200 rounded-bl-sm"
-                            }`}>
+                        <div className={`px-3 pt-2.5 pb-2 min-w-[200px] ${isMine ? "text-white" : "bg-white border border-slate-200 text-gray-800"}`}
+                            style={{
+                                borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : undefined,
+                            }}>
                             <textarea
                                 ref={editRef}
                                 value={editContent}
@@ -409,28 +406,29 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-gray-800 placeholder:text-gray-400"
-                                    }`}
+                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${
+                                    isMine ? "text-white placeholder:text-white/40" : "text-gray-800"
+                                }`}
                                 style={{ minHeight: 22 }}
                             />
                             <div className="flex items-center justify-between mt-2 gap-2">
-                                <span className={`text-[10px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
+                                <span className={`text-[9px] ${isMine ? "text-white/40" : "text-gray-400"}`}>
                                     Enter simpan · Esc batal
                                 </span>
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[10px] px-2 py-0.5 rounded-lg transition ${isMine ? "text-white/60 hover:bg-white/10 hover:text-white" : "text-gray-500 hover:bg-gray-100"
-                                            }`}
-                                    >
+                                        className={`text-[9px] px-2 py-1 rounded-lg transition ${
+                                            isMine ? "text-white/60 hover:bg-white/10" : "text-gray-500 hover:bg-gray-100"
+                                        }`}>
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[10px] px-2.5 py-0.5 rounded-lg font-semibold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white hover:bg-white/30" : "bg-[#1a1a2e] text-white hover:bg-[#16213e]"
-                                            }`}
-                                    >
+                                        className={`text-[9px] px-2.5 py-1 rounded-lg font-semibold transition disabled:opacity-40 ${
+                                            isMine ? "bg-white/20 text-white" : "bg-[#1e1b4b] text-white"
+                                        }`}>
                                         {saving ? "..." : "Simpan"}
                                     </button>
                                 </div>
@@ -438,30 +436,32 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                         </div>
                     ) : (
                         <div
-                            className={`relative px-3 py-2 rounded-2xl shadow-sm cursor-pointer select-text ${isMine
-                                ? "bg-[#1a1a2e] text-white rounded-br-sm"
-                                : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
-                                }`}
-                            onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}
-                        >
+                            className={`relative px-3 py-2.5 cursor-pointer select-text ${
+                                isMine ? "text-white" : "bg-white text-gray-800 border border-slate-200"
+                            }`}
+                            style={{
+                                borderRadius: isMine ? "14px 14px 3px 14px" : "14px 14px 14px 3px",
+                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : undefined,
+                                boxShadow: isMine ? "0 2px 12px rgba(30,27,75,0.3)" : "0 1px 4px rgba(0,0,0,0.06)",
+                            }}
+                            onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
+
                             {/* Reply preview */}
                             {msg.reply_to && (
                                 <div
-                                    className={`mb-2 px-2 py-1.5 rounded-lg cursor-pointer text-[10px] border-l-2 ${isMine
-                                        ? "bg-white/10 border-white/40 text-white/80"
-                                        : "bg-gray-50 border-gray-300 text-gray-600"
-                                        }`}
-                                    onClick={() => onScrollToReply(msg.reply_to_id!)}
-                                >
-                                    <p className="font-semibold truncate">{msg.reply_to.sender_name}</p>
-                                    <p className="truncate mt-0.5 opacity-80">
-                                        {msg.reply_to.is_deleted
-                                            ? "🚫 Pesan dihapus"
-                                            : msg.reply_to.attachment_type === "image"
-                                                ? "📷 Foto"
-                                                : msg.reply_to.attachment_type === "file"
-                                                    ? "📎 File"
-                                                    : msg.reply_to.content}
+                                    className={`mb-2 px-2.5 py-1.5 cursor-pointer text-[10px] border-l-2 ${
+                                        isMine
+                                            ? "bg-white/10 border-white/35 text-white/75"
+                                            : "bg-slate-50 border-indigo-300 text-slate-600"
+                                    }`}
+                                    style={{ borderRadius: 8 }}
+                                    onClick={() => onScrollToReply(msg.reply_to_id!)}>
+                                    <p className="font-bold truncate text-[9.5px]">{msg.reply_to.sender_name}</p>
+                                    <p className="truncate mt-0.5 opacity-75 text-[9px]">
+                                        {msg.reply_to.is_deleted ? "🚫 Pesan dihapus"
+                                            : msg.reply_to.attachment_type === "image" ? "📷 Foto"
+                                            : msg.reply_to.attachment_type === "file" ? "📎 File"
+                                            : msg.reply_to.content}
                                     </p>
                                 </div>
                             )}
@@ -479,7 +479,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                                 </div>
                             )}
 
-                            {/* Text dengan mention highlight */}
+                            {/* Text */}
                             {hasContent && (
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                                     {renderTextWithMentions(msg.content, undefined, currentUserName)}
@@ -487,9 +487,11 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                             )}
 
                             {/* Timestamp */}
-                            <div className={`flex items-center justify-end gap-1 mt-1 ${isMine ? "text-white/50" : "text-gray-400"}`}>
-                                {msg.edited_at && <span className="text-[9px] italic opacity-70">diedit</span>}
-                                <span className="text-[10px]">{formatTime(msg.created_at)}</span>
+                            <div className={`flex items-center justify-end gap-1 mt-1.5 ${
+                                isMine ? "text-white/40" : "text-slate-400"
+                            }`}>
+                                {msg.edited_at && <span className="text-[9px] italic">diedit</span>}
+                                <span className="text-[9.5px]">{formatTime(msg.created_at)}</span>
                             </div>
                         </div>
                     )}
@@ -498,14 +500,18 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                     {showMenu && !isEditing && (
                         <div
                             ref={menuRef}
-                            className={`absolute bottom-full mb-1 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden py-1 min-w-[140px] ${isMine ? "right-0" : "left-0"
-                                }`}
-                        >
+                            className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1 min-w-[145px] ${
+                                isMine ? "right-0" : "left-0"
+                            }`}
+                            style={{
+                                borderRadius: 16,
+                                border: "0.5px solid #e2e8f0",
+                                boxShadow: "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+                            }}>
                             <button
                                 onClick={() => { onReply(msg); setShowMenu(false); }}
-                                className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition">
+                                <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                 </svg>
@@ -514,25 +520,23 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                             {isMine && hasContent && (
                                 <button
                                     onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                                    className="w-full text-left px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    className="w-full text-left px-4 py-2.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-2.5 transition">
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
-                                    Edit
+                                    Edit pesan
                                 </button>
                             )}
                             {(isMine || isAdmin) && (
                                 <button
                                     onClick={() => { onDelete(msg.id); setShowMenu(false); }}
-                                    className="w-full text-left px-4 py-2 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    className="w-full text-left px-4 py-2.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition">
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
-                                    Hapus
+                                    Hapus pesan
                                 </button>
                             )}
                         </div>
@@ -540,14 +544,15 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
                 </div>
             </div>
 
+            {/* Quick reply button on hover */}
             {!isEditing && (
                 <div className={`opacity-0 group-hover:opacity-100 flex items-center self-end mb-1 transition-opacity ${isMine ? "order-first" : ""}`}>
                     <button
                         onClick={() => onReply(msg)}
-                        className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition"
-                        title="Balas"
-                    >
-                        <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        className="w-7 h-7 rounded-full flex items-center justify-center transition hover:scale-110"
+                        style={{ background: "#fff", border: "0.5px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
+                        title="Balas">
+                        <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                         </svg>
@@ -574,26 +579,32 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
             (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(query.toLowerCase())
         );
 
-    // Tambah opsi @semua di awal
     const showSemua = "semua".includes(query.toLowerCase()) || query === "";
     const totalItems = (showSemua ? 1 : 0) + filtered.length;
-
     if (totalItems === 0) return null;
 
     return (
-        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-            <div className="px-3 py-2 border-b border-gray-50">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Mention</p>
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white overflow-hidden z-50"
+            style={{
+                borderRadius: 16,
+                border: "0.5px solid #e2e8f0",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+            }}>
+            {/* Header */}
+            <div className="px-3 py-2 flex items-center gap-2"
+                style={{ borderBottom: "0.5px solid #f1f5f9", background: "#fafbff" }}>
+                <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention</span>
             </div>
             <div className="max-h-52 overflow-y-auto">
                 {showSemua && (
                     <button
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-gray-50"
-                            }`}
-                        onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}
-                    >
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-amber-600 font-bold text-xs">@</span>
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${
+                            selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"
+                        }`}
+                        onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}>
+                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                            style={{ borderRadius: 8, background: "#fef3c7" }}>
+                            <span className="text-amber-500 font-black text-sm">@</span>
                         </div>
                         <div className="min-w-0">
                             <p className="text-xs font-semibold text-gray-800">semua</p>
@@ -606,20 +617,23 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                     return (
                         <button
                             key={user.id}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${selectedIndex === idx ? "bg-blue-50" : "hover:bg-gray-50"
-                                }`}
-                            onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}
-                        >
-                            <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
-                                style={{ backgroundColor: getAvatarColor(user.role) }}
-                            >
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition ${
+                                selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"
+                            }`}
+                            onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}>
+                            <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
+                                style={{ backgroundColor: getAvatarColor(user.role), borderRadius: 8 }}>
                                 {getInitials(user.name)}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-xs font-semibold text-gray-800 truncate">{user.name}</p>
                                 <p className="text-[10px] text-gray-400 truncate">{ROLE_LABEL[user.role] ?? user.role}</p>
                             </div>
+                            {selectedIndex === idx && (
+                                <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            )}
                         </button>
                     );
                 })}
@@ -646,17 +660,14 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const [preview, setPreview] = useState<{
         url: string; name: string; type: "image" | "file"; size: number;
     } | null>(null);
-
-    // ── Mention state ─────────────────────────────────────────────────────────
     const [mentionActive, setMentionActive] = useState(false);
     const [mentionQuery, setMentionQuery] = useState("");
     const [mentionIndex, setMentionIndex] = useState(0);
-    const [mentionStart, setMentionStart] = useState(0); // posisi @ di textarea
+    const [mentionStart, setMentionStart] = useState(0);
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    // ── Mention helpers ───────────────────────────────────────────────────────
     const getMentionFilteredList = () => {
         const showSemua = "semua".includes(mentionQuery.toLowerCase()) || mentionQuery === "";
         const filtered = mentionQuery === ""
@@ -671,18 +682,14 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const insertMention = (user: UserOption | null) => {
         const ta = inputRef.current;
         if (!ta) return;
-
-        const before = input.slice(0, mentionStart); // teks sebelum @
-        const after = input.slice(ta.selectionStart);  // teks setelah cursor
+        const before = input.slice(0, mentionStart);
+        const after = input.slice(ta.selectionStart);
         const mentionText = user ? `@${user.name} ` : `@semua `;
         const newValue = before + mentionText + after;
-
         setInput(newValue);
         setMentionActive(false);
         setMentionQuery("");
         setMentionIndex(0);
-
-        // Set cursor setelah mention
         requestAnimationFrame(() => {
             const pos = before.length + mentionText.length;
             ta.focus();
@@ -696,25 +703,16 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
         const val = e.target.value;
         const cursor = e.target.selectionStart ?? 0;
         setInput(val);
-
-        // Resize textarea
         const ta = e.target;
         ta.style.height = "auto";
         ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-
-        // Detect mention: cari @ terakhir sebelum cursor
         const textBeforeCursor = val.slice(0, cursor);
         const lastAt = textBeforeCursor.lastIndexOf("@");
-
         if (lastAt !== -1) {
             const textAfterAt = textBeforeCursor.slice(lastAt + 1);
-            // Aktifkan mention jika: ada @ dan tidak ada spasi > 1 kata setelah @
-            // Maks 30 karakter query dan tidak ada newline
             const validQuery = !textAfterAt.includes("\n") && textAfterAt.length <= 30;
-            // Pastikan @ ini bukan bagian dari kata (preceded by spasi/awal)
             const charBefore = lastAt > 0 ? val[lastAt - 1] : " ";
             const isAtStart = charBefore === " " || charBefore === "\n" || lastAt === 0;
-
             if (validQuery && isAtStart) {
                 setMentionActive(true);
                 setMentionQuery(textAfterAt);
@@ -723,42 +721,27 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                 return;
             }
         }
-
         setMentionActive(false);
         setMentionQuery("");
     };
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        // Mention navigation
         if (mentionActive) {
             const { total } = getMentionFilteredList();
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setMentionIndex(i => (i + 1) % total);
-                return;
-            }
-            if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setMentionIndex(i => (i - 1 + total) % total);
-                return;
-            }
+            if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => (i + 1) % total); return; }
+            if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => (i - 1 + total) % total); return; }
             if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
                 const { showSemua, filtered } = getMentionFilteredList();
-                if (mentionIndex === 0 && showSemua) {
-                    insertMention(null);
-                } else {
+                if (mentionIndex === 0 && showSemua) { insertMention(null); }
+                else {
                     const userIdx = showSemua ? mentionIndex - 1 : mentionIndex;
                     if (filtered[userIdx]) insertMention(filtered[userIdx]);
                 }
                 return;
             }
-            if (e.key === "Escape") {
-                setMentionActive(false);
-                return;
-            }
+            if (e.key === "Escape") { setMentionActive(false); return; }
         }
-
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             if (preview) handleSendFile();
@@ -815,52 +798,57 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const isLoading = uploading || sending;
 
     return (
-        <div className="flex-shrink-0 border-t border-gray-100 bg-white">
+        <div className="flex-shrink-0 bg-white" style={{ borderTop: "0.5px solid #e2e8f0" }}>
+
             {/* Reply preview */}
             {replyTo && (
-                <div className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-100 bg-[#f8f9ff]">
-                    <div className="flex-1 min-w-0 pl-3 border-l-2 border-[#1a1a2e]">
-                        <p className="text-[10px] font-bold text-[#1a1a2e]">{replyTo.sender_name}</p>
-                        <p className="text-xs text-gray-500 truncate mt-0.5">
+                <div className="flex items-center gap-3 px-5 py-2.5"
+                    style={{ borderBottom: "0.5px solid #e2e8f0", background: "#f8fafc" }}>
+                    <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "2.5px solid #6366f1" }}>
+                        <p className="text-[10px] font-black text-indigo-600">{replyTo.sender_name}</p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">
                             {replyTo.attachment_type === "image" ? "📷 Foto"
                                 : replyTo.attachment_type === "file" ? "📎 File"
                                     : replyTo.content}
                         </p>
                     </div>
                     <button onClick={onCancelReply}
-                        className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300 transition flex-shrink-0">
-                        <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
+                        style={{ width: 24, height: 24, borderRadius: "50%", background: "#f1f5f9", border: "none" }}>
+                        <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
             )}
 
-            {/* File preview sebelum kirim */}
+            {/* File preview */}
             {preview && (
-                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <div className="px-4 py-3" style={{ borderBottom: "0.5px solid #e2e8f0" }}>
                     <div className="flex items-center gap-3">
                         {preview.type === "image" ? (
-                            <img src={preview.url} alt="preview"
-                                className="w-14 h-14 object-cover rounded-xl flex-shrink-0 border border-gray-200" />
+                            <img src={preview.url} alt="preview" className="object-cover flex-shrink-0"
+                                style={{ width: 52, height: 52, borderRadius: 12, border: "0.5px solid #e2e8f0" }} />
                         ) : (
-                            <div className="w-14 h-14 bg-[#1a1a2e] rounded-xl flex flex-col items-center justify-center flex-shrink-0 gap-1">
+                            <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1"
+                                style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(135deg, #1e1b4b, #312e81)" }}>
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                <span className="text-white text-[8px] font-bold">
+                                <span className="text-white text-[7px] font-bold">
                                     {preview.name.split(".").pop()?.toUpperCase()}
                                 </span>
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-800 truncate">{preview.name}</p>
-                            <p className="text-[10px] text-gray-400 mt-0.5">{formatFileSize(preview.size)}</p>
+                            <p className="text-xs font-semibold text-slate-800 truncate">{preview.name}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{formatFileSize(preview.size)}</p>
                         </div>
                         <button onClick={cancelPreview}
-                            className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition flex-shrink-0">
-                            <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            className="flex items-center justify-center flex-shrink-0 hover:bg-slate-200 transition"
+                            style={{ width: 24, height: 24, borderRadius: "50%", background: "#f1f5f9", border: "none" }}>
+                            <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -874,24 +862,29 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     <Avatar name={currentUser.name} role={currentUser.role} size={32} />
                 </div>
 
-                <div className="flex-1 flex items-end gap-2 bg-gray-100 rounded-2xl px-3 py-2 min-h-[42px] relative">
-                    {/* Mention dropdown — muncul di atas textarea */}
+                <div className="flex-1 flex items-end gap-2 relative"
+                    style={{
+                        background: "#f8fafc",
+                        border: "0.5px solid #e2e8f0",
+                        borderRadius: 20,
+                        padding: "8px 12px",
+                        minHeight: 42,
+                    }}>
                     {mentionActive && (
                         <MentionDropdown
                             query={mentionQuery}
                             users={users}
                             selectedIndex={mentionIndex}
                             onSelect={insertMention}
-                        />  
+                        />
                     )}
 
-                    {/* Attach button */}
+                    {/* Attach */}
                     <button
                         onClick={() => fileRef.current?.click()}
                         disabled={isLoading}
-                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-[#1a1a2e] transition flex-shrink-0 disabled:opacity-40"
-                        title="Lampirkan file / foto"
-                    >
+                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center text-slate-400 hover:text-indigo-500 transition flex-shrink-0 disabled:opacity-40"
+                        title="Lampirkan file / foto">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -903,34 +896,36 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        onBlur={() => {
-                            // Delay agar klik item dropdown sempat ter-register
-                            setTimeout(() => setMentionActive(false), 150);
-                        }}
+                        onBlur={() => { setTimeout(() => setMentionActive(false), 150); }}
                         placeholder={preview ? "Tambah caption (opsional)..." : "Tulis pesan... ketik @ untuk mention"}
                         maxLength={2000}
                         rows={1}
                         disabled={isLoading}
-                        className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 resize-none outline-none leading-relaxed max-h-[120px] min-h-[22px] disabled:opacity-50"
+                        className="flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 resize-none outline-none leading-relaxed max-h-[120px] min-h-[22px] disabled:opacity-50"
                         style={{ height: "22px" }}
                     />
                     {input.length > 1800 && (
-                        <span className="text-[10px] text-gray-400 self-end flex-shrink-0">{input.length}/2000</span>
+                        <span className="text-[9.5px] text-slate-400 self-end flex-shrink-0">{input.length}/2000</span>
                     )}
                 </div>
 
-                {/* Send button */}
+                {/* Send */}
                 <button
                     onClick={preview ? handleSendFile : handleSendText}
                     disabled={!canSend}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition self-end disabled:opacity-40"
-                    style={{ background: canSend ? "#1a1a2e" : "#e5e7eb" }}
-                >
+                    className="flex items-center justify-center flex-shrink-0 text-white transition self-end disabled:opacity-40 hover:scale-105"
+                    style={{
+                        width: 42, height: 42,
+                        borderRadius: 13,
+                        border: "none",
+                        background: canSend ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)" : "#cbd5e1",
+                        boxShadow: canSend ? "0 3px 12px rgba(30,27,75,0.4)" : "none",
+                    }}>
                     {isLoading ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <div className="animate-spin"
+                            style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
                     ) : (
-                        <svg className="w-4 h-4" fill="none"
-                            stroke={canSend ? "white" : "#9ca3af"} viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke={canSend ? "white" : "#94a3b8"} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
@@ -953,27 +948,25 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [unread, setUnread] = useState(0);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const [users, setUsers] = useState<UserOption[]>([]);
+    const [onlineCount] = useState<number>(0);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
 
-    // ── Fetch user list untuk mention ─────────────────────────────────────────
     useEffect(() => {
         fetch("/api/users")
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    // Filter out current user dari mention list
                     const others = (data.users as UserOption[]).filter(u => u.id !== currentUser.id);
                     setUsers(others);
                 }
             })
-            .catch(() => { /* silent fail — mention tetap bisa jalan dengan list kosong */ });
+            .catch(() => { });
     }, [currentUser.id]);
 
-    // ── Fetch messages ────────────────────────────────────────────────────────
     const fetchMessages = useCallback(async () => {
         setLoading(true);
         try {
@@ -995,11 +988,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const res = await fetch(`/api/group-chat?id=${encodeURIComponent(id)}`);
             const data = await res.json();
             if (data.success && data.message) return data.message as GroupMessage;
-        } catch { /* fallback */ }
+        } catch { }
         return null;
     }, []);
 
-    // ── Load more ─────────────────────────────────────────────────────────────
     const loadMore = useCallback(async () => {
         if (!hasMore || loadingMore || messages.length === 0) return;
         setLoadingMore(true);
@@ -1023,7 +1015,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [hasMore, loadingMore, messages]);
 
-    // ── Scroll effects ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!loading && messages.length > 0) {
             bottomRef.current?.scrollIntoView({ behavior: "auto" });
@@ -1039,8 +1030,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 bottomRef.current?.scrollIntoView({ behavior: "smooth" });
                 setUnread(0);
             } else {
-                const newUnread = messages.slice(prevMsgCount.current)
-                    .filter(m => m.sender_id !== currentUser.id).length;
+                const newUnread = messages.slice(prevMsgCount.current).filter(m => m.sender_id !== currentUser.id).length;
                 if (newUnread > 0) setUnread(u => u + newUnread);
             }
         }
@@ -1055,7 +1045,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         if (el.scrollTop < 80 && hasMore && !loadingMore) loadMore();
     }, [hasMore, loadingMore, loadMore]);
 
-    // ── Realtime ──────────────────────────────────────────────────────────────
     useEffect(() => {
         const channel = supabase
             .channel(`group-chat-${Math.random().toString(36).slice(2, 7)}`, {
@@ -1095,7 +1084,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return () => { channel.unsubscribe(); };
     }, [fetchSingleMessage]);
 
-    // ── Send text ─────────────────────────────────────────────────────────────
     const send = useCallback(async (content: string) => {
         if (!content.trim()) return;
         const tempId = `temp-${Date.now()}`;
@@ -1136,12 +1124,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [currentUser, replyTo]);
 
-    // ── Send attachment ───────────────────────────────────────────────────────
     const sendAttachment = useCallback(async (file: File, caption: string) => {
         const tempId = `temp-${Date.now()}`;
         const isImage = file.type.startsWith("image/");
         const previewUrl = isImage ? URL.createObjectURL(file) : null;
-
         const optimistic: GroupMessage = {
             id: tempId,
             sender_id: currentUser.id,
@@ -1160,23 +1146,19 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted, attachment_type: replyTo.attachment_type }
                 : null,
         };
-
         setMessages(prev => [...prev, optimistic]);
         setReplyTo(null);
-
         try {
             const formData = new FormData();
             formData.append("file", file);
             const uploadRes = await fetch("/api/group-chat/upload", { method: "POST", body: formData });
             const uploadData = await uploadRes.json();
-
             if (!uploadData.success) {
                 setMessages(prev => prev.filter(m => m.id !== tempId));
                 if (previewUrl) URL.revokeObjectURL(previewUrl);
                 alert(uploadData.message ?? "Upload gagal");
                 return;
             }
-
             const msgRes = await fetch("/api/group-chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1190,7 +1172,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 }),
             });
             const msgData = await msgRes.json();
-
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             if (msgData.success) {
                 setMessages(prev => prev.map(m => m.id === tempId ? msgData.message : m));
@@ -1203,7 +1184,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [currentUser, replyTo]);
 
-    // ── Delete ────────────────────────────────────────────────────────────────
     const deleteMessage = async (messageId: string) => {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
         try {
@@ -1213,7 +1193,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     };
 
-    // ── Edit ──────────────────────────────────────────────────────────────────
     const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
         setMessages(prev =>
             prev.map(m => m.id === messageId
@@ -1241,7 +1220,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     };
 
-    // ── Scroll to reply ───────────────────────────────────────────────────────
     const scrollToReply = (id: string) => {
         const el = document.getElementById(`msg-${id}`);
         if (el) {
@@ -1251,7 +1229,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     };
 
-    // ── Group by date ─────────────────────────────────────────────────────────
     type DateGroup = { dateKey: string; dateLabel: string; msgs: GroupMessage[] };
     const groupedMessages = messages.reduce<DateGroup[]>((acc, msg) => {
         const key = getDateKey(msg.created_at);
@@ -1264,82 +1241,117 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return acc;
     }, []);
 
-    // ─── Render ───────────────────────────────────────────────────────────────
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
-            style={{ backdropFilter: "blur(4px)", backgroundColor: "rgba(0,0,0,0.6)" }}
-        >
+            style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(0,0,0,0.7)" }}>
             <div
-                className="relative flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden"
-                style={{ width: "min(900px, 100%)", height: "min(760px, 95vh)" }}
-            >
-                {/* Header */}
+                className="relative flex flex-col bg-white overflow-hidden"
+                style={{
+                    width: "min(900px, 100%)",
+                    height: "min(760px, 95vh)",
+                    borderRadius: 22,
+                    boxShadow: "0 32px 100px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.1)",
+                }}>
+
+                {/* ── Header ── */}
                 <div
-                    className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
-                    style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)" }}
-                >
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: "rgba(255,255,255,0.12)" }}>
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
+                    className="flex-shrink-0 flex items-center gap-3 px-5 py-4 relative overflow-hidden"
+                    style={{ background: "#0d0d1a" }}>
+                    {/* Decorative orbs */}
+                    <div className="absolute rounded-full pointer-events-none"
+                        style={{ top: -30, right: -30, width: 120, height: 120, background: "rgba(99,102,241,0.08)" }} />
+                    <div className="absolute rounded-full pointer-events-none"
+                        style={{ bottom: -40, left: 80, width: 100, height: 100, background: "rgba(139,92,246,0.05)" }} />
+                    <div className="absolute rounded-full pointer-events-none"
+                        style={{ top: -10, left: "40%", width: 60, height: 60, background: "rgba(99,102,241,0.04)" }} />
+
+                    {/* Logo */}
+                    <div className="relative flex-shrink-0 z-10"
+                        style={{ border: "2px solid rgba(255,255,255,0.12)", borderRadius: 14, overflow: "hidden" }}>
+                        <SolitLogo size={46} radius={12} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-sm font-bold text-white">All Team Solit 💬</h2>
-                        <p className="text-[11px] text-white/50 mt-0.5">Grup chat seluruh tim</p>
+
+                    <div className="flex-1 min-w-0 z-10">
+                        <h2 className="text-[13px] font-black text-white tracking-tight">All Team Solit 💬</h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            {/* Animated green dot */}
+                            <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+                            </span>
+                            <span className="text-[9.5px] text-white/45">Grup chat seluruh tim</span>
+                            {/* Online badge */}
+                            {onlineCount > 0 && (
+                                <span className="text-[9px] font-semibold text-emerald-400 px-2 py-0.5"
+                                    style={{ background: "rgba(16,185,129,0.12)", border: "0.5px solid rgba(16,185,129,0.25)", borderRadius: 20 }}>
+                                    {onlineCount} online
+                                </span>
+                            )}
+                        </div>
                     </div>
-                    <button onClick={onClose}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/15 transition flex-shrink-0">
+
+                    <button
+                        onClick={onClose}
+                        className="w-9 h-9 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition flex-shrink-0 z-10"
+                        style={{ borderRadius: 10 }}>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
-                {/* Messages */}
+                {/* Accent line */}
+                <div style={{ height: 1, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 60%, transparent 100%)", opacity: 0.6 }} />
+
+                {/* ── Messages ── */}
                 <div
                     ref={messagesRef}
                     onScroll={handleScroll}
                     className="flex-1 overflow-y-auto px-5 py-4 space-y-1"
-                    style={{
-                        background: "linear-gradient(180deg, #f0f4ff 0%, #f8f9ff 100%)",
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231a1a2e' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-                    }}
-                >
+                    style={{ background: "#f8fafc" }}>
+
                     {loadingMore && (
                         <div className="flex justify-center py-2">
-                            <div className="w-5 h-5 border-2 border-gray-300 border-t-[#1a1a2e] rounded-full animate-spin" />
+                            <div className="animate-spin rounded-full"
+                                style={{ width: 20, height: 20, border: "2.5px solid #e2e8f0", borderTopColor: "#6366f1" }} />
                         </div>
                     )}
+
                     {hasMore && !loadingMore && (
                         <div className="flex justify-center py-2">
                             <button onClick={loadMore}
-                                className="text-[11px] text-[#1a1a2e]/60 hover:text-[#1a1a2e] transition px-3 py-1 bg-white/80 rounded-full border border-gray-200 hover:bg-white">
-                                Muat pesan lebih lama ↑
+                                className="text-[11px] text-indigo-600 hover:text-indigo-700 transition px-4 py-1.5 bg-white hover:bg-indigo-50 font-medium"
+                                style={{ border: "0.5px solid #e2e8f0", borderRadius: 20 }}>
+                                ↑ Muat pesan lebih lama
                             </button>
                         </div>
                     )}
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3">
-                            <div className="w-8 h-8 border-2 border-gray-300 border-t-[#1a1a2e] rounded-full animate-spin" />
-                            <p className="text-xs text-gray-400">Memuat pesan...</p>
+                            <div className="animate-spin rounded-full"
+                                style={{ width: 28, height: 28, border: "2.5px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                            <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
                         </div>
                     ) : messages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center text-3xl">👋</div>
+                        <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+                            <div className="flex items-center justify-center text-4xl"
+                                style={{ width: 72, height: 72, borderRadius: 22, background: "#fff", border: "0.5px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }}>
+                                👋
+                            </div>
                             <div>
-                                <p className="text-sm font-semibold text-gray-700">Belum ada pesan</p>
-                                <p className="text-xs text-gray-400 mt-1">Mulai percakapan untuk seluruh tim!</p>
+                                <p className="text-sm font-bold text-slate-700">Belum ada pesan</p>
+                                <p className="text-xs text-slate-400 mt-1.5">Mulai percakapan untuk seluruh tim!</p>
                             </div>
                         </div>
                     ) : (
                         groupedMessages.map((group: DateGroup) => (
                             <Fragment key={group.dateKey}>
+                                {/* Date pill */}
                                 <div className="flex items-center justify-center py-3">
-                                    <div className="bg-white/80 border border-gray-200 text-gray-500 text-[10px] font-semibold px-3 py-1 rounded-full shadow-sm">
+                                    <div className="text-slate-400 text-[9.5px] font-semibold px-3 py-1 bg-white"
+                                        style={{ borderRadius: 20, border: "0.5px solid #e2e8f0", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
                                         {group.dateLabel}
                                     </div>
                                 </div>
@@ -1373,13 +1385,20 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     <div className="absolute bottom-24 right-5 z-10">
                         <button
                             onClick={() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); setUnread(0); }}
-                            className="relative w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition"
-                        >
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            className="relative w-10 h-10 bg-white flex items-center justify-center hover:bg-slate-50 transition"
+                            style={{ borderRadius: "50%", border: "0.5px solid #e2e8f0", boxShadow: "0 4px 20px rgba(0,0,0,0.12)" }}>
+                            <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
                             {unread > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#1a1a2e] text-white text-[9px] font-bold flex items-center justify-center">
+                                <span className="absolute text-white text-[9px] font-black flex items-center justify-center"
+                                    style={{
+                                        top: -6, right: -6,
+                                        minWidth: 18, height: 18,
+                                        borderRadius: 9,
+                                        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                        padding: "0 4px",
+                                    }}>
                                     {unread > 9 ? "9+" : unread}
                                 </span>
                             )}
@@ -1387,7 +1406,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     </div>
                 )}
 
-                {/* Input Area */}
                 <InputArea
                     currentUser={currentUser}
                     replyTo={replyTo}
@@ -1399,16 +1417,16 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             </div>
 
             <style jsx global>{`
-        @keyframes highlightMsg {
-          0%   { background-color: transparent; }
-          30%  { background-color: rgba(26, 26, 46, 0.12); }
-          100% { background-color: transparent; }
-        }
-        .highlight-msg {
-          animation: highlightMsg 1.5s ease-out;
-          border-radius: 12px;
-        }
-      `}</style>
+                @keyframes highlightMsg {
+                    0%   { background-color: transparent; }
+                    25%  { background-color: rgba(99, 102, 241, 0.12); }
+                    100% { background-color: transparent; }
+                }
+                .highlight-msg {
+                    animation: highlightMsg 1.5s ease-out;
+                    border-radius: 14px;
+                }
+            `}</style>
         </div>
     );
 }
