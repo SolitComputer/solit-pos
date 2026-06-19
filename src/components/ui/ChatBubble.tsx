@@ -1,5 +1,4 @@
-// src/components/ui/ChatBubble.tsx
-"use client";
+ "use client";
 
 import { useEffect, useRef, useState, useCallback, KeyboardEvent } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
