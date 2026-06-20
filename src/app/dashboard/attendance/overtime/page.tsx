@@ -18,15 +18,34 @@ type OvertimeRequest = {
 };
 type User = { id: string; name: string; role: string };
 
-const MONTH_NAMES = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-const DAY_NAMES = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
-const FULL_ACCESS_ROLES = ["ADMIN","PROGRAMMER","ASISTEN_CEO"] as const;
-const DIVISION_HEAD_ROLES = ["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI"] as const;
-const PAY_VIEW_ROLES = ["KEPALA_SALES","KEPALA_MARKETING","KEPALA_TEKNISI","KEPALA_PENYEDIA_BARANG","ADMIN","PROGRAMMER","ASISTEN_CEO","KEPALA_ONPOINT","KEPALA_SOTECH"] as const;
+const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH"] as const;
+const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH"] as const;
+
+// Map: kepala → role bawahan yang boleh di-approve
+const DIVISION_HEAD_MAP: Record<string, string[]> = {
+  KEPALA_SALES: ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES"],
+  KEPALA_MARKETING: ["MARKETING", "KONTEN", "KEPALA_MARKETING"],
+  KEPALA_TEKNISI: ["TEKNISI", "KEPALA_TEKNISI"],
+  KEPALA_ONPOINT: ["ONPOINT", "KEPALA_ONPOINT"],
+  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG"],
+  KEPALA_SOTECH: ["SOTECH", "KEPALA_SOTECH"],
+};
 
 function canViewPay(role?: string) { return !!role && (PAY_VIEW_ROLES as readonly string[]).includes(role); }
 function isAdminRole(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
 function canSetPay(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
+function isDivisionHead(role?: string) { return !!role && (DIVISION_HEAD_ROLES as readonly string[]).includes(role); }
+
+// Apakah approverRole boleh approve targetRole?
+function canApproveTarget(approverRole?: string, targetRole?: string): boolean {
+  if (!approverRole || !targetRole) return false;
+  if (isAdminRole(approverRole)) return true;
+  return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
+}
+
 function formatRupiah(n: number) { return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n); }
 function formatTime(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -52,9 +71,9 @@ function addWatermarkToImage(imageDataUrl: string, callback: (blob: Blob, url: s
     const ctx = canvas.getContext("2d"); if (!ctx) return;
     ctx.drawImage(img, 0, 0);
     const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-    const days = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
-    const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    const txt = `${now.getUTCDate()}-${months[now.getUTCMonth()]}-${now.getUTCFullYear()} (${days[now.getUTCDay()]}) \u2022 ${String(now.getUTCHours()).padStart(2,"0")}:${String(now.getUTCMinutes()).padStart(2,"0")} WIB`;
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const txt = `${now.getUTCDate()}-${months[now.getUTCMonth()]}-${now.getUTCFullYear()} (${days[now.getUTCDay()]}) \u2022 ${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} WIB`;
     const pad = 12, fs = Math.max(16, canvas.width / 40);
     ctx.font = `bold ${fs}px Arial`;
     const tw = ctx.measureText(txt).width;
@@ -69,13 +88,13 @@ function addWatermarkToImage(imageDataUrl: string, callback: (blob: Blob, url: s
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
-  PENDING:    { label: "Pending",     icon: "⏳", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   dot: "bg-amber-400"   },
-  APPROVED:   { label: "Disetujui",   icon: "✅", bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",  dot: "bg-violet-500"  },
-  ONGOING:    { label: "Berjalan",    icon: "▶",  bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  COMPLETED:  { label: "Selesai",     icon: "✓",  bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    dot: "bg-blue-500"    },
-  NEED_PROOF: { label: "Upload Foto", icon: "📸", bg: "bg-orange-50",  text: "text-orange-700",  border: "border-orange-200",  dot: "bg-orange-500"  },
-  REJECTED:   { label: "Ditolak",     icon: "✕",  bg: "bg-red-50",     text: "text-red-700",     border: "border-red-200",     dot: "bg-red-500"     },
-  CANCELLED:  { label: "Dibatalkan",  icon: "⊘",  bg: "bg-gray-50",    text: "text-gray-500",    border: "border-gray-200",    dot: "bg-gray-400"    },
+  PENDING: { label: "Pending", icon: "⏳", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
+  APPROVED: { label: "Disetujui", icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  ONGOING: { label: "Berjalan", icon: "▶", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
+  COMPLETED: { label: "Selesai", icon: "✓", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
+  NEED_PROOF: { label: "Upload Foto", icon: "📸", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+  REJECTED: { label: "Ditolak", icon: "✕", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
+  CANCELLED: { label: "Dibatalkan", icon: "⊘", bg: "bg-gray-50", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
 };
 
 function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
@@ -87,7 +106,7 @@ function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
   );
 }
 
-const AV_COLORS = ["bg-violet-100 text-violet-700","bg-blue-100 text-blue-700","bg-emerald-100 text-emerald-700","bg-rose-100 text-rose-700","bg-amber-100 text-amber-700","bg-cyan-100 text-cyan-700","bg-purple-100 text-purple-700"];
+const AV_COLORS = ["bg-violet-100 text-violet-700", "bg-blue-100 text-blue-700", "bg-emerald-100 text-emerald-700", "bg-rose-100 text-rose-700", "bg-amber-100 text-amber-700", "bg-cyan-100 text-cyan-700", "bg-purple-100 text-purple-700"];
 function avBg(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff; return AV_COLORS[Math.abs(h) % AV_COLORS.length]; }
 
 const inp = "w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300";
@@ -191,7 +210,7 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
         <div className="flex-1 flex gap-2 flex-wrap">
           {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-9 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5">📸 Upload Foto</button>}
           {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5">🏁 Selesai</button>}
-          {isAdminRole(currentUser?.role) && o.status === "PENDING" && <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-9 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5">✅ Setujui</button>}
+          {canApproveTarget(currentUser?.role, o.users?.role) && o.status === "PENDING" && <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-9 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5">✅ Setujui</button>}
           {canSetPay(currentUser?.role) && (o.status === "COMPLETED" || o.status === "NEED_PROOF") && <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="flex-1 h-9 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5">💰 {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>}
           {isAdminRole(currentUser?.role) && <>
             <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-9 px-3 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center gap-1">✏️ Edit</button>
@@ -212,9 +231,9 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [facing, setFacing] = useState<"environment"|"user">("environment");
+  const [facing, setFacing] = useState<"environment" | "user">("environment");
 
-  const startCamera = useCallback(async (f: "environment"|"user") => {
+  const startCamera = useCallback(async (f: "environment" | "user") => {
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     setReady(false); setError("");
     try {
@@ -335,10 +354,10 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
 }
 
 const REASON_OPTIONS = [
-  { value: "Tugas Mendesak",          icon: "🔴", desc: "Harus diselesaikan segera"      },
+  { value: "Tugas Mendesak", icon: "🔴", desc: "Harus diselesaikan segera" },
   { value: "Pekerjaan Belum Selesai", icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
-  { value: "Permintaan Atasan",       icon: "🔵", desc: "Diminta langsung oleh atasan"    },
-  { value: "Lainnya",                 icon: "✏️", desc: "Alasan lain"                     },
+  { value: "Permintaan Atasan", icon: "🔵", desc: "Diminta langsung oleh atasan" },
+  { value: "Lainnya", icon: "✏️", desc: "Alasan lain" },
 ] as const;
 
 function ReasonGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -443,7 +462,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
   const mustUpload = isAutoCompleted || isNeedProof;
   const [photoFile, setPhotoFile] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false), [error, setError] = useState("");
-  const [photoStep, setPhotoStep] = useState<"idle"|"camera"|"preview">("idle");
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const handleClose = () => { if (mustUpload) { setError("⚠️ Wajib upload foto bukti dulu."); return; } onClose(); };
   const upload = async () => {
     if (mustUpload && !photoFile) { setError("⚠️ Foto bukti wajib diupload."); return; }
@@ -485,7 +504,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: { onClose: () => vo
   const [reasonType, setReasonType] = useState(""), [reasonCustom, setReasonCustom] = useState("");
   const [workDescription, setWorkDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoStep, setPhotoStep] = useState<"idle"|"camera"|"preview">("idle");
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const previewHours = useMemo(() => { if (!startTime || !endTime) return null; const d = (new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime()) / 3600000; return d > 0 ? Math.floor(d) : null; }, [startTime, endTime]);
   const submit = async () => {
@@ -521,8 +540,8 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: { onClose: () => vo
         <div>
           <label className={lbl}>Foto Bukti <span className="normal-case font-normal text-gray-400">(opsional)</span></label>
           {photoStep === "preview" && photoPreview ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-lg border border-gray-100 mb-2" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700">↺ Ambil Ulang</button></div>
-          : photoStep === "camera" ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-          : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+            : photoStep === "camera" ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && <ModalFoot><button onClick={onClose} className={secondaryBtn}>Batal</button><button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim()} className={primaryBtn}>{submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}</button></ModalFoot>}
@@ -532,7 +551,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: { onClose: () => vo
 
 // ─── EDIT MODAL ─────────────────────────────────────────────────────────────
 function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
-  const toTS = (iso: string | null | undefined): string => { if (!iso) return ""; if (!iso.includes("T")) return iso.substring(0, 5); const d = new Date(iso); if (isNaN(d.getTime())) return ""; const w = new Date(d.getTime() + 7 * 3600000); return `${String(w.getUTCHours()).padStart(2,"0")}:${String(w.getUTCMinutes()).padStart(2,"0")}`; };
+  const toTS = (iso: string | null | undefined): string => { if (!iso) return ""; if (!iso.includes("T")) return iso.substring(0, 5); const d = new Date(iso); if (isNaN(d.getTime())) return ""; const w = new Date(d.getTime() + 7 * 3600000); return `${String(w.getUTCHours()).padStart(2, "0")}:${String(w.getUTCMinutes()).padStart(2, "0")}`; };
   const savedReason = o.reason ?? ""; const knownOpts = REASON_OPTIONS.map(x => x.value) as string[]; const isKnown = knownOpts.includes(savedReason);
   const [requestDate, setRequestDate] = useState(o.request_date?.slice(0, 10) ?? "");
   const [startTime, setStartTime] = useState(toTS(o.actual_start ?? o.scheduled_start));
@@ -542,7 +561,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
   const [workDesc, setWorkDesc] = useState(o.work_description ?? "");
   const [status, setStatus] = useState(o.status);
   const [photoFile, setPhotoFile] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(o.proof_photo_url ?? null);
-  const [photoStep, setPhotoStep] = useState<"idle"|"camera"|"preview">(o.proof_photo_url ? "preview" : "idle");
+  const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">(o.proof_photo_url ? "preview" : "idle");
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   const isLainnya = reasonType === "Lainnya";
   const prevDur = useMemo(() => { if (!startTime || !endTime) return null; const d = (new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime()) / 3600000; return d > 0 ? Math.floor(d) : null; }, [startTime, endTime]);
@@ -566,7 +585,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
       onSaved(); onClose();
     } catch (err: any) { setError(err.message || "Terjadi kesalahan"); } finally { setSaving(false); }
   };
-  const STATUS_OPTIONS: OvertimeRequest["status"][] = ["PENDING","APPROVED","ONGOING","NEED_PROOF","COMPLETED","REJECTED","CANCELLED"];
+  const STATUS_OPTIONS: OvertimeRequest["status"][] = ["PENDING", "APPROVED", "ONGOING", "NEED_PROOF", "COMPLETED", "REJECTED", "CANCELLED"];
   return (
     <ModalWrapper onClose={onClose} wide>
       <ModalHead icon="✏️" title="Edit Lembur" sub={o.users?.name ?? "Karyawan"} onClose={onClose} />
@@ -590,8 +609,8 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
         <div>
           <label className={lbl}>Foto Bukti <span className="normal-case font-normal text-gray-400">(opsional)</span></label>
           {photoStep === "preview" && photoPreview ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-lg border border-gray-100 mb-2" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700">↺ Hapus Foto</button></div>
-          : photoStep === "camera" ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-          : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+            : photoStep === "camera" ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && <ModalFoot><button onClick={onClose} className={secondaryBtn}>Batal</button><button onClick={save} disabled={saving || !requestDate || !startTime || !endTime || !reasonType || (isLainnya && !reasonCustom.trim())} className={primaryBtn}>{saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}</button></ModalFoot>}
@@ -716,7 +735,7 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                     <StatusBadge status={o.status} />
                     {isMyUrgent && <span className="text-[8px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">{o.status === "NEED_PROOF" ? "Upload foto" : "Selesaikan"}</span>}
-                    {isAdminRole(currentUser?.role) && o.status === "PENDING" && <span className="text-[8px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md">Perlu acc</span>}
+                    {canApproveTarget(currentUser?.role, o.users?.role ?? userId) && o.status === "PENDING" && <span className="text-[8px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md">Perlu acc</span>}
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
                     <span className="font-mono">{formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}</span>
@@ -784,8 +803,10 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
         <div className="divide-y divide-gray-50">
           {groupedByUser.map(({ user, items }) => {
             const bg = avBg(user.name);
-            const hasUrgent = items.some(o => o.status === "NEED_PROOF" || (o.status === "PENDING" && currentUser?.id !== user.id));
-            const hasOngoing = items.some(o => o.status === "ONGOING");
+            const hasUrgent = items.some(o =>
+              o.status === "NEED_PROOF" ||
+              (o.status === "PENDING" && canApproveTarget(currentUser?.role, user.role))
+            ); const hasOngoing = items.some(o => o.status === "ONGOING");
             const totalPay = items.reduce((s, o) => s + (o.total_pay ?? 0), 0);
             const statusCounts: Record<string, number> = {};
             items.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
@@ -935,10 +956,10 @@ export default function OvertimePage() {
   };
 
   const statCards = [
-    { label: "Total",    value: overtimes.length,                                      icon: "📋", color: "text-gray-800"    },
-    { label: "Pending",  value: overtimes.filter(o => o.status === "PENDING").length,   icon: "⏳", color: "text-amber-600"   },
-    { label: "Berjalan", value: overtimes.filter(o => o.status === "ONGOING").length,   icon: "▶",  color: "text-emerald-600" },
-    { label: "Selesai",  value: overtimes.filter(o => o.status === "COMPLETED").length, icon: "✓",  color: "text-blue-600"    },
+    { label: "Total", value: overtimes.length, icon: "📋", color: "text-gray-800" },
+    { label: "Pending", value: overtimes.filter(o => o.status === "PENDING").length, icon: "⏳", color: "text-amber-600" },
+    { label: "Berjalan", value: overtimes.filter(o => o.status === "ONGOING").length, icon: "▶", color: "text-emerald-600" },
+    { label: "Selesai", value: overtimes.filter(o => o.status === "COMPLETED").length, icon: "✓", color: "text-blue-600" },
   ];
 
   const userCanViewPay = canViewPay(currentUser?.role);
@@ -1062,13 +1083,13 @@ export default function OvertimePage() {
 
       {/* Modals */}
       {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { fetchOvertimes(); setShowRequestModal(false); }} currentUser={currentUser} />}
-      {showManualModal  && <ManualOvertimeModal  onClose={() => setShowManualModal(false)}  onSaved={() => { fetchOvertimes(); setShowManualModal(false); }}  allUsers={allUsers} />}
-      {approveData      && <ApproveModal         overtime={approveData}    onClose={() => setApproveData(null)}    onSaved={() => { fetchOvertimes(); setApproveData(null);    }} />}
-      {setPayData       && <SetPayModal           overtime={setPayData}     onClose={() => setSetPayData(null)}     onSaved={() => { fetchOvertimes(); setSetPayData(null);     }} />}
-      {completeData     && <CompleteModal         overtime={completeData}   onClose={() => setCompleteData(null)}   onSaved={() => { fetchOvertimes(); setCompleteData(null);   }} isAutoCompleted={completeData.auto_completed} />}
-      {proofPhotoData   && <ProofPhotoModal       overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
-      {editData         && <EditOvertimeModal      overtime={editData}       onClose={() => setEditData(null)}       onSaved={() => { fetchOvertimes(); setEditData(null);       }} />}
-      {deleteData       && <DeleteConfirmModal     overtime={deleteData}     onClose={() => setDeleteData(null)}     onDeleted={() => { fetchOvertimes(); setDeleteData(null);   }} canViewPay={userCanViewPay} />}
+      {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { fetchOvertimes(); setShowManualModal(false); }} allUsers={allUsers} />}
+      {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { fetchOvertimes(); setApproveData(null); }} />}
+      {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { fetchOvertimes(); setSetPayData(null); }} />}
+      {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={() => { fetchOvertimes(); setCompleteData(null); }} isAutoCompleted={completeData.auto_completed} />}
+      {proofPhotoData && <ProofPhotoModal overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
+      {editData && <EditOvertimeModal overtime={editData} onClose={() => setEditData(null)} onSaved={() => { fetchOvertimes(); setEditData(null); }} />}
+      {deleteData && <DeleteConfirmModal overtime={deleteData} onClose={() => setDeleteData(null)} onDeleted={() => { fetchOvertimes(); setDeleteData(null); }} canViewPay={userCanViewPay} />}
       {detailData && (
         <OvertimeDetailModal
           overtime={detailData} onClose={() => setDetailData(null)} userCanViewPay={userCanViewPay} currentUser={currentUser}
