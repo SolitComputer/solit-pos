@@ -265,7 +265,7 @@ function ReportFormModal({
                             className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all resize-none leading-relaxed"
                         />
                         <p className="text-[10px] text-gray-400 mt-1">
-                            {form.description.length} karakter · minimal 20 karakter
+                            {form.description.length} karakter
                         </p>
                     </div>
 
@@ -291,7 +291,7 @@ function ReportFormModal({
                     </button>
                     <button
                         onClick={save}
-                        disabled={saving || form.description.trim().length < 20}
+                        disabled={saving || !form.description.trim()}
                         className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                         {saving
@@ -549,9 +549,27 @@ export default function PKLReportsPage() {
     const [loading, setLoading] = useState(true);
     const [totalCount, setTotalCount] = useState(0);
 
-    // Filters
-    const [activeDivision, setActiveDivision] = useState<string>("ALL");
-    const [filterStatus, setFilterStatus] = useState<string>("ALL");
+    function getDefaultDivision(role?: string): string {
+        if (!role) return "ALL";
+        const PKL_ROLE_DIVISION_MAP: Record<string, string> = {
+            PKL_MARKETING: "MARKETING",
+            PKL_SALES: "SALES",
+            PKL_PENYEDIA_BARANG: "PENYEDIA_BARANG",
+            PKL_TEKNISI: "TEKNISI",
+            PKL_ONPOINT: "ONPOINT",
+            PKL_SOTECH: "SOTECH",
+            PKL_KONTEN: "MARKETING",
+            KEPALA_MARKETING: "MARKETING",
+            KEPALA_SALES: "SALES",
+            KEPALA_PENYEDIA_BARANG: "PENYEDIA_BARANG",
+            KEPALA_TEKNISI: "TEKNISI",
+            KEPALA_ONPOINT: "ONPOINT",
+            KEPALA_SOTECH: "SOTECH",
+        };
+        return PKL_ROLE_DIVISION_MAP[role] ?? "ALL";
+    }
+
+    const [activeDivision, setActiveDivision] = useState<string>("ALL"); const [filterStatus, setFilterStatus] = useState<string>("ALL");
     const [filterPKL, setFilterPKL] = useState<string>("ALL");
     const [filterMonth, setFilterMonth] = useState<string>(() => getWIBToday().slice(0, 7));
 
@@ -610,7 +628,13 @@ export default function PKLReportsPage() {
     }, [currentUser?.role]);
 
     useEffect(() => {
-        getCurrentUserClient().then(u => setCurrentUser(u));
+        getCurrentUserClient().then(u => {
+            setCurrentUser(u);
+            if (u?.role) {
+                const defaultDiv = getDefaultDivision(u.role);
+                setActiveDivision(defaultDiv);
+            }
+        });
     }, []);
 
     useEffect(() => {
@@ -680,7 +704,9 @@ export default function PKLReportsPage() {
                         <p className="text-xs text-gray-400 mt-1">
                             {isPKLUser
                                 ? "Buat dan pantau laporan kerja harianmu"
-                                : `Pantau laporan kerja ${stats.uniquePKL} PKL aktif`}
+                                : isKepalaUser
+                                    ? `Pantau laporan kerja PKL divisi ${getDivisionInfo(activeDivision).label} · ${stats.uniquePKL} PKL aktif`
+                                    : `Pantau laporan kerja ${stats.uniquePKL} PKL aktif`}
                         </p>
                     </div>
                     {(isPKLUser || isAdminUser) && (
@@ -719,7 +745,7 @@ export default function PKLReportsPage() {
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
 
                     {/* Filter divisi — tab style */}
-                    {!isPKLUser && (
+                    {!isPKLUser && !isKepalaUser && (
                         <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Filter Divisi</p>
                             <div className="flex flex-wrap gap-2">
@@ -747,6 +773,19 @@ export default function PKLReportsPage() {
                             </div>
                         </div>
                     )}
+
+                    {/* Info divisi untuk kepala — read only */}
+                    {isKepalaUser && activeDivision !== "ALL" && (() => {
+                        const div = getDivisionInfo(activeDivision);
+                        return (
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border ${div.color}`}>
+                                    {div.emoji} Divisi {div.label}
+                                </span>
+                                <span className="text-[10px] text-gray-400">Kamu hanya dapat melihat laporan PKL divisimu</span>
+                            </div>
+                        );
+                    })()}
 
                     {/* Row filter lainnya */}
                     <div className="flex flex-wrap gap-3">

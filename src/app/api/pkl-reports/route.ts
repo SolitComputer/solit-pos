@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Filter optional ──────────────────────────────────────────────────────
-    if (division && isFullAccess(user.role)) query = query.eq("division", division);
+    if (division && (isFullAccess(user.role) || isKepala(user.role))) query = query.eq("division", division);
     if (pklUserId) query = query.eq("user_id", pklUserId);
     if (dateFrom) query = query.gte("report_date", dateFrom);
     if (dateTo) query = query.lte("report_date", dateTo);
