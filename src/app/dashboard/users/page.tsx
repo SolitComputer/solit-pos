@@ -89,6 +89,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PKL_PENYEDIA_BARANG: PKL_BADGE, PKL_SOTECH: PKL_BADGE,
   PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE,
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+  KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -110,6 +111,7 @@ const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+  "KEPALA_PENGELOLA_BARANG",
 ]);
 const PKL_ROLE_SET = new Set([
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -160,7 +162,7 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </optgroup>
       <optgroup label="— Operasional —">
-        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
+        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>

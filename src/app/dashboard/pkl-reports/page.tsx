@@ -580,7 +580,7 @@ export default function PKLReportsPage() {
     const [selectedReport, setSelectedReport] = useState<PKLReport | null>(null);
     const [editReport, setEditReport] = useState<PKLReport | null>(null);
     const [prefillDate, setPrefillDate] = useState<string | null>(null);
-
+    const [filterDate, setFilterDate] = useState<string | null>(null);
     // ── Fetch ──────────────────────────────────────────────────────────────
     const fetchReports = useCallback(async () => {
         if (!currentUser) return;
@@ -590,7 +590,10 @@ export default function PKLReportsPage() {
             if (activeDivision !== "ALL") params.set("division", activeDivision);
             if (filterStatus !== "ALL") params.set("status", filterStatus);
             if (filterPKL !== "ALL") params.set("pkl_user_id", filterPKL);
-            if (filterMonth) {
+            if (filterDate) {
+                params.set("date_from", filterDate);
+                params.set("date_to", filterDate);
+            } else if (filterMonth) {
                 params.set("date_from", `${filterMonth}-01`);
                 const [y, m] = filterMonth.split("-").map(Number);
                 const lastDay = new Date(y, m, 0).getDate();
@@ -600,7 +603,7 @@ export default function PKLReportsPage() {
             const d = await res.json();
             if (d.success) { setReports(d.data || []); setTotalCount(d.count ?? 0); }
         } finally { setLoading(false); }
-    }, [currentUser, activeDivision, filterStatus, filterPKL, filterMonth]);
+    }, [currentUser, activeDivision, filterStatus, filterPKL, filterMonth, filterDate]);
 
     const KEPALA_PKL_ROLE_MAP: Record<string, string> = {
         KEPALA_MARKETING: "PKL_MARKETING",
@@ -843,6 +846,111 @@ export default function PKLReportsPage() {
                     </div>
                 </div>
 
+                {/* ── Kalender view — tampil untuk semua role ── */}
+                {(isPKLUser || isAdminUser || isKepalaUser) && (() => {
+                    const [y, m] = filterMonth ? filterMonth.split("-").map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+                    const dim = new Date(y, m, 0).getDate();
+                    const fd = new Date(y, m - 1, 1).getDay();
+                    const reportDates = new Set(reports.map(r => r.report_date));
+                    const reviewedDates = new Set(reports.filter(r => r.status === "REVIEWED").map(r => r.report_date));
+                    const revisionDates = new Set(reports.filter(r => r.status === "REVISION").map(r => r.report_date));
+                    const today = getWIBToday();
+
+                    return (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between flex-wrap gap-2">
+                                <div>
+                                    <p className="text-sm font-bold text-gray-800">📅 Kalender Laporan</p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                        {isPKLUser
+                                            ? "Klik tanggal kosong untuk buat laporan · Klik tanggal berisi untuk lihat detail"
+                                            : "Klik tanggal untuk filter tabel · Klik lagi untuk reset filter"}
+                                    </p>
+                                </div>
+                                {filterDate && !isPKLUser && (
+                                    <button
+                                        onClick={() => setFilterDate(null)}
+                                        className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        Reset · {formatDateShort(filterDate)}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="p-4">
+                                <div className="grid grid-cols-7 mb-2">
+                                    {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(d => (
+                                        <div key={d} className="text-center text-[10px] font-black text-gray-400 uppercase py-1">{d}</div>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-7 gap-1">
+                                    {Array(fd).fill(null).map((_, i) => <div key={`e-${i}`} />)}
+                                    {Array.from({ length: dim }, (_, i) => i + 1).map(day => {
+                                        const dk = `${y}-${pad2(m)}-${pad2(day)}`;
+                                        const hasRep = reportDates.has(dk);
+                                        const isRev = reviewedDates.has(dk);
+                                        const isRevision = revisionDates.has(dk);
+                                        const isTod = dk === today;
+                                        const isFuture = dk > today;
+                                        const isSelected = filterDate === dk;
+
+                                        return (
+                                            <button
+                                                key={day}
+                                                disabled={isFuture}
+                                                onClick={() => {
+                                                    if (isPKLUser) {
+                                                        if (hasRep) {
+                                                            const r = reports.find(r => r.report_date === dk);
+                                                            if (r) { setSelectedReport(r); setShowDetail(true); }
+                                                        } else {
+                                                            setPrefillDate(dk);
+                                                            setEditReport(null);
+                                                            setShowForm(true);
+                                                        }
+                                                    } else {
+                                                        // admin/kepala: toggle filter tanggal
+                                                        setFilterDate(prev => prev === dk ? null : dk);
+                                                    }
+                                                }}
+                                                className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs font-bold transition-all
+                                                    ${isFuture ? "text-gray-200 cursor-not-allowed" :
+                                                        isSelected ? "bg-indigo-600 text-white ring-2 ring-indigo-400 scale-[1.05] shadow-md cursor-pointer" :
+                                                            isRev ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
+                                                                isRevision ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
+                                                                    hasRep ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
+                                                                        isTod ? "ring-2 ring-[#1a1a2e] text-[#1a1a2e] font-black hover:bg-gray-100 cursor-pointer" :
+                                                                            "hover:bg-gray-100 text-gray-500 cursor-pointer"
+                                                    }`}
+                                            >
+                                                {day}
+                                                {hasRep && !isSelected && (
+                                                    <div className={`w-1 h-1 rounded-full mt-0.5 ${isRev ? "bg-emerald-500" : isRevision ? "bg-amber-500" : "bg-blue-500"}`} />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Legend */}
+                                <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-50 flex-wrap">
+                                    {[
+                                        { color: "bg-emerald-400", label: "Disetujui" },
+                                        { color: "bg-blue-400", label: "Terkirim" },
+                                        { color: "bg-amber-400", label: "Perlu Revisi" },
+                                        { color: "bg-indigo-600", label: "Dipilih" },
+                                        { color: "ring-2 ring-[#1a1a2e] bg-white", label: "Hari ini" },
+                                    ].map(({ color, label }) => (
+                                        <span key={label} className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                                            <span className={`w-3 h-3 rounded-full ${color}`} />{label}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* ── PKL Summary Cards (untuk admin/kepala lihat per PKL) ── */}
                 {!isPKLUser && Object.keys(reportsByPKL).length > 0 && (
                     <div>
@@ -921,8 +1029,17 @@ export default function PKLReportsPage() {
                                 {isPKLUser ? "Laporan Kerjamu" : "Semua Laporan"}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-0.5">
-                                {filterMonth ? `${MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} ${filterMonth.split("-")[0]}` : "Semua bulan"}
+                                {filterDate
+                                    ? `📌 ${formatDate(filterDate)}`
+                                    : filterMonth
+                                        ? `${MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} ${filterMonth.split("-")[0]}`
+                                        : "Semua bulan"}
                                 {" · "}{totalCount} laporan
+                                {filterDate && (
+                                    <button onClick={() => setFilterDate(null)} className="ml-2 text-indigo-500 hover:text-indigo-700 font-bold">
+                                        (reset)
+                                    </button>
+                                )}
                             </p>
                         </div>
 
@@ -1028,85 +1145,6 @@ export default function PKLReportsPage() {
                         </div>
                     )}
                 </div>
-
-                {/* ── Kalender view untuk PKL — tampilkan streak laporan ── */}
-                {isPKLUser && (() => {
-                    const [y, m] = filterMonth ? filterMonth.split("-").map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
-                    const dim = new Date(y, m, 0).getDate();
-                    const fd = new Date(y, m - 1, 1).getDay();
-                    const reportDates = new Set(reports.map(r => r.report_date));
-                    const reviewedDates = new Set(reports.filter(r => r.status === "REVIEWED").map(r => r.report_date));
-                    const revisionDates = new Set(reports.filter(r => r.status === "REVISION").map(r => r.report_date));
-                    const today = getWIBToday();
-
-                    return (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                                <p className="text-sm font-bold text-gray-800">📅 Kalender Laporan</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">Hijau = disetujui · Biru = terkirim · Kuning = revisi</p>
-                            </div>
-                            <div className="p-4">
-                                <div className="grid grid-cols-7 mb-2">
-                                    {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(d => (
-                                        <div key={d} className="text-center text-[10px] font-black text-gray-400 uppercase py-1">{d}</div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-7 gap-1">
-                                    {Array(fd).fill(null).map((_, i) => <div key={`e-${i}`} />)}
-                                    {Array.from({ length: dim }, (_, i) => i + 1).map(day => {
-                                        const dk = `${y}-${pad2(m)}-${pad2(day)}`;
-                                        const hasRep = reportDates.has(dk);
-                                        const isRev = reviewedDates.has(dk);
-                                        const isRevision = revisionDates.has(dk);
-                                        const isTod = dk === today;
-                                        const isFuture = dk > today;
-
-                                        return (
-                                            <button
-                                                key={day}
-                                                disabled={isFuture}
-                                                onClick={() => {
-                                                    if (hasRep) {
-                                                        const r = reports.find(r => r.report_date === dk);
-                                                        if (r) { setSelectedReport(r); setShowDetail(true); }
-                                                    } else {
-                                                        setPrefillDate(dk);
-                                                        setEditReport(null);
-                                                        setShowForm(true);
-                                                    }
-                                                }}
-                                                className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs font-bold transition-all ${isFuture ? "text-gray-200 cursor-not-allowed" :
-                                                    isRev ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300" :
-                                                        isRevision ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300" :
-                                                            hasRep ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300" :
-                                                                isTod ? "ring-2 ring-[#1a1a2e] text-[#1a1a2e] font-black" :
-                                                                    "hover:bg-gray-100 text-gray-600"
-                                                    }`}
-                                            >
-                                                {day}
-                                                {hasRep && <div className={`w-1 h-1 rounded-full mt-0.5 ${isRev ? "bg-emerald-500" : isRevision ? "bg-amber-500" : "bg-blue-500"}`} />}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Legend */}
-                                <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-50 flex-wrap">
-                                    {[
-                                        { color: "bg-emerald-400", label: "Disetujui" },
-                                        { color: "bg-blue-400", label: "Terkirim" },
-                                        { color: "bg-amber-400", label: "Perlu Revisi" },
-                                        { color: "ring-2 ring-[#1a1a2e] bg-white", label: "Hari ini" },
-                                    ].map(({ color, label }) => (
-                                        <span key={label} className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                                            <span className={`w-3 h-3 rounded-full ${color}`} />{label}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })()}
 
             </div>
 
