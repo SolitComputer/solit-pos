@@ -14,7 +14,14 @@ interface ChatUser {
 }
 
 export function ChatManagerWrapper() {
-    const { activeChats, closeChat, openGroupChat, setOpenGroupChat, expandedChatId, setExpandedChatId } = useChatContext();
+    const {
+        activeChats,
+        closeChat,
+        openGroupChat,
+        setOpenGroupChat,
+        expandedChatId,
+        setExpandedChatId,
+    } = useChatContext();
     const [currentUser, setCurrentUser] = useState<ChatUser | null>(null);
 
     useEffect(() => {
@@ -29,6 +36,7 @@ export function ChatManagerWrapper() {
             const latest = activeChats[activeChats.length - 1];
             setExpandedChatId(latest.id);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeChats.length]);
 
     if (!currentUser) return null;
@@ -36,42 +44,60 @@ export function ChatManagerWrapper() {
     const hasAnything = activeChats.length > 0 || openGroupChat;
     if (!hasAnything) return null;
 
-    return (
-        <div
-            className="fixed z-[9991] flex items-end gap-2"
-            style={{ bottom: 80, right: 20 }}
-        >
-            {/* GroupChat Panel */}
-            {openGroupChat && (
-                <div style={{ animation: "chatSlideUp 0.18s ease-out" }}>
-                    <GroupChatPanel
-                        currentUser={currentUser}
-                        onClose={() => setOpenGroupChat(false)}
-                    />
-                </div>
-            )}
+    // Panel DM yang sedang aktif (expanded)
+    const expandedChat = activeChats.find(u => u.id === expandedChatId) ?? null;
 
-            {/* DM Panels — hanya yang expanded */}
-            {activeChats
-                .filter(u => expandedChatId === u.id)
-                .map(user => (
-                    <div key={user.id} style={{ animation: "chatSlideUp 0.18s ease-out" }}>
+    return (
+        <>
+            {/*
+             * Layout: semua panel duduk di pojok kanan bawah, tersusun ke kiri.
+             * Urutan dari kanan ke kiri: GroupChatPanel → DM Panel(s)
+             * Pakai flex-row-reverse agar GroupChat selalu paling kanan (dekat button),
+             * dan DM panels tumbuh ke kiri secara natural.
+             */}
+            <div
+                className="fixed z-[9991] flex flex-row-reverse items-end"
+                style={{
+                    bottom: 80,
+                    right: 20,
+                    gap: 10,
+                    // max-width agar tidak overflow ke kiri layar
+                    maxWidth: "calc(100vw - 280px)", // 280px = lebar sidebar dashboard
+                    alignItems: "flex-end",
+                }}
+            >
+                {/* GroupChat Panel — paling kanan */}
+                {openGroupChat && (
+                    <div style={{ animation: "chatSlideUp 0.18s ease-out", flexShrink: 0 }}>
+                        <GroupChatPanel
+                            currentUser={currentUser}
+                            onClose={() => setOpenGroupChat(false)}
+                        />
+                    </div>
+                )}
+
+                {/* DM Panel — muncul di kiri GroupChat */}
+                {expandedChat && (
+                    <div
+                        key={expandedChat.id}
+                        style={{ animation: "chatSlideUp 0.18s ease-out", flexShrink: 0 }}
+                    >
                         <ChatPanel
                             currentUser={currentUser}
-                            targetUser={user}
+                            targetUser={expandedChat}
                             isMinimized={false}
                             onToggleMinimize={() =>
-                                setExpandedChatId(expandedChatId === user.id ? null : user.id)
+                                setExpandedChatId(expandedChatId === expandedChat.id ? null : expandedChat.id)
                             }
                             onClose={() => {
-                                closeChat(user.id);
+                                closeChat(expandedChat.id);
                                 setExpandedChatId(null);
                             }}
                             unread={0}
                         />
                     </div>
-                ))
-            }
+                )}
+            </div>
 
             <style>{`
                 @keyframes chatSlideUp {
@@ -79,6 +105,6 @@ export function ChatManagerWrapper() {
                     to   { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
-        </div>
+        </>
     );
 }

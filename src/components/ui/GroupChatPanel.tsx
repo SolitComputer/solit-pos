@@ -953,6 +953,202 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     );
 }
 
+// ─── EmbeddedDMMessages (DM panel di dalam GroupChatPanel) ───────────────────
+interface EmbeddedDMMessagesProps {
+    currentUser: CurrentUser;
+    targetUser: UserOption;
+}
+
+function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps) {
+    interface DMMessage {
+        id: string;
+        sender_id: string;
+        receiver_id: string;
+        content: string;
+        is_read: boolean;
+        is_deleted: boolean;
+        edited_at: string | null;
+        created_at: string;
+        attachment_url: string | null;
+        attachment_type: "image" | "file" | null;
+        attachment_name: string | null;
+        attachment_size: number | null;
+    }
+
+    const [messages, setMessages] = useState<DMMessage[]>([]);
+    const [input, setInput] = useState("");
+    const [sending, setSending] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const bottomRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const fetchMessages = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/messages?with=${targetUser.id}`);
+            const data = await res.json();
+            if (data.success) setMessages(data.messages);
+        } finally { setLoading(false); }
+    }, [targetUser.id]);
+
+    useEffect(() => { fetchMessages(); }, [fetchMessages]);
+
+    useEffect(() => {
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }, [messages]);
+
+    // Realtime subscription
+    useEffect(() => {
+        const channel = supabase
+            .channel(`embedded-dm:${[currentUser.id, targetUser.id].sort().join(":")}`)
+            .on("postgres_changes",
+                { event: "INSERT", schema: "public", table: "messages", filter: `receiver_id=eq.${currentUser.id}` },
+                (payload) => {
+                    const msg = payload.new as DMMessage;
+                    if (msg.sender_id !== targetUser.id) return;
+                    setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+                }
+            )
+            .on("postgres_changes",
+                { event: "UPDATE", schema: "public", table: "messages" },
+                (payload) => {
+                    const u = payload.new as DMMessage;
+                    setMessages(prev => prev.map(m => m.id === u.id
+                        ? { ...m, content: u.content, is_deleted: u.is_deleted, edited_at: u.edited_at }
+                        : m
+                    ));
+                }
+            )
+            .subscribe();
+        return () => { channel.unsubscribe(); };
+    }, [currentUser.id, targetUser.id]);
+
+    const send = async () => {
+        const content = input.trim();
+        if (!content || sending) return;
+        setSending(true);
+        const tempId = `temp-${Date.now()}`;
+        const opt: DMMessage = {
+            id: tempId, sender_id: currentUser.id, receiver_id: targetUser.id,
+            content, is_read: false, is_deleted: false, edited_at: null,
+            created_at: new Date().toISOString(),
+            attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null,
+        };
+        setMessages(prev => [...prev, opt]);
+        setInput("");
+        try {
+            const res = await fetch("/api/messages", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ receiver_id: targetUser.id, content }),
+            });
+            const data = await res.json();
+            if (data.success) setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+            else setMessages(prev => prev.filter(m => m.id !== tempId));
+        } catch { setMessages(prev => prev.filter(m => m.id !== tempId)); }
+        finally { setSending(false); setTimeout(() => inputRef.current?.focus(), 0); }
+    };
+
+    const handleKey = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    };
+
+    return (
+        <>
+            {/* Messages area */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
+                {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="w-5 h-5 rounded-full animate-spin"
+                            style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                    </div>
+                ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+                        <div className="text-3xl opacity-20">💬</div>
+                        <p className="text-[11px] text-slate-400 font-medium">Mulai percakapan dengan</p>
+                        <p className="text-[11px] font-bold text-slate-600">{targetUser.name}</p>
+                    </div>
+                ) : messages.map(msg => {
+                    const isMine = msg.sender_id === currentUser.id;
+                    if (msg.is_deleted) {
+                        return (
+                            <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                                <span className="text-[10px] text-slate-400 italic px-2.5 py-1 bg-slate-100 rounded-lg">
+                                    Pesan dihapus
+                                </span>
+                            </div>
+                        );
+                    }
+                    return (
+                        <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                            <div
+                                className="max-w-[82%] px-3 py-2 text-xs leading-relaxed break-words font-medium"
+                                style={{
+                                    borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+                                    background: isMine ? "linear-gradient(135deg,#1e1b4b,#3730a3)" : "#fff",
+                                    border: isMine ? "none" : "1px solid #e8ecf0",
+                                    boxShadow: isMine ? "0 2px 8px rgba(79,70,229,0.25)" : "0 1px 4px rgba(0,0,0,0.06)",
+                                    color: isMine ? "#fff" : "#1e293b",
+                                }}>
+                                <p>{msg.content}</p>
+                                <div className="flex items-center justify-end gap-1 mt-1"
+                                    style={{ color: isMine ? "rgba(255,255,255,0.4)" : "#94a3b8" }}>
+                                    {msg.edited_at && <span className="text-[8px] italic">diedit ·</span>}
+                                    <span className="text-[9px]">{formatTime(msg.created_at)}</span>
+                                    {isMine && (
+                                        <span className="text-[9px]"
+                                            style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
+                                            {msg.is_read ? "✓✓" : "✓"}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+                <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white"
+                style={{ borderTop: "1px solid #f0f0f8" }}>
+                <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKey}
+                    placeholder="Tulis pesan pribadi..."
+                    maxLength={1000}
+                    disabled={sending}
+                    autoFocus
+                    className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-indigo-200"
+                    style={{
+                        background: "#f5f7ff",
+                        border: "1.5px solid #e8ecff",
+                        color: "#334155",
+                    }}
+                />
+                <button
+                    onClick={send}
+                    disabled={!input.trim() || sending}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
+                    style={{
+                        background: input.trim() ? "linear-gradient(135deg,#4f46e5,#7c3aed)" : "#e2e8f0",
+                        boxShadow: input.trim() ? "0 2px 8px rgba(79,70,229,0.35)" : "none",
+                    }}>
+                    {sending
+                        ? <div className="w-3 h-3 rounded-full animate-spin"
+                            style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                        : <svg className="w-3.5 h-3.5" fill="none" stroke={input.trim() ? "white" : "#94a3b8"} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                    }
+                </button>
+            </div>
+        </>
+    );
+}
+
 // ─── Main GroupChatPanel ──────────────────────────────────────────────────────
 export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -970,7 +1166,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
     const [memberSearch, setMemberSearch] = useState("");
-    const { openChat } = useChatContext();
+    const [embeddedDMUser, setEmbeddedDMUser] = useState<UserOption | null>(null);
 
     const filteredMembers = users.filter(u =>
         u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
@@ -1326,11 +1522,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <button
                                 key={user.id}
                                 onClick={() => {
-                                    openChat({ id: user.id, name: user.name, role: user.role });
-                                    onClose();
+                                    setEmbeddedDMUser(
+                                        embeddedDMUser?.id === user.id ? null : user
+                                    );
                                 }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all hover:bg-indigo-50 group"
-                            >
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all group ${embeddedDMUser?.id === user.id
+                                        ? "bg-indigo-50"
+                                        : "hover:bg-indigo-50"
+                                    }`}                            >
                                 {/* Avatar */}
                                 <div
                                     className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
@@ -1387,7 +1586,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 </div>
 
                 {/* ── Kolom kanan: Header + Chat ── */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden" style={{ minWidth: 0 }}>
 
                     {/* ── Header ── */}
                     <div
@@ -1573,10 +1772,71 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         onSend={send}
                         onSendAttachment={sendAttachment}
                     />
-                </div>
+               </div>
+
+                {/* ── Kolom kanan: Embedded DM Panel ── */}
+                {embeddedDMUser && (
+                    <div
+                        className="flex-shrink-0 flex flex-col overflow-hidden"
+                        style={{
+                            width: 340,
+                            borderLeft: "1px solid #f0f0f8",
+                            animation: "dmSlideIn 0.2s ease-out",
+                        }}
+                    >
+                        {/* DM Header */}
+                        <div
+                            className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5"
+                            style={{
+                                background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
+                                borderBottom: "2px solid transparent",
+                                backgroundClip: "padding-box",
+                            }}
+                        >
+                            <div
+                                className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[11px]"
+                                style={{
+                                    width: 34, height: 34,
+                                    borderRadius: 10,
+                                    background: `linear-gradient(135deg, ${getAvatarColor(embeddedDMUser.role)}cc, ${getAvatarColor(embeddedDMUser.role)})`,
+                                    boxShadow: `0 2px 8px ${getAvatarColor(embeddedDMUser.role)}55`,
+                                }}
+                            >
+                                {getInitials(embeddedDMUser.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-bold text-white truncate leading-tight">
+                                    {embeddedDMUser.name}
+                                </p>
+                                <p className="text-[9.5px] mt-0.5 truncate"
+                                    style={{ color: getAvatarColor(embeddedDMUser.role) }}>
+                                    {ROLE_LABEL[embeddedDMUser.role] ?? embeddedDMUser.role}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setEmbeddedDMUser(null)}
+                                className="w-7 h-7 flex items-center justify-center rounded-xl transition hover:bg-white/10 flex-shrink-0"
+                                style={{ color: "rgba(255,255,255,0.45)" }}
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        {/* Accent line */}
+                        <div style={{ height: 2, background: "linear-gradient(90deg,#6366f1,#8b5cf6 50%,#ec4899)", flexShrink: 0, opacity: 0.7 }} />
+
+                        {/* DM Messages — pakai EmbeddedDMMessages */}
+                        <EmbeddedDMMessages
+                            currentUser={currentUser}
+                            targetUser={embeddedDMUser}
+                        />
+                    </div>
+                )}
+
             </div>
 
-            <style jsx global>{`
+          <style jsx global>{`
                 @keyframes highlightMsg {
                     0%   { background-color: transparent; }
                     25%  { background-color: rgba(99, 102, 241, 0.1); }
@@ -1585,6 +1845,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 .highlight-msg {
                     animation: highlightMsg 1.5s ease-out;
                     border-radius: 18px;
+                }
+                @keyframes dmSlideIn {
+                    from { opacity: 0; transform: translateX(16px); }
+                    to   { opacity: 1; transform: translateX(0); }
                 }
             `}</style>
         </div>
