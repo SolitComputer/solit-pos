@@ -27,7 +27,9 @@ const ALL_ROLES = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-  "PKL", "CUSTOMER_SERVICE",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "CUSTOMER_SERVICE",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -38,7 +40,11 @@ const ROLE_LABEL: Record<string, string> = {
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
-  KEPALA_SOTECH: "Kepala Sotech", PKL: "PKL", CUSTOMER_SERVICE: "Customer Service",
+  KEPALA_SOTECH: "Kepala Sotech",
+  PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
+  PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
+  PKL_ONPOINT: "PKL Onpoint", PKL_TEKNISI: "PKL Teknisi", PKL_KONTEN: "PKL Content Creator",
+  CUSTOMER_SERVICE: "Customer Service",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -49,8 +55,13 @@ const ROLE_ICON: Record<string, string> = {
   MARKETING: "📱", KEBERSIHAN: "🧹",
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
   KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
-  PKL: "🎓", CUSTOMER_SERVICE: "🎧",
+  PKL: "🎓", PKL_MARKETING: "🎓", PKL_SALES: "🎓",
+  PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
+  PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓",
+  CUSTOMER_SERVICE: "🎧",
 };
+
+const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
 
 const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
   ADMIN: { bg: "#f3f0ff", text: "#6d28d9", border: "#ddd6fe" },
@@ -74,6 +85,9 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   ONPOINT: { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
   KEPALA_SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
   PKL: { bg: "#f8fafc", text: "#475569", border: "#cbd5e1" },
+  PKL_MARKETING: PKL_BADGE, PKL_SALES: PKL_BADGE,
+  PKL_PENYEDIA_BARANG: PKL_BADGE, PKL_SOTECH: PKL_BADGE,
+  PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE,
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
 };
 
@@ -85,7 +99,11 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
   KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
-  KEPALA_SOTECH: "#4d7c0f", PKL: "#475569", CUSTOMER_SERVICE: "#0369a1",
+  KEPALA_SOTECH: "#4d7c0f",
+  PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309",
+  PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
+  PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309",
+  CUSTOMER_SERVICE: "#0369a1",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -93,6 +111,11 @@ const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
 ]);
+const PKL_ROLE_SET = new Set([
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+]);
+function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
@@ -105,24 +128,22 @@ function getAvatarColor(role: string) {
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${
-      type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
-    }`}
+    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+      }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}>
       {type === "ok"
         ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
         : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
       }
       {msg}
     </div>
   );
 }
 
-// ── RoleSelect ────────────────────────────────────────────────────────────────
 function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
@@ -153,7 +174,12 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>
-      <optgroup label="— Magang —"><option value="PKL">🎓 PKL</option></optgroup>
+      <optgroup label="— Magang (PKL) —">
+        {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+          "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"].map(r => (
+            <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+          ))}
+      </optgroup>
       <optgroup label="— Layanan —"><option value="CUSTOMER_SERVICE">🎧 Customer Service</option></optgroup>
     </select>
   );
@@ -450,6 +476,7 @@ export default function UsersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<"karyawan" | "pkl">("karyawan");
 
   const { openChat, setOpenGroupChat } = useChatContext();
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
@@ -510,18 +537,33 @@ export default function UsersPage() {
       const matchSearch = !search
         || u.name.toLowerCase().includes(search.toLowerCase())
         || (u.phone_number ?? "").includes(search);
-      return matchSearch && (filterRole === "Semua" || u.role === filterRole);
+      const matchRole = filterRole === "Semua" || u.role === filterRole;
+      const matchTab = activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role);
+      return matchSearch && matchRole && matchTab;
     });
     result.sort((a, b) => {
       const c = a.name.localeCompare(b.name);
       return sortOrder === "asc" ? c : -c;
     });
     return result;
-  }, [users, search, filterRole, sortOrder]);
+  }, [users, search, filterRole, sortOrder, activeTab]);
+
+  const tabRoles = useMemo(() => {
+    return activeTab === "pkl"
+      ? ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"]
+      : ALL_ROLES.filter(r => !isPKLRole(r));
+  }, [activeTab]);
+
+  const totalInTab = useMemo(
+    () => users.filter(u => activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role)).length,
+    [users, activeTab]
+  );
 
   const enrolled = users.filter(u => u.face_embedding).length;
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
+  const totalKaryawan = users.filter(u => !isPKLRole(u.role)).length;
+  const totalPKL = users.filter(u => isPKLRole(u.role)).length;
   const showOnlinePanel = isAdmin || isKepala;
 
   return (
@@ -580,7 +622,7 @@ export default function UsersPage() {
               <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
                 {isAdmin ? "Kelola akun, role, shift, dan wajah karyawan"
                   : isKepala ? "Lihat detail dan chat dengan anggota tim"
-                  : "Lihat dan chat dengan rekan kerja"}
+                    : "Lihat dan chat dengan rekan kerja"}
               </p>
             </div>
           </div>
@@ -618,6 +660,35 @@ export default function UsersPage() {
             <StatCard icon="⚠️" value={pwNotSet} label="Belum Set PW"
               sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
               accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
+          </div>
+        )}
+
+        {/* ── Tab Karyawan / PKL ── */}
+        {isAdmin && (
+          <div className="bg-white rounded-2xl overflow-hidden"
+            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+            <div className="flex p-1.5 gap-1.5">
+              {([
+                { key: "karyawan", label: "👥 Karyawan", count: totalKaryawan, accent: "#6366f1" },
+                { key: "pkl", label: "🎓 PKL", count: totalPKL, accent: "#b45309" },
+              ] as const).map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
+                  style={activeTab === t.key
+                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                    : { background: "#f5f7ff", color: "#64748b" }}>
+                  {t.label}
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
+                    style={activeTab === t.key
+                      ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
+                      : { background: "#e8ecf5", color: "#64748b" }}>
+                    {t.count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -660,13 +731,13 @@ export default function UsersPage() {
                 </div>
                 {/* Role Pills */}
                 <div className="flex gap-1.5 flex-wrap max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
-                  {["Semua", ...ALL_ROLES].map(r => (
+                  {["Semua", ...tabRoles].map(r => (
                     <button key={r} onClick={() => setFilterRole(r)}
                       className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0"
                       style={filterRole === r
                         ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
                         : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
-                      {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
+                      {r === "Semua" ? `Semua (${totalInTab})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                     </button>
                   ))}
                 </div>

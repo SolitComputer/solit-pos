@@ -1,5 +1,3 @@
-// src/lib/permissions.ts
-
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -22,6 +20,13 @@ export type UserRole =
   | "ONPOINT"
   | "KEPALA_SOTECH"
   | "PKL"
+  | "PKL_MARKETING"
+  | "PKL_SALES"
+  | "PKL_PENYEDIA_BARANG"
+  | "PKL_SOTECH"
+  | "PKL_ONPOINT"
+  | "PKL_TEKNISI"
+  | "PKL_KONTEN"
   | "CUSTOMER_SERVICE";
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
@@ -46,20 +51,29 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ONPOINT: "/dashboard",
   KEPALA_SOTECH: "/dashboard",
   PKL: "/dashboard/laptops/ready",
+  PKL_MARKETING: "/dashboard/laptops/ready",
+  PKL_SALES: "/dashboard/laptops/ready",
+  PKL_PENYEDIA_BARANG: "/dashboard/laptops/ready",
+  PKL_SOTECH: "/dashboard/laptops/ready",
+  PKL_ONPOINT: "/dashboard/laptops/ready",
+  PKL_TEKNISI: "/dashboard/laptops/ready",
+  PKL_KONTEN: "/dashboard/laptops/ready",
   CUSTOMER_SERVICE: "/dashboard/service/antrian",
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
 const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-// ✅ FIX: Hapus duplikat CUSTOMER_SERVICE
 const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL", "CUSTOMER_SERVICE",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "CUSTOMER_SERVICE",
 ];
 
 const SALES_ACCESS: UserRole[] = [
@@ -106,6 +120,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
+    "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
@@ -122,7 +138,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
-  "/dashboard/users": ALL_ROLES.filter(r => r !== "PKL"),
+  "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
 
@@ -137,9 +153,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
 
-  // ─── API Routes ───────────────────────────────────────────────────────────
-  "/api/messages": ALL_ROLES.filter(r => r !== "PKL"),
-  "/api/group-chat": ALL_ROLES.filter(r => r !== "PKL"),
+  "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
+  "/api/group-chat": ALL_ROLES.filter(r => !r.startsWith("PKL")),
 
   // ✅ FIX: Tambah push notification route
   "/api/push/subscribe": [...ALL_ROLES],
@@ -150,13 +165,18 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
     "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
@@ -171,11 +191,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/api/units/reserve": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/units/hold": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES"],
   "/api/users": [...FULL_ACCESS],
@@ -201,9 +225,20 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/api/service": [...SERVICE_VIEW_ROLES],
 
-  "/dashboard/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
-  "/api/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
-
+  "/dashboard/pkl-reports": [
+    ...FULL_ACCESS,
+    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  ],
+  "/api/pkl-reports": [
+    ...FULL_ACCESS,
+    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  ],
 };
 
 export const PERMISSIONS = {
@@ -220,7 +255,9 @@ export const PERMISSIONS = {
 
   CREATE_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ] as UserRole[],
 
   EDIT_TRANSACTION: [
@@ -234,7 +271,9 @@ export const PERMISSIONS = {
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ] as UserRole[],
 
   VIEW_LAPTOPS: [
@@ -269,7 +308,10 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "TEKNISI", "KEPALA_TEKNISI", "PKL", "CUSTOMER_SERVICE",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
   ] as UserRole[],
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
@@ -290,13 +332,13 @@ export function hasPermission(
 }
 
 export const DIVISION_MAP: Record<string, UserRole[]> = {
-  KEPALA_TEKNISI: ["TEKNISI"],
-  KEPALA_SALES: ["CREW_SALES", "PENGANTARAN"],
-  KEPALA_MARKETING: ["KONTEN"],
-  KEPALA_ONPOINT: ["ONPOINT"],
-  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG"],
-  KEPALA_SOTECH: ["SOTECH"],
-  ADMIN: ["PENGELOLA_BARANG"],
+  KEPALA_TEKNISI:         ["TEKNISI",          "PKL_TEKNISI"],
+  KEPALA_SALES:           ["CREW_SALES",        "PENGANTARAN", "PKL_SALES"],
+  KEPALA_MARKETING:       ["KONTEN",            "PKL_MARKETING", "PKL_KONTEN"],
+  KEPALA_ONPOINT:         ["ONPOINT",           "PKL_ONPOINT"],
+  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG",   "PKL_PENYEDIA_BARANG"],
+  KEPALA_SOTECH:          ["SOTECH",            "PKL_SOTECH"],
+  ADMIN:                  ["PENGELOLA_BARANG"],
 };
 
 /** Full access check — ADMIN / PROGRAMMER / ASISTEN_CEO */
@@ -363,4 +405,14 @@ export function getDivisionLabel(headRole: string): string {
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
 }
-export const PKL_VISIBLE_ROLES: UserRole[] = ["PKL"]; 
+export const PKL_ROLES: UserRole[] = [
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+];
+
+export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
+
+export function isPKLRole(role?: string): boolean {
+  if (!role) return false;
+  return role === "PKL" || role.startsWith("PKL_");
+}
