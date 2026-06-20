@@ -17,7 +17,6 @@ export default function Layout({
       {/* NotificationBanner */}
       <NotificationBanner />
       {/* ChatManager + GroupChat — di luar main agar ada di semua halaman */}
-      <ChatManagerWrapper />
       {/* Bottom bar background strip (Facebook-style dark bar) */}
       <ChatBarBackground />
     </ChatProvider>

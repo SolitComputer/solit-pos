@@ -7,7 +7,6 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
 
-
 interface User {
   id: string;
   name: string;
@@ -38,12 +37,8 @@ const ROLE_LABEL: Record<string, string> = {
   PENGELOLA_BARANG: "Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
-  KONTEN: "Konten",
-  KEPALA_ONPOINT: "Kepala Onpoint",
-  ONPOINT: "Onpoint",
-  KEPALA_SOTECH: "Kepala Sotech",
-  PKL: "PKL",
-  CUSTOMER_SERVICE: "Customer Service",
+  KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
+  KEPALA_SOTECH: "Kepala Sotech", PKL: "PKL", CUSTOMER_SERVICE: "Customer Service",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -53,11 +48,8 @@ const ROLE_ICON: Record<string, string> = {
   PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
   MARKETING: "📱", KEBERSIHAN: "🧹",
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
-  KEPALA_ONPOINT: "🎯",
-  ONPOINT: "📍",
-  KEPALA_SOTECH: "⚙️",
-  PKL: "🎓",
-  CUSTOMER_SERVICE: "🎧",
+  KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
+  PKL: "🎓", CUSTOMER_SERVICE: "🎧",
 };
 
 const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
@@ -105,27 +97,25 @@ const KEPALA_ROLES = new Set([
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
-
 function getAvatarColor(role: string) {
   return ROLE_AVATAR_COLOR[role] ?? "#6b7280";
 }
 
-// ── Toast ──────────────────────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok"
-      ? "bg-white text-slate-700 border border-slate-100"
-      : "bg-white text-red-600 border border-red-100"
-      }`}
+    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${
+      type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+    }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}>
       {type === "ok"
-        ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0" style={{ boxShadow: "0 2px 8px rgba(16,185,129,0.35)" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-        </div>
-        : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0" style={{ boxShadow: "0 2px 8px rgba(239,68,68,0.35)" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-        </div>
+        ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+        : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </div>
       }
       {msg}
     </div>
@@ -135,12 +125,9 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
 // ── RoleSelect ────────────────────────────────────────────────────────────────
 function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
+    <select value={value} onChange={e => onChange(e.target.value)}
       className="w-full h-10 border rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 transition"
-      style={{ borderColor: "#e2e8f0" }}
-    >
+      style={{ borderColor: "#e2e8f0" }}>
       <optgroup label="— Akses Penuh —">
         {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
@@ -166,12 +153,8 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>
-      <optgroup label="— Magang —">
-        <option value="PKL">🎓 PKL</option>
-      </optgroup>
-      <optgroup label="— Layanan —">
-        <option value="CUSTOMER_SERVICE">🎧 Customer Service</option>
-      </optgroup>
+      <optgroup label="— Magang —"><option value="PKL">🎓 PKL</option></optgroup>
+      <optgroup label="— Layanan —"><option value="CUSTOMER_SERVICE">🎧 Customer Service</option></optgroup>
     </select>
   );
 }
@@ -189,7 +172,6 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   );
 }
 
-// ── Modal Header ──────────────────────────────────────────────────────────────
 function ModalHeader({ title, subtitle, icon, onClose }: {
   title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
 }) {
@@ -198,10 +180,6 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
       style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
       <div className="absolute inset-0 pointer-events-none" style={{
         backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%)",
-      }} />
-      <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
-        backgroundSize: "24px 24px",
       }} />
       <div className="flex items-center gap-3 z-10">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -216,15 +194,16 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
       <button onClick={onClose}
         className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10"
         style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+        </svg>
       </button>
-      {/* Accent line */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5" style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5"
+        style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
     </div>
   );
 }
 
-// ── Field ────────────────────────────────────────────────────────────────────
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -236,18 +215,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// ── Input ─────────────────────────────────────────────────────────────────────
 function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <input
-      {...props}
+    <input {...props}
       className="w-full h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2"
-      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
-    />
+      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }} />
   );
 }
 
-// ── CreateUserModal ────────────────────────────────────────────────────────────
+// ── CreateUserModal ───────────────────────────────────────────────────────────
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -274,24 +250,18 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <ModalShell onClose={onClose}>
-      <ModalHeader
-        title="Tambah User Baru"
-        subtitle="Admin membuat akun, user set password sendiri"
-        onClose={onClose}
-        icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
-      />
-
+      <ModalHeader title="Tambah User Baru" subtitle="Admin membuat akun, user set password sendiri" onClose={onClose}
+        icon={<svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+        </svg>} />
       <div className="p-6 space-y-4">
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {error}
           </div>
         )}
-        <Field label="Nama Lengkap">
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
-        </Field>
+        <Field label="Nama Lengkap"><Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" /></Field>
         <Field label="Nomor WhatsApp">
           <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
           <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
@@ -304,18 +274,6 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
               ⚠️ Role ini memiliki akses penuh ke semua fitur
             </div>
           )}
-          {role === "PKL" && (
-            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
-              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#475569" }}>
-              🎓 Akses terbatas: lihat laptop, buat payment, scanner
-            </div>
-          )}
-          {role === "CUSTOMER_SERVICE" && (
-            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
-              style={{ background: "#f0f9ff", border: "1px solid #bae6fd", color: "#0369a1" }}>
-              🎧 Akses layanan pelanggan — konfigurasi lanjut menyusul
-            </div>
-          )}
         </Field>
         <Field label="Shift Kerja">
           <div className="flex gap-2">
@@ -323,44 +281,28 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
               <button key={s} type="button" onClick={() => setShift(s)}
                 className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all"
                 style={shift === s
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }
-                }>
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
               </button>
             ))}
           </div>
-          <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>{shift === "PAGI" ? "07.30 – 12.00 WIB" : "14.00 – 18.00 WIB"}</p>
         </Field>
-        <div className="px-4 py-3.5 rounded-2xl"
-          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
-          <p className="text-[11px] font-bold" style={{ color: "#92400e" }}>ℹ️ Cara kerja</p>
-          <p className="text-[10.5px] mt-1 leading-relaxed" style={{ color: "#a16207" }}>
-            Setelah akun dibuat, user login pertama kali dengan nomor WA ini. Sistem akan meminta mereka membuat password sendiri.
-          </p>
-        </div>
       </div>
-
       <div className="px-6 pb-6 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-        <button onClick={onClose}
-          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:scale-[1.01]"
-          style={{ background: "#f1f5f9", color: "#64748b" }}>
-          Batal
-        </button>
+        <button onClick={onClose} className="flex-1 h-10 rounded-xl text-sm font-semibold"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.01] disabled:opacity-50 flex items-center justify-center gap-2"
-          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-          {saving
-            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
-            : "✅ Buat Akun"
-          }
+          className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+          {saving ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</> : "✅ Buat Akun"}
         </button>
       </div>
     </ModalShell>
   );
 }
 
-// ── EditUserModal ──────────────────────────────────────────────────────────────
+// ── EditUserModal ─────────────────────────────────────────────────────────────
 function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
@@ -385,44 +327,24 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
 
   return (
     <ModalShell onClose={onClose}>
-      <ModalHeader
-        title="Edit User"
-        subtitle={user.name}
-        onClose={onClose}
-        icon={
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
-            style={{ background: `${getAvatarColor(user.role)}cc` }}>
-            {getInitials(user.name)}
-          </div>
-        }
-      />
-
+      <ModalHeader title="Edit User" subtitle={user.name} onClose={onClose}
+        icon={<div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
+          style={{ background: `${getAvatarColor(user.role)}cc` }}>{getInitials(user.name)}</div>} />
       <div className="p-6 space-y-4">
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             {error}
           </div>
         )}
-        <Field label="Nama">
-          <Input value={name} onChange={e => setName(e.target.value)} />
-        </Field>
-        <Field label="Nomor WhatsApp">
-          <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} />
-        </Field>
+        <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
+        <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
         <Field label="Role">
           <RoleSelect value={role} onChange={setRole} />
           {FULL_ACCESS_ROLES.has(role) && (
             <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
               style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
               ⚠️ Role ini memiliki akses penuh ke semua fitur
-            </div>
-          )}
-          {role === "PKL" && (
-            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
-              style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#475569" }}>
-              🎓 Akses terbatas: lihat laptop, buat payment, scanner
             </div>
           )}
         </Field>
@@ -432,76 +354,47 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
               <button key={s} type="button" onClick={() => setShift(s)}
                 className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all"
                 style={shift === s
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }
-                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }
-                }>
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 {s === "PAGI" ? "🌅" : "🌆"} {s}
               </button>
             ))}
           </div>
         </Field>
       </div>
-
       <div className="px-6 pb-6 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-        <button onClick={onClose}
-          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: "#f1f5f9", color: "#64748b" }}>
-          Batal
-        </button>
+        <button onClick={onClose} className="flex-1 h-10 rounded-xl text-sm font-semibold"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-          {saving
-            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
-            : "💾 Simpan Perubahan"
-          }
+          className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+          {saving ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</> : "💾 Simpan"}
         </button>
       </div>
     </ModalShell>
   );
 }
 
-// ── ConfirmLogoutModal ─────────────────────────────────────────────────────────
+// ── ConfirmLogoutModal ────────────────────────────────────────────────────────
 function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
   user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
-        style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.2)" }}>
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl"
-          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
-          🚪
-        </div>
+          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>🚪</div>
         <h3 className="font-black text-slate-800 text-center text-base mb-1.5">Paksa Logout {user.name}?</h3>
-        <p className="text-sm text-slate-500 text-center mb-1">Session aktif user ini akan diakhiri.</p>
-        <p className="text-[11px] text-slate-400 text-center mb-5">User akan di-redirect ke halaman login saat membuka atau reload halaman.</p>
-
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-5"
-          style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black flex-shrink-0"
-            style={{ background: getAvatarColor(user.role), boxShadow: `0 2px 8px ${getAvatarColor(user.role)}55` }}>
-            {getInitials(user.name)}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800">{user.name}</p>
-            <p className="text-[11px] text-slate-400">{ROLE_LABEL[user.role] ?? user.role} · {user.shift}</p>
-          </div>
-        </div>
+        <p className="text-sm text-slate-500 text-center mb-5">Session aktif user ini akan diakhiri.</p>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
-            Batal
-          </button>
+            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.35)" }}>
-            {loading
-              ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Proses...</>
-              : "🚪 Ya, Logout"
-            }
+            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)" }}>
+            {loading ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} /> : "🚪 Ya, Logout"}
           </button>
         </div>
       </div>
@@ -509,25 +402,20 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
-// ── ActionButton ──────────────────────────────────────────────────────────────
-function ActionBtn({
-  onClick, title, bg, color, children,
-}: {
+// ── ActionBtn — ukuran lebih kecil, selalu tampil ─────────────────────────────
+function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110"
-      style={{ background: bg, color: color }}
-    >
+    <button onClick={onClick} title={title}
+      className="w-7 h-7 flex items-center justify-center rounded-lg transition-all hover:scale-110 flex-shrink-0"
+      style={{ background: bg, color }}>
       {children}
     </button>
   );
 }
 
-// ── Stat Card ──────────────────────────────────────────────────────────────────
+// ── StatCard ──────────────────────────────────────────────────────────────────
 function StatCard({ icon, value, label, sub, accent }: {
   icon: string; value: number; label: string; sub: string; accent: string;
 }) {
@@ -545,7 +433,7 @@ function StatCard({ icon, value, label, sub, accent }: {
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -562,8 +450,8 @@ export default function UsersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
-  const { openChat, setOpenGroupChat } = useChatContext();
 
+  const { openChat, setOpenGroupChat } = useChatContext();
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
 
   useEffect(() => {
@@ -634,7 +522,6 @@ export default function UsersPage() {
   const enrolled = users.filter(u => u.face_embedding).length;
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
-
   const showOnlinePanel = isAdmin || isKepala;
 
   return (
@@ -645,12 +532,9 @@ export default function UsersPage() {
       {isAdmin && confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} onClick={() => setConfirmReset(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
-            style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.2)" }}>
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 text-3xl"
-              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>
-              😶
-            </div>
+              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>😶</div>
             <h3 className="font-black text-slate-800 text-center text-base mb-1.5">Reset Wajah {confirmReset.name}?</h3>
             <p className="text-sm text-slate-500 text-center mb-6">User harus scan ulang wajah saat login berikutnya.</p>
             <div className="flex gap-2.5">
@@ -659,7 +543,7 @@ export default function UsersPage() {
                 style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
               <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
                 className="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.35)" }}>
+                style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>
                 {resetting === confirmReset.id
                   ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
                   : null}
@@ -681,32 +565,29 @@ export default function UsersPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
 
-        {/* ── Page Header ── */}
+        {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }}>
-                <svg className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">Manajemen User</h1>
-                <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
-                  {isAdmin
-                    ? "Kelola akun, role, shift, dan wajah karyawan"
-                    : isKepala ? "Lihat detail dan chat dengan anggota tim"
-                      : "Lihat dan chat dengan rekan kerja"}
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 12px rgba(15,12,41,0.3)" }}>
+              <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">Manajemen User</h1>
+              <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                {isAdmin ? "Kelola akun, role, shift, dan wajah karyawan"
+                  : isKepala ? "Lihat detail dan chat dengan anggota tim"
+                  : "Lihat dan chat dengan rekan kerja"}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <NotificationToggle />
-            <button
-              onClick={() => setOpenGroupChat(true)}
+            <button onClick={() => setOpenGroupChat(true)}
               className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95"
               style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -734,13 +615,9 @@ export default function UsersPage() {
             <StatCard icon="👥" value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
             <StatCard icon="🔑" value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
             <StatCard icon="😊" value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
-            <StatCard
-              icon="⚠️"
-              value={pwNotSet}
-              label="Belum Set PW"
+            <StatCard icon="⚠️" value={pwNotSet} label="Belum Set PW"
               sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
-              accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"}
-            />
+              accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
           </div>
         )}
 
@@ -755,45 +632,40 @@ export default function UsersPage() {
               <div className="px-4 pt-4 pb-3.5 space-y-3">
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1 min-w-0">
-                    <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <input
-                      type="text"
-                      placeholder="Cari nama atau nomor..."
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
+                    <input type="text" placeholder="Cari nama atau nomor..."
+                      value={search} onChange={e => setSearch(e.target.value)}
                       className="w-full h-9 rounded-xl pl-9 pr-3 text-xs font-medium focus:outline-none focus:ring-2 transition"
-                      style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
-                    />
+                      style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
                     {search && (
-                      <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:scale-110">
-                        <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                      <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                    className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white transition-all hover:scale-[1.02] flex-shrink-0 flex items-center gap-1.5"
-                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.3)" }}>
+                  <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
+                    className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5"
+                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sortOrder === "asc" ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4" : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d={sortOrder === "asc" ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4" : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
                     </svg>
                     {sortOrder === "asc" ? "A–Z" : "Z–A"}
                   </button>
                 </div>
-
                 {/* Role Pills */}
                 <div className="flex gap-1.5 flex-wrap max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
                   {["Semua", ...ALL_ROLES].map(r => (
-                    <button
-                      key={r}
-                      onClick={() => setFilterRole(r)}
+                    <button key={r} onClick={() => setFilterRole(r)}
                       className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0"
                       style={filterRole === r
-                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }
-                        : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }
-                      }>
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
                       {r === "Semua" ? `Semua (${users.length})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
                     </button>
                   ))}
@@ -811,62 +683,40 @@ export default function UsersPage() {
                 <div className="flex items-center gap-2.5">
                   <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
                   <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
-                    {filtered.length === users.length
-                      ? `${users.length} karyawan`
-                      : `${filtered.length} dari ${users.length} karyawan`}
+                    {filtered.length === users.length ? `${users.length} karyawan` : `${filtered.length} dari ${users.length} karyawan`}
                   </p>
                 </div>
                 {isAdmin && (
                   <div className="flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      Wajah terdaftar
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-violet-400" />
-                      Akses penuh
-                    </span>
+                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah terdaftar</span>
+                    <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh</span>
                   </div>
                 )}
               </div>
 
               {/* Loading */}
               {loading ? (
-                <div style={{ borderTop: "none" }}>
+                <div>
                   {Array(6).fill(0).map((_, i) => (
                     <div key={i} className="px-5 py-3.5 flex items-center gap-3 animate-pulse"
                       style={{ borderBottom: "1px solid #f8f8fc" }}>
                       <div className="w-11 h-11 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
                       <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-3 rounded-full w-28" style={{ background: "#e2e8f0" }} />
-                          <div className="h-3 rounded-full w-16" style={{ background: "#f1f5f9" }} />
-                        </div>
+                        <div className="h-3 rounded-full w-28" style={{ background: "#e2e8f0" }} />
                         <div className="h-2.5 rounded-full w-36" style={{ background: "#f1f5f9" }} />
                       </div>
                     </div>
                   ))}
                 </div>
-
               ) : filtered.length === 0 ? (
                 <div className="text-center py-20">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                    style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
-                    <svg className="w-7 h-7" style={{ color: "#c7d2fe" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
                   <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
                   <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
                   {(search || filterRole !== "Semua") && (
                     <button onClick={() => { setSearch(""); setFilterRole("Semua"); }}
-                      className="mt-4 text-xs font-bold transition-all hover:opacity-70"
-                      style={{ color: "#6366f1" }}>
-                      Reset filter
-                    </button>
+                      className="mt-4 text-xs font-bold" style={{ color: "#6366f1" }}>Reset filter</button>
                   )}
                 </div>
-
               ) : (
                 <div className="overflow-y-auto max-h-[calc(100vh-340px)]">
                   {filtered.map(user => {
@@ -875,25 +725,25 @@ export default function UsersPage() {
                     const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
 
                     return (
-                      <div key={user.id} className="px-5 py-3.5 transition-all group cursor-default hover:bg-slate-50/60"
+                      <div key={user.id} className="px-5 py-3 hover:bg-slate-50/60 transition-colors"
                         style={{ borderBottom: "1px solid #f5f5fb" }}>
                         <div className="flex items-center gap-3">
 
                           {/* Avatar */}
                           <div className="relative flex-shrink-0">
-                            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-xs font-black"
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black"
                               style={{
                                 background: isFullAccess
-                                  ? `linear-gradient(135deg, #7c3aed, #6d28d9)`
+                                  ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
                                   : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
-                                boxShadow: `0 3px 10px ${avatarColor}40`,
+                                boxShadow: `0 2px 8px ${avatarColor}35`,
                               }}>
                               {getInitials(user.name)}
                             </div>
                             {isAdmin && user.face_embedding && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
-                                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-white flex items-center justify-center"
+                                style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                               </div>
                             )}
                           </div>
@@ -901,70 +751,46 @@ export default function UsersPage() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-bold truncate leading-tight" style={{ color: "#0f172a" }}>
+                              <span className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>
                                 {user.name}
                               </span>
-
-                              {/* Role badge */}
                               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                 style={{ background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}` }}>
                                 {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
                               </span>
-
-                              {/* Shift */}
                               {(isAdmin || isKepala) && user.shift && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                   style={user.shift === "PAGI"
                                     ? { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }
-                                    : { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }
-                                  }>
+                                    : { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>
                                   {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
                                 </span>
                               )}
-
-                              {/* Belum PW */}
                               {isAdmin && !user.password_set && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                   style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
                                   🔑 Belum PW
                                 </span>
                               )}
-                              {/* Force logout */}
                               {isAdmin && user.force_logout_at && (
-                                <span
-                                  className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                  style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}
-                                  title={`Logout paksa: ${new Date(user.force_logout_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}`}>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                  style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
                                   🚪 Forced Out
                                 </span>
                               )}
                             </div>
-
-                            {/* Phone */}
-                            {(isAdmin || isKepala) && (
-                              <p className="text-[11px] mt-0.5 truncate flex items-center gap-1" style={{ color: "#94a3b8" }}>
-                                {user.phone_number
-                                  ? <>
-                                    <svg className="w-2.5 h-2.5 flex-shrink-0" style={{ color: "#c7d2fe" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
-                                    <span className="font-medium">{user.phone_number}</span>
-                                  </>
-                                  : isAdmin ? <span className="italic text-orange-400">Nomor belum diset</span> : null
-                                }
-                              </p>
+                            {(isAdmin || isKepala) && user.phone_number && (
+                              <p className="text-[11px] mt-0.5 text-gray-400 font-medium">{user.phone_number}</p>
                             )}
                           </div>
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-150">
-
+                          {/* ── Actions — selalu tampil, tidak perlu hover ── */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             {currentUserInfo && user.id !== currentUserInfo.id && (
                               <ActionBtn
                                 onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
                                 title={`Chat dengan ${user.name}`}
-                                bg="#eff6ff"
-                                color="#3b82f6">
+                                bg="#eff6ff" color="#3b82f6">
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -1011,7 +837,7 @@ export default function UsersPage() {
               {isAdmin && (
                 <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
                   style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: "#dbeafe" }}>
                     <svg className="w-4 h-4" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1020,7 +846,7 @@ export default function UsersPage() {
                   <div>
                     <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
                     <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
-                      Session diakhiri otomatis setiap 03:00 WIB. Gunakan tombol 🚪 untuk paksa logout manual.
+                      Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.
                     </p>
                   </div>
                 </div>
@@ -1030,25 +856,10 @@ export default function UsersPage() {
           )}
         </div>
 
-        {/* ── Mobile: Online Panel ── */}
+        {/* ── Mobile Online Panel ── */}
         {showOnlinePanel && (
           <div className="lg:hidden space-y-3">
             <OnlineUsersPanel />
-            {isAdmin && (
-              <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
-                style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "#dbeafe" }}>
-                  <svg className="w-3.5 h-3.5" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
-                  <p className="text-[10.5px] mt-0.5" style={{ color: "#3b82f6" }}>Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.</p>
-                </div>
-              </div>
-            )}
           </div>
         )}
 

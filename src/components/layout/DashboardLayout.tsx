@@ -47,8 +47,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="w-9" />
         </div>
 
-        {/* pb-10 = ruang untuk bar 32px + sedikit gap */}
-        <main className="flex-1 pb-10">
+        {/* Tidak perlu pb extra karena chat sekarang floating, tidak ada bar bawah */}
+        <main className="flex-1">
           <div className="p-4 lg:p-5 max-w-[1280px]">
             {children}
           </div>
