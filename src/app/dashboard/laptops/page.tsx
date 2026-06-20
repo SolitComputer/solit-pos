@@ -28,6 +28,7 @@ interface Laptop {
     selling_price: number;
     qty: number;
     stok_tersedia: number;
+    siap_jual: number;
     stok_minus: number;
     terjual: number;
     status: string;
@@ -204,7 +205,6 @@ function DeleteConfirmModal({
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onCancel} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-popIn">
                 <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-700 to-gray-900" />
-                {/* Header */}
                 <div className="bg-gray-800 px-6 py-5">
                     <div className="flex items-center gap-3.5">
                         <div className="w-11 h-11 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
@@ -221,13 +221,11 @@ function DeleteConfirmModal({
                 </div>
 
                 <div className="p-6 space-y-4">
-                    {/* Nama laptop */}
                     <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200">
                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Laptop yang akan dihapus</p>
                         <p className="text-sm font-bold text-gray-800 truncate">{laptop.laptop_name}</p>
                     </div>
 
-                    {/* Warning */}
                     {unitCount > 0 && (
                         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                             <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +239,6 @@ function DeleteConfirmModal({
                         </div>
                     )}
 
-                    {/* Input konfirmasi */}
                     <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2 block">
                             Ketik nama laptop untuk konfirmasi
@@ -249,17 +246,12 @@ function DeleteConfirmModal({
                         <div className="bg-gray-100 rounded-lg px-3.5 py-2 mb-2.5 border border-gray-200">
                             <code className="text-xs font-mono text-gray-700 select-all">{laptop.laptop_name}</code>
                         </div>
+                        {/* FIX: hapus duplikat className */}
                         <input
                             type="text"
                             value={inputName}
                             onChange={e => setInputName(e.target.value)}
                             placeholder="Ketik nama laptop di atas..."
-                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
-                                ? isMatch
-                                    ? "border-green-400 focus:ring-green-200 bg-green-50/30"
-                                    : "border-red-300 focus:ring-red-200"
-                                : "border-gray-200 focus:ring-gray-200"
-                                }`}
                             className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
                                 ? isMatch
                                     ? "border-green-400 focus:ring-green-200 bg-green-50/30"
@@ -286,7 +278,6 @@ function DeleteConfirmModal({
                         )}
                     </div>
 
-                    {/* Actions */}
                     <div className="flex gap-3 pt-1">
                         <button onClick={onCancel}
                             className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 active:scale-[0.98] transition-all duration-150">
@@ -333,7 +324,6 @@ export default function Page() {
         "MARKETING", "KEPALA_MARKETING"
     ] as UserRole[]) : false;
     const canViewUnits = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
-    const canViewBarcode = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) : false;
     const canViewTotalStok = userRole
         ? hasPermission(userRole, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"] as UserRole[])
         : false;
@@ -343,6 +333,7 @@ export default function Page() {
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const showConfirm = (msg: string, onConfirm: () => void) => setConfirmModal({ message: msg, onConfirm });
 
     useEffect(() => { fetchLaptops(); }, []);
@@ -368,7 +359,8 @@ export default function Page() {
                 ...l,
                 selling_price: Math.round(Number(l.selling_price) || 0),
                 qty: (l.laptop_units || []).length,
-                stok_tersedia: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
+                stok_tersedia: (l.laptop_units || []).filter((u: LaptopUnit) => u.status !== "SOLD").length,
+                siap_jual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
                 stok_minus: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length,
                 terjual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SOLD").length,
             }));
@@ -584,7 +576,15 @@ export default function Page() {
         });
         filteredLaptops.forEach((item, idx) => {
             const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
-            const row = ws.addRow({ no: idx + 1, product: item.laptop_name || "", cpu: item.cpu || "", ram: item.ram || "", storage: item.storage || "", stock: item.qty ?? 0, price_store: item.selling_price || 0 });
+            const row = ws.addRow({
+                no: idx + 1,
+                product: item.laptop_name || "",
+                cpu: item.cpu || "",
+                ram: item.ram || "",
+                storage: item.storage || "",
+                stock: item.stok_tersedia ?? 0,
+                price_store: item.selling_price || 0,
+            });
             row.height = 22;
             row.eachCell((cell, colNum) => {
                 const key = ws.getColumn(colNum).key as string;
@@ -608,9 +608,10 @@ export default function Page() {
         document.body.removeChild(link);
     };
 
-    // Stats ringkasan
-    const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
+    // ── Stats ringkasan ───────────────────────────────────────────────────
+    // FIX: hapus totalStok (duplikat), totalSisa = stok_tersedia (siap jual)
     const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
+    const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
     const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
@@ -621,10 +622,7 @@ export default function Page() {
                     0%   { background-position: -600px 0; }
                     100% { background-position:  600px 0; }
                 }
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes popIn {
                     from { opacity: 0; transform: scale(0.94) translateY(8px); }
                     to   { opacity: 1; transform: scale(1) translateY(0); }
@@ -637,24 +635,18 @@ export default function Page() {
                     from { opacity: 0; transform: translateY(16px); }
                     to   { opacity: 1; transform: translateY(0); }
                 }
-                .animate-fadeIn  { animation: fadeIn  0.2s ease-out; }
-                .animate-popIn   { animation: popIn   0.25s cubic-bezier(0.34,1.56,0.64,1); }
+                .animate-fadeIn   { animation: fadeIn   0.2s ease-out; }
+                .animate-popIn    { animation: popIn    0.25s cubic-bezier(0.34,1.56,0.64,1); }
                 .animate-slideDown { animation: slideDown 0.3s ease-out; }
                 .animate-slideUp   { animation: slideUp   0.3s ease-out; }
-
-                .table-scroll {
-                    scrollbar-width: thin;
-                    scrollbar-color: #d1d5db #f9fafb;
-                }
+                .table-scroll { scrollbar-width: thin; scrollbar-color: #d1d5db #f9fafb; }
                 .table-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
                 .table-scroll::-webkit-scrollbar-track { background: #f9fafb; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-
                 .data-row { transition: background-color 0.15s ease; }
                 .data-row:hover { background-color: #f8fafc; }
                 .data-row:hover td:first-child { border-left: 3px solid #374151; }
-
                 .filter-select {
                     appearance: none;
                     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
@@ -759,7 +751,6 @@ export default function Page() {
 
                         {/* ── FILTER PANEL ───────────────────────────────── */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
-                            {/* Row 1 */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                                 <SearchInput
                                     placeholder="Cari nama, brand, CPU..."
@@ -784,7 +775,11 @@ export default function Page() {
                                     ))}
                                 </FilterSelect>
                                 <button
-                                    onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT"); }}
+                                    onClick={() => {
+                                        setSearch(""); setFilterSN(""); setFilterStatus("ALL");
+                                        setFilterBrand("ALL"); setFilterProcessor("ALL");
+                                        setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT");
+                                    }}
                                     className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
                                 >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -794,7 +789,6 @@ export default function Page() {
                                 </button>
                             </div>
 
-                            {/* Row 2 */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                 <FilterSelect value={filterProcessor} onChange={e => setFilterProcessor(e.target.value)}>
                                     {uniqueProcessors.map(p => (
@@ -823,21 +817,12 @@ export default function Page() {
                                 </FilterSelect>
                             </div>
 
-                            {/* Active Filters Chips */}
                             {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
                                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                    {filterProcessor !== "ALL" && (
-                                        <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />
-                                    )}
-                                    {filterRam !== "ALL" && (
-                                        <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />
-                                    )}
-                                    {filterPriceRange !== "ALL" && (
-                                        <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />
-                                    )}
-                                    {sortBy !== "DEFAULT" && (
-                                        <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />
-                                    )}
+                                    {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
+                                    {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
+                                    {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                    {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
                                 </div>
                             )}
                         </div>
@@ -866,6 +851,7 @@ export default function Page() {
                                                 <Th>Brand</Th>
                                                 <Th>CPU</Th>
                                                 <Th>RAM</Th>
+                                                {/* GPU dihapus dari tampilan tabel */}
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
                                                 {canViewTotalStok && <Th right>Stok Tersisa</Th>}
@@ -876,127 +862,123 @@ export default function Page() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredLaptops.map((item, idx) => {
-                                                return (
-                                                    <tr
-                                                        key={item.id}
-                                                        className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
-                                                        onClick={() => openDetail(item)}
-                                                    >
-                                                        <td className="px-4 py-3.5 text-center w-10">
-                                                            <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 max-w-[200px]">
-                                                            <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>
-                                                                {item.laptop_name}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            <span className="text-xs font-medium text-gray-500">
-                                                                {item.brand || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 max-w-[160px]">
-                                                            <span className="block text-xs text-gray-600 truncate" title={item.cpu}>
-                                                                {item.cpu || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            <span className="text-xs font-medium text-gray-600">
-                                                                {item.ram || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            <span className="text-xs font-medium text-gray-600">
-                                                                {item.storage || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
+                                            {filteredLaptops.map((item, idx) => (
+                                                <tr
+                                                    key={item.id}
+                                                    className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
+                                                    onClick={() => openDetail(item)}
+                                                >
+                                                    <td className="px-4 py-3.5 text-center w-10">
+                                                        <span className="text-xs font-semibold text-gray-300 tabular-nums">
+                                                            {String(idx + 1).padStart(2, "0")}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 max-w-[200px]">
+                                                        <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>
+                                                            {item.laptop_name}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                                        <span className="text-xs font-medium text-gray-500">
+                                                            {item.brand || <span className="text-gray-200">—</span>}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 max-w-[160px]">
+                                                        <span className="block text-xs text-gray-600 truncate" title={item.cpu}>
+                                                            {item.cpu || <span className="text-gray-200">—</span>}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                                        <span className="text-xs font-medium text-gray-600">
+                                                            {item.ram || <span className="text-gray-200">—</span>}
+                                                        </span>
+                                                    </td>
+                                                    {/* GPU td dihapus */}
+                                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                                        <span className="text-xs font-medium text-gray-600">
+                                                            {item.storage || <span className="text-gray-200">—</span>}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="text-[13px] font-bold text-gray-800 tabular-nums">
+                                                            {fmt(item.selling_price)}
+                                                        </span>
+                                                    </td>
+                                                    {canViewTotalStok && (
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className="text-[13px] font-bold text-gray-800 tabular-nums">
-                                                                {fmt(item.selling_price)}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stok_tersedia ?? 0) === 0
-                                                                ? "bg-red-50 text-red-500 ring-1 ring-red-200"
-                                                                : "bg-green-50 text-green-700 ring-1 ring-green-200"
-                                                                }`}>
-                                                        {canViewTotalStok && (
-                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
-                                                                    {item.stok_tersedia ?? 0}
-                                                                </span>
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stok_tersedia ?? 0) === 0
-                                                                ? "bg-red-50 text-red-500 ring-1 ring-red-200"
-                                                                : "bg-green-50 text-green-700 ring-1 ring-green-200"
-                                                                }`}>
+                                                            <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
                                                                 {item.stok_tersedia ?? 0}
                                                             </span>
                                                         </td>
-                                                        {canViewTotalStok && (
-                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
-                                                                    {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
-                                                                </span>
-                                                            </td>
-                                                        )}
-                                                        {canViewTotalStok && (
-                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0
-                                                                    ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                                                                    : "text-gray-200"
-                                                                    }`}>
-                                                                    {item.terjual ?? 0}
-                                                                </span>
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
-                                                                    <button
-                                                                        onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
-                                                                        title="Lihat Barcode"
-                                                                    >
-                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                                                                d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
-                                                                        </svg>
-                                                                    </button>
-                                                                )}
-                                                                {canViewUnits && (
-                                                                    <Link
-                                                                        href={`/dashboard/laptops/${item.id}/units`}
-                                                                        onClick={e => e.stopPropagation()}
-                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center"
-                                                                    >
-                                                                        Units
-                                                                    </Link>
-                                                                )}
-                                                                {canEditLaptop && (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={() => openEdit(item)}
-                                                                            className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150"
-                                                                        >
-                                                                            Edit
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleDelete(item.id)}
-                                                                            className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150"
-                                                                        >
-                                                                            Hapus
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                            </div>
+                                                    )}
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0
+                                                            ? "bg-red-50 text-red-500 ring-1 ring-red-200"
+                                                            : "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                                            }`}>
+                                                            {item.siap_jual ?? 0}
+                                                        </span>
+                                                    </td>
+                                                    {canViewTotalStok && (
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
+                                                                {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
+                                                            </span>
                                                         </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                                    )}
+                                                    {canViewTotalStok && (
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0
+                                                                ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                                                                : "text-gray-200"
+                                                                }`}>
+                                                                {item.terjual ?? 0}
+                                                            </span>
+                                                        </td>
+                                                    )}
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
+                                                                <button
+                                                                    onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
+                                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
+                                                                    title="Lihat Barcode"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                                                            d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                                    </svg>
+                                                                </button>
+                                                            )}
+                                                            {canViewUnits && (
+                                                                <Link
+                                                                    href={`/dashboard/laptops/${item.id}/units`}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center"
+                                                                >
+                                                                    Units
+                                                                </Link>
+                                                            )}
+                                                            {canEditLaptop && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => openEdit(item)}
+                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150"
+                                                                    >
+                                                                        Edit
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDelete(item.id)}
+                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150"
+                                                                    >
+                                                                        Hapus
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1028,7 +1010,7 @@ export default function Page() {
 
                 {/* ── MODALS ───────────────────────────────────────────── */}
 
-                {/* Create Modal */}
+                {/* Create Modal — GPU field tetap ada */}
                 <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="lg">
                     <form onSubmit={handleCreate} className="space-y-5">
                         <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5">
@@ -1079,7 +1061,7 @@ export default function Page() {
                     </form>
                 </Modal>
 
-                {/* Edit Modal */}
+                {/* Edit Modal — GPU field tetap ada */}
                 <Modal open={modalMode === "edit"} onClose={closeModal} title="Edit Laptop" size="lg">
                     <form onSubmit={handleEdit} className="space-y-5">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1124,7 +1106,6 @@ export default function Page() {
                         <ModalDetailSkeleton />
                     ) : selectedLaptop ? (
                         <div className="space-y-5">
-                            {/* Hero info */}
                             <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
                                 <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">
                                     💻
@@ -1161,7 +1142,7 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Specs grid */}
+                            {/* Specs — GPU tetap tampil di detail modal */}
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spesifikasi Teknis</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -1182,7 +1163,6 @@ export default function Page() {
                                 </div>
                             </div>
 
-                            {/* Info banner */}
                             <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3.5">
                                 <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1192,7 +1172,6 @@ export default function Page() {
                                 </p>
                             </div>
 
-                            {/* Notes */}
                             {(selectedLaptop.condition_note || selectedLaptop.notes) && (
                                 <div className="space-y-2.5">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catatan</p>
@@ -1211,7 +1190,6 @@ export default function Page() {
                                 </div>
                             )}
 
-                            {/* Footer actions */}
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                 <p className="text-xs text-gray-400">
                                     {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}
@@ -1273,7 +1251,7 @@ export default function Page() {
                         }}
                     />
                 )}
-            </DashboardLayout >
+            </DashboardLayout>
         </>
     );
 }
@@ -1405,7 +1383,8 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Siap", "Stok", "−", "Status", "Aksi"].map(h => (
+                            {/* GPU dihapus dari skeleton header */}
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1418,6 +1397,7 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
+                                {/* GPU td dihapus dari skeleton */}
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
@@ -1484,9 +1464,7 @@ function Modal({ open, onClose, title, children, size = "md" }: {
             onClick={e => { if (e.target === overlayRef.current) onClose(); }}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" />
             <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn ${size === "lg" ? "sm:max-w-3xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh]`}>
-                {/* Accent top bar */}
                 <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
-                {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <h2 className="font-bold text-gray-900 text-[15px] tracking-tight">{title}</h2>
                     <button onClick={onClose}
