@@ -15,6 +15,7 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_ONPOINT: ["ONPOINT", "KEPALA_ONPOINT"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "KEPALA_SOTECH"],
+  KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
 };
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
@@ -28,6 +29,7 @@ const PAY_VIEW_ROLES = [
   "ASISTEN_CEO",
   "KEPALA_ONPOINT",
   "KEPALA_SOTECH",
+  "KEPALA_PENGELOLA_BARANG",
 ];
 
 function canApprove(approverRole: string, targetRole: string, approverId?: string, targetUserId?: string): boolean {

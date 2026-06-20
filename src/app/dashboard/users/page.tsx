@@ -27,7 +27,7 @@ const ALL_ROLES = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-  "PKL", "CUSTOMER_SERVICE",
+  "PKL", "CUSTOMER_SERVICE", "KEPALA_PENGELOLA_BARANG",
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -39,6 +39,7 @@ const ROLE_LABEL: Record<string, string> = {
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
   KEPALA_SOTECH: "Kepala Sotech", PKL: "PKL", CUSTOMER_SERVICE: "Customer Service",
+  KEPALA_PENGELOLA_BARANG: "Kepala Pengelola Barang",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -50,6 +51,7 @@ const ROLE_ICON: Record<string, string> = {
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
   KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
   PKL: "🎓", CUSTOMER_SERVICE: "🎧",
+  KEPALA_PENGELOLA_BARANG: "📦",
 };
 
 const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
@@ -75,6 +77,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   KEPALA_SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
   PKL: { bg: "#f8fafc", text: "#475569", border: "#cbd5e1" },
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
+  KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -86,12 +89,14 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
   KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
   KEPALA_SOTECH: "#4d7c0f", PKL: "#475569", CUSTOMER_SERVICE: "#0369a1",
+  KEPALA_PENGELOLA_BARANG: "#1d4ed8",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+  "KEPALA_PENGELOLA_BARANG",
 ]);
 
 function getInitials(name: string) {
@@ -105,17 +110,16 @@ function getAvatarColor(role: string) {
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${
-      type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
-    }`}
+    <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+      }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}>
       {type === "ok"
         ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
         : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
       }
       {msg}
     </div>
@@ -139,7 +143,7 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </optgroup>
       <optgroup label="— Operasional —">
-        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
+        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>
@@ -580,7 +584,7 @@ export default function UsersPage() {
               <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
                 {isAdmin ? "Kelola akun, role, shift, dan wajah karyawan"
                   : isKepala ? "Lihat detail dan chat dengan anggota tim"
-                  : "Lihat dan chat dengan rekan kerja"}
+                    : "Lihat dan chat dengan rekan kerja"}
               </p>
             </div>
           </div>
