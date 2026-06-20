@@ -604,7 +604,7 @@ export default function Page() {
 
     // Stats ringkasan
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
-    const totalStok = filteredLaptops.reduce((s, l) => s + (l.qty ?? 0), 0);
+    const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
     const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
@@ -702,12 +702,11 @@ export default function Page() {
                         </div>
 
                         {/* ── STAT CARDS ─────────────────────────────────── */}
-                        {/* ── STAT CARDS ─────────────────────────────────── */}
                         <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
                             {canViewTotalStok && (
                                 <StatCard
-                                    label="Stok Awal"
-                                    value={`${totalStok} unit`}
+                                    label="Stok Tersisa"
+                                    value={`${totalSisa} unit`}
                                     accent="bg-gray-700"
                                     icon={
                                         <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -861,10 +860,9 @@ export default function Page() {
                                                 <Th>Brand</Th>
                                                 <Th>CPU</Th>
                                                 <Th>RAM</Th>
-                                                <Th>GPU</Th>
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
-                                                {canViewTotalStok && <Th right>Stok Awal</Th>}
+                                                {canViewTotalStok && <Th right>Stok Tersisa</Th>}
                                                 <Th right>Siap Jual</Th>
                                                 {canViewTotalStok && <Th right>Minus</Th>}
                                                 {canViewTotalStok && <Th right>Terjual</Th>}
@@ -902,11 +900,6 @@ export default function Page() {
                                                                 {item.ram || <span className="text-gray-200">—</span>}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3.5 max-w-[140px]">
-                                                            <span className="block text-xs text-gray-500 truncate" title={item.gpu}>
-                                                                {item.gpu || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             <span className="text-xs font-medium text-gray-600">
                                                                 {item.storage || <span className="text-gray-200">—</span>}
@@ -919,8 +912,8 @@ export default function Page() {
                                                         </td>
                                                         {canViewTotalStok && (
                                                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-semibold tabular-nums ${(item.qty ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
-                                                                    {item.qty ?? 0}
+                                                                <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
+                                                                    {item.stok_tersedia ?? 0}
                                                                 </span>
                                                             </td>
                                                         )}
@@ -1006,7 +999,7 @@ export default function Page() {
                                     </p>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         {canViewTotalStok && (
-                                            <FooterStat label="Stok Awal" value={totalStok} dot="bg-gray-400" color="text-gray-800" />
+                                            <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />
                                         )}
                                         <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
                                         {canViewTotalStok && (
@@ -1401,7 +1394,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga", "Stok Awal", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1414,7 +1407,6 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={80} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
