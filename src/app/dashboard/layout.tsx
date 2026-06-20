@@ -1,6 +1,8 @@
 // src/app/dashboard/layout.tsx
 import { ChatProvider } from "@/contexts/ChatContext";
 import { ChatManagerWrapper } from "@/components/ui/ChatManagerWrapper";
+import { NotificationBanner } from "@/components/ui/NotificationBanner";
+import ChatBarBackground from "@/components/ui/ChatBarBackground";
 
 export default function Layout({
   children,
@@ -12,8 +14,12 @@ export default function Layout({
       <main>
         {children}
       </main>
-      {/* ChatManager harus di luar <main> tapi masih di dalam ChatProvider */}
+      {/* NotificationBanner */}
+      <NotificationBanner />
+      {/* ChatManager + GroupChat — di luar main agar ada di semua halaman */}
       <ChatManagerWrapper />
+      {/* Bottom bar background strip (Facebook-style dark bar) */}
+      <ChatBarBackground />
     </ChatProvider>
   );
 }

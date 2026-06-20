@@ -608,8 +608,6 @@ export default function Page() {
         document.body.removeChild(link);
     };
 
-    // ── Stats ringkasan ───────────────────────────────────────────────────
-    // FIX: hapus totalStok (duplikat), totalSisa = stok_tersedia (siap jual)
     const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);

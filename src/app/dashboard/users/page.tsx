@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
-import { ChatManager } from "@/components/ui/ChatBubble";
-import { GroupChatPanel } from "@/components/ui/GroupChatPanel";
+import { useChatContext } from "@/contexts/ChatContext";
+import { NotificationToggle } from "@/components/ui/NotificationToggle";
+
 
 interface User {
   id: string;
@@ -114,8 +115,8 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
     <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok"
-        ? "bg-white text-slate-700 border border-slate-100"
-        : "bg-white text-red-600 border border-red-100"
+      ? "bg-white text-slate-700 border border-slate-100"
+      : "bg-white text-red-600 border border-red-100"
       }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}>
       {type === "ok"
@@ -561,8 +562,7 @@ export default function UsersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
-  const [activeChats, setActiveChats] = useState<Array<{ user: { id: string; name: string; role: string } }>>([]);
-  const [showGroupChat, setShowGroupChat] = useState(false);
+  const { openChat, setOpenGroupChat } = useChatContext();
 
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
 
@@ -615,19 +615,6 @@ export default function UsersPage() {
       else showToast(data.message ?? "Gagal logout user", "err");
     } catch { showToast("Terjadi kesalahan", "err"); }
     finally { setLoggingOut(false); setConfirmLogoutUser(null); }
-  };
-
-  const openChat = (targetUser: User) => {
-    if (!currentUserInfo || targetUser.id === currentUserInfo.id) return;
-    setActiveChats(prev => {
-      if (prev.some(c => c.user.id === targetUser.id)) return prev;
-      const limited = prev.length >= 3 ? prev.slice(1) : prev;
-      return [...limited, { user: { id: targetUser.id, name: targetUser.name, role: targetUser.role } }];
-    });
-  };
-
-  const closeChat = (userId: string) => {
-    setActiveChats(prev => prev.filter(c => c.user.id !== userId));
   };
 
   const filtered = useMemo(() => {
@@ -717,8 +704,9 @@ export default function UsersPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <NotificationToggle />
             <button
-              onClick={() => { if (currentUserInfo) setShowGroupChat(true); }}
+              onClick={() => setOpenGroupChat(true)}
               className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all hover:scale-[1.02] active:scale-95"
               style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -973,7 +961,7 @@ export default function UsersPage() {
 
                             {currentUserInfo && user.id !== currentUserInfo.id && (
                               <ActionBtn
-                                onClick={() => openChat(user)}
+                                onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
                                 title={`Chat dengan ${user.name}`}
                                 bg="#eff6ff"
                                 color="#3b82f6">
@@ -1074,21 +1062,6 @@ export default function UsersPage() {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-
-      {currentUserInfo && (
-        <ChatManager
-          currentUser={currentUserInfo}
-          activeChats={activeChats}
-          onClose={closeChat}
-        />
-      )}
-
-      {showGroupChat && currentUserInfo && (
-        <GroupChatPanel
-          currentUser={currentUserInfo}
-          onClose={() => setShowGroupChat(false)}
-        />
-      )}
     </DashboardLayout>
   );
 }
