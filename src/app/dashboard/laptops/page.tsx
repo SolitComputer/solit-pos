@@ -260,6 +260,12 @@ function DeleteConfirmModal({
                                     : "border-red-300 focus:ring-red-200"
                                 : "border-gray-200 focus:ring-gray-200"
                                 }`}
+                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
+                                ? isMatch
+                                    ? "border-green-400 focus:ring-green-200 bg-green-50/30"
+                                    : "border-red-300 focus:ring-red-200"
+                                : "border-gray-200 focus:ring-gray-200"
+                                }`}
                             autoFocus
                         />
                         {inputName.length > 0 && !isMatch && (
@@ -910,6 +916,11 @@ export default function Page() {
                                                                 {fmt(item.selling_price)}
                                                             </span>
                                                         </td>
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stok_tersedia ?? 0) === 0
+                                                                ? "bg-red-50 text-red-500 ring-1 ring-red-200"
+                                                                : "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                                                }`}>
                                                         {canViewTotalStok && (
                                                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                                 <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
@@ -1394,7 +1405,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Siap", "Stok", "−", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
