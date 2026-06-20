@@ -1,4 +1,3 @@
-// src/app/dashboard/layout.tsx
 import { ChatProvider } from "@/contexts/ChatContext";
 import { ChatManagerWrapper } from "@/components/ui/ChatManagerWrapper";
 import { NotificationBanner } from "@/components/ui/NotificationBanner";
@@ -14,11 +13,11 @@ export default function Layout({
       <main>
         {children}
       </main>
-      {/* NotificationBanner */}
       <NotificationBanner />
-      {/* ChatManager + GroupChat — di luar main agar ada di semua halaman */}
-      {/* Bottom bar background strip (Facebook-style dark bar) */}
+      {/* Floating chat button pojok kanan bawah */}
       <ChatBarBackground />
+      {/* Chat panels (DM + GroupChat) — tanpa bottom bar strip */}
+      <ChatManagerWrapper />
     </ChatProvider>
   );
 }

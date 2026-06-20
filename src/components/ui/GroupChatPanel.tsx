@@ -1,4 +1,3 @@
-// src/components/ui/GroupChatPanel.tsx
 "use client";
 
 import {
@@ -6,6 +5,7 @@ import {
     KeyboardEvent, Fragment,
 } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
+import { useChatContext } from "@/contexts/ChatContext";
 
 const supabase = getSupabaseClient();
 
@@ -969,6 +969,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
+    const [memberSearch, setMemberSearch] = useState("");
+    const { openChat } = useChatContext();
+
+    const filteredMembers = users.filter(u =>
+        u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(memberSearch.toLowerCase())
+    );
 
     useEffect(() => {
         fetch("/api/users")
@@ -1261,200 +1268,312 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
             style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)" }}>
             <div
-                className="relative flex flex-col overflow-hidden"
+                className="relative flex overflow-hidden"
                 style={{
-                    width: "min(900px, 100%)",
-                    height: "min(780px, 95vh)",
+                    width: "min(1160px, 100%)",
+                    height: "min(800px, 95vh)",
                     borderRadius: 26,
                     background: "#fff",
                     boxShadow: "0 40px 120px rgba(10,8,30,0.3), 0 4px 20px rgba(0,0,0,0.08)",
                     border: "1px solid rgba(255,255,255,0.8)",
                 }}>
 
-                {/* ── Header ── */}
-                <div
-                    className="flex-shrink-0 flex items-center gap-3.5 px-6 py-4 relative overflow-hidden"
-                    style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
+                {/* ── Sidebar kiri: Member List ── */}
+                <div className="flex-shrink-0 flex flex-col"
+                    style={{
+                        width: 240,
+                        borderRight: "1px solid #f0f0f8",
+                        background: "#fafbff",
+                    }}>
 
-                    {/* Background mesh pattern */}
-                    <div className="absolute inset-0 pointer-events-none" style={{
-                        backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.1) 0%, transparent 50%)",
-                    }} />
-                    {/* Subtle grid */}
-                    <div className="absolute inset-0 pointer-events-none" style={{
-                        backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-                        backgroundSize: "32px 32px",
-                    }} />
-
-                    {/* Logo */}
-                    <div className="relative flex-shrink-0 z-10">
-                        <div style={{ border: "2px solid rgba(255,255,255,0.15)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>
-                            <SolitLogo size={48} radius={14} />
-                        </div>
-                        {/* Online indicator */}
-                        <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center"
-                            style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }}>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0 z-10">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-sm font-black text-white tracking-tight">All Team Solit</h2>
-                            <span style={{ fontSize: 14 }}>💬</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
-                            </span>
-                            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
-                            {onlineCount > 0 && (
-                                <span className="text-[9px] font-bold text-emerald-400 px-2 py-0.5"
-                                    style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
-                                    {onlineCount} online
-                                </span>
-                            )}
+                    {/* Sidebar header */}
+                    <div className="px-4 pt-5 pb-3 flex-shrink-0"
+                        style={{ borderBottom: "1px solid #f0f0f8" }}>
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-3"
+                            style={{ color: "#94a3b8" }}>
+                            Anggota Tim ({users.length})
+                        </p>
+                        {/* Search */}
+                        <div className="relative">
+                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                                style={{ color: "#94a3b8" }}
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Cari anggota..."
+                                value={memberSearch}
+                                onChange={e => setMemberSearch(e.target.value)}
+                                className="w-full h-8 rounded-xl pl-8 pr-3 text-[11px] font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition"
+                                style={{
+                                    background: "#f1f5f9",
+                                    border: "1px solid #e2e8f0",
+                                    color: "#334155",
+                                }}
+                            />
                         </div>
                     </div>
 
-                    <button
-                        onClick={onClose}
-                        className="w-9 h-9 flex items-center justify-center transition-all hover:scale-105 flex-shrink-0 z-10"
-                        style={{
-                            borderRadius: 12,
-                            background: "rgba(255,255,255,0.07)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.5)",
-                        }}>
-                        <svg className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    {/* Member list */}
+                    <div className="flex-1 overflow-y-auto py-2">
+                        {filteredMembers.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 text-center mt-8 px-4">
+                                Tidak ditemukan
+                            </p>
+                        ) : filteredMembers.map(user => (
+                            <button
+                                key={user.id}
+                                onClick={() => {
+                                    openChat({ id: user.id, name: user.name, role: user.role });
+                                    onClose();
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all hover:bg-indigo-50 group"
+                            >
+                                {/* Avatar */}
+                                <div
+                                    className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
+                                    style={{
+                                        width: 32, height: 32,
+                                        borderRadius: 10,
+                                        background: `linear-gradient(135deg, ${getAvatarColor(user.role)}cc, ${getAvatarColor(user.role)})`,
+                                        boxShadow: `0 2px 6px ${getAvatarColor(user.role)}44`,
+                                    }}>
+                                    {getInitials(user.name)}
+                                </div>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-indigo-700 transition-colors">
+                                        {user.name}
+                                    </p>
+                                    <p className="text-[9.5px] truncate" style={{ color: getAvatarColor(user.role) }}>
+                                        {ROLE_LABEL[user.role] ?? user.role}
+                                    </p>
+                                </div>
+
+                                {/* Chat icon — muncul saat hover */}
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                    <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Footer sidebar — current user info */}
+                    <div className="flex-shrink-0 px-3 py-3 flex items-center gap-2.5"
+                        style={{ borderTop: "1px solid #f0f0f8", background: "#f5f7ff" }}>
+                        <div
+                            className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
+                            style={{
+                                width: 30, height: 30,
+                                borderRadius: 9,
+                                background: `linear-gradient(135deg, ${getAvatarColor(currentUser.role)}cc, ${getAvatarColor(currentUser.role)})`,
+                            }}>
+                            {getInitials(currentUser.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-slate-700 truncate">{currentUser.name}</p>
+                            <p className="text-[9px]" style={{ color: getAvatarColor(currentUser.role) }}>
+                                {ROLE_LABEL[currentUser.role] ?? currentUser.role}
+                            </p>
+                        </div>
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                    </div>
                 </div>
 
-                {/* Accent line */}
-                <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
+                {/* ── Kolom kanan: Header + Chat ── */}
+                <div className="flex-1 flex flex-col overflow-hidden">
 
-                {/* ── Messages ── */}
-                <div
-                    ref={messagesRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto px-6 py-5 space-y-1"
-                    style={{ background: "#f7f8fc" }}>
+                    {/* ── Header ── */}
+                    <div
+                        className="flex-shrink-0 flex items-center gap-3.5 px-6 py-4 relative overflow-hidden"
+                        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
 
-                    {loadingMore && (
-                        <div className="flex justify-center py-3">
-                            <div className="animate-spin rounded-full"
-                                style={{ width: 20, height: 20, border: "2.5px solid #e8ecf5", borderTopColor: "#6366f1" }} />
+                        {/* Background mesh pattern */}
+                        <div className="absolute inset-0 pointer-events-none" style={{
+                            backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.1) 0%, transparent 50%)",
+                        }} />
+                        {/* Subtle grid */}
+                        <div className="absolute inset-0 pointer-events-none" style={{
+                            backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+                            backgroundSize: "32px 32px",
+                        }} />
+
+                        {/* Logo */}
+                        <div className="relative flex-shrink-0 z-10">
+                            <div style={{ border: "2px solid rgba(255,255,255,0.15)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>
+                                <SolitLogo size={48} radius={14} />
+                            </div>
+                            {/* Online indicator */}
+                            <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center"
+                                style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }}>
+                            </div>
                         </div>
-                    )}
 
-                    {hasMore && !loadingMore && (
-                        <div className="flex justify-center py-2">
-                            <button onClick={loadMore}
-                                className="text-[11px] text-indigo-600 hover:text-indigo-700 transition-all px-5 py-2 font-semibold hover:scale-105"
-                                style={{ background: "#fff", border: "1px solid #e0e4f5", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-                                ↑ Muat pesan lebih lama
+                        <div className="flex-1 min-w-0 z-10">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-sm font-black text-white tracking-tight">All Team Solit</h2>
+                                <span style={{ fontSize: 14 }}>💬</span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+                                </span>
+                                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
+                                {onlineCount > 0 && (
+                                    <span className="text-[9px] font-bold text-emerald-400 px-2 py-0.5"
+                                        style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
+                                        {onlineCount} online
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={onClose}
+                            className="w-9 h-9 flex items-center justify-center transition-all hover:scale-105 flex-shrink-0 z-10"
+                            style={{
+                                borderRadius: 12,
+                                background: "rgba(255,255,255,0.07)",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                color: "rgba(255,255,255,0.5)",
+                            }}>
+                            <svg className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Accent line */}
+                    <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
+
+                    {/* ── Messages ── */}
+                    <div
+                        ref={messagesRef}
+                        onScroll={handleScroll}
+                        className="flex-1 overflow-y-auto px-6 py-5 space-y-1"
+                        style={{ background: "#f7f8fc" }}>
+
+                        {loadingMore && (
+                            <div className="flex justify-center py-3">
+                                <div className="animate-spin rounded-full"
+                                    style={{ width: 20, height: 20, border: "2.5px solid #e8ecf5", borderTopColor: "#6366f1" }} />
+                            </div>
+                        )}
+
+                        {hasMore && !loadingMore && (
+                            <div className="flex justify-center py-2">
+                                <button onClick={loadMore}
+                                    className="text-[11px] text-indigo-600 hover:text-indigo-700 transition-all px-5 py-2 font-semibold hover:scale-105"
+                                    style={{ background: "#fff", border: "1px solid #e0e4f5", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+                                    ↑ Muat pesan lebih lama
+                                </button>
+                            </div>
+                        )}
+
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center h-full gap-3">
+                                <div className="animate-spin rounded-full"
+                                    style={{ width: 30, height: 30, border: "3px solid #e8ecf5", borderTopColor: "#6366f1" }} />
+                                <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
+                            </div>
+                        ) : messages.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+                                <div className="flex items-center justify-center text-4xl"
+                                    style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
+                                    👋
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700">Belum ada pesan</p>
+                                    <p className="text-xs text-slate-400 mt-1.5">Mulai percakapan untuk seluruh tim!</p>
+                                </div>
+                            </div>
+                        ) : (
+                            groupedMessages.map((group: DateGroup) => (
+                                <Fragment key={group.dateKey}>
+                                    {/* Date pill */}
+                                    <div className="flex items-center justify-center py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #d1d5f5)" }} />
+                                            <div className="text-slate-400 text-[9.5px] font-semibold px-3.5 py-1.5 bg-white"
+                                                style={{ borderRadius: 100, border: "1px solid #ebebf5", boxShadow: "0 2px 6px rgba(0,0,0,0.04)", letterSpacing: "0.03em" }}>
+                                                {group.dateLabel}
+                                            </div>
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #d1d5f5, transparent)" }} />
+                                        </div>
+                                    </div>
+                                    {group.msgs.map((msg: GroupMessage, idx: number) => {
+                                        const isMine = msg.sender_id === currentUser.id;
+                                        const prevMsg = group.msgs[idx - 1];
+                                        const isNewSender = !prevMsg || prevMsg.sender_id !== msg.sender_id;
+                                        return (
+                                            <div key={msg.id} className={isNewSender ? "mt-4" : "mt-0.5"}>
+                                                <MessageBubble
+                                                    msg={msg}
+                                                    isMine={isMine}
+                                                    isAdmin={isAdmin}
+                                                    currentUserName={currentUser.name}
+                                                    onReply={setReplyTo}
+                                                    onDelete={deleteMessage}
+                                                    onEdit={editMessage}
+                                                    onScrollToReply={scrollToReply}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </Fragment>
+                            ))
+                        )}
+                        <div ref={bottomRef} />
+                    </div>
+
+                    {/* Scroll to bottom */}
+                    {isScrolledUp && (
+                        <div className="absolute bottom-24 right-6 z-10">
+                            <button
+                                onClick={() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); setUnread(0); }}
+                                className="relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
+                                style={{
+                                    borderRadius: "50%",
+                                    background: "#fff",
+                                    border: "1px solid #e8ecf5",
+                                    boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
+                                }}>
+                                <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                </svg>
+                                {unread > 0 && (
+                                    <span className="absolute text-white text-[9px] font-black flex items-center justify-center"
+                                        style={{
+                                            top: -6, right: -6,
+                                            minWidth: 18, height: 18,
+                                            borderRadius: 9,
+                                            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                            padding: "0 4px",
+                                            boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
+                                        }}>
+                                        {unread > 9 ? "9+" : unread}
+                                    </span>
+                                )}
                             </button>
                         </div>
                     )}
 
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-3">
-                            <div className="animate-spin rounded-full"
-                                style={{ width: 30, height: 30, border: "3px solid #e8ecf5", borderTopColor: "#6366f1" }} />
-                            <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
-                        </div>
-                    ) : messages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-                            <div className="flex items-center justify-center text-4xl"
-                                style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
-                                👋
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-700">Belum ada pesan</p>
-                                <p className="text-xs text-slate-400 mt-1.5">Mulai percakapan untuk seluruh tim!</p>
-                            </div>
-                        </div>
-                    ) : (
-                        groupedMessages.map((group: DateGroup) => (
-                            <Fragment key={group.dateKey}>
-                                {/* Date pill */}
-                                <div className="flex items-center justify-center py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #d1d5f5)" }} />
-                                        <div className="text-slate-400 text-[9.5px] font-semibold px-3.5 py-1.5 bg-white"
-                                            style={{ borderRadius: 100, border: "1px solid #ebebf5", boxShadow: "0 2px 6px rgba(0,0,0,0.04)", letterSpacing: "0.03em" }}>
-                                            {group.dateLabel}
-                                        </div>
-                                        <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #d1d5f5, transparent)" }} />
-                                    </div>
-                                </div>
-                                {group.msgs.map((msg: GroupMessage, idx: number) => {
-                                    const isMine = msg.sender_id === currentUser.id;
-                                    const prevMsg = group.msgs[idx - 1];
-                                    const isNewSender = !prevMsg || prevMsg.sender_id !== msg.sender_id;
-                                    return (
-                                        <div key={msg.id} className={isNewSender ? "mt-4" : "mt-0.5"}>
-                                            <MessageBubble
-                                                msg={msg}
-                                                isMine={isMine}
-                                                isAdmin={isAdmin}
-                                                currentUserName={currentUser.name}
-                                                onReply={setReplyTo}
-                                                onDelete={deleteMessage}
-                                                onEdit={editMessage}
-                                                onScrollToReply={scrollToReply}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            </Fragment>
-                        ))
-                    )}
-                    <div ref={bottomRef} />
+                    <InputArea
+                        currentUser={currentUser}
+                        replyTo={replyTo}
+                        users={users}
+                        onCancelReply={() => setReplyTo(null)}
+                        onSend={send}
+                        onSendAttachment={sendAttachment}
+                    />
                 </div>
-
-                {/* Scroll to bottom */}
-                {isScrolledUp && (
-                    <div className="absolute bottom-24 right-6 z-10">
-                        <button
-                            onClick={() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); setUnread(0); }}
-                            className="relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
-                            style={{
-                                borderRadius: "50%",
-                                background: "#fff",
-                                border: "1px solid #e8ecf5",
-                                boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
-                            }}>
-                            <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                            </svg>
-                            {unread > 0 && (
-                                <span className="absolute text-white text-[9px] font-black flex items-center justify-center"
-                                    style={{
-                                        top: -6, right: -6,
-                                        minWidth: 18, height: 18,
-                                        borderRadius: 9,
-                                        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                                        padding: "0 4px",
-                                        boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
-                                    }}>
-                                    {unread > 9 ? "9+" : unread}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                )}
-
-                <InputArea
-                    currentUser={currentUser}
-                    replyTo={replyTo}
-                    users={users}
-                    onCancelReply={() => setReplyTo(null)}
-                    onSend={send}
-                    onSendAttachment={sendAttachment}
-                />
             </div>
 
             <style jsx global>{`

@@ -7,7 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
 export default function ChatBarBackground() {
-    const { setOpenGroupChat, openGroupChat, activeChats } = useChatContext();
+    const { setOpenGroupChat, openGroupChat, activeChats, expandedChatId, setExpandedChatId } = useChatContext();
     const [ready, setReady] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -88,7 +88,10 @@ export default function ChatBarBackground() {
                             {activeChats.map(chat => (
                                 <div key={chat.id}
                                     className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-50 transition cursor-pointer"
-                                    onClick={() => setShowMenu(false)}
+                                    onClick={() => {
+                                        setExpandedChatId(expandedChatId === chat.id ? null : chat.id);
+                                        setShowMenu(false);
+                                    }}
                                 >
                                     <div
                                         className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"

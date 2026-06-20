@@ -15,6 +15,8 @@ interface ChatContextType {
     closeChat: (userId: string) => void;
     openGroupChat: boolean;
     setOpenGroupChat: (v: boolean) => void;
+    expandedChatId: string | null;
+    setExpandedChatId: (id: string | null) => void;
 }
 
 const ChatContext = createContext<ChatContextType | null>(null);
@@ -22,6 +24,7 @@ const ChatContext = createContext<ChatContextType | null>(null);
 export function ChatProvider({ children }: { children: ReactNode }) {
     const [activeChats, setActiveChats] = useState<ChatUser[]>([]);
     const [openGroupChat, setOpenGroupChat] = useState(false);
+    const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
 
     const openChat = (user: ChatUser) => {
         setActiveChats(prev => {
@@ -35,13 +38,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setActiveChats(prev => prev.filter(c => c.id !== userId));
     };
 
-    return (
+   return (
         <ChatContext.Provider value={{
             activeChats,
             openChat,
             closeChat,
             openGroupChat,
             setOpenGroupChat,
+            expandedChatId,
+            setExpandedChatId,
         }}>
             {children}
         </ChatContext.Provider>
