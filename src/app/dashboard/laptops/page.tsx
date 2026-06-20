@@ -253,13 +253,12 @@ function DeleteConfirmModal({
                             value={inputName}
                             onChange={e => setInputName(e.target.value)}
                             placeholder="Ketik nama laptop di atas..."
-                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                inputName.length > 0
-                                    ? isMatch
-                                        ? "border-green-400 focus:ring-green-200 bg-green-50/30"
-                                        : "border-red-300 focus:ring-red-200"
-                                    : "border-gray-200 focus:ring-gray-200"
-                            }`}
+                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
+                                ? isMatch
+                                    ? "border-green-400 focus:ring-green-200 bg-green-50/30"
+                                    : "border-red-300 focus:ring-red-200"
+                                : "border-gray-200 focus:ring-gray-200"
+                                }`}
                             autoFocus
                         />
                         {inputName.length > 0 && !isMatch && (
@@ -846,7 +845,6 @@ export default function Page() {
                                                 <Th>Brand</Th>
                                                 <Th>CPU</Th>
                                                 <Th>RAM</Th>
-                                                <Th>GPU</Th>
                                                 <Th>Storage</Th>
                                                 <Th right>Harga Jual</Th>
                                                 <Th right>Siap Jual</Th>
@@ -888,11 +886,6 @@ export default function Page() {
                                                                 {item.ram || <span className="text-gray-200">—</span>}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3.5 max-w-[140px]">
-                                                            <span className="block text-xs text-gray-500 truncate" title={item.gpu}>
-                                                                {item.gpu || <span className="text-gray-200">—</span>}
-                                                            </span>
-                                                        </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             <span className="text-xs font-medium text-gray-600">
                                                                 {item.storage || <span className="text-gray-200">—</span>}
@@ -904,11 +897,10 @@ export default function Page() {
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${
-                                                                (item.stok_tersedia ?? 0) === 0
-                                                                    ? "bg-red-50 text-red-500 ring-1 ring-red-200"
-                                                                    : "bg-green-50 text-green-700 ring-1 ring-green-200"
-                                                            }`}>
+                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stok_tersedia ?? 0) === 0
+                                                                ? "bg-red-50 text-red-500 ring-1 ring-red-200"
+                                                                : "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                                                }`}>
                                                                 {item.stok_tersedia ?? 0}
                                                             </span>
                                                         </td>
@@ -1387,7 +1379,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "GPU", "Storage", "Harga", "Siap", "Stok", "−", "Status", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Siap", "Stok", "−", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1400,7 +1392,6 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={80} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
@@ -1436,7 +1427,7 @@ function ModalDetailSkeleton() {
                 </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {[1,2,3,4,5].map(i => (
+                {[1, 2, 3, 4, 5].map(i => (
                     <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                         <Shimmer w={40} h={9} className="mb-1.5" />
                         <Shimmer w="80%" h={13} />

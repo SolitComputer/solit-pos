@@ -60,6 +60,7 @@ const EMPTY_FORM = {
     received_at: "",
 };
 
+// Style map untuk grade button di form (pakai class statis agar Tailwind tidak purge)
 const GRADE_FORM_STYLE: Record<string, { border: string; text: string; sub: string }> = {
     A: { border: "border-emerald-400 bg-emerald-50", text: "text-emerald-700", sub: "text-emerald-500" },
     B: { border: "border-amber-400 bg-amber-50", text: "text-amber-700", sub: "text-amber-500" },
@@ -158,6 +159,7 @@ function BulkAddModal({
     const [preview, setPreview] = useState<string[]>([]);
 
     const [grade, setGrade] = useState("B");
+    // ── CHANGED: default status hanya 2 pilihan ──
     const [status, setStatus] = useState("SIAP_JUAL");
     const [purchasePrice, setPurchasePrice] = useState("");
     const [sellingPrice, setSellingPrice] = useState(String(defaultSellingPrice || ""));
@@ -222,6 +224,7 @@ function BulkAddModal({
                     const gradeKey = findKey(row, gradeKeys);
                     const statKey = findKey(row, statusKeys);
                     const noteKey = findKey(row, noteKeys);
+                    // Normalisasi status Excel ke 2 status baru
                     const rawStatus = statKey ? String(row[statKey]) : status;
                     const normalizedStatus = rawStatus === "SIAP_JUAL" ? "SIAP_JUAL" : "BELUM_SIAP";
                     return {
@@ -464,6 +467,7 @@ function BulkAddModal({
                         <div className="border-t border-gray-100 pt-4 space-y-3">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nilai Default Semua Unit</p>
 
+                            {/* ── CHANGED: Status 2 tombol (bukan select dropdown) ── */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
                                 <div className="flex gap-1.5">
@@ -485,6 +489,7 @@ function BulkAddModal({
                                 </div>
                             </div>
 
+                            {/* ── CHANGED: Grade hanya tampil kalau Siap Jual, Kondisi kalau Belum Siap ── */}
                             {status === "SIAP_JUAL" ? (
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Grade</label>
@@ -533,6 +538,7 @@ function BulkAddModal({
                                 </div>
                             </div>
 
+                            {/* Kondisi tetap ada kalau Siap Jual (sebagai catatan tambahan) */}
                             {status === "SIAP_JUAL" && (
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Kondisi <span className="text-gray-400 font-normal">(opsional)</span></label>
@@ -736,16 +742,16 @@ export default function UnitsPage() {
         setShowForm(true);
     };
 
-    // ── FIX: openEdit — hanya 2 status: SOLD dan BELUM_SIAP
-    // SIAP_JUAL dan SERVICE → default ke BELUM_SIAP
-    // SOLD → preserve SOLD
+    // ── CHANGED: normalisasi status lama (SERVICE/SOLD) → BELUM_SIAP ──
     const openEdit = (unit: LaptopUnit) => {
         setEditingUnit(unit);
+        // Preserve status asli — hanya normalisasi saat form ditampilkan untuk pilihan user
+        // SOLD dan SERVICE tetap disimpan, bukan di-override ke BELUM_SIAP
         const editableStatus =
-            unit.status === "SOLD" ? "SOLD" :
-                unit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
-                    "BELUM_SIAP";
-
+            unit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
+                unit.status === "SOLD" ? "SOLD" :
+                    unit.status === "SERVICE" ? "SERVICE" :
+                        "BELUM_SIAP";
         setFormData({
             serial_number: unit.serial_number,
             grade: unit.grade,
@@ -1144,7 +1150,9 @@ export default function UnitsPage() {
                 </div>
             </main>
 
-            {/* FORM MODAL */}
+            {/* ═══════════════════════════════════════════════════════
+                FORM MODAL — CHANGED: UI Status + Grade baru
+            ═══════════════════════════════════════════════════════ */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeForm} />
@@ -1218,78 +1226,79 @@ export default function UnitsPage() {
                                     </div>
                                 )}
 
-                                {/* ── Status — 3 pilihan: Terjual, Siap Jual, Belum Siap Jual ── */}
+                                {/* ── CHANGED: Status — 2 tombol besar ── */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-2">
                                         Status <span className="text-red-400">*</span>
                                     </label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {/* Terjual */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "SOLD" }))}
-                                            className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "SOLD"
-                                                ? "border-gray-500 bg-gray-100 shadow-sm"
-                                                : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SOLD" ? "bg-gray-500" : "bg-gray-300"
-                                                    }`} />
-                                                <p className={`text-xs font-bold ${formData.status === "SOLD" ? "text-gray-700" : "text-gray-500"
-                                                    }`}>Terjual</p>
-                                            </div>
-                                            <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "SOLD" ? "text-gray-500" : "text-gray-400"
-                                                }`}>
-                                                Sudah terjual
-                                            </p>
-                                        </button>
 
-                                        {/* Siap Jual */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "SIAP_JUAL" }))}
-                                            className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "SIAP_JUAL"
-                                                ? "border-emerald-500 bg-emerald-50 shadow-sm"
-                                                : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SIAP_JUAL" ? "bg-emerald-500" : "bg-gray-300"
-                                                    }`} />
-                                                <p className={`text-xs font-bold ${formData.status === "SIAP_JUAL" ? "text-emerald-700" : "text-gray-600"
-                                                    }`}>Siap Jual</p>
+                                    {/* Read-only badge untuk SOLD dan SERVICE */}
+                                    {(formData.status === "SOLD" || formData.status === "SERVICE") ? (
+                                        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 ${formData.status === "SOLD"
+                                            ? "border-gray-300 bg-gray-50"
+                                            : "border-blue-300 bg-blue-50"
+                                            }`}>
+                                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${formData.status === "SOLD" ? "bg-gray-400" : "bg-blue-500"
+                                                }`} />
+                                            <div>
+                                                <p className={`text-sm font-bold ${formData.status === "SOLD" ? "text-gray-600" : "text-blue-700"
+                                                    }`}>
+                                                    {formData.status === "SOLD" ? "Terjual" : "Service"}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                                    Status ini tidak dapat diubah melalui form edit.
+                                                    Ganti harga modal di atas lalu klik Simpan.
+                                                </p>
                                             </div>
-                                            <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "SIAP_JUAL" ? "text-emerald-500" : "text-gray-400"
-                                                }`}>
-                                                Pilih Grade
-                                            </p>
-                                        </button>
+                                            {/* Hidden input untuk tetap mengirim status asli */}
+                                            <input type="hidden" name="status" value={formData.status} />
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, status: "SIAP_JUAL" }))}
+                                                className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "SIAP_JUAL"
+                                                    ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                                                    : "border-gray-200 bg-white hover:border-gray-300"
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SIAP_JUAL" ? "bg-emerald-500" : "bg-gray-300"
+                                                        }`} />
+                                                    <p className={`text-sm font-bold ${formData.status === "SIAP_JUAL" ? "text-emerald-700" : "text-gray-600"
+                                                        }`}>Siap Jual</p>
+                                                </div>
+                                                <p className={`text-[10px] leading-tight ml-4 ${formData.status === "SIAP_JUAL" ? "text-emerald-500" : "text-gray-400"
+                                                    }`}>
+                                                    Pilih Grade di bawah
+                                                </p>
+                                            </button>
 
-                                        {/* Belum Siap Jual */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "BELUM_SIAP" }))}
-                                            className={`relative py-3 px-2 rounded-xl border-2 transition-all text-left ${formData.status === "BELUM_SIAP"
-                                                ? "border-amber-500 bg-amber-50 shadow-sm"
-                                                : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "BELUM_SIAP" ? "bg-amber-500" : "bg-gray-300"
-                                                    }`} />
-                                                <p className={`text-xs font-bold ${formData.status === "BELUM_SIAP" ? "text-amber-700" : "text-gray-600"
-                                                    }`}>Belum Siap</p>
-                                            </div>
-                                            <p className={`text-[10px] leading-tight ml-3.5 ${formData.status === "BELUM_SIAP" ? "text-amber-500" : "text-gray-400"
-                                                }`}>
-                                                Beri keterangan
-                                            </p>
-                                        </button>
-                                    </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, status: "BELUM_SIAP" }))}
+                                                className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "BELUM_SIAP"
+                                                    ? "border-amber-500 bg-amber-50 shadow-sm"
+                                                    : "border-gray-200 bg-white hover:border-gray-300"
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "BELUM_SIAP" ? "bg-amber-500" : "bg-gray-300"
+                                                        }`} />
+                                                    <p className={`text-sm font-bold ${formData.status === "BELUM_SIAP" ? "text-amber-700" : "text-gray-600"
+                                                        }`}>Belum Siap</p>
+                                                </div>
+                                                <p className={`text-[10px] leading-tight ml-4 ${formData.status === "BELUM_SIAP" ? "text-amber-500" : "text-gray-400"
+                                                    }`}>
+                                                    Beri keterangan di bawah
+                                                </p>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Conditional field berdasarkan status */}
+
                                 {formData.status === "SIAP_JUAL" ? (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -1314,20 +1323,6 @@ export default function UnitsPage() {
                                                 );
                                             })}
                                         </div>
-                                        {/* Catatan kondisi untuk Siap Jual */}
-                                        <div className="mt-3">
-                                            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                                Catatan Kondisi
-                                                <span className="text-gray-400 font-normal ml-1">(opsional)</span>
-                                            </label>
-                                            <input
-                                                name="condition_note"
-                                                placeholder="Kondisi fisik unit, misal: mulus, ada goresan tipis..."
-                                                value={formData.condition_note}
-                                                onChange={handleChange}
-                                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
-                                            />
-                                        </div>
                                     </div>
                                 ) : formData.status === "BELUM_SIAP" ? (
                                     <div>
@@ -1350,15 +1345,22 @@ export default function UnitsPage() {
                                             Unit tidak akan muncul di daftar siap jual
                                         </p>
                                     </div>
-                                ) : (
-                                    /* SOLD — info box */
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
-                                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                                            <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Status Terjual — hanya harga modal dan harga jual yang bisa diubah.
-                                        </p>
+                                ) : null /* SOLD / SERVICE — tidak ada selector grade/kondisi tambahan */}
+
+                                {/* Kondisi tambahan (hanya tampil kalau Siap Jual) */}
+                                {formData.status === "SIAP_JUAL" && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                            Catatan Kondisi
+                                            <span className="text-gray-400 font-normal ml-1">(opsional)</span>
+                                        </label>
+                                        <input
+                                            name="condition_note"
+                                            placeholder="Kondisi fisik unit, misal: mulus, ada goresan tipis..."
+                                            value={formData.condition_note}
+                                            onChange={handleChange}
+                                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                                        />
                                     </div>
                                 )}
 
