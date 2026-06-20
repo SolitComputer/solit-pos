@@ -1,7 +1,7 @@
 // src/contexts/ChatContext.tsx
 "use client";
 
-import { createContext, useCallback, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 
 export interface ChatUser {
     id: string;
@@ -9,40 +9,52 @@ export interface ChatUser {
     role: string;
 }
 
-interface ChatContextValue {
+interface ChatContextType {
     activeChats: ChatUser[];
     openChat: (user: ChatUser) => void;
     closeChat: (userId: string) => void;
+    openGroupChat: boolean;
+    setOpenGroupChat: (v: boolean) => void;
+    expandedChatId: string | null;
+    setExpandedChatId: (id: string | null) => void;
 }
 
-const ChatContext = createContext<ChatContextValue | null>(null);
+const ChatContext = createContext<ChatContextType | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
     const [activeChats, setActiveChats] = useState<ChatUser[]>([]);
+    const [openGroupChat, setOpenGroupChat] = useState(false);
+    const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
 
-    const openChat = useCallback((user: ChatUser) => {
+    const openChat = (user: ChatUser) => {
         setActiveChats(prev => {
-            // Sudah terbuka → tidak duplikat
             if (prev.some(c => c.id === user.id)) return prev;
-            // Maksimal 3 bubble sekaligus
-            const next = prev.length >= 3 ? prev.slice(1) : prev;
-            return [...next, user];
+            const limited = prev.length >= 3 ? prev.slice(1) : prev;
+            return [...limited, user];
         });
-    }, []);
+    };
 
-    const closeChat = useCallback((userId: string) => {
+    const closeChat = (userId: string) => {
         setActiveChats(prev => prev.filter(c => c.id !== userId));
-    }, []);
+    };
 
-    return (
-        <ChatContext.Provider value={{ activeChats, openChat, closeChat }}>
+   return (
+        <ChatContext.Provider value={{
+            activeChats,
+            openChat,
+            closeChat,
+            openGroupChat,
+            setOpenGroupChat,
+            expandedChatId,
+            setExpandedChatId,
+        }}>
             {children}
         </ChatContext.Provider>
     );
 }
 
-export function useChatContext(): ChatContextValue {
+export function useChatContext() {
     const ctx = useContext(ChatContext);
-    if (!ctx) throw new Error("useChatContext harus dipakai di dalam ChatProvider");
+    if (!ctx) throw new Error("useChatContext must be used within ChatProvider");
     return ctx;
 }

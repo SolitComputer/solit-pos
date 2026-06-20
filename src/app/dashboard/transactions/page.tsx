@@ -124,6 +124,81 @@ function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   return { text: "Umum", icon: "👤" };
 }
 
+// ─── PAYMENT BREAKDOWN (TF + Cash detail) ────────────────────────────
+// Membaca field: payment_method, payment_method_2, amount_method_1, amount_method_2
+function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md" }) {
+  const method2 = (item.payment_method_2 ?? "").trim();
+  const amount1 = Number(item.amount_method_1 ?? 0);
+  const amount2 = Number(item.amount_method_2 ?? 0);
+
+  // Hanya tampil jika ada metode kedua dan kedua nominal terisi
+  if (!method2 || amount1 <= 0 || amount2 <= 0) return null;
+
+  const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+
+  const getMethodMeta = (m: string): { label: string; icon: string; color: string } => {
+    const upper = m.toUpperCase();
+    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI"))
+      return { label: "Transfer", icon: "🏦", color: "blue" };
+    if (upper.includes("TUNAI") || upper.includes("CASH"))
+      return { label: "Tunai", icon: "💵", color: "emerald" };
+    if (upper.includes("QRIS") || upper.includes("QR"))
+      return { label: "QRIS", icon: "📱", color: "purple" };
+    return { label: m, icon: "💳", color: "gray" };
+  };
+
+  const colorMap: Record<string, { bg: string; border: string; text: string; label: string }> = {
+    blue: { bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-800", label: "text-blue-500" },
+    emerald: { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-800", label: "text-emerald-500" },
+    purple: { bg: "bg-purple-50", border: "border-purple-100", text: "text-purple-800", label: "text-purple-500" },
+    gray: { bg: "bg-gray-50", border: "border-gray-100", text: "text-gray-800", label: "text-gray-500" },
+  };
+
+  const m1meta = getMethodMeta(item.payment_method ?? "");
+  const m2meta = getMethodMeta(method2);
+
+  const entries = [
+    { meta: m1meta, amount: amount1 },
+    { meta: m2meta, amount: amount2 },
+  ];
+
+  // ── size="md" → card grid 2 kolom (Mobile card & Detail modal) ──
+  if (size === "md") {
+    return (
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {entries.map(({ meta, amount }, i) => {
+          const c = colorMap[meta.color] ?? colorMap.gray;
+          return (
+            <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-2.5 py-1.5`}>
+              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>
+                {meta.icon} {meta.label}
+              </p>
+              <p className={`text-xs font-bold ${c.text} font-mono`}>{fmt(amount)}</p>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── size="sm" → inline compact (Desktop table row) ──────────────
+  return (
+    <div className="flex items-center gap-1 mt-1 flex-wrap">
+      {entries.map(({ meta, amount }, i) => {
+        const c = colorMap[meta.color] ?? colorMap.gray;
+        return (
+          <span
+            key={i}
+            className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}
+          >
+            {meta.icon} {fmt(amount)}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── SKELETON COMPONENTS ────────────────────────────────────────────
 
 function SkeletonPulse({ className }: { className: string }) {
@@ -432,10 +507,14 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           )}
         </div>
 
-        {/* Payment Method */}
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2.5 border border-purple-200 flex items-center gap-2">
-          {payStyle.icon}
-          <span className="text-xs font-bold text-purple-900">{payStyle.text}</span>
+        {/* ── Payment Method — DIUBAH: tambah PaymentBreakdown ── */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2.5 border border-purple-200">
+          <div className="flex items-center gap-2">
+            {payStyle.icon}
+            <span className="text-xs font-bold text-purple-900">{payStyle.text}</span>
+          </div>
+          {/* Breakdown TF + Cash jika split payment */}
+          <PaymentBreakdown item={item} size="md" />
         </div>
       </div>
 
@@ -576,7 +655,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Metode</th>
+              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Metode</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Sumber</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Aksi</th>
             </tr>
@@ -778,12 +857,19 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
+
+        {/* ── Kolom Metode — DIUBAH: tambah PaymentBreakdown ── */}
         <td className="px-3 py-2.5 text-center">
-          <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
-            {payStyle.icon}
-            <span className="text-[9px] font-bold text-gray-700">{payStyle.text.replace(/^[^\s]+ /, "")}</span>
+          <div className="flex flex-col items-center gap-1">
+            <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
+              {payStyle.icon}
+              <span className="text-[9px] font-bold text-gray-700">{payStyle.text.replace(/^[^\s]+ /, "")}</span>
+            </div>
+            {/* Breakdown TF + Cash inline di bawah badge */}
+            <PaymentBreakdown item={item} size="sm" />
           </div>
         </td>
+
         <td className="px-3 py-2.5 text-center">
           {item.source_platform ? (
             <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
@@ -998,10 +1084,17 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   </span>
                 </div>
               )}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-gray-500">Metode</span>
-                <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
+
+              {/* ── Baris Metode — DIUBAH: tambah PaymentBreakdown ── */}
+              <div className="pt-1 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Metode</span>
+                  <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
+                </div>
+                {/* Breakdown TF + Cash di detail modal */}
+                <PaymentBreakdown item={item} size="md" />
               </div>
+
               {item.source_platform && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Platform</span>
@@ -1119,7 +1212,7 @@ export default function Page() {
     if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
     if (customerType !== "ALL") filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
     if (dateFrom) { const from = new Date(dateFrom); from.setHours(0, 0, 0, 0); filtered = filtered.filter((item) => new Date(item.created_at) >= from); }
-    if (dateTo)   { const to   = new Date(dateTo);   to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
+    if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
     if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
     if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
 
@@ -1171,28 +1264,26 @@ export default function Page() {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
       });
 
-      // ── Definisi kolom ──────────────────────────────────────────
       const COL_DEFS = [
-        { header: "No. Invoice",   key: "invoice",   width: 24 },
-        { header: "Tanggal",       key: "tanggal",   width: 14 },
-        { header: "Jumlah Unit",   key: "qty",       width: 13 },
-        { header: "Laptop",        key: "laptop",    width: 34 },
-        { header: "CPU",           key: "cpu",       width: 22 },
-        { header: "RAM",           key: "ram",       width: 10 },
-        { header: "Storage",       key: "storage",   width: 13 },
-        { header: "Metode Bayar",  key: "metode",    width: 18 },
-        { header: "Harga Modal",   key: "modal",     width: 22 },
-        { header: "Harga Jual",    key: "jual",      width: 22 },
-        { header: "Nama Customer", key: "customer",  width: 24 },
-        { header: "No. HP",        key: "hp",        width: 18 },
-        { header: "Platform",      key: "platform",  width: 15 },
-        { header: "Serial Number", key: "sn",        width: 30 },
-        { header: "Catatan",       key: "catatan",   width: 32 },
+        { header: "No. Invoice", key: "invoice", width: 24 },
+        { header: "Tanggal", key: "tanggal", width: 14 },
+        { header: "Jumlah Unit", key: "qty", width: 13 },
+        { header: "Laptop", key: "laptop", width: 34 },
+        { header: "CPU", key: "cpu", width: 22 },
+        { header: "RAM", key: "ram", width: 10 },
+        { header: "Storage", key: "storage", width: 13 },
+        { header: "Metode Bayar", key: "metode", width: 18 },
+        { header: "Harga Modal", key: "modal", width: 22 },
+        { header: "Harga Jual", key: "jual", width: 22 },
+        { header: "Nama Customer", key: "customer", width: 24 },
+        { header: "No. HP", key: "hp", width: 18 },
+        { header: "Platform", key: "platform", width: 15 },
+        { header: "Serial Number", key: "sn", width: 30 },
+        { header: "Catatan", key: "catatan", width: 32 },
       ];
 
       ws.columns = COL_DEFS;
 
-      // ── Fetch detail modal per transaksi dari API ───────────────
       type DetailCache = {
         purchase_price_total: number;
         grouped_items?: Array<{ laptop_name: string; purchase_price_total: number; margin: number }>;
@@ -1218,17 +1309,16 @@ export default function Page() {
         );
       }
 
-      // ── Flatten data → tableRows (array of array) ───────────────
       const LEFT_KEYS = new Set(["invoice", "tanggal"]);
       const CURR_KEYS = new Set(["modal", "jual"]);
-      const NUM_KEYS  = new Set(["qty"]);
+      const NUM_KEYS = new Set(["qty"]);
 
       const tableRows: (string | number)[][] = [];
 
       for (const item of filteredTransactions) {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
-        const cached  = detailCache.get(item.invoice_number);
+        const cached = detailCache.get(item.invoice_number);
 
         const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", {
           day: "2-digit", month: "2-digit", year: "numeric",
@@ -1294,7 +1384,6 @@ export default function Page() {
         }
       }
 
-      // ── Tambah Excel Table (dengan filter dropdown) ─────────────
       if (tableRows.length > 0) {
         ws.addTable({
           name: "TabelTransaksi",
@@ -1309,74 +1398,58 @@ export default function Page() {
           rows: tableRows,
         });
       } else {
-        // Data kosong — tulis header manual
         const hRow = ws.getRow(1);
         hRow.height = 30;
         COL_DEFS.forEach((col, ci) => {
           const cell = hRow.getCell(ci + 1);
           cell.value = col.header;
-          cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
-          cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+          cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
           cell.alignment = { horizontal: "center", vertical: "middle" };
         });
       }
 
-      // ── Override style header (baris 1) ────────────────────────
       const headerRow = ws.getRow(1);
       headerRow.height = 30;
       headerRow.eachCell((cell, colNum) => {
         const key = COL_DEFS[colNum - 1]?.key ?? "";
-        cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
-        cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
-        cell.alignment = {
-          horizontal: LEFT_KEYS.has(key) ? "left" : "center",
-          vertical: "middle",
-        };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+        cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+        cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle" };
         cell.border = {
-          top:    { style: "thin",   color: { argb: "FFCBD5E1" } },
-          left:   { style: "thin",   color: { argb: "FFCBD5E1" } },
+          top: { style: "thin", color: { argb: "FFCBD5E1" } },
+          left: { style: "thin", color: { argb: "FFCBD5E1" } },
           bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-          right:  { style: "thin",   color: { argb: "FFCBD5E1" } },
+          right: { style: "thin", color: { argb: "FFCBD5E1" } },
         };
       });
 
       // ── Style data rows + format Rupiah ────────────────────────
       tableRows.forEach((_, idx) => {
         const rowNum = idx + 2;
-        const row    = ws.getRow(rowNum);
-        row.height   = 22;
-
+        const row = ws.getRow(rowNum);
+        row.height = 22;
         row.eachCell((cell, colNum) => {
           const key = COL_DEFS[colNum - 1]?.key ?? "";
           cell.font = { size: 10, name: "Arial", color: { argb: "FF111827" } };
-          cell.alignment = {
-            horizontal: LEFT_KEYS.has(key) ? "left" : "center",
-            vertical:   "middle",
-            wrapText:   false,
-          };
+          cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle", wrapText: false };
           cell.border = {
-            top:    { style: "hair", color: { argb: "FFCBD5E1" } },
-            left:   { style: "hair", color: { argb: "FFCBD5E1" } },
+            top: { style: "hair", color: { argb: "FFCBD5E1" } },
+            left: { style: "hair", color: { argb: "FFCBD5E1" } },
             bottom: { style: "hair", color: { argb: "FFCBD5E1" } },
-            right:  { style: "hair", color: { argb: "FFCBD5E1" } },
+            right: { style: "hair", color: { argb: "FFCBD5E1" } },
           };
           if (CURR_KEYS.has(key)) cell.numFmt = '"Rp "#,##0';
-          if (NUM_KEYS.has(key))  cell.numFmt = "0";
+          if (NUM_KEYS.has(key)) cell.numFmt = "0";
         });
       });
 
-      // ── Set lebar kolom (addTable reset width) ─────────────────
-      COL_DEFS.forEach((col, idx) => {
-        ws.getColumn(idx + 1).width = col.width;
-      });
+      COL_DEFS.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width; });
 
-      // ── Export ke file ─────────────────────────────────────────
       const buffer = await wb.xlsx.writeBuffer();
-      const blob   = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const link   = document.createElement("a");
-      link.href    = URL.createObjectURL(blob);
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
       const dateStr = new Date()
         .toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
         .replace(/\//g, "-");
@@ -1486,7 +1559,6 @@ export default function Page() {
 
           {showFilters && (
             <div className="pt-3 border-t border-gray-100 space-y-4">
-              {/* Status */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Status Transaksi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -1499,7 +1571,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1519,7 +1590,6 @@ export default function Page() {
                 )}
               </div>
 
-              {/* Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Sumber / Platform</label>
@@ -1538,7 +1608,6 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Metode Bayar */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Metode Pembayaran</label>

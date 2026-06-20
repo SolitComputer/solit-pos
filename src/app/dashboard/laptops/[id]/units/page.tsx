@@ -477,10 +477,10 @@ function BulkAddModal({
                                             type="button"
                                             onClick={() => setStatus(s)}
                                             className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition ${status === s
-                                                    ? s === "SIAP_JUAL"
-                                                        ? "bg-emerald-600 text-white border-emerald-600"
-                                                        : "bg-amber-500 text-white border-amber-500"
-                                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                                ? s === "SIAP_JUAL"
+                                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                                    : "bg-amber-500 text-white border-amber-500"
+                                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
                                             {s === "SIAP_JUAL" ? "✅ Siap Jual" : "⏳ Belum Siap"}
@@ -620,6 +620,9 @@ export default function UnitsPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
+    const activeUnits = units.filter(u => u.status !== "SOLD");
+
+
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
@@ -673,8 +676,9 @@ export default function UnitsPage() {
         } catch { /* non-blocking */ }
     }, [laptopId]);
 
+
     const filteredUnits = sortUnits(
-        units.filter(u => {
+        activeUnits.filter(u => {
             if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
             if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
             if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
@@ -726,14 +730,14 @@ export default function UnitsPage() {
     };
 
     const counts = {
-        total: units.length,
-        siap: units.filter(u => u.status === "SIAP_JUAL").length,
-        sold: units.filter(u => u.status === "SOLD").length,
-        service: units.filter(u => u.status === "SERVICE").length,
-        belum: units.filter(u => u.status === "BELUM_SIAP").length,
-        gradeA: units.filter(u => u.grade === "A").length,
-        gradeB: units.filter(u => u.grade === "B").length,
-        gradeC: units.filter(u => u.grade === "C").length,
+        total: activeUnits.length,   
+        siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
+        sold: units.filter(u => u.status === "SOLD").length,  
+        service: activeUnits.filter(u => u.status === "SERVICE").length,
+        belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
+        gradeA: activeUnits.filter(u => u.grade === "A").length,
+        gradeB: activeUnits.filter(u => u.grade === "B").length,
+        gradeC: activeUnits.filter(u => u.grade === "C").length,
     };
 
     const openCreate = () => {
@@ -745,14 +749,20 @@ export default function UnitsPage() {
     // ── CHANGED: normalisasi status lama (SERVICE/SOLD) → BELUM_SIAP ──
     const openEdit = (unit: LaptopUnit) => {
         setEditingUnit(unit);
-        const normalizedStatus = unit.status === "SIAP_JUAL" ? "SIAP_JUAL" : "BELUM_SIAP";
+        // Preserve status asli — hanya normalisasi saat form ditampilkan untuk pilihan user
+        // SOLD dan SERVICE tetap disimpan, bukan di-override ke BELUM_SIAP
+        const editableStatus =
+            unit.status === "SIAP_JUAL" ? "SIAP_JUAL" :
+                unit.status === "SOLD" ? "SOLD" :
+                    unit.status === "SERVICE" ? "SERVICE" :
+                        "BELUM_SIAP";
         setFormData({
             serial_number: unit.serial_number,
             grade: unit.grade,
             condition_note: unit.condition_note || "",
             purchase_price: String(unit.purchase_price || ""),
             selling_price: String(unit.selling_price || ""),
-            status: normalizedStatus,
+            status: editableStatus,
             notes: unit.notes || "",
             received_at: unit.created_at ? new Date(unit.created_at).toISOString().split("T")[0] : "",
         });
@@ -845,24 +855,37 @@ export default function UnitsPage() {
                                 {[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ") || "Detail laptop"}
                             </p>
                         </div>
-                        {canManageUnits && (
-                            <div className="flex items-center gap-2">
-                                <button onClick={openCreate}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#1a1a2e] rounded-lg text-sm font-medium text-white hover:bg-[#16213e] transition shadow-sm">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Tambah Unit
-                                </button>
-                                <button onClick={() => setShowBulkModal(true)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white transition shadow-sm">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Tambah Banyak
-                                </button>
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href={`/dashboard/laptops/${laptopId}/units/sold`}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition shadow-sm"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Terjual ({counts.sold})
+                            </Link>
+
+                            {canManageUnits && (
+                                <>
+                                    <button onClick={openCreate}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#1a1a2e] rounded-lg text-sm font-medium text-white hover:bg-[#16213e] transition shadow-sm">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Tambah Unit
+                                    </button>
+                                    <button onClick={() => setShowBulkModal(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white transition shadow-sm">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Tambah Banyak
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {/* Stats Cards */}
@@ -917,7 +940,6 @@ export default function UnitsPage() {
                                 { value: "SIAP_JUAL", label: "Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
                                 { value: "BELUM_SIAP", label: "Belum Siap", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
                                 { value: "SERVICE", label: "Service", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
-                                { value: "SOLD", label: "Terjual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SOLD").length },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
@@ -1225,44 +1247,74 @@ export default function UnitsPage() {
                                     <label className="block text-xs font-medium text-gray-500 mb-2">
                                         Status <span className="text-red-400">*</span>
                                     </label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "SIAP_JUAL" }))}
-                                            className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "SIAP_JUAL"
+
+                                    {/* Read-only badge untuk SOLD dan SERVICE */}
+                                    {(formData.status === "SOLD" || formData.status === "SERVICE") ? (
+                                        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 ${formData.status === "SOLD"
+                                            ? "border-gray-300 bg-gray-50"
+                                            : "border-blue-300 bg-blue-50"
+                                            }`}>
+                                            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${formData.status === "SOLD" ? "bg-gray-400" : "bg-blue-500"
+                                                }`} />
+                                            <div>
+                                                <p className={`text-sm font-bold ${formData.status === "SOLD" ? "text-gray-600" : "text-blue-700"
+                                                    }`}>
+                                                    {formData.status === "SOLD" ? "Terjual" : "Service"}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                                    Status ini tidak dapat diubah melalui form edit.
+                                                    Ganti harga modal di atas lalu klik Simpan.
+                                                </p>
+                                            </div>
+                                            {/* Hidden input untuk tetap mengirim status asli */}
+                                            <input type="hidden" name="status" value={formData.status} />
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, status: "SIAP_JUAL" }))}
+                                                className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "SIAP_JUAL"
                                                     ? "border-emerald-500 bg-emerald-50 shadow-sm"
                                                     : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SIAP_JUAL" ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                                <p className={`text-sm font-bold ${formData.status === "SIAP_JUAL" ? "text-emerald-700" : "text-gray-600"}`}>Siap Jual</p>
-                                            </div>
-                                            <p className={`text-[10px] leading-tight ml-4 ${formData.status === "SIAP_JUAL" ? "text-emerald-500" : "text-gray-400"}`}>
-                                                Pilih Grade di bawah
-                                            </p>
-                                        </button>
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "SIAP_JUAL" ? "bg-emerald-500" : "bg-gray-300"
+                                                        }`} />
+                                                    <p className={`text-sm font-bold ${formData.status === "SIAP_JUAL" ? "text-emerald-700" : "text-gray-600"
+                                                        }`}>Siap Jual</p>
+                                                </div>
+                                                <p className={`text-[10px] leading-tight ml-4 ${formData.status === "SIAP_JUAL" ? "text-emerald-500" : "text-gray-400"
+                                                    }`}>
+                                                    Pilih Grade di bawah
+                                                </p>
+                                            </button>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(prev => ({ ...prev, status: "BELUM_SIAP" }))}
-                                            className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "BELUM_SIAP"
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, status: "BELUM_SIAP" }))}
+                                                className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${formData.status === "BELUM_SIAP"
                                                     ? "border-amber-500 bg-amber-50 shadow-sm"
                                                     : "border-gray-200 bg-white hover:border-gray-300"
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "BELUM_SIAP" ? "bg-amber-500" : "bg-gray-300"}`} />
-                                                <p className={`text-sm font-bold ${formData.status === "BELUM_SIAP" ? "text-amber-700" : "text-gray-600"}`}>Belum Siap</p>
-                                            </div>
-                                            <p className={`text-[10px] leading-tight ml-4 ${formData.status === "BELUM_SIAP" ? "text-amber-500" : "text-gray-400"}`}>
-                                                Beri keterangan di bawah
-                                            </p>
-                                        </button>
-                                    </div>
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${formData.status === "BELUM_SIAP" ? "bg-amber-500" : "bg-gray-300"
+                                                        }`} />
+                                                    <p className={`text-sm font-bold ${formData.status === "BELUM_SIAP" ? "text-amber-700" : "text-gray-600"
+                                                        }`}>Belum Siap</p>
+                                                </div>
+                                                <p className={`text-[10px] leading-tight ml-4 ${formData.status === "BELUM_SIAP" ? "text-amber-500" : "text-gray-400"
+                                                    }`}>
+                                                    Beri keterangan di bawah
+                                                </p>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* ── CHANGED: Conditional — Grade (Siap Jual) atau Keterangan (Belum Siap) ── */}
+
                                 {formData.status === "SIAP_JUAL" ? (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -1288,7 +1340,7 @@ export default function UnitsPage() {
                                             })}
                                         </div>
                                     </div>
-                                ) : (
+                                ) : formData.status === "BELUM_SIAP" ? (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                             Keterangan Belum Siap
@@ -1309,7 +1361,7 @@ export default function UnitsPage() {
                                             Unit tidak akan muncul di daftar siap jual
                                         </p>
                                     </div>
-                                )}
+                                ) : null /* SOLD / SERVICE — tidak ada selector grade/kondisi tambahan */}
 
                                 {/* Kondisi tambahan (hanya tampil kalau Siap Jual) */}
                                 {formData.status === "SIAP_JUAL" && (

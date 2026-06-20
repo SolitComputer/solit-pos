@@ -5,7 +5,8 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
-import { canManageAttendance } from "@/lib/permissions";
+import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
+import { canManageAttendance, DIVISION_MAP } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function isPKLRole(role?: string): boolean {
@@ -124,6 +125,17 @@ type AttendanceSummaryDetail = {
     type: "present" | "late";
     items: AttendanceDetailItem[];
     monthLabel: string;
+};
+
+type MonthlyOff = {
+    id: string;
+    user_id: string;
+    off_date: string;
+    year: number;
+    month: number;
+    notes: string | null;
+    set_by: string | null;
+    users?: { id: string; name: string; role: string };
 };
 
 const PKL_DAILY_RATE = 10000;
@@ -2462,6 +2474,8 @@ export default function AttendanceDashboardPage() {
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
     const [salaryModalPklOnly, setSalaryModalPklOnly] = useState<boolean | undefined>(undefined);
+    const [showMonthlyOffModal, setShowMonthlyOffModal] = useState(false);
+    const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -2498,6 +2512,16 @@ export default function AttendanceDashboardPage() {
         const r = await fetch("/api/attendance/allowances");
         const d = await r.json();
         if (d.success) setAllowances(d.data || []);
+    }, []);
+
+    const fetchMonthlyOffs = useCallback(async (y: number, m: number) => {
+        try {
+            const r = await fetch(`/api/attendance/monthly-off?year=${y}&month=${m + 1}`);
+            const d = await r.json();
+            if (d.success) setMonthlyOffs(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch monthly offs:", err);
+        }
     }, []);
 
     const fetchOvertimeTotal = useCallback(async (y: number, m: number) => {
@@ -2624,6 +2648,7 @@ export default function AttendanceDashboardPage() {
             fetchDayOffs(),
             fetchAllDateOffs(),
             fetchAllDateWorks(),
+            fetchMonthlyOffs(year, month),
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
@@ -2680,6 +2705,7 @@ export default function AttendanceDashboardPage() {
             fetchDayOffs(),
             fetchAllDateOffs(),
             fetchAllDateWorks(),
+            fetchMonthlyOffs(year, month),
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
@@ -2695,6 +2721,8 @@ export default function AttendanceDashboardPage() {
         fetchAttendance,
         fetchDayOffs,
         fetchAllDateOffs,
+        fetchAllDateWorks,
+        fetchMonthlyOffs,
         fetchManualRecords,
         fetchAllUsers,
         fetchSalaries,
@@ -2717,13 +2745,31 @@ export default function AttendanceDashboardPage() {
         return m;
     }, [allDateWorks]);
 
+    const monthlyOffByName = useMemo(() => {
+        const m: Record<string, Set<string>> = {};
+        monthlyOffs.forEach(o => {
+            const uInfo = allUsers.find(u => u.id === o.user_id);
+            if (!uInfo) return;
+            if (!m[uInfo.name]) m[uInfo.name] = new Set();
+            m[uInfo.name].add(o.off_date);
+        });
+        return m;
+    }, [monthlyOffs, allUsers]);
+
     const isDayOffForUser = (name: string, dk: string) => {
+        if (monthlyOffByName[name]?.has(dk)) return true;
         if (dateWorkByName[name]?.has(dk)) return false;
         const dow = new Date(dk + "T12:00:00").getDay();
         return (dayOffByName[name]?.has(dow) ?? false) || (dateOffByName[name]?.has(dk) ?? false);
     };
-    const getOffUsersForDate = (dk: string) => { const dow = new Date(dk + "T12:00:00").getDay(); const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n); const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n); return [...new Set([...w, ...s])]; };
-    // Nama → role (untuk label di daftar libur). allUsers sudah ter-scope per role dari backend.
+
+    const getOffUsersForDate = (dk: string) => {
+        const dow = new Date(dk + "T12:00:00").getDay();
+        const w = Object.entries(dayOffByName).filter(([, s]) => s.has(dow)).map(([n]) => n);
+        const s = Object.entries(dateOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n);
+        const mo = Object.entries(monthlyOffByName).filter(([, s]) => s.has(dk)).map(([n]) => n);
+        return [...new Set([...w, ...s, ...mo])];
+    };
     const roleByName = useMemo(() => {
         const m: Record<string, string> = {};
         allUsers.forEach(u => { m[u.name] = u.role; });
@@ -2744,6 +2790,7 @@ export default function AttendanceDashboardPage() {
             result.push({ name, role: roleByName[name] ?? "", reason });
         };
 
+        Object.entries(monthlyOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur Bulanan"); });
         Object.entries(dayOffByName).forEach(([name, dows]) => { if (dows.has(dow)) add(name, "Libur Mingguan"); });
         Object.entries(dateOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur / Tukar"); });
         leaveData.forEach(ld => { if (ld.requests.some(r => r.leave_date === dk)) add(ld.user.name, "Cuti"); });
@@ -2885,44 +2932,57 @@ export default function AttendanceDashboardPage() {
             const userInfo = allUsers.find(u => u.id === userId);
             const userStartDate = getUserStartDate(userInfo?.created_at, calYear, calMonth);
 
+            // Tanggal cuti user ini → diperlakukan sebagai hari libur (tidak dihitung kewajiban hadir)
+            const userLeaveSet = new Set<string>(
+                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
+                    .map(r => r.leave_date)
+            );
+
             let present = 0, late = 0, score = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
+            let totalWorkdays = 0; // total hari kerja sebulan (rule SAMA dengan loop evaluasi)
+            let pastWorkdays = 0;  // hari kerja yang sudah lewat / hari ini
 
             for (let d = 1; d <= dim; d++) {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
-                if (isCurrentMonth && dk > todayWIB) break;
 
-                if (dk < userStartDate) {
-                    const mr = manualByName[name]?.[dk];
-                    if (!mr) continue;
-                }
+                // Lewati tanggal sebelum user bergabung (kecuali ada absen manual di tanggal itu)
+                const beforeStart = dk < userStartDate;
+                const hasManual = !!manualByName[name]?.[dk];
+                if (beforeStart && !hasManual) continue;
+
                 const dow = new Date(dk + "T12:00:00").getDay();
-                const isDateWork = allDateWorks.some(dw => dw.user_id === userIdByName[name] && dw.work_date === dk);
-                const isWeeklyOff = dows.has(dow) && !isDateWork; // libur mingguan, tapi bukan date_work override
-                if ((isWeeklyOff || offs.has(dk)) && !isDateWork) { offDates.push(dk); continue; }
 
+                // ── Penentuan hari libur dengan rule TERPADU ──
+                // date_work (tukar libur masuk) menang: hari itu jadi hari KERJA walau libur mingguan
+                const isDateWork = allDateWorks.some(dw => dw.user_id === userId && dw.work_date === dk);
+                const isMonthlyOff = monthlyOffByName[name]?.has(dk) ?? false;
+                const isWeeklyOff = dows.has(dow) && !isDateWork;
+                const isDateOff = offs.has(dk) && !isDateWork;
+                const isLeave = userLeaveSet.has(dk);
+                const isOffDay = isMonthlyOff || isWeeklyOff || isDateOff || isLeave;
+
+                const isPastOrToday = !(isCurrentMonth && dk > todayWIB);
+
+                if (isOffDay) {
+                    if (isPastOrToday) offDates.push(dk);
+                    continue;                            
+                }
+
+                totalWorkdays++;                  
+                if (!isPastOrToday) continue;     
+
+                pastWorkdays++;
                 const eff = effByName[name]?.[dk];
                 if (eff === "PRESENT") { present++; score += 1; }
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
                     const mr = manualByName[name]?.[dk];
-                    const hasLeaveToday = leaveData.find(ld => ld.user.id === userIdByName[name])?.requests.some(r => r.leave_date === dk);
-
-                    if (!hasLeaveToday) {
-                        absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
-                    } else {
-                        offDates.push(dk);
-                    }
+                    absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
                 }
             }
 
-            const pastWorkdays = present + late + absences.length;
-            const leaveDatesForUser = new Set<string>(
-                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
-                    .map(r => r.leave_date)
-            );
-            const totalWorkdays = countWorkingDaysFrom(calYear, calMonth, dows, offs, userStartDate, leaveDatesForUser);
             const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
 
             const resolvedUserId = userIdByName[name] ??
@@ -2940,7 +3000,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -3235,10 +3295,13 @@ export default function AttendanceDashboardPage() {
                         {canManage && (
                             <>
                                 <button
-                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowDayOffModal(true); }}
+                                    onClick={async () => {
+                                        if (allUsers.length === 0) await fetchAllUsers();
+                                        setShowMonthlyOffModal(true);
+                                    }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
-                                    📅 Libur Mingguan
+                                    📅 Atur Libur
                                 </button>
                                 <button
                                     onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSwapModal(true); }}
@@ -5217,12 +5280,23 @@ export default function AttendanceDashboardPage() {
                 </div>
             )}
 
-            {showDayOffModal && canManage && (
-                <DayOffModal
-                    users={isAdmin ? allUsers : allUsers.filter(u => u.id !== currentUser?.id)}
-                    dayOffs={dayOffs}
-                    onClose={() => setShowDayOffModal(false)}
-                    onSaved={() => { fetchDayOffs(); setShowDayOffModal(false); }}
+            {showMonthlyOffModal && canManage && (
+                <MonthlyOffModal
+                    users={
+                        isAdmin
+                            ? allUsers.filter(u => u.id !== currentUser?.id)
+                            : allUsers.filter(u => {
+                                const subs = DIVISION_MAP[currentUser?.role as string] ?? [];
+                                return (subs as string[]).includes(u.role);
+                            })
+                    }
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onClose={() => setShowMonthlyOffModal(false)}
+                    onSaved={() => {
+                        fetchMonthlyOffs(calYear, calMonth);
+                        fetchAllDateOffs();
+                    }}
                 />
             )}
             {showManualModal && isAdminRole(currentUser?.role) && (
