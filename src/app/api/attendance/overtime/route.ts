@@ -10,8 +10,11 @@ const supabase = createClient(
 
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_SALES: ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES"],
-  KEPALA_MARKETING: ["MARKETING", "KEPALA_MARKETING"],
+  KEPALA_MARKETING: ["MARKETING", "KONTEN", "KEPALA_MARKETING"],
   KEPALA_TEKNISI: ["TEKNISI", "KEPALA_TEKNISI"],
+  KEPALA_ONPOINT: ["ONPOINT", "KEPALA_ONPOINT"],
+  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG"],
+  KEPALA_SOTECH: ["SOTECH", "KEPALA_SOTECH"],
 };
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
@@ -27,7 +30,9 @@ const PAY_VIEW_ROLES = [
   "KEPALA_SOTECH",
 ];
 
-function canApprove(approverRole: string, targetRole: string): boolean {
+function canApprove(approverRole: string, targetRole: string, approverId?: string, targetUserId?: string): boolean {
+  // Tidak boleh approve diri sendiri (kecuali admin)
+  if (approverId && targetUserId && approverId === targetUserId && !FULL_ACCESS.includes(approverRole)) return false;
   if (FULL_ACCESS.includes(approverRole)) return true;
   return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
 }
@@ -112,10 +117,32 @@ export async function GET(request: Request) {
 
     if (status) q = q.eq("status", status);
 
-    const isAdmin =
-      FULL_ACCESS.includes(user.role) ||
-      Object.keys(DIVISION_HEAD_MAP).includes(user.role);
-    if (!isAdmin) q = q.eq("user_id", user.id);
+    const isFullAccess = FULL_ACCESS.includes(user.role);
+    const isDivisionHead = Object.keys(DIVISION_HEAD_MAP).includes(user.role);
+
+    if (isFullAccess) {
+      // Lihat semua — tidak perlu filter
+    } else if (isDivisionHead) {
+      // Ambil semua user_id yang role-nya termasuk bawahan kepala ini
+      const subordinateRoles = DIVISION_HEAD_MAP[user.role] ?? [];
+      const { data: subordinateUsers } = await supabase
+        .from("users")
+        .select("id")
+        .in("role", subordinateRoles);
+
+      const subordinateIds = (subordinateUsers ?? []).map((u: any) => u.id);
+      // Juga include lembur milik kepala itu sendiri
+      if (!subordinateIds.includes(user.id)) subordinateIds.push(user.id);
+
+      if (subordinateIds.length > 0) {
+        q = q.in("user_id", subordinateIds);
+      } else {
+        q = q.eq("user_id", user.id);
+      }
+    } else {
+      // Karyawan biasa — hanya lihat milik sendiri
+      q = q.eq("user_id", user.id);
+    }
 
     const { data: overtimes, error } = await q;
     if (error)
@@ -386,7 +413,7 @@ export async function PATCH(request: Request) {
 
     // ─── APPROVE ──────────────────────────────────────────────────────────
     if (action === "APPROVE") {
-      if (!canApprove(user.role, targetUser?.role ?? "")) {
+      if (!canApprove(user.role, targetUser?.role ?? "", user.id, overtime.user_id)) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang menyetujui" },
           { status: 403 }
@@ -442,7 +469,7 @@ export async function PATCH(request: Request) {
 
     // ─── REJECT ───────────────────────────────────────────────────────────
     if (action === "REJECT") {
-      if (!canApprove(user.role, targetUser?.role ?? "")) {
+      if (!canApprove(user.role, targetUser?.role ?? "", user.id, overtime.user_id)) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang menolak" },
           { status: 403 }
