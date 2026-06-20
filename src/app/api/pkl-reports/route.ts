@@ -8,7 +8,6 @@ const KEPALA_ROLES = [
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
 ];
 
-// Kepala → divisi PKL yang dia pantau
 const KEPALA_DIVISION_MAP: Record<string, string> = {
     KEPALA_MARKETING: "MARKETING",
     KEPALA_SALES: "SALES",
@@ -18,9 +17,18 @@ const KEPALA_DIVISION_MAP: Record<string, string> = {
     KEPALA_SOTECH: "SOTECH",
 };
 
+const KEPALA_PKL_ROLE_MAP: Record<string, string> = {
+    KEPALA_MARKETING: "PKL_MARKETING",
+    KEPALA_SALES: "PKL_SALES",
+    KEPALA_PENYEDIA_BARANG: "PKL_PENYEDIA_BARANG",
+    KEPALA_TEKNISI: "PKL_TEKNISI",
+    KEPALA_ONPOINT: "PKL_ONPOINT",
+    KEPALA_SOTECH: "PKL_SOTECH",
+};
+
 function isFullAccess(role: string) { return FULL_ACCESS.includes(role); }
-function isKepala(role: string)     { return KEPALA_ROLES.includes(role); }
-function isPKL(role: string)        { return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-"); }
+function isKepala(role: string) { return KEPALA_ROLES.includes(role); }
+function isPKL(role: string) { return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-"); }
 
 // ── GET — ambil laporan ───────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -28,14 +36,14 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const division  = searchParams.get("division");  // filter divisi
+    const division = searchParams.get("division");  // filter divisi
     const pklUserId = searchParams.get("pkl_user_id");
-    const dateFrom  = searchParams.get("date_from");
-    const dateTo    = searchParams.get("date_to");
-    const status    = searchParams.get("status");
-    const page      = parseInt(searchParams.get("page") ?? "1");
-    const limit     = parseInt(searchParams.get("limit") ?? "50");
-    const offset    = (page - 1) * limit;
+    const dateFrom = searchParams.get("date_from");
+    const dateTo = searchParams.get("date_to");
+    const status = searchParams.get("status");
+    const page = parseInt(searchParams.get("page") ?? "1");
+    const limit = parseInt(searchParams.get("limit") ?? "50");
+    const offset = (page - 1) * limit;
 
     let query = supabaseAdmin
         .from("pkl_work_reports")
@@ -47,33 +55,33 @@ export async function GET(req: NextRequest) {
             reviewer:pkl_work_reports_reviewed_by_fkey(id, name, role)
         `, { count: "exact" });
 
-    // ── Scope berdasarkan role ────────────────────────────────────────────────
     if (isPKL(user.role)) {
-        // PKL hanya lihat laporan sendiri
         query = query.eq("user_id", user.id);
     } else if (isKepala(user.role)) {
-        // Kepala lihat laporan PKL di divisinya
-        const kepalaDiv = KEPALA_DIVISION_MAP[user.role];
-        // Ambil semua PKL yang termasuk divisi ini
-        const { data: pklUsers } = await supabaseAdmin
-            .from("users")
-            .select("id")
-            .or(`role.eq.PKL,role.ilike.PKL_%,role.ilike.PKL-%`)
-            .contains("metadata", { division: kepalaDiv }); // jika ada metadata
-        
-        // Fallback: filter berdasar divisi laporan
-        if (kepalaDiv) {
-            query = query.eq("division", kepalaDiv);
+        const pklRole = KEPALA_PKL_ROLE_MAP[user.role];
+        if (pklRole) {
+            const { data: pklUsersInDiv } = await supabaseAdmin
+                .from("users")
+                .select("id")
+                .eq("role", pklRole)
+                .eq("is_active", true);
+
+            const pklIds = (pklUsersInDiv ?? []).map((u: { id: string }) => u.id);
+            if (pklIds.length === 0) {
+                return NextResponse.json({ success: true, data: [], count: 0, page, limit });
+            }
+            query = query.in("user_id", pklIds);
+        } else {
+            return NextResponse.json({ success: true, data: [], count: 0, page, limit });
         }
     }
-    // Full access: tidak ada scope tambahan
 
     // ── Filter optional ──────────────────────────────────────────────────────
-    if (division && !isPKL(user.role)) query = query.eq("division", division);
-    if (pklUserId)  query = query.eq("user_id", pklUserId);
-    if (dateFrom)   query = query.gte("report_date", dateFrom);
-    if (dateTo)     query = query.lte("report_date", dateTo);
-    if (status)     query = query.eq("status", status);
+    if (division && isFullAccess(user.role)) query = query.eq("division", division);
+    if (pklUserId) query = query.eq("user_id", pklUserId);
+    if (dateFrom) query = query.gte("report_date", dateFrom);
+    if (dateTo) query = query.lte("report_date", dateTo);
+    if (status) query = query.eq("status", status);
 
     const { data, error, count } = await query
         .order("report_date", { ascending: false })
@@ -95,13 +103,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // ── Action: review (Kepala / Admin) ──────────────────────────────────────
     if (action === "review") {
         if (!isFullAccess(user.role) && !isKepala(user.role)) {
             return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
         }
         const { report_id, review_note, status: newStatus } = body;
         if (!report_id) return NextResponse.json({ success: false, message: "report_id wajib" }, { status: 400 });
+
+        if (isKepala(user.role)) {
+            const pklRole = KEPALA_PKL_ROLE_MAP[user.role];
+            if (!pklRole) {
+                return NextResponse.json({ success: false, message: "Tidak ada PKL di divisi kamu" }, { status: 403 });
+            }
+            const { data: reportCheck } = await supabaseAdmin
+                .from("pkl_work_reports")
+                .select("user_id, users!pkl_work_reports_user_id_fkey(role)")
+                .eq("id", report_id)
+                .maybeSingle();
+
+            const reportOwnerRole = (reportCheck as any)?.users?.role;
+            if (!reportCheck || reportOwnerRole !== pklRole) {
+                return NextResponse.json({ success: false, message: "Laporan ini bukan dari PKL divisi kamu" }, { status: 403 });
+            }
+        }
 
         const { data, error } = await supabaseAdmin
             .from("pkl_work_reports")
@@ -238,7 +262,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (title)       updates.title       = title;
+    if (title) updates.title = title;
     if (description) updates.description = description;
     if (status && isFullAccess(user.role)) updates.status = status;
 
@@ -269,7 +293,7 @@ export async function DELETE(req: NextRequest) {
             .select("user_id")
             .eq("id", id)
             .maybeSingle();
-        
+
         if (!existing || existing.user_id !== user.id) {
             return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
         }
