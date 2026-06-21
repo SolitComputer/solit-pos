@@ -1,7 +1,7 @@
 "use client";
 
 import {
-    useEffect, useRef, useState, useCallback,
+    useEffect, useRef, useState, useCallback, memo, useMemo,
     KeyboardEvent, Fragment,
 } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
@@ -319,7 +319,7 @@ interface BubbleProps {
     onScrollToReply: (id: string) => void;
 }
 
-function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
+const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
@@ -593,7 +593,7 @@ function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelet
             )}
         </div>
     );
-}
+});
 
 // ─── MentionDropdown ──────────────────────────────────────────────────────────
 interface MentionDropdownProps {
@@ -1179,6 +1179,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const [users, setUsers] = useState<UserOption[]>([]);
 
+    const usersRef = useRef<UserOption[]>([]);
+    const messagesDataRef = useRef<GroupMessage[]>([]);
+    useEffect(() => { usersRef.current = users; }, [users]);
+    useEffect(() => { messagesDataRef.current = messages; }, [messages]);
+
     // ── Presence: status online + terakhir online per user ──
     const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
     const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
@@ -1258,7 +1263,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const fetchMessages = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/group-chat?limit=60");
+            const res = await fetch("/api/group-chat?limit=30");
             const data = await res.json();
             if (data.success) {
                 setMessages(data.messages);
@@ -1342,11 +1347,40 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 { event: "INSERT", schema: "public", table: "group_messages" },
                 async (payload) => {
                     const incoming = payload.new as GroupMessage;
-                    const fullMsg = await fetchSingleMessage(incoming.id);
-                    const msgToAdd = fullMsg ?? incoming;
+                    let enriched: GroupMessage = incoming;
+
+                    if (!incoming.sender_name || !incoming.sender_role) {
+                        const u = usersRef.current.find(x => x.id === incoming.sender_id);
+                        if (u) enriched = { ...enriched, sender_name: u.name, sender_role: u.role };
+                    }
+
+                    if (incoming.reply_to_id && !incoming.reply_to) {
+                        const orig = messagesDataRef.current.find(m => m.id === incoming.reply_to_id);
+                        if (orig) {
+                            enriched = {
+                                ...enriched,
+                                reply_to: {
+                                    id: orig.id, sender_name: orig.sender_name,
+                                    content: orig.content, is_deleted: orig.is_deleted,
+                                    attachment_type: orig.attachment_type,
+                                },
+                            };
+                        } else {
+                            const full = await fetchSingleMessage(incoming.id);
+                            if (full) enriched = full;
+                        }
+                    }
+
                     setMessages(prev => {
-                        if (prev.some(m => m.id === msgToAdd.id)) return prev;
-                        return [...prev, msgToAdd];
+                        if (prev.some(m => m.id === enriched.id)) return prev;
+                        const cleaned = prev.filter(m => {
+                            if (!m.id.startsWith("temp-")) return true;
+                            if (m.sender_id !== enriched.sender_id) return true;
+                            const sameText = m.content === enriched.content;
+                            const sameAtt = (m.attachment_name ?? null) === (enriched.attachment_name ?? null);
+                            return !(sameText && sameAtt);
+                        });
+                        return [...cleaned, enriched];
                     });
                 }
             )
@@ -1472,16 +1506,16 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [currentUser, replyTo]);
 
-    const deleteMessage = async (messageId: string) => {
+    const deleteMessage = useCallback(async (messageId: string) => {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
         try {
             await fetch(`/api/group-chat?id=${messageId}`, { method: "DELETE" });
         } catch {
             setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: false } : m));
         }
-    };
+    }, []);
 
-    const editMessage = async (messageId: string, newContent: string): Promise<boolean> => {
+    const editMessage = useCallback(async (messageId: string, newContent: string): Promise<boolean> => {
         setMessages(prev =>
             prev.map(m => m.id === messageId
                 ? { ...m, content: newContent, edited_at: new Date().toISOString() }
@@ -1506,19 +1540,19 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             if (original) setMessages(prev => prev.map(m => m.id === messageId ? original : m));
             return false;
         }
-    };
+    }, [fetchSingleMessage]);
 
-    const scrollToReply = (id: string) => {
+    const scrollToReply = useCallback((id: string) => {
         const el = document.getElementById(`msg-${id}`);
         if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "center" });
             el.classList.add("highlight-msg");
             setTimeout(() => el.classList.remove("highlight-msg"), 1500);
         }
-    };
+    }, []);
 
     type DateGroup = { dateKey: string; dateLabel: string; msgs: GroupMessage[] };
-    const groupedMessages = messages.reduce<DateGroup[]>((acc, msg) => {
+    const groupedMessages = useMemo<DateGroup[]>(() => messages.reduce<DateGroup[]>((acc, msg) => {
         const key = getDateKey(msg.created_at);
         const last = acc[acc.length - 1];
         if (!last || last.dateKey !== key) {
@@ -1527,7 +1561,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             last.msgs.push(msg);
         }
         return acc;
-    }, []);
+    }, []), [messages]);
 
     return (
         <div
@@ -1618,8 +1652,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                         );
                                     }}
                                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all group ${embeddedDMUser?.id === user.id
-                                            ? "bg-indigo-50"
-                                            : "hover:bg-indigo-50"
+                                        ? "bg-indigo-50"
+                                        : "hover:bg-indigo-50"
                                         }`}                            >
                                     {/* Avatar + status dot */}
                                     <div className="relative flex-shrink-0">
@@ -1902,7 +1936,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         onSend={send}
                         onSendAttachment={sendAttachment}
                     />
-               </div>
+                </div>
 
                 {/* ── Kolom kanan: Embedded DM Panel ── */}
                 {embeddedDMUser && (
@@ -1964,7 +1998,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
             </div>
 
-          <style jsx global>{`
+            <style jsx global>{`
                 @keyframes highlightMsg {
                     0%   { background-color: transparent; }
                     25%  { background-color: rgba(99, 102, 241, 0.1); }
