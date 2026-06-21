@@ -392,6 +392,33 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
+  KEPALA_PENGELOLA_BARANG: [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+      ITEM_ABSENSI,
+      ITEM_LEMBUR,
+      ITEM_USERS,
+      ITEM_PKL_REPORT,
+    ],
+  },
+  {
+    label: "Inventaris",
+    items: [
+      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+    ],
+  },
+  {
+    label: "Transaksi",
+    items: [
+      { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+    ],
+  },
+  { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+],
   MARKETING: [
     {
       label: "Overview",
@@ -530,6 +557,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     SERVICE_MENU,
   ],
+  
 };
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -539,6 +567,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
   ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
   PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },

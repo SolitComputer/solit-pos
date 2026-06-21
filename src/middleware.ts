@@ -16,6 +16,7 @@ const PUBLIC_API_ROUTES = [
   "/api/auth/set-password",
   "/api/service/stream",
   "/api/service/public",
+  "/api/public/catalog",
 ];
 
 const FACE_API_WHITELIST = [
