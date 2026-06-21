@@ -52,6 +52,13 @@ interface GroupChatPanelProps {
     onClose: () => void;
 }
 
+// Info presence per user (dihitung dari /api/presence, sama dgn OnlineUsersPanel)
+interface PresenceInfo {
+    is_online: boolean;
+    last_seen: string | null;
+    seconds_ago: number | null;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROLE_LABEL: Record<string, string> = {
     ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",
@@ -77,6 +84,9 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
 };
 
 const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+
+// Online = aktif dalam 2 menit terakhir (sama dgn OnlineUsersPanel)
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
@@ -113,6 +123,15 @@ function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Format "terakhir online" gaya WA (sama dgn OnlineUsersPanel)
+function formatLastSeen(secondsAgo: number | null): string {
+    if (secondsAgo === null) return "Belum pernah";
+    if (secondsAgo < 60) return "baru saja";
+    if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)} mnt lalu`;
+    if (secondsAgo < 86400) return `${Math.floor(secondsAgo / 3600)} jam lalu`;
+    return `${Math.floor(secondsAgo / 86400)} hari lalu`;
 }
 
 // ─── Mention highlight ────────────────────────────────────────────────────────
@@ -1159,7 +1178,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [unread, setUnread] = useState(0);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const [users, setUsers] = useState<UserOption[]>([]);
-    const [onlineCount] = useState<number>(0);
+
+    // ── Presence: status online + terakhir online per user ──
+    const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
+    const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
@@ -1168,10 +1190,26 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [memberSearch, setMemberSearch] = useState("");
     const [embeddedDMUser, setEmbeddedDMUser] = useState<UserOption | null>(null);
 
-    const filteredMembers = users.filter(u =>
-        u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-        (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(memberSearch.toLowerCase())
-    );
+    // Hitung jumlah online + urutkan (online dulu, lalu yang paling baru terakhir online)
+    const onlineCount = users.filter(u => presenceMap[u.id]?.is_online).length;
+
+    const filteredMembers = users
+        .filter(u =>
+            u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+            (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(memberSearch.toLowerCase())
+        )
+        .filter(u => memberFilter === "online" ? presenceMap[u.id]?.is_online : true)
+        .sort((a, b) => {
+            const ao = presenceMap[a.id]?.is_online ? 1 : 0;
+            const bo = presenceMap[b.id]?.is_online ? 1 : 0;
+            if (ao !== bo) return bo - ao; // online di atas
+            const al = presenceMap[a.id]?.last_seen ?? null;
+            const bl = presenceMap[b.id]?.last_seen ?? null;
+            if (!al && !bl) return a.name.localeCompare(b.name);
+            if (!al) return 1;
+            if (!bl) return -1;
+            return new Date(bl).getTime() - new Date(al).getTime(); // terakhir online di atas
+        });
 
     useEffect(() => {
         fetch("/api/users")
@@ -1184,6 +1222,35 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             })
             .catch(() => { });
     }, [currentUser.id]);
+
+    // ── Ambil presence dari /api/presence (sumber sama dgn OnlineUsersPanel) + refresh tiap 30 dtk ──
+    const fetchPresence = useCallback(async () => {
+        try {
+            const res = await fetch("/api/presence");
+            const data = await res.json();
+            if (data.success) {
+                const now = Date.now();
+                const map: Record<string, PresenceInfo> = {};
+                for (const p of (data.data ?? [])) {
+                    const lastSeen: string | null = p.last_seen ?? null;
+                    map[p.user_id] = {
+                        last_seen: lastSeen,
+                        is_online: lastSeen ? now - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS : false,
+                        seconds_ago: lastSeen ? Math.floor((now - new Date(lastSeen).getTime()) / 1000) : null,
+                    };
+                }
+                setPresenceMap(map);
+            }
+        } catch (err) {
+            console.error("[GroupChatPanel] presence error:", err);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPresence();
+        const ticker = setInterval(fetchPresence, 30_000); // refresh status online tiap 30 detik
+        return () => clearInterval(ticker);
+    }, [fetchPresence]);
 
     const fetchMessages = useCallback(async () => {
         setLoading(true);
@@ -1485,10 +1552,16 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {/* Sidebar header */}
                     <div className="px-4 pt-5 pb-3 flex-shrink-0"
                         style={{ borderBottom: "1px solid #f0f0f8" }}>
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-3"
-                            style={{ color: "#94a3b8" }}>
-                            Anggota Tim ({users.length})
-                        </p>
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black uppercase tracking-widest"
+                                style={{ color: "#94a3b8" }}>
+                                Anggota Tim ({users.length})
+                            </p>
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                {onlineCount} online
+                            </span>
+                        </div>
                         {/* Search */}
                         <div className="relative">
                             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -1510,57 +1583,88 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 }}
                             />
                         </div>
+                        {/* Filter Semua / Online */}
+                        <div className="flex gap-0.5 mt-2.5 bg-gray-100 rounded-lg p-0.5">
+                            {(["all", "online"] as const).map(f => (
+                                <button key={f} onClick={() => setMemberFilter(f)}
+                                    className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${memberFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                                        }`}>
+                                    {f === "all" ? `Semua (${users.length})` : `🟢 Online (${onlineCount})`}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Member list */}
                     <div className="flex-1 overflow-y-auto py-2">
                         {filteredMembers.length === 0 ? (
                             <p className="text-[11px] text-slate-400 text-center mt-8 px-4">
-                                Tidak ditemukan
+                                {memberFilter === "online" ? "Tidak ada yang online" : "Tidak ditemukan"}
                             </p>
-                        ) : filteredMembers.map(user => (
-                            <button
-                                key={user.id}
-                                onClick={() => {
-                                    setEmbeddedDMUser(
-                                        embeddedDMUser?.id === user.id ? null : user
-                                    );
-                                }}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all group ${embeddedDMUser?.id === user.id
-                                        ? "bg-indigo-50"
-                                        : "hover:bg-indigo-50"
-                                    }`}                            >
-                                {/* Avatar */}
-                                <div
-                                    className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
-                                    style={{
-                                        width: 32, height: 32,
-                                        borderRadius: 10,
-                                        background: `linear-gradient(135deg, ${getAvatarColor(user.role)}cc, ${getAvatarColor(user.role)})`,
-                                        boxShadow: `0 2px 6px ${getAvatarColor(user.role)}44`,
-                                    }}>
-                                    {getInitials(user.name)}
-                                </div>
+                        ) : filteredMembers.map(user => {
+                            const pres = presenceMap[user.id];
+                            const isOnline = !!pres?.is_online;
+                            return (
+                                <button
+                                    key={user.id}
+                                    onClick={() => {
+                                        setEmbeddedDMUser(
+                                            embeddedDMUser?.id === user.id ? null : user
+                                        );
+                                    }}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all group ${embeddedDMUser?.id === user.id
+                                            ? "bg-indigo-50"
+                                            : "hover:bg-indigo-50"
+                                        }`}                            >
+                                    {/* Avatar + status dot */}
+                                    <div className="relative flex-shrink-0">
+                                        <div
+                                            className="flex items-center justify-center text-white font-bold text-[10px]"
+                                            style={{
+                                                width: 32, height: 32,
+                                                borderRadius: 10,
+                                                background: `linear-gradient(135deg, ${getAvatarColor(user.role)}cc, ${getAvatarColor(user.role)})`,
+                                                boxShadow: `0 2px 6px ${getAvatarColor(user.role)}44`,
+                                                opacity: isOnline ? 1 : 0.5,
+                                            }}>
+                                            {getInitials(user.name)}
+                                        </div>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafbff] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
+                                            }`} />
+                                    </div>
 
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-indigo-700 transition-colors">
-                                        {user.name}
-                                    </p>
-                                    <p className="text-[9.5px] truncate" style={{ color: getAvatarColor(user.role) }}>
-                                        {ROLE_LABEL[user.role] ?? user.role}
-                                    </p>
-                                </div>
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-indigo-700 transition-colors">
+                                            {user.name}
+                                        </p>
+                                        <p className="text-[9.5px] truncate" style={{ color: getAvatarColor(user.role) }}>
+                                            {ROLE_LABEL[user.role] ?? user.role}
+                                        </p>
+                                    </div>
 
-                                {/* Chat icon — muncul saat hover */}
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                    <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                    </svg>
-                                </div>
-                            </button>
-                        ))}
+                                    {/* Status (default) ↔ ikon chat (saat hover) */}
+                                    <div className="flex-shrink-0 flex items-center justify-end min-w-[54px]">
+                                        <div className="group-hover:hidden">
+                                            {isOnline ? (
+                                                <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    online
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                                                    {formatLastSeen(pres?.seconds_ago ?? null)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <svg className="w-3.5 h-3.5 text-indigo-400 hidden group-hover:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Footer sidebar — current user info */}
@@ -1810,7 +1914,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 </p>
                                 <p className="text-[9.5px] mt-0.5 truncate"
                                     style={{ color: getAvatarColor(embeddedDMUser.role) }}>
-                                    {ROLE_LABEL[embeddedDMUser.role] ?? embeddedDMUser.role}
+                                    {presenceMap[embeddedDMUser.id]?.is_online
+                                        ? "🟢 online"
+                                        : `Terakhir online ${formatLastSeen(presenceMap[embeddedDMUser.id]?.seconds_ago ?? null)}`}
                                 </p>
                             </div>
                             <button
