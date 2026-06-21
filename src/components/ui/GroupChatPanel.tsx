@@ -1183,6 +1183,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
     const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
 
+    // ── Mobile: pane mana yang lagi tampil (chat / members). DM pakai embeddedDMUser ──
+    const [mobileView, setMobileView] = useState<"chat" | "members">("chat");
+
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -1528,30 +1531,32 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
     return (
         <div
-            className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[9998] flex items-center justify-center p-0 md:p-4"
             style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)" }}>
             <div
-                className="relative flex overflow-hidden"
+                className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-[26px]"
                 style={{
-                    width: "min(1160px, 100%)",
-                    height: "min(800px, 95vh)",
-                    borderRadius: 26,
                     background: "#fff",
                     boxShadow: "0 40px 120px rgba(10,8,30,0.3), 0 4px 20px rgba(0,0,0,0.08)",
                     border: "1px solid rgba(255,255,255,0.8)",
                 }}>
 
                 {/* ── Sidebar kiri: Member List ── */}
-                <div className="flex-shrink-0 flex flex-col"
-                    style={{
-                        width: 240,
-                        borderRight: "1px solid #f0f0f8",
-                        background: "#fafbff",
-                    }}>
+                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:flex md:border-r md:border-[#f0f0f8] ${mobileView === "members" && !embeddedDMUser ? "flex" : "hidden"}`}
+                    style={{ background: "#fafbff" }}>
 
                     {/* Sidebar header */}
-                    <div className="px-4 pt-5 pb-3 flex-shrink-0"
+                    <div className="px-4 pt-4 pb-3 flex-shrink-0"
                         style={{ borderBottom: "1px solid #f0f0f8" }}>
+                        {/* Tombol kembali — mobile only */}
+                        <button
+                            onClick={() => setMobileView("chat")}
+                            className="md:hidden flex items-center gap-1.5 mb-3 text-[11px] font-bold text-indigo-600 active:scale-95 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            Kembali ke Grup Chat
+                        </button>
                         <div className="flex items-center justify-between mb-3">
                             <p className="text-[10px] font-black uppercase tracking-widest"
                                 style={{ color: "#94a3b8" }}>
@@ -1690,11 +1695,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 </div>
 
                 {/* ── Kolom kanan: Header + Chat ── */}
-                <div className="flex-1 flex flex-col overflow-hidden" style={{ minWidth: 0 }}>
+                <div className={`flex-1 flex-col overflow-hidden md:flex ${mobileView === "chat" && !embeddedDMUser ? "flex" : "hidden"}`} style={{ minWidth: 0 }}>
 
                     {/* ── Header ── */}
                     <div
-                        className="flex-shrink-0 flex items-center gap-3.5 px-6 py-4 relative overflow-hidden"
+                        className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative overflow-hidden"
                         style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
 
                         {/* Background mesh pattern */}
@@ -1723,12 +1728,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 <h2 className="text-sm font-black text-white tracking-tight">All Team Solit</h2>
                                 <span style={{ fontSize: 14 }}>💬</span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="relative flex h-1.5 w-1.5">
+                            <div className="flex items-center gap-2 mt-1 min-w-0">
+                                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
                                 </span>
-                                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
+                                <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
                                 {onlineCount > 0 && (
                                     <span className="text-[9px] font-bold text-emerald-400 px-2 py-0.5"
                                         style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
@@ -1738,6 +1743,27 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             </div>
                         </div>
 
+                        {/* Tombol anggota tim — mobile only */}
+                        <button
+                            onClick={() => setMobileView("members")}
+                            className="md:hidden w-9 h-9 flex items-center justify-center transition-all active:scale-95 flex-shrink-0 z-10 mr-1 relative"
+                            style={{
+                                borderRadius: 12,
+                                background: "rgba(255,255,255,0.07)",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                color: "rgba(255,255,255,0.7)",
+                            }}
+                            title="Anggota tim">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.66" />
+                            </svg>
+                            {onlineCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-emerald-500 text-white text-[8px] font-black flex items-center justify-center border border-[#0f0c29]">
+                                    {onlineCount}
+                                </span>
+                            )}
+                        </button>
                         <button
                             onClick={onClose}
                             className="w-9 h-9 flex items-center justify-center transition-all hover:scale-105 flex-shrink-0 z-10"
@@ -1760,7 +1786,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     <div
                         ref={messagesRef}
                         onScroll={handleScroll}
-                        className="flex-1 overflow-y-auto px-6 py-5 space-y-1"
+                        className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-1"
                         style={{ background: "#f7f8fc" }}>
 
                         {loadingMore && (
@@ -1881,12 +1907,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 {/* ── Kolom kanan: Embedded DM Panel ── */}
                 {embeddedDMUser && (
                     <div
-                        className="flex-shrink-0 flex flex-col overflow-hidden"
-                        style={{
-                            width: 340,
-                            borderLeft: "1px solid #f0f0f8",
-                            animation: "dmSlideIn 0.2s ease-out",
-                        }}
+                        className="flex-shrink-0 flex flex-col overflow-hidden w-full md:w-[340px] md:border-l md:border-[#f0f0f8]"
+                        style={{ animation: "dmSlideIn 0.2s ease-out" }}
                     >
                         {/* DM Header */}
                         <div
