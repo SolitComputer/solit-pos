@@ -255,6 +255,36 @@ const SALES_TRANSAKSI: MenuGroup = {
 };
 
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
+const PKL_MENU: MenuGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+      ITEM_ABSENSI,
+      ITEM_PKL_REPORT,
+    ],
+  },
+  {
+    label: "Inventaris",
+    items: [
+      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+    ],
+  },
+  {
+    label: "Transaksi",
+    items: [
+      { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      { name: "Scanner", href: "/scan", icon: Icons.scanner },
+    ],
+  },
+];
+
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
   PROGRAMMER: [
@@ -485,35 +515,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-  PKL: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_PKL_REPORT,
-      ],
-    },
-    {
-      label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
-    },
-    {
-      label: "Transaksi",
-      items: [
-        { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-      ],
-    },
-    {
-      label: "Tools",
-      items: [
-        { name: "Scanner", href: "/scan", icon: Icons.scanner },
-      ],
-    },
-  ],
+  PKL: PKL_MENU,
+  PKL_MARKETING: PKL_MENU,
+  PKL_SALES: PKL_MENU,
+  PKL_PENYEDIA_BARANG: PKL_MENU,
+  PKL_SOTECH: PKL_MENU,
+  PKL_ONPOINT: PKL_MENU,
+  PKL_TEKNISI: PKL_MENU,
+  PKL_KONTEN: PKL_MENU,
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -581,6 +590,13 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
+  PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
+  PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
+  PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang", className: "bg-amber-50 text-amber-700" },
+  PKL_SOTECH: { label: "PKL Sotech", className: "bg-amber-50 text-amber-700" },
+  PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
+  PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
+  PKL_KONTEN: { label: "PKL Content Creator", className: "bg-amber-50 text-amber-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
 

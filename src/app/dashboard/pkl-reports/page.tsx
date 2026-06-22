@@ -33,31 +33,31 @@ const KEPALA_ROLES = [
 ];
 
 const DIVISIONS = [
-    { id: "MARKETING",       label: "Marketing",         emoji: "📣", color: "bg-pink-100 text-pink-700 border-pink-200" },
-    { id: "SALES",           label: "Sales",             emoji: "🛒", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    { id: "PENYEDIA_BARANG", label: "Penyedia Barang",   emoji: "📦", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    { id: "TEKNISI",         label: "Teknisi",           emoji: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
-    { id: "ONPOINT",         label: "Onpoint",           emoji: "🎯", color: "bg-blue-100 text-blue-700 border-blue-200" },
-    { id: "SOTECH",          label: "Sotech",            emoji: "💻", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-    { id: "UMUM",            label: "Umum",              emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" },
+    { id: "MARKETING", label: "Marketing", emoji: "📣", color: "bg-pink-100 text-pink-700 border-pink-200" },
+    { id: "SALES", label: "Sales", emoji: "🛒", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    { id: "PENYEDIA_BARANG", label: "Penyedia Barang", emoji: "📦", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    { id: "TEKNISI", label: "Teknisi", emoji: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
+    { id: "ONPOINT", label: "Onpoint", emoji: "🎯", color: "bg-blue-100 text-blue-700 border-blue-200" },
+    { id: "SOTECH", label: "Sotech", emoji: "💻", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+    { id: "UMUM", label: "Umum", emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" },
 ];
 
 const STATUS_CONFIG = {
-    SUBMITTED: { label: "Terkirim",  emoji: "📤", bg: "bg-blue-100",   color: "text-blue-700",   border: "border-blue-200"   },
-    REVIEWED:  { label: "Disetujui", emoji: "✅", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
-    REVISION:  { label: "Revisi",    emoji: "🔄", bg: "bg-amber-100",  color: "text-amber-700",  border: "border-amber-200"  },
+    SUBMITTED: { label: "Terkirim", emoji: "📤", bg: "bg-blue-100", color: "text-blue-700", border: "border-blue-200" },
+    REVIEWED: { label: "Disetujui", emoji: "✅", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
+    REVISION: { label: "Revisi", emoji: "🔄", bg: "bg-amber-100", color: "text-amber-700", border: "border-amber-200" },
 };
 
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function isFullAccess(role?: string)  { return !!role && FULL_ACCESS.includes(role); }
-function isKepala(role?: string)      { return !!role && KEPALA_ROLES.includes(role); }
-function isPKL(role?: string)         { return !!role && (role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-")); }
+function isFullAccess(role?: string) { return !!role && FULL_ACCESS.includes(role); }
+function isKepala(role?: string) { return !!role && KEPALA_ROLES.includes(role); }
+function isPKL(role?: string) { return !!role && (role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-")); }
 function canAccessPage(role?: string) { return isFullAccess(role) || isKepala(role) || isPKL(role); }
-function canReview(role?: string)     { return isFullAccess(role) || isKepala(role); }
-function canAddManual(role?: string)  { return isFullAccess(role); }
+function canReview(role?: string) { return isFullAccess(role) || isKepala(role); }
+function canAddManual(role?: string) { return isFullAccess(role); }
 
 function initials(name: string) {
     return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
@@ -98,23 +98,23 @@ function ReportFormModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const isEdit       = !!editData;
-    const isAdminAdd   = canAddManual(currentUser?.role) && !!prefillUserId && prefillUserId !== currentUser?.id;
-    const isPKLUser    = isPKL(currentUser?.role);
+    const isEdit = !!editData;
+    const isAdminAdd = canAddManual(currentUser?.role) && !!prefillUserId && prefillUserId !== currentUser?.id;
+    const isPKLUser = isPKL(currentUser?.role);
 
     const [form, setForm] = useState({
-        report_date:  editData?.report_date ?? prefillDate ?? getWIBToday(),
-        division:     editData?.division    ?? prefillDivision ?? DIVISIONS[0].id,
-        title:        editData?.title       ?? "",
-        description:  editData?.description ?? "",
-        pkl_user_id:  prefillUserId ?? currentUser?.id ?? "",
+        report_date: editData?.report_date ?? prefillDate ?? getWIBToday(),
+        division: editData?.division ?? prefillDivision ?? DIVISIONS[0].id,
+        title: editData?.title ?? "",
+        description: editData?.description ?? "",
+        pkl_user_id: prefillUserId ?? currentUser?.id ?? "",
     });
-    const [saving, setSaving]   = useState(false);
-    const [error, setError]     = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
 
     const save = async () => {
         if (!form.description.trim()) { setError("Deskripsi laporan wajib diisi"); return; }
-        if (!form.report_date)        { setError("Tanggal laporan wajib diisi"); return; }
+        if (!form.report_date) { setError("Tanggal laporan wajib diisi"); return; }
         setSaving(true); setError("");
 
         try {
@@ -317,10 +317,10 @@ function ReviewModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const [note, setNote]     = useState(report.review_note ?? "");
+    const [note, setNote] = useState(report.review_note ?? "");
     const [status, setStatus] = useState<"REVIEWED" | "REVISION">("REVIEWED");
     const [saving, setSaving] = useState(false);
-    const [error, setError]   = useState("");
+    const [error, setError] = useState("");
 
     const submit = async () => {
         setSaving(true); setError("");
@@ -432,11 +432,11 @@ function ReportDetailModal({
     onReview: () => void;
     onDelete: () => void;
 }) {
-    const div    = getDivisionInfo(report.division);
+    const div = getDivisionInfo(report.division);
     const status = STATUS_CONFIG[report.status] ?? STATUS_CONFIG.SUBMITTED;
-    const isOwner    = currentUser?.id === report.user_id;
-    const canEdit    = isPKL(currentUser?.role) && isOwner && report.status !== "REVIEWED";
-    const canDel     = isOwner || isFullAccess(currentUser?.role);
+    const isOwner = currentUser?.id === report.user_id;
+    const canEdit = isPKL(currentUser?.role) && isOwner && report.status !== "REVIEWED";
+    const canDel = isOwner || isFullAccess(currentUser?.role);
     const canDoReview = canReview(currentUser?.role);
 
     return (
@@ -544,24 +544,24 @@ function ReportDetailModal({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PKLReportsPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
-    const [reports, setReports]         = useState<PKLReport[]>([]);
-    const [pklUsers, setPKLUsers]       = useState<PKLUser[]>([]);
-    const [loading, setLoading]         = useState(true);
-    const [totalCount, setTotalCount]   = useState(0);
+    const [reports, setReports] = useState<PKLReport[]>([]);
+    const [pklUsers, setPKLUsers] = useState<PKLUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [totalCount, setTotalCount] = useState(0);
 
     // Filters
     const [activeDivision, setActiveDivision] = useState<string>("ALL");
-    const [filterStatus,   setFilterStatus]   = useState<string>("ALL");
-    const [filterPKL,      setFilterPKL]      = useState<string>("ALL");
-    const [filterMonth,    setFilterMonth]    = useState<string>(() => getWIBToday().slice(0, 7));
+    const [filterStatus, setFilterStatus] = useState<string>("ALL");
+    const [filterPKL, setFilterPKL] = useState<string>("ALL");
+    const [filterMonth, setFilterMonth] = useState<string>(() => getWIBToday().slice(0, 7));
 
     // Modal states
-    const [showForm,    setShowForm]    = useState(false);
-    const [showReview,  setShowReview]  = useState(false);
-    const [showDetail,  setShowDetail]  = useState(false);
+    const [showForm, setShowForm] = useState(false);
+    const [showReview, setShowReview] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
     const [selectedReport, setSelectedReport] = useState<PKLReport | null>(null);
-    const [editReport,     setEditReport]     = useState<PKLReport | null>(null);
-    const [prefillDate,    setPrefillDate]    = useState<string | null>(null);
+    const [editReport, setEditReport] = useState<PKLReport | null>(null);
+    const [prefillDate, setPrefillDate] = useState<string | null>(null);
 
     // ── Fetch ──────────────────────────────────────────────────────────────
     const fetchReports = useCallback(async () => {
@@ -570,8 +570,8 @@ export default function PKLReportsPage() {
         try {
             const params = new URLSearchParams();
             if (activeDivision !== "ALL") params.set("division", activeDivision);
-            if (filterStatus !== "ALL")   params.set("status", filterStatus);
-            if (filterPKL !== "ALL")      params.set("pkl_user_id", filterPKL);
+            if (filterStatus !== "ALL") params.set("status", filterStatus);
+            if (filterPKL !== "ALL") params.set("pkl_user_id", filterPKL);
             if (filterMonth) {
                 params.set("date_from", `${filterMonth}-01`);
                 const [y, m] = filterMonth.split("-").map(Number);
@@ -579,21 +579,35 @@ export default function PKLReportsPage() {
                 params.set("date_to", `${filterMonth}-${pad2(lastDay)}`);
             }
             const res = await fetch(`/api/pkl-reports?${params}`);
-            const d   = await res.json();
+            const d = await res.json();
             if (d.success) { setReports(d.data || []); setTotalCount(d.count ?? 0); }
         } finally { setLoading(false); }
     }, [currentUser, activeDivision, filterStatus, filterPKL, filterMonth]);
 
+    const KEPALA_PKL_ROLE_MAP: Record<string, string> = {
+        KEPALA_MARKETING: "PKL_MARKETING",
+        KEPALA_SALES: "PKL_SALES",
+        KEPALA_PENYEDIA_BARANG: "PKL_PENYEDIA_BARANG",
+        KEPALA_TEKNISI: "PKL_TEKNISI",
+        KEPALA_ONPOINT: "PKL_ONPOINT",
+        KEPALA_SOTECH: "PKL_SOTECH",
+    };
+
     const fetchPKLUsers = useCallback(async () => {
         const res = await fetch("/api/attendance/users");
-        const d   = await res.json();
+        const d = await res.json();
         if (d.success) {
-            const pkl = (d.data || []).filter((u: PKLUser) =>
+            const allPKL = (d.data || []).filter((u: PKLUser) =>
                 u.role === "PKL" || u.role.startsWith("PKL_") || u.role.startsWith("PKL-")
             );
-            setPKLUsers(pkl);
+            if (isKepala(currentUser?.role)) {
+                const allowedRole = KEPALA_PKL_ROLE_MAP[currentUser.role];
+                setPKLUsers(allowedRole ? allPKL.filter((u: PKLUser) => u.role === allowedRole) : []);
+            } else {
+                setPKLUsers(allPKL);
+            }
         }
-    }, []);
+    }, [currentUser?.role]);
 
     useEffect(() => {
         getCurrentUserClient().then(u => setCurrentUser(u));
@@ -602,14 +616,14 @@ export default function PKLReportsPage() {
     useEffect(() => {
         if (!currentUser) return;
         fetchReports();
-        if (isFullAccess(currentUser.role)) fetchPKLUsers();
+        if (isFullAccess(currentUser.role) || isKepala(currentUser.role)) fetchPKLUsers();
     }, [currentUser, fetchReports, fetchPKLUsers]);
 
     // ── Delete ─────────────────────────────────────────────────────────────
     const handleDelete = async (id: string) => {
         if (!confirm("Hapus laporan ini?")) return;
         const res = await fetch(`/api/pkl-reports?id=${id}`, { method: "DELETE" });
-        const d   = await res.json();
+        const d = await res.json();
         if (d.success) { setShowDetail(false); fetchReports(); }
         else alert(d.message || "Gagal menghapus");
     };
@@ -617,8 +631,8 @@ export default function PKLReportsPage() {
     // ── Derived stats ──────────────────────────────────────────────────────
     const stats = useMemo(() => {
         const submitted = reports.filter(r => r.status === "SUBMITTED").length;
-        const reviewed  = reports.filter(r => r.status === "REVIEWED").length;
-        const revision  = reports.filter(r => r.status === "REVISION").length;
+        const reviewed = reports.filter(r => r.status === "REVIEWED").length;
+        const revision = reports.filter(r => r.status === "REVISION").length;
         const uniquePKL = new Set(reports.map(r => r.user_id)).size;
         return { total: reports.length, submitted, reviewed, revision, uniquePKL };
     }, [reports]);
@@ -649,8 +663,8 @@ export default function PKLReportsPage() {
         );
     }
 
-    const isPKLUser    = isPKL(currentUser?.role);
-    const isAdminUser  = isFullAccess(currentUser?.role);
+    const isPKLUser = isPKL(currentUser?.role);
+    const isAdminUser = isFullAccess(currentUser?.role);
     const isKepalaUser = isKepala(currentUser?.role);
 
     return (
@@ -682,10 +696,10 @@ export default function PKLReportsPage() {
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                        { label: "Total Laporan",  value: stats.total,     icon: "📋", gradient: "from-gray-50 to-gray-100",   iconBg: "bg-gray-100" },
-                        { label: "Terkirim",       value: stats.submitted, icon: "📤", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
-                        { label: "Disetujui",      value: stats.reviewed,  icon: "✅", gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
-                        { label: "Perlu Revisi",   value: stats.revision,  icon: "🔄", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
+                        { label: "Total Laporan", value: stats.total, icon: "📋", gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
+                        { label: "Terkirim", value: stats.submitted, icon: "📤", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
+                        { label: "Disetujui", value: stats.reviewed, icon: "✅", gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
+                        { label: "Perlu Revisi", value: stats.revision, icon: "🔄", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
                     ].map(c => (
                         <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl p-4 shadow-sm`}>
                             <div className="flex items-start justify-between mb-2">
@@ -796,12 +810,12 @@ export default function PKLReportsPage() {
                         <p className="text-sm font-bold text-gray-600 mb-3">📊 Ringkasan per PKL</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {Object.entries(reportsByPKL).map(([uid, rpts]) => {
-                                const pklName    = rpts[0]?.users?.name ?? "—";
-                                const pklRole    = rpts[0]?.users?.role ?? "PKL";
-                                const reviewed   = rpts.filter(r => r.status === "REVIEWED").length;
-                                const submitted  = rpts.filter(r => r.status === "SUBMITTED").length;
-                                const revision   = rpts.filter(r => r.status === "REVISION").length;
-                                const pct        = rpts.length > 0 ? Math.round((reviewed / rpts.length) * 100) : 0;
+                                const pklName = rpts[0]?.users?.name ?? "—";
+                                const pklRole = rpts[0]?.users?.role ?? "PKL";
+                                const reviewed = rpts.filter(r => r.status === "REVIEWED").length;
+                                const submitted = rpts.filter(r => r.status === "SUBMITTED").length;
+                                const revision = rpts.filter(r => r.status === "REVISION").length;
+                                const pct = rpts.length > 0 ? Math.round((reviewed / rpts.length) * 100) : 0;
                                 const divCounts: Record<string, number> = {};
                                 rpts.forEach(r => { divCounts[r.division] = (divCounts[r.division] ?? 0) + 1; });
                                 const topDiv = Object.entries(divCounts).sort((a, b) => b[1] - a[1])[0];
@@ -908,7 +922,7 @@ export default function PKLReportsPage() {
                     ) : (
                         <div className="divide-y divide-gray-50">
                             {reports.map(report => {
-                                const div    = getDivisionInfo(report.division);
+                                const div = getDivisionInfo(report.division);
                                 const status = STATUS_CONFIG[report.status] ?? STATUS_CONFIG.SUBMITTED;
                                 const isToday = report.report_date === getWIBToday();
 
@@ -979,8 +993,8 @@ export default function PKLReportsPage() {
                 {/* ── Kalender view untuk PKL — tampilkan streak laporan ── */}
                 {isPKLUser && (() => {
                     const [y, m] = filterMonth ? filterMonth.split("-").map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
-                    const dim    = new Date(y, m, 0).getDate();
-                    const fd     = new Date(y, m - 1, 1).getDay();
+                    const dim = new Date(y, m, 0).getDate();
+                    const fd = new Date(y, m - 1, 1).getDay();
                     const reportDates = new Set(reports.map(r => r.report_date));
                     const reviewedDates = new Set(reports.filter(r => r.status === "REVIEWED").map(r => r.report_date));
                     const revisionDates = new Set(reports.filter(r => r.status === "REVISION").map(r => r.report_date));
@@ -1001,11 +1015,11 @@ export default function PKLReportsPage() {
                                 <div className="grid grid-cols-7 gap-1">
                                     {Array(fd).fill(null).map((_, i) => <div key={`e-${i}`} />)}
                                     {Array.from({ length: dim }, (_, i) => i + 1).map(day => {
-                                        const dk     = `${y}-${pad2(m)}-${pad2(day)}`;
+                                        const dk = `${y}-${pad2(m)}-${pad2(day)}`;
                                         const hasRep = reportDates.has(dk);
-                                        const isRev  = reviewedDates.has(dk);
+                                        const isRev = reviewedDates.has(dk);
                                         const isRevision = revisionDates.has(dk);
-                                        const isTod  = dk === today;
+                                        const isTod = dk === today;
                                         const isFuture = dk > today;
 
                                         return (
