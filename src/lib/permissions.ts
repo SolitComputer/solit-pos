@@ -27,6 +27,7 @@ export type UserRole =
   | "PKL_ONPOINT"
   | "PKL_TEKNISI"
   | "PKL_KONTEN"
+  | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {

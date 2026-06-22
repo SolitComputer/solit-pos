@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Filter optional ──────────────────────────────────────────────────────
-    if (division && isFullAccess(user.role)) query = query.eq("division", division);
+    if (division && (isFullAccess(user.role) || isKepala(user.role))) query = query.eq("division", division);
     if (pklUserId) query = query.eq("user_id", pklUserId);
     if (dateFrom) query = query.gte("report_date", dateFrom);
     if (dateTo) query = query.lte("report_date", dateTo);
@@ -174,7 +174,9 @@ export async function POST(req: NextRequest) {
                 report_date,
                 title: title ?? `Laporan ${report_date}`,
                 description,
-                status: "SUBMITTED",
+                status: "REVIEWED",
+                reviewed_by: user.id,
+                reviewed_at: new Date().toISOString(),
                 created_by_admin: user.id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
