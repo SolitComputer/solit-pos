@@ -2967,11 +2967,11 @@ export default function AttendanceDashboardPage() {
 
                 if (isOffDay) {
                     if (isPastOrToday) offDates.push(dk);
-                    continue;                            
+                    continue;
                 }
 
-                totalWorkdays++;                  
-                if (!isPastOrToday) continue;     
+                totalWorkdays++;
+                if (!isPastOrToday) continue;
 
                 pastWorkdays++;
                 const eff = effByName[name]?.[dk];
@@ -3715,7 +3715,7 @@ export default function AttendanceDashboardPage() {
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.source === "MANUAL" ? "bg-blue-100 text-blue-700 border-blue-200" : a.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
-                                                                    {a.source === "MANUAL" ? "✏️ Manual" : a.method === "FACE" ? "🫦 Wajah" : "⏭ Skip"}
+                                                                    {a.source === "MANUAL" ? "✏️ Manual" : a.method === "FACE" ? "📷 Wajah" : "⏭️ Skip"}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-4">
