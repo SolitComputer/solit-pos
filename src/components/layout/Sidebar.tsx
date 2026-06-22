@@ -155,6 +155,12 @@ const Icons = {
       <path d="M9 13h6M9 17h4M9 9h1" />
     </svg>
   ),
+  accessories: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+      <path d="M8 12h.01M12 12h.01M16 12h.01" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -165,6 +171,12 @@ const ITEM_PKL_REPORT: MenuItem = {
   name: "Laporan Kerja PKL",
   href: "/dashboard/pkl-reports",
   icon: Icons.pklReport,
+};
+
+const ITEM_ACCESSORIES: MenuItem = {
+  name: "Data Aksesori",
+  href: "/dashboard/accessories",
+  icon: Icons.accessories,
 };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
@@ -189,6 +201,7 @@ const ADMIN_INVENTARIS: MenuGroup = {
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
     { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+    ITEM_ACCESSORIES,
   ],
 };
 
@@ -317,6 +330,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        ITEM_ACCESSORIES,
       ],
     },
     SERVICE_MENU,
@@ -331,7 +345,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        ITEM_ACCESSORIES,
       ],
     },
     {
@@ -358,6 +374,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        ITEM_ACCESSORIES,
       ],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -521,6 +538,24 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     SERVICE_MENU,
   ],
+  KEPALA_PENGELOLA_BARANG: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+      ],
+    },
+    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+  ],
 };
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -547,6 +582,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
+  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+
 };
 
 function getInitials(name: string): string {
@@ -560,11 +597,10 @@ function NavItem({ item, isActive, onClick }: {
     <Link
       href={item.href}
       onClick={onClick}
-      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${
-        isActive
-          ? "bg-[#1a1a2e] text-white shadow-sm"
-          : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-      }`}
+      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
+        ? "bg-[#1a1a2e] text-white shadow-sm"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+        }`}
     >
       <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
@@ -590,7 +626,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
     if (saved) el.scrollTop = parseInt(saved, 10);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // sengaja kosong — hanya restore saat pertama mount
 
   const handleNavScroll = useCallback(() => {
@@ -797,18 +833,16 @@ export default function Sidebar() {
 
       {/* Mobile overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       {/* Mobile sidebar */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>

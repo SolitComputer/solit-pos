@@ -25,12 +25,18 @@ interface UnitOption {
     id: string;
     serial_number: string;
     purchase_price?: number;
-    grade: "A" | "B" | "C";
+    grade: "A" | "B" | "C" | null;
     selling_price: number;
     condition_note: string;
     status: string;
-    laptop_name?: string;
     laptop_id?: string;
+    laptop_name?: string;
+    // Aksesori fields (undefined untuk laptop units)
+    unit_type?: "laptop" | "accessory";
+    accessory_id?: string;
+    accessory_name?: string;
+    category?: string;
+    condition?: "BARU" | "BEKAS";
 }
 
 const DRAFT_KEY = "payment_draft_v2";
@@ -126,7 +132,7 @@ export default function CreatePaymentPage() {
     // ── Multi-unit state ──────────────────────────────────────────────────────
     const [selectedUnits, setSelectedUnits] = useState<(UnitItem & { grade?: string; condition_note?: string; purchase_price?: number })[]>([]);
     const [snSearch, setSnSearch] = useState("");
-    const [snResults, setSnResults] = useState<(UnitOption & { laptop_name: string; laptop_id: string })[]>([]);
+    const [snResults, setSnResults] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
     // ── Pricing ───────────────────────────────────────────────────────────────
@@ -288,16 +294,23 @@ export default function CreatePaymentPage() {
         }
     }, [selectedUnits]);
 
-    const handleSelectSnResult = (u: UnitOption & { laptop_name: string; laptop_id: string }) => {
-        const item: UnitItem & { grade?: string; condition_note?: string; purchase_price?: number } = {
+    const handleSelectSnResult = (u: UnitOption) => {
+        const item: UnitItem & {
+            grade?: string | null;
+            condition_note?: string;
+            purchase_price?: number;
+            unit_type?: "laptop" | "accessory";
+        } = {
             unit_id: u.id,
-            laptop_id: u.laptop_id,
+            // Untuk aksesori, laptop_id diisi accessory_id (konsistensi field)
+            laptop_id: u.unit_type === "accessory" ? (u.accessory_id ?? "") : (u.laptop_id ?? ""),
             serial_number: u.serial_number,
             purchase_price: u.purchase_price ?? 0,
-            laptop_name: u.laptop_name,
-            grade: u.grade,
+            laptop_name: u.laptop_name ?? "",
+            grade: u.grade ?? undefined,
             selling_price: u.selling_price ?? 0,
-            condition_note: u.condition_note,
+            condition_note: u.condition_note ?? "",
+            unit_type: u.unit_type,
         };
         const newUnits = [...selectedUnits, item];
         setSelectedUnits(newUnits);
@@ -576,9 +589,23 @@ export default function CreatePaymentPage() {
                                         {snResults.map(u => (
                                             <button key={u.id} type="button" onClick={() => handleSelectSnResult(u)}
                                                 className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                                                <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-mono text-sm font-semibold text-gray-800">{u.serial_number}</p>
+                                                    {u.unit_type === "accessory" ? (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0">
+                                                            AKSESORI
+                                                        </span>
+                                                    ) : (
+                                                        u.grade && (
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                                Grade {u.grade}
+                                                            </span>
+                                                        )
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-gray-500 mt-0.5">
-                                                    {u.laptop_name} · Grade {u.grade}
+                                                    {u.laptop_name}
+                                                    {u.unit_type === "accessory" && u.condition ? ` · ${u.condition}` : ""}
                                                     {u.selling_price ? ` · ${fmt(u.selling_price)}` : ""}
                                                 </p>
                                             </button>

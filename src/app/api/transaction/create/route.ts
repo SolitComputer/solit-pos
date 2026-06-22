@@ -7,15 +7,11 @@ import { logActivity } from "@/lib/activityLogger";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
-    if (typeof value === 'number') return value;
-
-    // Handle string "1000000.00" dari DECIMAL database
-    const str = String(value).trim().replace(',', '.');
+    if (typeof value === "number") return value;
+    const str = String(value).trim().replace(",", ".");
     const num = parseFloat(str);
-
     return isNaN(num) ? 0 : num;
 }
-
 
 async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
@@ -23,17 +19,18 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
         // ─────────────────────────────────────────────────────────────────────────
         // 1. Normalisasi units
-        //    Mode A (baru):  body.units = [{ unit_id, laptop_id, cost_price, ... }]
-        //    Mode B (lama):  body.unit_id  ← dari scan barcode
+        //    Mode A (baru):  body.units = [{ unit_id, laptop_id, unit_type, ... }]
+        //    Mode B (lama):  body.unit_id  ← dari scan barcode (selalu laptop)
         // ─────────────────────────────────────────────────────────────────────────
         let units: Array<{
             unit_id: string;
-            laptop_id: string;
-            laptop_name: string;
+            laptop_id: string;       // untuk aksesori: berisi accessory_id
+            laptop_name: string;     // untuk aksesori: berisi display name aksesori
             serial_number: string;
-            grade?: string;
-            cost_price?: number;  // ✅ RENAMED: selling_price → cost_price (JELAS!)
-            selling_price?: number; // Optional: harga jual default (info saja, tidak untuk kalkulasi profit)
+            grade?: string | null;
+            cost_price?: number;
+            selling_price?: number;
+            unit_type: "laptop" | "accessory"; // ← NEW: penanda tipe
         }> = [];
 
         if (Array.isArray(body.units) && body.units.length > 0) {
@@ -42,21 +39,22 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 laptop_id: u.laptop_id,
                 laptop_name: u.laptop_name,
                 serial_number: u.serial_number,
-                grade: u.grade,
-                cost_price: toNumber(u.purchase_price || u.cost_price || u.selling_price || 0),  
+                grade: u.grade ?? null,
+                cost_price: toNumber(u.purchase_price || u.cost_price || u.selling_price || 0),
                 selling_price: toNumber(u.selling_price || 0),
+                unit_type: (u.unit_type === "accessory" ? "accessory" : "laptop") as "laptop" | "accessory",
             }));
         } else if (body.unit_id) {
-            // Mode B — legacy single unit, fetch dari DB
+            // Mode B — legacy single unit dari scan (pasti laptop)
             const { data: unit, error: unitError } = await supabase
                 .from("laptop_units")
                 .select(`
-          *,
-          laptop:laptops (
-            id, laptop_name, brand, cpu, ram,
-            storage, gpu, display, qty, selling_price
-          )
-        `)
+                    *,
+                    laptop:laptops (
+                        id, laptop_name, brand, cpu, ram,
+                        storage, gpu, display, qty, selling_price
+                    )
+                `)
                 .eq("id", body.unit_id)
                 .single();
 
@@ -81,7 +79,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 serial_number: unit.serial_number,
                 grade: unit.grade,
                 cost_price: toNumber(unit.purchase_price),
-                selling_price: Number(unit.selling_price) || 0, // FYI: harga jual default
+                selling_price: Number(unit.selling_price) || 0,
+                unit_type: "laptop",
             }];
         } else {
             return NextResponse.json(
@@ -91,50 +90,73 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 2. ✅ VALIDASI BARU: cost_price harus > 0!
+        // 2. Pisahkan unit laptop vs aksesori
         // ─────────────────────────────────────────────────────────────────────────
-        const invalidUnits = units.filter(u => !u.cost_price || u.cost_price <= 0);
-        if (invalidUnits.length > 0) {
-            const sns = invalidUnits.map(u => u.serial_number).join(", ");
+        const laptopUnits = units.filter(u => u.unit_type === "laptop");
+        const accessoryUnits = units.filter(u => u.unit_type === "accessory");
+
+        const laptopUnitIds = laptopUnits.map(u => u.unit_id);
+        const accessoryUnitIds = accessoryUnits.map(u => u.unit_id);
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 3. Validasi cost_price hanya untuk laptop (aksesori boleh 0)
+        // ─────────────────────────────────────────────────────────────────────────
+        const invalidLaptopUnits = laptopUnits.filter(u => !u.cost_price || u.cost_price <= 0);
+        if (invalidLaptopUnits.length > 0) {
+            const sns = invalidLaptopUnits.map(u => u.serial_number).join(", ");
             return NextResponse.json(
                 {
                     success: false,
-                    message: `❌ HARGA MODAL tidak boleh kosong/nol! Unit: ${sns}. Silakan set harga modal di Laptops → Units terlebih dahulu.`
+                    message: `❌ HARGA MODAL tidak boleh kosong/nol! Unit: ${sns}. Silakan set harga modal di Laptops → Units terlebih dahulu.`,
                 },
                 { status: 400 }
             );
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 3. Validasi semua unit masih SIAP_JUAL
+        // 4. Validasi ketersediaan — laptop_units dan accessory_units terpisah
         // ─────────────────────────────────────────────────────────────────────────
-        const unitIds = units.map(u => u.unit_id);
+        if (laptopUnitIds.length > 0) {
+            const { data: laptopChecks, error: laptopCheckError } = await supabase
+                .from("laptop_units")
+                .select("id, serial_number, status")
+                .in("id", laptopUnitIds);
 
-        const { data: unitChecks, error: unitCheckError } = await supabase
-            .from("laptop_units")
-            .select("id, serial_number, status")
-            .in("id", unitIds);
+            if (laptopCheckError) throw laptopCheckError;
 
-        if (unitCheckError) throw unitCheckError;
+            const notAvailable = (laptopChecks ?? []).filter(u => u.status !== "SIAP_JUAL");
+            if (notAvailable.length > 0) {
+                const sns = notAvailable.map(u => u.serial_number).join(", ");
+                return NextResponse.json(
+                    { success: false, message: `Unit laptop tidak tersedia: ${sns}` },
+                    { status: 409 }
+                );
+            }
+        }
 
-        const notAvailable = (unitChecks ?? []).filter(u => u.status !== "SIAP_JUAL");
-        if (notAvailable.length > 0) {
-            const sns = notAvailable.map(u => u.serial_number).join(", ");
-            return NextResponse.json(
-                { success: false, message: `Unit tidak tersedia: ${sns}` },
-                { status: 409 }
-            );
+        if (accessoryUnitIds.length > 0) {
+            const { data: accChecks, error: accCheckError } = await supabase
+                .from("accessory_units")
+                .select("id, serial_number, status")
+                .in("id", accessoryUnitIds);
+
+            if (accCheckError) throw accCheckError;
+
+            const notAvailable = (accChecks ?? []).filter(u => u.status !== "TERSEDIA");
+            if (notAvailable.length > 0) {
+                const sns = notAvailable.map(u => u.serial_number).join(", ");
+                return NextResponse.json(
+                    { success: false, message: `Unit aksesori tidak tersedia: ${sns}` },
+                    { status: 409 }
+                );
+            }
         }
 
         const invoice_number = await generateInvoice();
         const deal_price = Number(body.amount) || 0;
-
-        // ✅ JELAS: inventory_price = TOTAL COST PRICE (harga modal) dari semua unit
         const inventory_price = units.reduce((sum, u) => sum + (u.cost_price ?? 0), 0);
-
         const payment_method = body.payment_method || "CASH";
 
-        // Trade-in
         const is_trade_in = Boolean(body.is_trade_in);
         const trade_in_value = is_trade_in ? (Number(body.trade_in_value) || 0) : 0;
         const trade_in_cash = is_trade_in ? (Number(body.trade_in_cash) || 0) : 0;
@@ -147,48 +169,36 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: `Total TF+Cash (${amount_method_1 + amount_method_2}) tidak sama dengan harga deal (${deal_price})`
+                    message: `Total TF+Cash (${amount_method_1 + amount_method_2}) tidak sama dengan harga deal (${deal_price})`,
                 },
                 { status: 400 }
             );
         }
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // 4. GROSS PROFIT CALCULATION (PENTING!)
-        // ─────────────────────────────────────────────────────────────────────────
-        // GROSS PROFIT = Deal Price - Total Cost Price (harga modal)
-        // Contoh:
-        // - Customer membeli 1 laptop seharga Rp 2.500.000 (deal_price)
-        // - Harga modal (cost): Rp 1.200.000 (inventory_price)
-        // - GROSS PROFIT = Rp 2.500.000 - Rp 1.200.000 = Rp 1.300.000 ✓
-        // - Margin % = (1.300.000 / 2.500.000) * 100 = 52%
-        //
-        // Field "other" di transactions table = GROSS PROFIT (bukan "biaya lain")
-        // ─────────────────────────────────────────────────────────────────────────
         const gross_profit = deal_price - inventory_price;
-
-        // ✅ INFO UNTUK DEBUG/LOG
         const profitStatus =
-            gross_profit > 0 ? `✓ PROFIT` :
-                gross_profit < 0 ? `⚠️ LOSS` :
-                    `➖ BREAK EVEN`;
+            gross_profit > 0 ? "✓ PROFIT" :
+                gross_profit < 0 ? "⚠️ LOSS" :
+                    "➖ BREAK EVEN";
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // 5. Status transaksi & unit
-        // ─────────────────────────────────────────────────────────────────────────
         const isEcommerce = Boolean(body.is_ecommerce);
         const txStatus = isEcommerce ? "PACKING" : "PAID";
-        const unitStatus = isEcommerce ? "RESERVED" : "SOLD";
 
-        // Display fields
+        // Status per tipe unit
+        const laptopUnitStatus = isEcommerce ? "RESERVED" : "SOLD";
+        const accessoryUnitStatus = isEcommerce ? "RESERVED" : "TERJUAL"; // ← BERBEDA: accessory_units pakai TERJUAL
+
         const primaryUnit = units[0];
         const displayLaptopName = units.length > 1
             ? `${primaryUnit.laptop_name} (+${units.length - 1} unit)`
             : primaryUnit.laptop_name;
         const displaySN = units.map(u => u.serial_number).join(", ");
 
+        const allUnitIds = units.map(u => u.unit_id);
+
         // ─────────────────────────────────────────────────────────────────────────
-        // 6. Insert transaction
+        // 5. Insert transaction
+        //    unit_id FK ke laptop_units — set null kalau primary unit adalah aksesori
         // ─────────────────────────────────────────────────────────────────────────
         const { data: transaction, error: txError } = await supabase
             .from("transactions")
@@ -204,21 +214,20 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 company_name: body.company_name,
                 customer_phone: body.customer_phone,
 
-                // Laptop — primary unit (backward compat)
-                laptop_id: primaryUnit.laptop_id,
-                unit_id: primaryUnit.unit_id,
+                // Primary unit — unit_id nullable kalau aksesori (hindari FK violation)
+                laptop_id: primaryUnit.unit_type === "laptop" ? primaryUnit.laptop_id : null,
+                unit_id: primaryUnit.unit_type === "laptop" ? primaryUnit.unit_id : null,
                 laptop_name: displayLaptopName,
                 serial_number: displaySN,
 
-                // Multi-unit arrays
-                unit_ids: unitIds,
+                // Multi-unit arrays — simpan semua ID tapi di kolom terpisah per tipe
+                unit_ids: laptopUnitIds.length > 0 ? laptopUnitIds : null,
                 serial_numbers: units.map(u => u.serial_number),
 
                 // Harga
                 deal_price,
                 amount: deal_price,
-                inventory_price,  // ✅ JELAS: ini adalah TOTAL COST PRICE (harga modal)
-                // PENTING: "other" field = GROSS PROFIT (deal_price - inventory_price)
+                inventory_price,
                 other: gross_profit,
 
                 // Metode bayar
@@ -262,16 +271,20 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         if (txError) throw txError;
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 7. Insert transaction_items (detail per unit, non-fatal)
+        // 6. Insert transaction_items per unit
+        //    unit_id nullable kalau aksesori, ada accessory_unit_id untuk aksesori
         // ─────────────────────────────────────────────────────────────────────────
         const itemsToInsert = units.map(u => ({
             transaction_id: transaction.id,
             invoice_number,
-            unit_id: u.unit_id,
-            laptop_id: u.laptop_id,
+            // Laptop: isi unit_id, kosongkan accessory_unit_id
+            // Aksesori: unit_id null, isi accessory_unit_id
+            unit_id: u.unit_type === "laptop" ? u.unit_id : null,
+            accessory_unit_id: u.unit_type === "accessory" ? u.unit_id : null,
+            laptop_id: u.unit_type === "laptop" ? u.laptop_id : null,
             serial_number: u.serial_number,
             laptop_name: u.laptop_name,
-            selling_price: u.cost_price ?? 0,  // ✅ Jelas: ini adalah cost price per unit
+            selling_price: u.cost_price ?? 0,
             deal_price: Math.round(deal_price / units.length),
             grade: u.grade ?? null,
         }));
@@ -285,43 +298,55 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 8. Update status semua unit
+        // 7. Update status — laptop_units dan accessory_units terpisah
         // ─────────────────────────────────────────────────────────────────────────
-        await supabase
-            .from("laptop_units")
-            .update({
-                status: unitStatus,
-                reserved_by: unitStatus === "RESERVED" ? body.customer_name : null,
-                reserved_invoice: unitStatus === "RESERVED" ? invoice_number : null,
-            })
-            .in("id", unitIds);
-
-        // ─────────────────────────────────────────────────────────────────────────
-        // 9. Update qty tiap laptop yang terlibat
-        // ─────────────────────────────────────────────────────────────────────────
-        const uniqueLaptopIds = [...new Set(units.map(u => u.laptop_id))];
-
-        await Promise.all(uniqueLaptopIds.map(async (lid) => {
-            const { data: remaining } = await supabase
-                .from("laptop_units")
-                .select("id")
-                .eq("laptop_id", lid)
-                .eq("status", "SIAP_JUAL");
-
-            const newQty = remaining?.length ?? 0;
+        if (laptopUnitIds.length > 0) {
             await supabase
-                .from("laptops")
+                .from("laptop_units")
                 .update({
-                    qty: newQty,
-                    status: newQty <= 0
-                        ? (isEcommerce ? "BELUM_SIAP" : "SOLD")
-                        : "SIAP_JUAL",
+                    status: laptopUnitStatus,
+                    reserved_by: laptopUnitStatus === "RESERVED" ? body.customer_name : null,
+                    reserved_invoice: laptopUnitStatus === "RESERVED" ? invoice_number : null,
                 })
-                .eq("id", lid);
-        }));
+                .in("id", laptopUnitIds);
+        }
+
+        if (accessoryUnitIds.length > 0) {
+            await supabase
+                .from("accessory_units")
+                .update({ status: accessoryUnitStatus })
+                .in("id", accessoryUnitIds);
+        }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 10. Buat warranty per unit (hanya jika PAID, bukan PACKING)
+        // 8. Update qty tiap laptop (hanya untuk laptop units, skip aksesori)
+        // ─────────────────────────────────────────────────────────────────────────
+        if (laptopUnitIds.length > 0) {
+            const uniqueLaptopIds = [...new Set(laptopUnits.map(u => u.laptop_id))];
+
+            await Promise.all(uniqueLaptopIds.map(async (lid) => {
+                const { data: remaining } = await supabase
+                    .from("laptop_units")
+                    .select("id")
+                    .eq("laptop_id", lid)
+                    .eq("status", "SIAP_JUAL");
+
+                const newQty = remaining?.length ?? 0;
+                await supabase
+                    .from("laptops")
+                    .update({
+                        qty: newQty,
+                        status: newQty <= 0
+                            ? (isEcommerce ? "BELUM_SIAP" : "SOLD")
+                            : "SIAP_JUAL",
+                    })
+                    .eq("id", lid);
+            }));
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // 9. Buat warranty per unit (hanya PAID, bukan PACKING)
+        //    Untuk aksesori: unit_id null, pakai accessory_unit_id
         // ─────────────────────────────────────────────────────────────────────────
         if (!isEcommerce) {
             const warrantyDuration = Number(body.warranty_duration) || 30;
@@ -335,8 +360,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 customer_name: body.customer_name,
                 customer_phone: body.customer_phone || null,
                 laptop_name: u.laptop_name,
-                laptop_id: u.laptop_id,
-                unit_id: u.unit_id,
+                laptop_id: u.unit_type === "laptop" ? u.laptop_id : null,
+                unit_id: u.unit_type === "laptop" ? u.unit_id : null,
                 warranty_start: warrantyStart.toISOString().split("T")[0],
                 warranty_end: warrantyEnd.toISOString().split("T")[0],
                 warranty_duration: warrantyDuration,
@@ -354,7 +379,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 11. Activity log
+        // 10. Activity log
         // ─────────────────────────────────────────────────────────────────────────
         await logActivity({
             userId: user.id,
@@ -368,7 +393,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         });
 
         // ─────────────────────────────────────────────────────────────────────────
-        // 12. Kirim WhatsApp (non-blocking, fire & forget)
+        // 11. Kirim WhatsApp (non-blocking)
         // ─────────────────────────────────────────────────────────────────────────
         if (body.customer_phone) {
             const message = buildPaymentMessage({

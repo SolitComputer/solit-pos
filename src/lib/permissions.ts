@@ -207,6 +207,22 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
   "/api/pkl-reports": [...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "PKL"],
 
+  // ─── Accessories Routes ───────────────────────────────────────────────────
+  "/dashboard/accessories": [
+    ...FULL_ACCESS,
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES",
+    "ACCOUNTING",
+  ],
+  "/api/accessories": [
+    ...FULL_ACCESS,
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES",
+    "ACCOUNTING",
+  ],
+
 };
 
 export const PERMISSIONS = {
@@ -283,6 +299,25 @@ export const PERMISSIONS = {
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
+
+  // Accessories
+  VIEW_ACCESSORIES: [
+    ...FULL_ACCESS,
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES",
+    "ACCOUNTING",
+  ] as UserRole[],
+  CREATE_ACCESSORIES: [
+    ...FULL_ACCESS,
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+  ] as UserRole[],
+  EDIT_ACCESSORIES: [
+    ...FULL_ACCESS,
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+  ] as UserRole[],
 } as const;
 
 export function hasPermission(
@@ -341,6 +376,7 @@ export function canManageTargetRole(actorRole: string, targetRole: string): bool
   if (isFullAccess(actorRole)) return true;
   return isSubordinate(actorRole, targetRole);
 }
+
 export function canViewOvertimePay(role: string): boolean {
   const PAY_VIEW: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
