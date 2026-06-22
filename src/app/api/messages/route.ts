@@ -1,7 +1,7 @@
-// src/app/api/messages/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { after } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -88,7 +88,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const senderName = user.name;
   const senderId = user.id;
 
-  Promise.resolve().then(async () => {
+  after(async () => {
     try {
       const { sendPushToUser } = await import("@/lib/push-notify");
       const pushBody = attachment_type === "image"
@@ -101,7 +101,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         title: `💬 ${senderName}`,
         body: pushBody,
         tag: `dm-${senderId}`,
-        url: "/dashboard/users",
+        url: `/dashboard?dm=${senderId}`, 
         requireInteraction: false,
       });
     } catch (err) {
