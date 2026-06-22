@@ -25,7 +25,7 @@ export async function GET(
     // Step 2: Ambil user secara terpisah — hindari ambiguity join
     const { data: user, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id, name, role, phone_number, shift")
+      .select("id, name, role, shift")
       .eq("id", slip.user_id)
       .single();
 
@@ -46,15 +46,6 @@ export async function GET(
     function fmt(n: number | null | undefined): string {
       if (!n || n === 0) return "-";
       return new Intl.NumberFormat("id-ID").format(n);
-    }
-
-    function fmtPhone(phone: string | null): string {
-      if (!phone) return "—";
-      const d = phone.replace(/\D/g, "");
-      const local = d.startsWith("62") ? "0" + d.slice(2) : d;
-      return [local.slice(0, 4), local.slice(4, 8), local.slice(8)]
-        .filter(Boolean)
-        .join("-");
     }
 
     function roleLabel(role: string): string {
@@ -83,7 +74,6 @@ export async function GET(
     const today = new Date().toLocaleDateString("id-ID", {
       day: "numeric", month: "long", year: "numeric",
     });
-    const shortName = user.name.split(" ").slice(0, 2).join(" ");
     const sentLabel = slip.sent_at
       ? new Date(slip.sent_at).toLocaleDateString("id-ID", {
           day: "numeric", month: "long", year: "numeric",
@@ -179,9 +169,6 @@ export async function GET(
 
     /* FOOTER */
     .slip-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; padding-top: 14px; border-top: 1px solid #d1d5db; }
-    .bank-block { font-size: 12px; line-height: 1.6; }
-    .bank-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; margin-bottom: 3px; }
-    .bank-acc { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
     .sig-block { text-align: center; min-width: 160px; }
     .sig-city-date { font-size: 12px; color: #374151; margin-bottom: 52px; }
     .sig-line { width: 140px; height: 1px; background: #374151; margin: 0 auto 6px; }
@@ -237,17 +224,6 @@ export async function GET(
         <span class="emp-colon">:</span>
         <span>${roleLabel(user.role)}</span>
       </div>
-      ${user.phone_number ? `
-      <div class="emp-row">
-        <span class="emp-label">Rek Pribadi</span>
-        <span class="emp-colon">:</span>
-        <strong>${fmtPhone(user.phone_number)}</strong>
-      </div>
-      <div class="emp-row">
-        <span class="emp-label">DANA a/n</span>
-        <span class="emp-colon">:</span>
-        <strong>${shortName}</strong>
-      </div>` : ""}
     </div>
 
     <!-- SALARY TABLES -->
@@ -301,12 +277,7 @@ export async function GET(
 
     <!-- FOOTER -->
     <div class="slip-footer">
-      ${user.phone_number ? `
-      <div class="bank-block">
-        <div class="bank-label">Dibayarkan ke</div>
-        <div>Dana (e-wallet) · a/n ${shortName}</div>
-        <div class="bank-acc">${fmtPhone(user.phone_number)}</div>
-      </div>` : "<div></div>"}
+      <div></div>
       <div class="sig-block">
         <div class="sig-city-date">Depok, ${today}</div>
         <div class="sig-line"></div>
