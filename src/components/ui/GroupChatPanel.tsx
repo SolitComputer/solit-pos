@@ -627,7 +627,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                 style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
                 <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention Anggota</span>
             </div>
-            <div className="max-h-52 overflow-y-auto solit-scroll">
+            <div className="max-h-52 overflow-y-auto">
                 {showSemua && (
                     <button
                         className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"
@@ -893,8 +893,15 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     <Avatar name={currentUser.name} role={currentUser.role} size={32} />
                 </div>
 
-                <div className="flex-1 flex items-end gap-2 relative rounded-[22px] border-[1.5px] border-[#e8ecff] bg-[#f5f7ff] transition-all focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100"
-                    style={{ padding: "9px 14px", minHeight: 44 }}>
+                <div className="flex-1 flex items-end gap-2 relative"
+                    style={{
+                        background: "#f5f7ff",
+                        border: "1.5px solid #e8ecff",
+                        borderRadius: 22,
+                        padding: "9px 14px",
+                        minHeight: 44,
+                        transition: "border-color 0.15s",
+                    }}>
                     {mentionActive && (
                         <MentionDropdown
                             query={mentionQuery}
@@ -1067,7 +1074,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
     return (
         <>
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto solit-scroll px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="w-5 h-5 rounded-full animate-spin"
@@ -1559,7 +1566,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-0 md:p-4"
-            style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)", animation: "solitFadeIn 0.2s ease-out" }}>
+            style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)" }}>
             <div
                 className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-[26px]"
                 style={{
@@ -1578,8 +1585,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         {/* Tombol kembali — mobile only */}
                         <button
                             onClick={() => setMobileView("chat")}
-                            className="md:hidden inline-flex items-center gap-1.5 mb-3 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg active:scale-95 transition">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            className="md:hidden flex items-center gap-1.5 mb-3 text-[11px] font-bold text-indigo-600 active:scale-95 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
                             Kembali ke Grup Chat
@@ -1628,7 +1635,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     </div>
 
                     {/* Member list */}
-                    <div className="flex-1 overflow-y-auto solit-scroll py-2 px-2 space-y-0.5">
+                    <div className="flex-1 overflow-y-auto py-2">
                         {filteredMembers.length === 0 ? (
                             <p className="text-[11px] text-slate-400 text-center mt-8 px-4">
                                 {memberFilter === "online" ? "Tidak ada yang online" : "Tidak ditemukan"}
@@ -1813,7 +1820,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     <div
                         ref={messagesRef}
                         onScroll={handleScroll}
-                        className="flex-1 overflow-y-auto solit-scroll px-4 md:px-6 py-5 space-y-1"
+                        className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-1"
                         style={{ background: "#f7f8fc" }}>
 
                         {loadingMore && (
@@ -2005,17 +2012,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     from { opacity: 0; transform: translateX(16px); }
                     to   { opacity: 1; transform: translateX(0); }
                 }
-                @keyframes solitFadeIn {
-                    from { opacity: 0; }
-                    to   { opacity: 1; }
-                }
-                /* Scrollbar halus & konsisten di semua area chat */
-                .solit-scroll { scrollbar-width: thin; scrollbar-color: #d4d8ea transparent; -webkit-overflow-scrolling: touch; }
-                .solit-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-                .solit-scroll::-webkit-scrollbar-track { background: transparent; }
-                .solit-scroll::-webkit-scrollbar-thumb { background: #d4d8ea; border-radius: 999px; }
-                .solit-scroll::-webkit-scrollbar-thumb:hover { background: #b8bedb; }
             `}</style>
         </div>
     );
-}
+}   
