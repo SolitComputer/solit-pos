@@ -1267,6 +1267,7 @@ export default function Page() {
       const COL_DEFS = [
         { header: "No. Invoice", key: "invoice", width: 24 },
         { header: "Tanggal", key: "tanggal", width: 14 },
+        { header: "Status", key: "status", width: 14 },
         { header: "Jumlah Unit", key: "qty", width: 13 },
         { header: "Laptop", key: "laptop", width: 34 },
         { header: "CPU", key: "cpu", width: 22 },
@@ -1339,6 +1340,7 @@ export default function Page() {
             tableRows.push([
               item.invoice_number ?? "",
               tanggal,
+              STATUS_LABEL[item.status] ?? item.status ?? "",
               Number(g.unit_count ?? 1),
               g.laptop_name ?? "",
               g.cpu ?? "",
@@ -1367,6 +1369,7 @@ export default function Page() {
           tableRows.push([
             item.invoice_number ?? "",
             tanggal,
+            STATUS_LABEL[item.status] ?? item.status ?? "",
             1,
             item.laptop_name ?? "",
             item.cpu ?? "",
