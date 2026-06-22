@@ -247,5 +247,6 @@ export const config = {
     "/api/presence",
     "/api/group-chat",
     "/api/service/:path*",
-  ],
+    "/api/accessories/:path*",
+    "/dashboard/accessories/:path*",],
 };
