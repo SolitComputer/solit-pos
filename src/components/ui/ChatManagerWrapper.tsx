@@ -6,6 +6,7 @@ import { useChatContext } from "@/contexts/ChatContext";
 import { ChatPanel } from "@/components/ui/ChatBubble";
 import { GroupChatPanel } from "@/components/ui/GroupChatPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { useIncomingChat } from "@/hooks/useIncomingChat";
 
 interface ChatUser {
     id: string;
@@ -24,13 +25,14 @@ export function ChatManagerWrapper() {
     } = useChatContext();
     const [currentUser, setCurrentUser] = useState<ChatUser | null>(null);
 
+    useIncomingChat();
+
     useEffect(() => {
         getCurrentUserClient().then(user => {
             if (user) setCurrentUser({ id: user.id, name: user.name, role: user.role });
         });
     }, []);
 
-    // Auto-expand chat terbaru ketika ditambahkan
     useEffect(() => {
         if (activeChats.length > 0) {
             const latest = activeChats[activeChats.length - 1];
