@@ -153,8 +153,9 @@ export default function CreatePaymentPage() {
     const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
     const [ecommerceOrderId, setEcommerceOrderId] = useState("");
 
-    // ── Customer type ─────────────────────────────────────────────────────────
     const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
+
+    const [sellerType, setSellerType] = useState<"USER" | "PEDAGANG">("USER");
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } =
         useForm<CreatePaymentType, any, CreatePaymentType>({
@@ -219,6 +220,7 @@ export default function CreatePaymentPage() {
 
         if (draft._step) setStep(draft._step);
         if (draft._customerType) setCustomerType(draft._customerType);
+        if (draft._sellerType) setSellerType(draft._sellerType);
         if (draft._selectedUnits) setSelectedUnits(draft._selectedUnits);
         if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
         if (draft._isTradeIn) setIsTradeIn(draft._isTradeIn);
@@ -237,14 +239,14 @@ export default function CreatePaymentPage() {
         if (fromScan || isSubmitted) return;
         saveDraft({
             ...watchedFields,
-            _step: step, _customerType: customerType,
+            _step: step, _customerType: customerType, _sellerType: sellerType,
             _selectedUnits: selectedUnits, _rawDealPrice: rawDealPrice,
             _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
             _splitTF: splitTF, _splitCash: splitCash,
             _savedAt: new Date().toISOString(),
         });
-    }, [watchedFields, step, customerType, selectedUnits, rawDealPrice,
+    }, [watchedFields, step, customerType, sellerType, selectedUnits, rawDealPrice,
         isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────
@@ -421,6 +423,7 @@ export default function CreatePaymentPage() {
                     payment_photo: imageData.publicUrl,
                     latitude, longitude,
                     warranty_duration: warrantyDuration,
+                    seller_type: sellerType,
                     is_ecommerce: isEcommerce,
                     ecommerce_platform: isEcommerce ? ecommercePlatform : null,
                     ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
@@ -535,8 +538,29 @@ export default function CreatePaymentPage() {
                                 </div>
                             </div>
 
-                            <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />
-                            <input type="tel" placeholder="No. WhatsApp *" className={inputClass} {...register("customer_phone")} />
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Kategori Seller *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { value: "USER", label: "User", icon: "🙋", desc: "Follow-up 7 hari" },
+                                        { value: "PEDAGANG", label: "Pedagang", icon: "🏷️", desc: "Follow-up 3 hari" },
+                                    ].map(o => (
+                                        <button key={o.value} type="button"
+                                            onClick={() => setSellerType(o.value as any)}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all duration-200 ${sellerType === o.value
+                                                ? "border-gray-600 bg-gray-50 ring-2 ring-gray-600/20"
+                                                : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <span className="text-xl">{o.icon}</span>
+                                            <span className={`text-xs font-medium ${sellerType === o.value ? "text-gray-800" : "text-gray-600"}`}>{o.label}</span>
+                                            <span className="text-[9px] text-gray-400">{o.desc}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <input type="text" placeholder="Nama Perusahaan" className={inputClass} {...register("company_name")} />                            <input type="tel" placeholder="No. WhatsApp *" className={inputClass} {...register("customer_phone")} />
 
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>

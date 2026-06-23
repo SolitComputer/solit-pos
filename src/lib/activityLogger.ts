@@ -6,7 +6,7 @@ const supabaseAdmin = createClient(
 );
 
 export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE";
-export type LogEntity = "laptop" | "unit" | "transaction" | "warranty";
+export type LogEntity = "laptop" | "unit" | "transaction" | "warranty" | "seller_followup";
 
 interface LogActivityParams {
   userId: string;

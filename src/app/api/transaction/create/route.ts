@@ -13,6 +13,14 @@ function toNumber(value: any): number {
     return isNaN(num) ? 0 : num;
 }
 
+const SELLER_FOLLOWUP_DAYS: Record<string, number> = { USER: 7, PEDAGANG: 3 };
+function nextFollowupISO(sellerType: string, from: Date = new Date()): string {
+    const days = SELLER_FOLLOWUP_DAYS[sellerType] ?? 7;
+    const next = new Date(from);
+    next.setDate(next.getDate() + days);
+    return next.toISOString();
+}
+
 async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
         const body = await req.json();
@@ -24,13 +32,13 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         // ─────────────────────────────────────────────────────────────────────────
         let units: Array<{
             unit_id: string;
-            laptop_id: string;       // untuk aksesori: berisi accessory_id
-            laptop_name: string;     // untuk aksesori: berisi display name aksesori
+            laptop_id: string;
+            laptop_name: string;
             serial_number: string;
             grade?: string | null;
             cost_price?: number;
             selling_price?: number;
-            unit_type: "laptop" | "accessory"; // ← NEW: penanda tipe
+            unit_type: "laptop" | "accessory";
         }> = [];
 
         if (Array.isArray(body.units) && body.units.length > 0) {
@@ -211,6 +219,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 // Customer
                 customer_name: body.customer_name,
                 customer_type: body.customer_type || "UMUM",
+                seller_type: body.seller_type === "PEDAGANG" ? "PEDAGANG" : "USER",
                 company_name: body.company_name,
                 customer_phone: body.customer_phone,
 
@@ -375,6 +384,54 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
             if (warrantyError) {
                 console.error("[warranty insert]", warrantyError.message);
+            }
+        }
+
+        // ── Upsert seller follow-up (Management Seller) ──────────────────────────
+        // Hanya kalau ada nomor HP (follow-up butuh kontak). Dedup by customer_phone:
+        // kalau customer beli lagi, timer-nya di-refresh & purchase_count nambah.
+        if (body.customer_phone) {
+            const sellerType = body.seller_type === "PEDAGANG" ? "PEDAGANG" : "USER";
+            const nowISO = new Date().toISOString();
+            const nextISO = nextFollowupISO(sellerType);
+
+            try {
+                const { data: existing } = await supabase
+                    .from("seller_followups")
+                    .select("id, purchase_count")
+                    .eq("customer_phone", body.customer_phone)
+                    .maybeSingle();
+
+                if (existing) {
+                    await supabase
+                        .from("seller_followups")
+                        .update({
+                            transaction_id: transaction.id,
+                            invoice_number,
+                            customer_name: body.customer_name,
+                            seller_type: sellerType,
+                            last_purchase_at: nowISO,
+                            next_followup_at: nextISO,
+                            purchase_count: (existing.purchase_count ?? 1) + 1,
+                            is_active: true,
+                            updated_at: nowISO,
+                        })
+                        .eq("id", existing.id);
+                } else {
+                    await supabase.from("seller_followups").insert({
+                        transaction_id: transaction.id,
+                        invoice_number,
+                        customer_name: body.customer_name,
+                        customer_phone: body.customer_phone,
+                        seller_type: sellerType,
+                        last_purchase_at: nowISO,
+                        next_followup_at: nextISO,
+                        purchase_count: 1,
+                        is_active: true,
+                    });
+                }
+            } catch (followupErr: any) {
+                console.error("[seller_followup upsert]", followupErr?.message ?? followupErr);
             }
         }
 
