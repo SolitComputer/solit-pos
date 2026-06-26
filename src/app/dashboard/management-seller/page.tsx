@@ -121,20 +121,34 @@ function FollowupCard({ f, scope, processing, canManage, onFollowup, onArchive, 
 
       {canManage && (
         <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
-          <a href={waLink(f)} target="_blank" rel="noopener noreferrer"
-            className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.477-.255z" /></svg>
-            Chat WA
-          </a>
           {scope === "ACTIVE" ? (
             <>
-              <button onClick={() => onFollowup(f.id)} disabled={processing}
-                className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition disabled:opacity-60">
-                {processing
-                  ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>}
-                Sudah FU
-              </button>
+              {/* Tombol utama: hijau & bisa diklik HANYA saat sudah waktunya follow-up (is_due).
+                  Klik = buka WhatsApp + tandai sudah FU sekaligus.
+                  Setelah di-FU, tombol terkunci sampai jadwal berikutnya (User 7 hari / Pedagang 3 hari). */}
+              {f.is_due ? (
+                <a
+                  href={waLink(f)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => onFollowup(f.id)}
+                  className={`flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg text-white text-xs font-semibold transition ${processing ? "bg-emerald-400 opacity-70 pointer-events-none" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                >
+                  {processing
+                    ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.477-.255z" /></svg>}
+                  Chat WA &amp; Follow-up
+                </a>
+              ) : (
+                <button
+                  disabled
+                  title={`Sudah di-follow-up. Aktif lagi ${fmtDate(f.next_followup_at)}`}
+                  className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg>
+                  Sudah FU · {daysDiff(f.next_followup_at) <= 0 ? "hari ini" : `${daysDiff(f.next_followup_at)}h lagi`}
+                </button>
+              )}
               <button onClick={() => onArchive(f.id)} disabled={processing}
                 className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition disabled:opacity-60"
                 title="Arsipkan (stop follow-up)">
@@ -142,13 +156,20 @@ function FollowupCard({ f, scope, processing, canManage, onFollowup, onArchive, 
               </button>
             </>
           ) : (
-            <button onClick={() => onReactivate(f.id)} disabled={processing}
-              className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition disabled:opacity-60">
-              {processing
-                ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
-              Aktifkan Lagi
-            </button>
+            <>
+              <a href={waLink(f)} target="_blank" rel="noopener noreferrer"
+                className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.477-.255z" /></svg>
+                Chat WA
+              </a>
+              <button onClick={() => onReactivate(f.id)} disabled={processing}
+                className="flex-1 h-9 flex items-center justify-center gap-1.5 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition disabled:opacity-60">
+                {processing
+                  ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
+                Aktifkan Lagi
+              </button>
+            </>
           )}
         </div>
       )}
