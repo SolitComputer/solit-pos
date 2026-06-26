@@ -657,9 +657,9 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
   const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
   const hours = (!start || !end) ? 0 : Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 3600000);
-  // ✅ Mode bayar: PER_JAM (rate × jam) atau TETAP (nominal bebas)
-  const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">("PER_JAM");
-  const [rate, setRate] = useState(o.rate_per_hour ?? 100000);
+  const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
+  const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
+  const [rate, setRate] = useState(o.rate_per_hour || 100000);
   const [fixedPay, setFixedPay] = useState(o.total_pay ?? 0); // ✅ nominal tetap
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
@@ -830,7 +830,6 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
   );
 }
 
-// ─── MANUAL MODAL ──────────────────────────────────────────────────────────
 function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onClose: () => void; onSaved: () => void; allUsers: User[]; currentUser: any }) {
   const [targetUserId, setTargetUserId] = useState(""), [requestDate, setRequestDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("09:00"), [endTime, setEndTime] = useState("17:00");
@@ -839,14 +838,12 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [photoFile, setPhotoFile] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
+  const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
+  const [fixedPay, setFixedPay] = useState<number>(0);
 
-  // ✅ Hitung sekali, dipakai di dropdown + hint text
   const allowedRoles = useMemo(() => getManualAllowedRoles(currentUser?.role), [currentUser?.role]);
-  const isFullAdmin = allowedRoles === null; // null = ADMIN/PROGRAMMER/ASISTEN_CEO → semua user
+  const isFullAdmin = allowedRoles === null;
 
-  // ✅ Filter user sesuai hak akses:
-  // - Admin/Programmer/Asisten CEO → semua user tanpa filter
-  // - Kepala divisi → hanya bawahan sesuai DIVISION_HEAD_MAP
   const filteredUsers = useMemo(() =>
     allUsers
       .filter(u => isFullAdmin || allowedRoles!.includes(u.role))
@@ -865,11 +862,27 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     const s = new Date(`1970-01-01T${startTime}:00`).getTime(), e = new Date(`1970-01-01T${endTime}:00`).getTime();
     if (e <= s) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
     if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan"); return; }
+    if (isHolidayOvertime && (!fixedPay || fixedPay <= 0)) { setError("Nominal bayaran hari libur wajib diisi"); return; }
     setSubmitting(true); setError("");
     try {
       let photoUrl: string | null = null;
       if (photoFile) { const fd = new FormData(); fd.append("file", photoFile); const ur = await fetch("/api/attendance/overtime/upload", { method: "POST", body: fd }); if (!ur.ok) throw new Error((await ur.json()).message || "Upload gagal"); photoUrl = (await ur.json()).url; }
-      const res = await fetch("/api/attendance/overtime", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_manual: true, target_user_id: targetUserId, request_date: requestDate, actual_start_time: startTime, actual_end_time: endTime, work_description: workDescription.trim(), reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType, proof_photo_url: photoUrl }) });
+      const res = await fetch("/api/attendance/overtime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          is_manual: true,
+          target_user_id: targetUserId,
+          request_date: requestDate,
+          actual_start_time: startTime,
+          actual_end_time: endTime,
+          work_description: workDescription.trim(),
+          reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
+          proof_photo_url: photoUrl,
+          is_holiday: isHolidayOvertime,
+          total_pay: isHolidayOvertime ? Math.round(fixedPay) : undefined,
+        }),
+      });
       const d = await res.json();
       if (!d.success) { setError(d.message || "Gagal"); return; }
       onSaved(); onClose();
@@ -916,6 +929,41 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong></span>
           </div>
         )}
+
+        {/* ✅ Toggle Lembur hari libur → bayaran flat */}
+        <button
+          type="button"
+          onClick={() => setIsHolidayOvertime(v => !v)}
+          className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-all active:scale-[0.99] ${isHolidayOvertime ? "bg-purple-600 border-purple-600 shadow-sm shadow-purple-200" : "bg-white border-gray-200 hover:border-purple-300 hover:bg-purple-50/50"}`}
+        >
+          <span className={`w-9 h-5 rounded-full flex-shrink-0 relative transition-colors ${isHolidayOvertime ? "bg-white/30" : "bg-gray-200"}`}>
+            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isHolidayOvertime ? "left-[18px]" : "left-0.5"}`} />
+          </span>
+          <div className="flex-1">
+            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}>🏖️ Lembur hari libur</p>
+            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Bayaran nominal tetap, tidak dihitung per jam</p>
+          </div>
+        </button>
+
+        {/* ✅ Input nominal tetap saat hari libur aktif */}
+        {isHolidayOvertime && (
+          <div>
+            <label className={lbl}>Nominal Bayaran Hari Libur (Rp) *</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+              <input
+                type="number"
+                min={0}
+                value={fixedPay || ""}
+                onChange={e => setFixedPay(parseFloat(e.target.value) || 0)}
+                placeholder="Bebas, contoh: 150000"
+                className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
+              />
+            </div>
+            <p className="text-[9px] text-gray-400 mt-1">Nominal flat untuk lembur di hari libur — durasi {previewHours ?? 0} jam hanya jadi catatan, tidak dikali tarif.</p>
+          </div>
+        )}
+
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {reasonType === "Lainnya" && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Alasan spesifik..." className={inp} autoFocus /></div>}
         <div>
@@ -934,7 +982,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
       {photoStep !== "camera" && (
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
-          <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim()} className={primaryBtn}>
+          <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim() || (isHolidayOvertime && (!fixedPay || fixedPay <= 0))} className={primaryBtn}>
             {submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}
           </button>
         </ModalFoot>

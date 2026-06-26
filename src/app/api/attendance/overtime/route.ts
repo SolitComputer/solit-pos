@@ -217,6 +217,7 @@ export async function POST(request: Request) {
       work_description,
       proof_photo_url,
       rate_per_hour,
+      total_pay: manualTotalPay,
       is_holiday = false,
       is_late = false,
     } = body;
@@ -277,25 +278,32 @@ export async function POST(request: Request) {
       );
       const billedHours = Math.floor(durationMins / 60);
 
-      let finalRate = rate_per_hour ?? 0;
-      if (!finalRate) {
-        const { data: targetUserData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", target_user_id)
-          .single();
+      let finalRate: number;
+      let totalPay: number;
 
-        if (targetUserData?.role) {
-          const { data: rateData } = await supabase
-            .from("overtime_rates")
-            .select("rate_per_hour")
-            .eq("role", targetUserData.role)
-            .maybeSingle();
-          finalRate = rateData?.rate_per_hour ?? 0;
+      if (is_holiday === true) {
+        finalRate = 0;
+        totalPay = Math.max(0, Math.round(Number(manualTotalPay) || 0));
+      } else {
+        finalRate = rate_per_hour ?? 0;
+        if (!finalRate) {
+          const { data: targetUserData } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", target_user_id)
+            .single();
+
+          if (targetUserData?.role) {
+            const { data: rateData } = await supabase
+              .from("overtime_rates")
+              .select("rate_per_hour")
+              .eq("role", targetUserData.role)
+              .maybeSingle();
+            finalRate = rateData?.rate_per_hour ?? 0;
+          }
         }
+        totalPay = billedHours * finalRate;
       }
-
-      const totalPay = billedHours * finalRate;
 
       const { data, error } = await supabase
         .from("overtime_requests")
@@ -319,6 +327,7 @@ export async function POST(request: Request) {
           duration_minutes: durationMins,
           completed_at: new Date().toISOString(),
           auto_completed: false,
+          is_holiday: is_holiday === true,
         })
         .select()
         .single();
