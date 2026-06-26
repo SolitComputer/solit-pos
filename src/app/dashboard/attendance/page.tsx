@@ -3303,12 +3303,6 @@ export default function AttendanceDashboardPage() {
                                 >
                                     📅 Atur Libur
                                 </button>
-                                <button
-                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSwapModal(true); }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
-                                >
-                                    🔄 Tukar Libur
-                                </button>
                             </>
                         )}
                         <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
@@ -5296,6 +5290,8 @@ export default function AttendanceDashboardPage() {
                     onSaved={() => {
                         fetchMonthlyOffs(calYear, calMonth);
                         fetchAllDateOffs();
+                        fetchAllDateWorks();
+                        fetchDayOffs();
                     }}
                 />
             )}

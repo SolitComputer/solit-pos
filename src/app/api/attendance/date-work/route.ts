@@ -8,6 +8,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function canManageUser(actorRole: string, targetRole: string): boolean {
+  if (isFullAccess(actorRole)) return true;
+  if (!isDivisionHead(actorRole)) return false;
+  const subs = (DIVISION_MAP[actorRole] ?? []) as string[];
+  return subs.includes(targetRole);
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -39,7 +46,7 @@ export async function GET(request: Request) {
       query = query.gte("work_date", firstDay).lte("work_date", lastDayStr);
     }
 
-   if (isFullAccess(user.role)) {
+    if (isFullAccess(user.role)) {
     } else if (isDivisionHead(user.role)) {
       const subRoles = (DIVISION_MAP[user.role] ?? []) as string[];
       if (subRoles.length === 0) {
@@ -65,7 +72,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || !isFullAccess(user.role)) {
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    if (!canManage) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
@@ -77,6 +89,14 @@ export async function POST(request: Request) {
         { success: false, message: "user_id dan work_date wajib diisi" },
         { status: 400 }
       );
+    }
+
+    if (!isFullAccess(user.role)) {
+      const { data: targetUser } = await supabase
+        .from("users").select("id, role").eq("id", user_id).maybeSingle();
+      if (!targetUser || !canManageUser(user.role, targetUser.role)) {
+        return NextResponse.json({ success: false, message: "User bukan anggota divisi kamu" }, { status: 403 });
+      }
     }
 
     const { data, error } = await supabase
@@ -96,17 +116,20 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE — hapus date-work override
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || !isFullAccess(user.role)) {
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    if (!canManage) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    // Alternatif: hapus by user_id + work_date
     const userId = searchParams.get("user_id");
     const workDate = searchParams.get("work_date");
 
@@ -115,6 +138,14 @@ export async function DELETE(request: Request) {
         { success: false, message: "id atau user_id+work_date wajib diisi" },
         { status: 400 }
       );
+    }
+
+    if (!isFullAccess(user.role) && userId) {
+      const { data: targetUser } = await supabase
+        .from("users").select("id, role").eq("id", userId).maybeSingle();
+      if (!targetUser || !canManageUser(user.role, targetUser.role)) {
+        return NextResponse.json({ success: false, message: "User bukan anggota divisi kamu" }, { status: 403 });
+      }
     }
 
     let query = supabase.from("user_date_work").delete();

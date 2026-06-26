@@ -63,11 +63,12 @@ export async function GET() {
       supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       supabase.from("attendance_manual").select("id, status, created_by")
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
-      supabase.from("face_verifications").select("id, created_at")
+      supabase.from("face_verifications").select("id")
         .eq("user_id", user.id).eq("status", "SUCCESS")
         .gte("created_at", `${todayDate}T00:00:00+07:00`)
         .lte("created_at", `${todayDate}T23:59:59+07:00`)
-        .maybeSingle(),
+        .order("created_at", { ascending: false })
+        .limit(1),
       supabase.from("users").select("face_embedding, shift").eq("id", user.id).single(),
     ]);
 
@@ -156,7 +157,7 @@ export async function GET() {
     }
 
     const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
-     const alreadyAttendedDB = Boolean(todaySuccess);
+    const alreadyAttendedDB = Array.isArray(todaySuccess) ? todaySuccess.length > 0 : Boolean(todaySuccess);
 
     const schedule = await resolveShiftConfigFromDB(user.id, supabase);
     const timeStatus = isAttendanceTimeForSchedule(schedule);
