@@ -193,11 +193,6 @@ const ITEM_ACCESSORIES: MenuItem = {
   href: "/dashboard/accessories",
   icon: Icons.accessories,
 };
-const ITEM_MANAGEMENT_SELLER: MenuItem = {
-  name: "Management Seller",
-  href: "/dashboard/management-seller",
-  icon: Icons.managementSeller,
-};
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -232,7 +227,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-    ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -478,7 +472,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi",
       items: [
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_MANAGEMENT_SELLER,
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
@@ -661,6 +654,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
   const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
 
+  // ── Preserve scroll position nav saat navigasi ────────────────────────────
   const navRef = useRef<HTMLElement>(null);
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 

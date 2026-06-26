@@ -38,7 +38,16 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
 function canViewPay(role?: string) { return !!role && (PAY_VIEW_ROLES as readonly string[]).includes(role); }
 function isAdminRole(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
 function canSetPay(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
-function isDivisionHead(role?: string) { return !!role && (DIVISION_HEAD_ROLES as readonly string[]).includes(role); }
+function canInputManual(role?: string) {
+  if (!role) return false;
+  if ((FULL_ACCESS_ROLES as readonly string[]).includes(role)) return true;
+  return Object.keys(DIVISION_HEAD_MAP).includes(role);
+}
+function getManualAllowedRoles(role?: string): string[] | null {
+  if (!role) return null;
+  if ((FULL_ACCESS_ROLES as readonly string[]).includes(role)) return null; // null = semua user
+  return DIVISION_HEAD_MAP[role] ?? [];
+} function isDivisionHead(role?: string) { return !!role && (DIVISION_HEAD_ROLES as readonly string[]).includes(role); }
 
 function canApproveTarget(approverRole?: string, targetRole?: string): boolean {
   if (!approverRole || !targetRole) return false;
@@ -822,7 +831,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
 }
 
 // ─── MANUAL MODAL ──────────────────────────────────────────────────────────
-function ManualOvertimeModal({ onClose, onSaved, allUsers }: { onClose: () => void; onSaved: () => void; allUsers: User[] }) {
+function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onClose: () => void; onSaved: () => void; allUsers: User[]; currentUser: any }) {
   const [targetUserId, setTargetUserId] = useState(""), [requestDate, setRequestDate] = useState(new Date().toISOString().split("T")[0]);
   const [startTime, setStartTime] = useState("09:00"), [endTime, setEndTime] = useState("17:00");
   const [reasonType, setReasonType] = useState(""), [reasonCustom, setReasonCustom] = useState("");
@@ -855,17 +864,39 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers }: { onClose: () => vo
 
   return (
     <ModalWrapper onClose={onClose} wide>
-      <ModalHead icon="✏️" title="Input Lembur Manual" sub="Admin · Asisten CEO · Programmer" onClose={onClose} />
+      <ModalHead
+        icon="✏️"
+        title="Input Lembur Manual"
+        sub={
+          isAdminRole(currentUser?.role)
+            ? "Admin · Asisten CEO · Programmer"
+            : `${currentUser?.role?.replace(/_/g, " ") ?? "Kepala Divisi"} · Bawahan divisimu`
+        }
+        onClose={onClose}
+      />
       <div className="px-5 py-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div>
           <label className={lbl}>Nama Karyawan *</label>
-          <select value={targetUserId} onChange={e => setTargetUserId(e.target.value)} className={inp + " cursor-pointer"}>
-            <option value="">— Pilih karyawan —</option>
-            {allUsers.slice().sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => (
-              <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
-            ))}
-          </select>
+          {(() => {
+            const allowedRoles = getManualAllowedRoles(currentUser?.role);
+            const filtered = allUsers
+              .filter(u => allowedRoles === null || allowedRoles.includes(u.role))
+              .sort((a, b) => a.name.localeCompare(b.name, "id-ID"));
+            return (
+              <select value={targetUserId} onChange={e => setTargetUserId(e.target.value)} className={inp + " cursor-pointer"}>
+                <option value="">— Pilih karyawan —</option>
+                {filtered.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
+                ))}
+              </select>
+            );
+          })()}
+          {getManualAllowedRoles(currentUser?.role) !== null && (
+            <p className="text-[9px] text-gray-400 mt-1.5">
+              Menampilkan bawahan divisimu saja ({getManualAllowedRoles(currentUser?.role)?.map(r => r.replace(/_/g, " ")).join(", ")})
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
@@ -1409,7 +1440,7 @@ export default function OvertimePage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {isAdminRole(currentUser?.role) && (
+              {canInputManual(currentUser?.role) && (
                 <button onClick={() => setShowManualModal(true)}
                   className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                   <span>✏️</span><span className="hidden sm:inline">Input Manual</span>
@@ -1534,7 +1565,7 @@ export default function OvertimePage() {
 
       {/* ── Modals ── */}
       {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { fetchOvertimes(); setShowRequestModal(false); }} currentUser={currentUser} />}
-      {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { fetchOvertimes(); setShowManualModal(false); }} allUsers={allUsers} />}
+      {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { fetchOvertimes(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
       {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { fetchOvertimes(); setApproveData(null); }} />}
       {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { fetchOvertimes(); setSetPayData(null); }} />}
       {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={() => { fetchOvertimes(); setCompleteData(null); }} isAutoCompleted={completeData.auto_completed} />}

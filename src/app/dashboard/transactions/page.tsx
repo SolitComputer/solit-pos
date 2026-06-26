@@ -117,6 +117,15 @@ function getSourcePlatformBadge(platform: string): { text: string; color: string
   return { text: platform || "-", color: "bg-gray-50 text-gray-700 border-gray-200" };
 }
 
+function getCompanyBadge(company: string): { label: string; color: string } {
+  const cn = (company ?? "").toLowerCase();
+  if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 border-orange-200" };
+  if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 border-blue-200" };
+  if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 border-purple-200" };
+  if (!company || company.trim() === "") return { label: "—", color: "bg-gray-50 text-gray-400 border-gray-100" };
+  return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
+}
+
 function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   const t = (type ?? "UMUM").toUpperCase();
   if (t === "RESELLER") return { text: "Reseller", icon: "🏪" };
@@ -124,14 +133,90 @@ function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   return { text: "Umum", icon: "👤" };
 }
 
-// ─── PAYMENT BREAKDOWN (TF + Cash detail) ────────────────────────────
-// Membaca field: payment_method, payment_method_2, amount_method_1, amount_method_2
+// ─── RESTORE MODAL — shared component ────────────────────────────────
+function RestoreModal({
+  item,
+  isPending,
+  restoring,
+  onConfirm,
+  onClose,
+}: {
+  item: any;
+  isPending: boolean;
+  restoring: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const statusLabelMap: Record<string, string> = {
+    RESERVED: "DP",
+    HELD: "Ambil Dulu",
+    PACKING: "Packing",
+    PAID: "Lunas",
+  };
+  const currentLabel = statusLabelMap[item.status] ?? item.status;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className={`px-5 py-4 ${isPending ? "bg-red-700" : "bg-gray-800"}`}>
+          <p className="font-semibold text-white text-sm">
+            {isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}
+          </p>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+            <p className="font-bold mb-1">
+              {isPending
+                ? `Batalkan pesanan "${currentLabel}" untuk ${item.customer_name}?`
+                : `Konfirmasi restore untuk ${item.customer_name}?`}
+            </p>
+            <p className="font-mono text-amber-600">{item.invoice_number}</p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600 space-y-1.5">
+            <p className="font-semibold text-gray-700 mb-1">Yang akan terjadi:</p>
+            <p>• Status transaksi → <span className="font-bold text-red-600">BATAL</span></p>
+            <p>• Unit laptop kembali ke stok <span className="font-bold text-green-700">SIAP JUAL</span></p>
+            {item.status === "PAID" && (
+              <p>• Garansi (jika ada) akan di-<span className="font-bold text-orange-600">VOID</span></p>
+            )}
+            {item.status === "RESERVED" && (
+              <p className="text-amber-700 font-semibold">⚠️ DP yang sudah dibayar diurus manual</p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={restoring}
+            className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60"
+          >
+            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PAYMENT BREAKDOWN ────────────────────────────────────────────────
 function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md" }) {
   const method2 = (item.payment_method_2 ?? "").trim();
   const amount1 = Number(item.amount_method_1 ?? 0);
   const amount2 = Number(item.amount_method_2 ?? 0);
 
-  // Hanya tampil jika ada metode kedua dan kedua nominal terisi
   if (!method2 || amount1 <= 0 || amount2 <= 0) return null;
 
   const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
@@ -156,13 +241,11 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
 
   const m1meta = getMethodMeta(item.payment_method ?? "");
   const m2meta = getMethodMeta(method2);
-
   const entries = [
     { meta: m1meta, amount: amount1 },
     { meta: m2meta, amount: amount2 },
   ];
 
-  // ── size="md" → card grid 2 kolom (Mobile card & Detail modal) ──
   if (size === "md") {
     return (
       <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -170,9 +253,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
           const c = colorMap[meta.color] ?? colorMap.gray;
           return (
             <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-2.5 py-1.5`}>
-              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>
-                {meta.icon} {meta.label}
-              </p>
+              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>{meta.icon} {meta.label}</p>
               <p className={`text-xs font-bold ${c.text} font-mono`}>{fmt(amount)}</p>
             </div>
           );
@@ -181,16 +262,12 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
     );
   }
 
-  // ── size="sm" → inline compact (Desktop table row) ──────────────
   return (
     <div className="flex items-center gap-1 mt-1 flex-wrap">
       {entries.map(({ meta, amount }, i) => {
         const c = colorMap[meta.color] ?? colorMap.gray;
         return (
-          <span
-            key={i}
-            className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}
-          >
+          <span key={i} className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}>
             {meta.icon} {fmt(amount)}
           </span>
         );
@@ -199,8 +276,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   );
 }
 
-// ─── SKELETON COMPONENTS ────────────────────────────────────────────
-
+// ─── SKELETON ────────────────────────────────────────────────────────
 function SkeletonPulse({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
@@ -258,7 +334,7 @@ function TableRowSkeleton() {
           <SkeletonPulse className="h-3 w-20" />
         </div>
       </td>
-      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-24" /></div></td>
+      <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-20" /></td>
       <td className="px-3 py-3">
         <div className="space-y-1">
@@ -275,10 +351,12 @@ function TableRowSkeleton() {
           </div>
         </div>
       </td>
+      <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-16" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-7 w-20 rounded-lg mx-auto" /></td>
+      <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3">
         <div className="flex items-center justify-center gap-1">
@@ -294,9 +372,7 @@ function TableRowSkeleton() {
 function MobileSkeletonList() {
   return (
     <div className="space-y-2">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <MobileCardSkeleton key={i} />
-      ))}
+      {Array.from({ length: 5 }).map((_, i) => (<MobileCardSkeleton key={i} />))}
     </div>
   );
 }
@@ -305,10 +381,10 @@ function DesktopSkeletonTable() {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1400px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1680px" }}>
           <thead>
             <tr className="border-b border-gray-300 bg-gray-100">
-              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "SN", "Harga", "Margin", "Metode", "Sumber", "Aksi"].map((h) => (
+              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Toko", "Aksi"].map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -356,6 +432,7 @@ function SerialNumberList({
   );
 }
 
+// ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
 function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -366,7 +443,10 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const [confirmError, setConfirmError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
+  const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
@@ -386,7 +466,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
       const result = await res.json();
-      if (!result.success) { setAlertModal("Gagal restore: " + result.message); return; }
+      if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false);
       onRestored(item.invoice_number);
     } catch { setAlertModal("Terjadi kesalahan saat restore"); }
@@ -456,6 +536,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                         <p className="text-xs font-bold text-gray-900 leading-snug">{g.laptop_name}</p>
                       </div>
                       <div className="flex flex-wrap gap-1">
+                        {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
                         {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
                         {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
                       </div>
@@ -507,13 +588,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           )}
         </div>
 
-        {/* ── Payment Method — DIUBAH: tambah PaymentBreakdown ── */}
+        {/* Payment Method */}
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2.5 border border-purple-200">
           <div className="flex items-center gap-2">
             {payStyle.icon}
             <span className="text-xs font-bold text-purple-900">{payStyle.text}</span>
           </div>
-          {/* Breakdown TF + Cash jika split payment */}
           <PaymentBreakdown item={item} size="md" />
         </div>
       </div>
@@ -564,14 +644,21 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <span className="text-lg">✏️</span><span className="text-[9px] font-semibold">Edit</span>
             </a>
           )}
+          {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
           {isPending && canEditTransaction && (
             <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition" title="Konfirmasi lunas">
               <span className="text-lg">✅</span><span className="text-[9px] font-semibold">Lunas</span>
             </button>
           )}
-          {canRestoreTransaction && item.status === "PAID" && (
-            <button onClick={() => setShowRestoreModal(true)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition" title="Restore transaksi">
-              <span className="text-lg">↩️</span><span className="text-[9px] font-semibold">Restore</span>
+          {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
+          {canRestore && (
+            <button
+              onClick={() => setShowRestoreModal(true)}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
+              title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+            >
+              <span className="text-lg">↩️</span>
+              <span className="text-[9px] font-semibold">{isPending ? "Batal" : "Restore"}</span>
             </button>
           )}
           <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="Lihat receipt">
@@ -582,24 +669,15 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
 
+      {/* ✅ Pakai shared RestoreModal component */}
       {showRestoreModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
-            <div className="p-5">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
-              </div>
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => setShowRestoreModal(false)} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">
-                {restoring ? "Memproses..." : "Ya, Restore"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
       )}
 
       {showConfirmModal && (
@@ -638,31 +716,41 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
   return null;
 }
 
-// ─── TRANSACTION TABLE ────────────────────────────────────────────────
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1440px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1680px" }}>
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50">
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & waktu</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & Waktu</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Kontak</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Sales</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[200px]">Laptop</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[180px]">Laptop</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">CPU</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Metode</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Sumber</th>
+              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Toko</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {paginatedTransactions.map((item: any) => (
-              <TransactionTableRow key={item.id} item={item} onPhotoClick={onPhotoClick} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onRestored={onRestored} onRowClick={onRowClick} />
+              <TransactionTableRow
+                key={item.id}
+                item={item}
+                onPhotoClick={onPhotoClick}
+                canEditTransaction={canEditTransaction}
+                canRestoreTransaction={canRestoreTransaction}
+                canSeeFinancials={canSeeFinancials}
+                onRestored={onRestored}
+                onRowClick={onRowClick}
+              />
             ))}
           </tbody>
         </table>
@@ -694,29 +782,7 @@ function StatusBadge({ item }: { item: any }) {
   );
 }
 
-function StatusBadgeMobile({ item }: { item: any }) {
-  const originalStatus = getOriginalStatus(item);
-  if (originalStatus) {
-    return (
-      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
-          {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
-        </span>
-        <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5 whitespace-nowrap">
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-          Lunas
-        </span>
-      </div>
-    );
-  }
-  return (
-    <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-      {STATUS_LABEL[item.status] ?? item.status}
-    </span>
-  );
-}
-
-// ─── TABLE ROW ────────────────────────────────────────────────────────
+// ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -726,7 +792,10 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
+  const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
@@ -746,7 +815,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
       const result = await res.json();
-      if (!result.success) { setAlertModal("Gagal restore: " + result.message); return; }
+      if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false);
       onRestored(item.invoice_number);
     } catch { setAlertModal("Terjadi kesalahan saat restore"); }
@@ -757,6 +826,62 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+  const renderLaptopCell = () => {
+    const grouped: any[] = item.grouped_items ?? [];
+    if (grouped.length > 1) {
+      return (
+        <div className="space-y-1">
+          {grouped.map((g: any, idx: number) => (
+            <div key={idx} className="flex items-start gap-1.5">
+              <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
+                <div className="flex gap-0.5 flex-wrap mt-0.5">
+                  {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
+                  {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-0.5">
+        <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
+        {(item.ram || item.storage) && (
+          <div className="flex items-center gap-1 flex-wrap">
+            {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.ram}</span>}
+            {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCpuCell = () => {
+    const grouped: any[] = item.grouped_items ?? [];
+    if (grouped.length > 1) {
+      const cpus = grouped.map((g: any) => g.cpu).filter(Boolean);
+      if (cpus.length === 0) return <span className="text-[10px] text-gray-300">—</span>;
+      return (
+        <div className="space-y-1">
+          {grouped.map((g: any, idx: number) => (
+            g.cpu
+              ? <div key={idx} className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 leading-snug">{g.cpu}</div>
+              : <span key={idx} className="text-[10px] text-gray-300">—</span>
+          ))}
+        </div>
+      );
+    }
+    if (!item.cpu) return <span className="text-[10px] text-gray-300">—</span>;
+    return (
+      <div className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-1 leading-snug">
+        {item.cpu}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -793,42 +918,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </div>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5">
-          {(() => {
-            const grouped: any[] = item.grouped_items ?? [];
-            if (grouped.length > 1) {
-              return (
-                <div className="space-y-1">
-                  {grouped.map((g: any, idx: number) => (
-                    <div key={idx} className="flex items-start gap-1.5">
-                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
-                        <div className="flex gap-0.5 flex-wrap mt-0.5">
-                          {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
-                          {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            }
-            return (
-              <div className="space-y-0.5">
-                <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
-                {(item.cpu || item.ram || item.storage || item.vga) && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {item.cpu && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.cpu}</span>}
-                    {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.ram}</span>}
-                    {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
-                    {item.vga && <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold whitespace-nowrap border border-purple-100">{item.gpu}</span>}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </td>
+        <td className="px-3 py-2.5">{renderLaptopCell()}</td>
+        <td className="px-3 py-2.5">{renderCpuCell()}</td>
         <td className="px-3 py-2.5">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
@@ -836,7 +927,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               return (
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
-                    <div key={idx} className="space-y-0.5">
+                    <div key={idx}>
                       {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
@@ -857,23 +948,29 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* ── Kolom Metode — DIUBAH: tambah PaymentBreakdown ── */}
         <td className="px-3 py-2.5 text-center">
           <div className="flex flex-col items-center gap-1">
             <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
               {payStyle.icon}
               <span className="text-[9px] font-bold text-gray-700">{payStyle.text.replace(/^[^\s]+ /, "")}</span>
             </div>
-            {/* Breakdown TF + Cash inline di bawah badge */}
             <PaymentBreakdown item={item} size="sm" />
           </div>
         </td>
-
         <td className="px-3 py-2.5 text-center">
           {item.source_platform ? (
             <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
+        </td>
+        <td className="px-3 py-2.5 text-center">
+          {(() => {
+            const badge = getCompanyBadge(item.company_name ?? "");
+            return (
+              <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${badge.color}`}>
+                {badge.label}
+              </span>
+            );
+          })()}
         </td>
         <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center gap-0.5">
@@ -887,13 +984,19 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </a>
             )}
+            {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
             {isPending && canEditTransaction && (
               <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-150" title="Konfirmasi lunas">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
-            {canRestoreTransaction && item.status === "PAID" && (
-              <button onClick={() => setShowRestoreModal(true)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150" title="Restore">
+            {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
+            {canRestore && (
+              <button
+                onClick={() => setShowRestoreModal(true)}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150"
+                title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
               </button>
             )}
@@ -906,24 +1009,15 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
 
+      {/* ✅ Pakai shared RestoreModal component */}
       {showRestoreModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
-            <div className="p-5">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
-              </div>
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => setShowRestoreModal(false)} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">
-                {restoring ? "Memproses..." : "Ya, Restore"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
       )}
 
       {showConfirmModal && (
@@ -1084,17 +1178,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   </span>
                 </div>
               )}
-
-              {/* ── Baris Metode — DIUBAH: tambah PaymentBreakdown ── */}
               <div className="pt-1 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Metode</span>
                   <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
                 </div>
-                {/* Breakdown TF + Cash di detail modal */}
                 <PaymentBreakdown item={item} size="md" />
               </div>
-
               {item.source_platform && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Platform</span>
@@ -1140,6 +1230,7 @@ export default function Page() {
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
   const [customerType, setCustomerType] = useState("ALL");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [companyName, setCompanyName] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -1156,8 +1247,8 @@ export default function Page() {
     fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
   }, []);
 
-  const canEditTransaction    = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
-  const canSeeFinancials      = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
+  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+  const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -1181,30 +1272,23 @@ export default function Page() {
     if (search.trim()) {
       const term = search.toLowerCase();
       filtered = filtered.filter((item) => {
-        // Field-field existing
         if (item.invoice_number?.toLowerCase().includes(term)) return true;
         if (item.customer_name?.toLowerCase().includes(term)) return true;
         if (item.customer_phone?.toLowerCase().includes(term)) return true;
         if (item.laptop_name?.toLowerCase().includes(term)) return true;
-
-        // ── Serial Number ──────────────────────────────────────────────
-        // 1. serial_number (string tunggal, format lama)
+        if (item.cpu?.toLowerCase().includes(term)) return true;
         if (item.serial_number?.toLowerCase().includes(term)) return true;
-
-        // 2. serial_numbers (array, transaksi single-unit baru)
         if (Array.isArray(item.serial_numbers)) {
           if (item.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
         }
-
-        // 3. grouped_items[].serial_numbers (transaksi multi-unit)
         if (Array.isArray(item.grouped_items)) {
           for (const g of item.grouped_items) {
+            if (g.cpu?.toLowerCase().includes(term)) return true;
             if (Array.isArray(g.serial_numbers)) {
               if (g.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
             }
           }
         }
-
         return false;
       });
     }
@@ -1215,6 +1299,15 @@ export default function Page() {
     if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
     if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
     if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
+    if (companyName !== "ALL") {
+      const q = companyName.toLowerCase();
+      filtered = filtered.filter((item) => {
+        const cn = (item.company_name ?? "").toLowerCase();
+        if (q === "sotech") return cn.includes("sotech");
+        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech");
+        return cn === q;
+      });
+    }
 
     filtered.sort((a, b) => {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -1222,7 +1315,7 @@ export default function Page() {
     });
 
     return filtered;
-  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
+  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
@@ -1230,7 +1323,9 @@ export default function Page() {
     return filteredTransactions.slice(start, start + itemsPerPage);
   }, [filteredTransactions, currentPage, itemsPerPage]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const uniquePaymentMethods = useMemo(() => {
     const methods = new Set(allTransactions.map((t) => t.payment_method).filter(Boolean));
@@ -1242,18 +1337,30 @@ export default function Page() {
     return ["ALL", ...Array.from(platforms)];
   }, [allTransactions]);
 
-  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || dateFrom || dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL";
+  const hasActiveFilter =
+    status !== "ALL" ||
+    customerType !== "ALL" ||
+    !!dateFrom ||
+    !!dateTo ||
+    paymentMethod !== "ALL" ||
+    sourcePlatform !== "ALL" ||
+    companyName !== "ALL";
 
   const resetFilters = () => {
-    setSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
-    setPaymentMethod("ALL"); setSourcePlatform("ALL");
+    setSearch("");
+    setStatus("ALL");
+    setCustomerType("ALL");
+    setDateFrom("");
+    setDateTo("");
+    setPaymentMethod("ALL");
+    setSourcePlatform("ALL");
+    setCompanyName("ALL");
   };
 
   // ─── EXPORT EXCEL ──────────────────────────────────────────────────
   const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
-
     try {
       const wb = new ExcelJS.Workbook();
       wb.creator = "Solit POS";
@@ -1313,14 +1420,12 @@ export default function Page() {
       const LEFT_KEYS = new Set(["invoice", "tanggal"]);
       const CURR_KEYS = new Set(["modal", "jual"]);
       const NUM_KEYS = new Set(["qty"]);
-
       const tableRows: (string | number)[][] = [];
 
       for (const item of filteredTransactions) {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
         const cached = detailCache.get(item.invoice_number);
-
         const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", {
           day: "2-digit", month: "2-digit", year: "numeric",
         });
@@ -1330,73 +1435,44 @@ export default function Page() {
           cached?.grouped_items?.forEach((cg) => {
             if (cg.laptop_name) cachedGroupMap.set(cg.laptop_name, cg.purchase_price_total);
           });
-
           for (const g of grouped) {
             const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
             const modal = canSeeFinancials
               ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0))
               : 0;
-
             tableRows.push([
-              item.invoice_number ?? "",
-              tanggal,
+              item.invoice_number ?? "", tanggal,
               STATUS_LABEL[item.status] ?? item.status ?? "",
-              Number(g.unit_count ?? 1),
-              g.laptop_name ?? "",
-              g.cpu ?? "",
-              g.ram ?? "",
-              g.storage ?? "",
-              item.payment_method ?? "",
-              modal,
-              Number(g.allocated_deal_price ?? 0),
-              item.customer_name ?? "",
-              item.customer_phone ?? "",
-              item.source_platform ?? "",
-              sns.join(", "),
-              item.notes ?? "",
+              Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "",
+              g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal,
+              Number(g.allocated_deal_price ?? 0), item.customer_name ?? "",
+              item.customer_phone ?? "", item.source_platform ?? "",
+              sns.join(", "), item.notes ?? "",
             ]);
           }
         } else {
-          const sns: string[] =
-            Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-              ? item.serial_numbers
-              : item.serial_number ? [item.serial_number] : [];
-
+          const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+            ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
           const modal = canSeeFinancials
             ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0))
             : 0;
-
           tableRows.push([
-            item.invoice_number ?? "",
-            tanggal,
+            item.invoice_number ?? "", tanggal,
             STATUS_LABEL[item.status] ?? item.status ?? "",
-            1,
-            item.laptop_name ?? "",
-            item.cpu ?? "",
-            item.ram ?? "",
-            item.storage ?? "",
-            item.payment_method ?? "",
-            modal,
-            Number(item.deal_price ?? item.amount ?? 0),
-            item.customer_name ?? "",
-            item.customer_phone ?? "",
-            item.source_platform ?? "",
-            sns.join(", "),
-            item.notes ?? "",
+            1, item.laptop_name ?? "", item.cpu ?? "",
+            item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal,
+            Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "",
+            item.customer_phone ?? "", item.source_platform ?? "",
+            sns.join(", "), item.notes ?? "",
           ]);
         }
       }
 
       if (tableRows.length > 0) {
         ws.addTable({
-          name: "TabelTransaksi",
-          ref:  "A1",
-          headerRow:  true,
-          totalsRow:  false,
-          style: {
-            theme:          "TableStyleMedium7",
-            showRowStripes: true,
-          },
+          name: "TabelTransaksi", ref: "A1",
+          headerRow: true, totalsRow: false,
+          style: { theme: "TableStyleMedium7", showRowStripes: true },
           columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
           rows: tableRows,
         });
@@ -1427,7 +1503,6 @@ export default function Page() {
         };
       });
 
-      // ── Style data rows + format Rupiah ────────────────────────
       tableRows.forEach((_, idx) => {
         const rowNum = idx + 2;
         const row = ws.getRow(rowNum);
@@ -1461,7 +1536,6 @@ export default function Page() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
-
     } catch (err) {
       console.error("Export error:", err);
       alert("Gagal export Excel. Silakan coba lagi.");
@@ -1488,7 +1562,6 @@ export default function Page() {
             </div>
             <p className="text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
           </div>
-
           <div className="flex items-center gap-2">
             {!isLoading && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200">
@@ -1533,12 +1606,18 @@ export default function Page() {
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <input type="text" placeholder="Cari nota, customer, WA, laptop, SN..."
+              <input
+                type="text"
+                placeholder="Cari nota, customer, WA, laptop, CPU, SN..."
                 className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                value={search} onChange={(e) => setSearch(e.target.value)} />
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <button onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50">
+            <button
+              onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50"
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {sortOrder === "newest"
                   ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
@@ -1546,22 +1625,27 @@ export default function Page() {
               </svg>
               <span className="hidden sm:inline text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
             </button>
-            <button onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
               Filter
               {hasActiveFilter && (
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-                  {[status !== "ALL", customerType !== "ALL", dateFrom, dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL"].filter(Boolean).length}
+                  {[status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL"].filter(Boolean).length}
                 </span>
               )}
             </button>
           </div>
 
+          {/* ── Filter Panel ── */}
           {showFilters && (
             <div className="pt-3 border-t border-gray-100 space-y-4">
+
+              {/* Status */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Status Transaksi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -1574,6 +1658,7 @@ export default function Page() {
                 </div>
               </div>
 
+              {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1589,10 +1674,13 @@ export default function Page() {
                   </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">✕ Hapus filter tanggal</button>
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">
+                    ✕ Hapus filter tanggal
+                  </button>
                 )}
               </div>
 
+              {/* Sumber Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Sumber / Platform</label>
@@ -1611,6 +1699,7 @@ export default function Page() {
                 </div>
               )}
 
+              {/* Metode Pembayaran */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Metode Pembayaran</label>
@@ -1629,8 +1718,47 @@ export default function Page() {
                 </div>
               )}
 
+              {/* ── Filter Perusahaan ── */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-2 block">Perusahaan / Nama Toko</label>
+                <div className="flex gap-1.5">
+                  {[
+                    { value: "ALL", label: "Semua", icon: "🏢", desc: null },
+                    { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
+                    { value: "sotech", label: "Sotech", icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
+                  ].map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setCompanyName(c.value)}
+                      title={c.desc ?? undefined}
+                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                        }`}
+                    >
+                      <span>{c.icon}</span>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                {companyName !== "ALL" && (
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Menampilkan transaksi toko:{" "}
+                    <span className="font-semibold text-gray-600">
+                      {companyName === "solit" ? "Solit 03" : "Sotech"}
+                    </span>
+                    {" "}<span className="text-gray-300">·</span>{" "}
+                    <span className="text-gray-400">termasuk semua variasi penulisan nama</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Reset */}
               {hasActiveFilter && (
-                <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium">
+                <button
+                  onClick={resetFilters}
+                  className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium"
+                >
                   ✕ Reset semua filter
                 </button>
               )}
@@ -1645,23 +1773,47 @@ export default function Page() {
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <div className="text-5xl mb-4 opacity-40">🔍</div>
             <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi ditemukan</p>
-            {hasActiveFilter && <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">Reset filter</button>}
+            {hasActiveFilter && (
+              <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">
+                Reset filter
+              </button>
+            )}
           </div>
         ) : isMobile ? (
           <div className="space-y-2">
             {paginatedTransactions.map((item) => (
-              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials} canRestoreTransaction={canRestoreTransaction} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+              <TransactionCard
+                key={item.id}
+                item={item}
+                onPhotoClick={setPhotoModal}
+                canEditTransaction={canEditTransaction}
+                canSeeFinancials={canSeeFinancials}
+                canRestoreTransaction={canRestoreTransaction}
+                onRestored={() => fetchTransactions()}
+                onRowClick={setDetailItem}
+              />
             ))}
           </div>
         ) : (
-          <TransactionTable paginatedTransactions={paginatedTransactions} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onPhotoClick={setPhotoModal} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+          <TransactionTable
+            paginatedTransactions={paginatedTransactions}
+            canEditTransaction={canEditTransaction}
+            canRestoreTransaction={canRestoreTransaction}
+            canSeeFinancials={canSeeFinancials}
+            onPhotoClick={setPhotoModal}
+            onRestored={() => fetchTransactions()}
+            onRowClick={setDetailItem}
+          />
         )}
 
         {/* ── Pagination ── */}
         {!isLoading && filteredTransactions.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-1">
-            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
               Sebelumnya
             </button>
@@ -1670,8 +1822,11 @@ export default function Page() {
               <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{currentPage}</span>
               <span className="text-xs text-gray-400">dari {totalPages}</span>
             </div>
-            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               Selanjutnya
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </button>

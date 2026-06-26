@@ -5,7 +5,6 @@ import {
     KeyboardEvent, Fragment,
 } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
-import { useChatContext } from "@/contexts/ChatContext";
 
 const supabase = getSupabaseClient();
 
@@ -52,7 +51,7 @@ interface GroupChatPanelProps {
     onClose: () => void;
 }
 
-// Info presence per user (dihitung dari /api/presence, sama dgn OnlineUsersPanel)
+// FIX BUG 3: PresenceInfo dipakai untuk semua user termasuk currentUser
 interface PresenceInfo {
     is_online: boolean;
     last_seen: string | null;
@@ -85,7 +84,8 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
 
 const FULL_ACCESS = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
-// Online = aktif dalam 2 menit terakhir (sama dgn OnlineUsersPanel)
+// FIX BUG 4: threshold tetap 2 menit, tapi is_online di-recompute live dari last_seen
+// bukan di-snapshot saat fetch
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -125,7 +125,20 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Format "terakhir online" gaya WA (sama dgn OnlineUsersPanel)
+// FIX BUG 4: Helper pure function — hitung is_online & seconds_ago dari last_seen + now
+// Dipanggil saat render, bukan disimpan di state, jadi selalu fresh
+function computePresence(lastSeen: string | null, now: number): {
+    is_online: boolean;
+    seconds_ago: number | null;
+} {
+    if (!lastSeen) return { is_online: false, seconds_ago: null };
+    const elapsed = now - new Date(lastSeen).getTime();
+    return {
+        is_online: elapsed < ONLINE_THRESHOLD_MS,
+        seconds_ago: Math.floor(elapsed / 1000),
+    };
+}
+
 function formatLastSeen(secondsAgo: number | null): string {
     if (secondsAgo === null) return "Belum pernah";
     if (secondsAgo < 60) return "baru saja";
@@ -135,7 +148,7 @@ function formatLastSeen(secondsAgo: number | null): string {
 }
 
 // ─── Mention highlight ────────────────────────────────────────────────────────
-function renderTextWithMentions(text: string, currentUserId?: string, currentUserName?: string) {
+function renderTextWithMentions(text: string, currentUserName?: string) {
     const parts = text.split(/(@semua|@[A-Za-z][A-Za-z\s.]*)/g);
     return parts.map((part, i) => {
         if (part === "@semua") {
@@ -319,7 +332,10 @@ interface BubbleProps {
     onScrollToReply: (id: string) => void;
 }
 
-const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
+const MessageBubble = memo(function MessageBubble({
+    msg, isMine, isAdmin, currentUserName,
+    onReply, onDelete, onEdit, onScrollToReply,
+}: BubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
@@ -366,7 +382,6 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
         if (e.key === "Escape") { setIsEditing(false); setEditContent(msg.content); }
     };
 
-    // ── Deleted ──
     if (msg.is_deleted) {
         return (
             <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
@@ -404,7 +419,6 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
             )}
 
             <div className={`flex flex-col max-w-[70%] ${isMine ? "items-end" : "items-start"}`}>
-                {/* Sender label */}
                 {!isMine && (
                     <span className="text-[9.5px] font-bold mb-1.5 px-1 tracking-wide"
                         style={{ color: getAvatarColor(msg.sender_role) }}>
@@ -415,7 +429,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
 
                 <div className="relative">
                     {isEditing ? (
-                        <div className={`px-3.5 pt-3 pb-2.5 min-w-[220px]`}
+                        <div className="px-3.5 pt-3 pb-2.5 min-w-[220px]"
                             style={{
                                 borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
                                 background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
@@ -433,8 +447,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-slate-800"
-                                    }`}
+                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-slate-800"}`}
                                 style={{ minHeight: 22 }}
                             />
                             <div className="flex items-center justify-between mt-2.5 gap-2">
@@ -444,15 +457,13 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[10px] px-2.5 py-1 rounded-lg transition font-medium ${isMine ? "text-white/60 hover:bg-white/10" : "text-slate-500 hover:bg-slate-100"
-                                            }`}>
+                                        className={`text-[10px] px-2.5 py-1 rounded-lg transition font-medium ${isMine ? "text-white/60 hover:bg-white/10" : "text-slate-500 hover:bg-slate-100"}`}>
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[10px] px-3 py-1 rounded-lg font-bold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-indigo-600 text-white"
-                                            }`}>
+                                        className={`text-[10px] px-3 py-1 rounded-lg font-bold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-indigo-600 text-white"}`}>
                                         {saving ? "..." : "Simpan"}
                                     </button>
                                 </div>
@@ -460,7 +471,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         </div>
                     ) : (
                         <div
-                            className={`relative px-3.5 py-2.5 cursor-pointer select-text transition-all`}
+                            className="relative px-3.5 py-2.5 cursor-pointer select-text transition-all"
                             style={{
                                 borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
                                 background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
@@ -510,7 +521,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                             {/* Text */}
                             {hasContent && (
                                 <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                                    {renderTextWithMentions(msg.content, undefined, currentUserName)}
+                                    {renderTextWithMentions(msg.content, currentUserName)}
                                 </p>
                             )}
 
@@ -527,8 +538,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                     {showMenu && !isEditing && (
                         <div
                             ref={menuRef}
-                            className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1.5 min-w-[155px] ${isMine ? "right-0" : "left-0"
-                                }`}
+                            className={`absolute bottom-full mb-2 z-50 bg-white overflow-hidden py-1.5 min-w-[155px] ${isMine ? "right-0" : "left-0"}`}
                             style={{
                                 borderRadius: 18,
                                 border: "1px solid #f0f0f5",
@@ -538,8 +548,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 onClick={() => { onReply(msg); setShowMenu(false); }}
                                 className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition font-medium">
                                 <svg className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                 </svg>
                                 Balas
                             </button>
@@ -585,8 +594,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         style={{ background: "#fff", border: "1px solid #e8ecf0", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
                         title="Balas">
                         <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                         </svg>
                     </button>
                 </div>
@@ -622,7 +630,6 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                 border: "1px solid #ebebf5",
                 boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
             }}>
-            {/* Header */}
             <div className="px-4 py-2.5 flex items-center gap-2"
                 style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
                 <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention Anggota</span>
@@ -630,8 +637,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
             <div className="max-h-52 overflow-y-auto">
                 {showSemua && (
                     <button
-                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"
-                            }`}
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === 0 ? "bg-amber-50" : "hover:bg-slate-50"}`}
                         onMouseDown={(e) => { e.preventDefault(); onSelect(null); }}>
                         <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
                             style={{ borderRadius: 10, background: "linear-gradient(135deg, #fef3c7, #fde68a)" }}>
@@ -648,8 +654,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                     return (
                         <button
                             key={user.id}
-                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"
-                                }`}
+                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"}`}
                             onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}>
                             <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
                                 style={{ backgroundColor: getAvatarColor(user.role), borderRadius: 10 }}>
@@ -829,7 +834,6 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
 
     return (
         <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
-
             {/* Reply preview */}
             {replyTo && (
                 <div className="flex items-center gap-3 px-5 py-3"
@@ -910,8 +914,6 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                             onSelect={insertMention}
                         />
                     )}
-
-                    {/* Attach */}
                     <button
                         onClick={() => fileRef.current?.click()}
                         disabled={isLoading}
@@ -923,7 +925,6 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                                 d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                         </svg>
                     </button>
-
                     <textarea
                         ref={inputRef}
                         value={input}
@@ -942,7 +943,6 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     )}
                 </div>
 
-                {/* Send */}
                 <button
                     onClick={preview ? handleSendFile : handleSendText}
                     disabled={!canSend}
@@ -950,9 +950,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     style={{
                         width: 44, height: 44,
                         borderRadius: 14,
-                        background: canSend
-                            ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
-                            : "#e2e8f0",
+                        background: canSend ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" : "#e2e8f0",
                         boxShadow: canSend ? "0 4px 16px rgba(79,70,229,0.4)" : "none",
                     }}>
                     {isLoading ? (
@@ -960,8 +958,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                             style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
                     ) : (
                         <svg className="w-4 h-4" fill="none" stroke={canSend ? "white" : "#94a3b8"} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                     )}
                 </button>
@@ -972,7 +969,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     );
 }
 
-// ─── EmbeddedDMMessages (DM panel di dalam GroupChatPanel) ───────────────────
+// ─── EmbeddedDMMessages ───────────────────────────────────────────────────────
 interface EmbeddedDMMessagesProps {
     currentUser: CurrentUser;
     targetUser: UserOption;
@@ -1016,7 +1013,6 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     }, [messages]);
 
-    // Realtime subscription
     useEffect(() => {
         const channel = supabase
             .channel(`embedded-dm:${[currentUser.id, targetUser.id].sort().join(":")}`)
@@ -1127,7 +1123,6 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                 <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
             <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white"
                 style={{ borderTop: "1px solid #f0f0f8" }}>
                 <input
@@ -1140,11 +1135,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     disabled={sending}
                     autoFocus
                     className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-indigo-200"
-                    style={{
-                        background: "#f5f7ff",
-                        border: "1.5px solid #e8ecff",
-                        color: "#334155",
-                    }}
+                    style={{ background: "#f5f7ff", border: "1.5px solid #e8ecff", color: "#334155" }}
                 />
                 <button
                     onClick={send}
@@ -1158,8 +1149,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                         ? <div className="w-3 h-3 rounded-full animate-spin"
                             style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
                         : <svg className="w-3.5 h-3.5" fill="none" stroke={input.trim() ? "white" : "#94a3b8"} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                     }
                 </button>
@@ -1177,31 +1167,64 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [replyTo, setReplyTo] = useState<GroupMessage | null>(null);
     const [unread, setUnread] = useState(0);
     const [isScrolledUp, setIsScrolledUp] = useState(false);
-    const [users, setUsers] = useState<UserOption[]>([]);
+
+    // FIX BUG 3 & 2: users sekarang berisi SEMUA user dari /api/users
+    // termasuk currentUser, agar presenceMap bisa include currentUser
+    // Untuk mention dropdown, kita filter keluar currentUser saat display
+    const [allUsers, setAllUsers] = useState<UserOption[]>([]);
 
     const usersRef = useRef<UserOption[]>([]);
     const messagesDataRef = useRef<GroupMessage[]>([]);
-    useEffect(() => { usersRef.current = users; }, [users]);
+
+    // FIX BUG 2: usersRef selalu update sebelum realtime handler dipanggil
+    useEffect(() => { usersRef.current = allUsers; }, [allUsers]);
     useEffect(() => { messagesDataRef.current = messages; }, [messages]);
 
-    // ── Presence: status online + terakhir online per user ──
-    const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
-    const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
+    // FIX BUG 4: Simpan raw last_seen map dari API, hitung is_online saat render
+    // bukan di-snapshot saat fetch
+    const [lastSeenMap, setLastSeenMap] = useState<Record<string, string | null>>({});
 
-    // ── Mobile: pane mana yang lagi tampil (chat / members). DM pakai embeddedDMUser ──
+    // Tick tiap 30 detik untuk trigger recompute online status
+    const [tick, setTick] = useState(0);
+
+    const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
+    const [memberSearch, setMemberSearch] = useState("");
+
+    // FIX BUG 1: mobile view tidak include embeddedDMUser check di sini
+    // Kondisi render panel sudah handle ini sendiri di JSX
     const [mobileView, setMobileView] = useState<"chat" | "members">("chat");
+    const [embeddedDMUser, setEmbeddedDMUser] = useState<UserOption | null>(null);
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<HTMLDivElement>(null);
     const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
     const isAdmin = FULL_ACCESS.has(currentUser.role);
-    const [memberSearch, setMemberSearch] = useState("");
-    const [embeddedDMUser, setEmbeddedDMUser] = useState<UserOption | null>(null);
 
-    // Hitung jumlah online + urutkan (online dulu, lalu yang paling baru terakhir online)
-    const onlineCount = users.filter(u => presenceMap[u.id]?.is_online).length;
+    // FIX BUG 4: Compute presence map live dari lastSeenMap + current time (tick)
+    const presenceMap = useMemo<Record<string, PresenceInfo>>(() => {
+        const now = Date.now();
+        const map: Record<string, PresenceInfo> = {};
+        for (const [userId, lastSeen] of Object.entries(lastSeenMap)) {
+            const { is_online, seconds_ago } = computePresence(lastSeen, now);
+            map[userId] = { is_online, last_seen: lastSeen, seconds_ago };
+        }
+        return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lastSeenMap, tick]); // tick berubah tiap 30 detik → recompute
 
-    const filteredMembers = users
+    // users untuk mention dropdown (tanpa currentUser)
+    const users = useMemo(
+        () => allUsers.filter(u => u.id !== currentUser.id),
+        [allUsers, currentUser.id]
+    );
+
+    // FIX BUG 3: onlineCount sekarang hitung currentUser juga via presenceMap
+    const onlineCount = useMemo(() => {
+        // Hitung dari presenceMap yang sudah include semua user termasuk currentUser
+        return allUsers.filter(u => presenceMap[u.id]?.is_online).length;
+    }, [allUsers, presenceMap]);
+
+    const filteredMembers = useMemo(() => users
         .filter(u =>
             u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
             (ROLE_LABEL[u.role] ?? u.role).toLowerCase().includes(memberSearch.toLowerCase())
@@ -1210,44 +1233,39 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         .sort((a, b) => {
             const ao = presenceMap[a.id]?.is_online ? 1 : 0;
             const bo = presenceMap[b.id]?.is_online ? 1 : 0;
-            if (ao !== bo) return bo - ao; // online di atas
+            if (ao !== bo) return bo - ao;
             const al = presenceMap[a.id]?.last_seen ?? null;
             const bl = presenceMap[b.id]?.last_seen ?? null;
             if (!al && !bl) return a.name.localeCompare(b.name);
             if (!al) return 1;
             if (!bl) return -1;
-            return new Date(bl).getTime() - new Date(al).getTime(); // terakhir online di atas
-        });
+            return new Date(bl).getTime() - new Date(al).getTime();
+        }),
+    [users, memberSearch, memberFilter, presenceMap]);
 
+    // FIX BUG 3: Ambil semua user, tidak filter keluar currentUser
     useEffect(() => {
         fetch("/api/users")
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    const others = (data.users as UserOption[]).filter(u => u.id !== currentUser.id);
-                    setUsers(others);
+                    setAllUsers(data.users as UserOption[]);
                 }
             })
             .catch(() => { });
     }, [currentUser.id]);
 
-    // ── Ambil presence dari /api/presence (sumber sama dgn OnlineUsersPanel) + refresh tiap 30 dtk ──
+    // FIX BUG 4: Simpan raw last_seen, bukan computed is_online
     const fetchPresence = useCallback(async () => {
         try {
             const res = await fetch("/api/presence");
             const data = await res.json();
             if (data.success) {
-                const now = Date.now();
-                const map: Record<string, PresenceInfo> = {};
+                const map: Record<string, string | null> = {};
                 for (const p of (data.data ?? [])) {
-                    const lastSeen: string | null = p.last_seen ?? null;
-                    map[p.user_id] = {
-                        last_seen: lastSeen,
-                        is_online: lastSeen ? now - new Date(lastSeen).getTime() < ONLINE_THRESHOLD_MS : false,
-                        seconds_ago: lastSeen ? Math.floor((now - new Date(lastSeen).getTime()) / 1000) : null,
-                    };
+                    map[p.user_id] = p.last_seen ?? null;
                 }
-                setPresenceMap(map);
+                setLastSeenMap(map);
             }
         } catch (err) {
             console.error("[GroupChatPanel] presence error:", err);
@@ -1256,8 +1274,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
     useEffect(() => {
         fetchPresence();
-        const ticker = setInterval(fetchPresence, 30_000); // refresh status online tiap 30 detik
-        return () => clearInterval(ticker);
+        // Refresh raw data dari server tiap 30 detik
+        const dataTimer = setInterval(fetchPresence, 30_000);
+        // Tick tiap 30 detik untuk recompute is_online dari lastSeenMap yang ada
+        // Ini penting supaya user yang sudah 2 menit tidak aktif langsung kedeteksi offline
+        const tickTimer = setInterval(() => setTick(t => t + 1), 30_000);
+        return () => {
+            clearInterval(dataTimer);
+            clearInterval(tickTimer);
+        };
     }, [fetchPresence]);
 
     const fetchMessages = useCallback(async () => {
@@ -1349,6 +1374,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     const incoming = payload.new as GroupMessage;
                     let enriched: GroupMessage = incoming;
 
+                    // FIX BUG 2: usersRef.current sekarang include semua user
                     if (!incoming.sender_name || !incoming.sender_role) {
                         const u = usersRef.current.find(x => x.id === incoming.sender_id);
                         if (u) enriched = { ...enriched, sender_name: u.name, sender_role: u.role };
@@ -1563,6 +1589,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return acc;
     }, []), [messages]);
 
+    // FIX BUG 1: Handler untuk buka DM dari mobile — auto switch ke chat view
+    const handleOpenDM = useCallback((user: UserOption) => {
+        setEmbeddedDMUser(prev => prev?.id === user.id ? null : user);
+        // Di mobile: saat DM dibuka dari panel members, switch ke "chat" dulu
+        // supaya DM panel tampil (karena DM panel muncul di kolom kanan / replace chat view di mobile)
+        setMobileView("chat");
+    }, []);
+
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-0 md:p-4"
@@ -1575,8 +1609,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     border: "1px solid rgba(255,255,255,0.8)",
                 }}>
 
-                {/* ── Sidebar kiri: Member List ── */}
-                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:flex md:border-r md:border-[#f0f0f8] ${mobileView === "members" && !embeddedDMUser ? "flex" : "hidden"}`}
+                {/* ── Sidebar kiri: Member List ──
+                    FIX BUG 1: Logika visibility diperbaiki
+                    Desktop: selalu tampil (md:flex)
+                    Mobile: tampil hanya jika mobileView === "members" DAN tidak ada embeddedDMUser aktif
+                */}
+                <div className={`
+                    flex-col flex-shrink-0 w-full md:w-60 md:flex md:border-r md:border-[#f0f0f8]
+                    ${mobileView === "members" && !embeddedDMUser ? "flex" : "hidden"}
+                `}
                     style={{ background: "#fafbff" }}>
 
                     {/* Sidebar header */}
@@ -1592,8 +1633,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             Kembali ke Grup Chat
                         </button>
                         <div className="flex items-center justify-between mb-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest"
-                                style={{ color: "#94a3b8" }}>
+                            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#94a3b8" }}>
                                 Anggota Tim ({users.length})
                             </p>
                             <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0">
@@ -1615,19 +1655,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 value={memberSearch}
                                 onChange={e => setMemberSearch(e.target.value)}
                                 className="w-full h-8 rounded-xl pl-8 pr-3 text-[11px] font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition"
-                                style={{
-                                    background: "#f1f5f9",
-                                    border: "1px solid #e2e8f0",
-                                    color: "#334155",
-                                }}
+                                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#334155" }}
                             />
                         </div>
                         {/* Filter Semua / Online */}
                         <div className="flex gap-0.5 mt-2.5 bg-gray-100 rounded-lg p-0.5">
                             {(["all", "online"] as const).map(f => (
                                 <button key={f} onClick={() => setMemberFilter(f)}
-                                    className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${memberFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
-                                        }`}>
+                                    className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${memberFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}>
                                     {f === "all" ? `Semua (${users.length})` : `🟢 Online (${onlineCount})`}
                                 </button>
                             ))}
@@ -1668,11 +1703,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                             }}>
                                             {getInitials(user.name)}
                                         </div>
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafbff] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
-                                            }`} />
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafbff] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} />
                                     </div>
-
-                                    {/* Info */}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-indigo-700 transition-colors">
                                             {user.name}
@@ -1681,8 +1713,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                             {ROLE_LABEL[user.role] ?? user.role}
                                         </p>
                                     </div>
-
-                                    {/* Status (default) ↔ ikon chat (saat hover) */}
                                     <div className="flex-shrink-0 flex items-center justify-end min-w-[54px]">
                                         <div className="group-hover:hidden">
                                             {isOnline ? (
@@ -1728,33 +1758,36 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     </div>
                 </div>
 
-                {/* ── Kolom kanan: Header + Chat ── */}
-                <div className={`flex-1 flex-col overflow-hidden md:flex ${mobileView === "chat" && !embeddedDMUser ? "flex" : "hidden"}`} style={{ minWidth: 0 }}>
+                {/* ── Kolom tengah: Group Chat ──
+                    FIX BUG 1: Di mobile, chat column tampil jika:
+                    - mobileView === "chat" DAN tidak ada embeddedDMUser (DM panel belum dibuka)
+                    - ATAU mobileView === "chat" DAN embeddedDMUser ada → DM panel yang override di kolom kanan
+                    Sederhananya: chat column tersembunyi hanya saat mobileView === "members"
+                */}
+                <div className={`
+                    flex-1 flex-col overflow-hidden md:flex
+                    ${mobileView !== "members" ? "flex" : "hidden"}
+                    ${embeddedDMUser ? "hidden md:flex" : ""}
+                `} style={{ minWidth: 0 }}>
 
                     {/* ── Header ── */}
                     <div
                         className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative overflow-hidden"
                         style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
-
-                        {/* Background mesh pattern */}
                         <div className="absolute inset-0 pointer-events-none" style={{
                             backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.1) 0%, transparent 50%)",
                         }} />
-                        {/* Subtle grid */}
                         <div className="absolute inset-0 pointer-events-none" style={{
                             backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
                             backgroundSize: "32px 32px",
                         }} />
 
-                        {/* Logo */}
                         <div className="relative flex-shrink-0 z-10">
                             <div style={{ border: "2px solid rgba(255,255,255,0.15)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>
                                 <SolitLogo size={48} radius={14} />
                             </div>
-                            {/* Online indicator */}
                             <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center"
-                                style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }}>
-                            </div>
+                                style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }} />
                         </div>
 
                         <div className="flex-1 min-w-0 z-10">
@@ -1807,13 +1840,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 border: "1px solid rgba(255,255,255,0.1)",
                                 color: "rgba(255,255,255,0.5)",
                             }}>
-                            <svg className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
 
-                    {/* Accent line */}
                     <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
 
                     {/* ── Messages ── */}
@@ -1860,7 +1892,6 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         ) : (
                             groupedMessages.map((group: DateGroup) => (
                                 <Fragment key={group.dateKey}>
-                                    {/* Date pill */}
                                     <div className="flex items-center justify-center py-4">
                                         <div className="flex items-center gap-3">
                                             <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #d1d5f5)" }} />
@@ -1902,20 +1933,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <button
                                 onClick={() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); setUnread(0); }}
                                 className="relative w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
-                                style={{
-                                    borderRadius: "50%",
-                                    background: "#fff",
-                                    border: "1px solid #e8ecf5",
-                                    boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
-                                }}>
+                                style={{ borderRadius: "50%", background: "#fff", border: "1px solid #e8ecf5", boxShadow: "0 6px 24px rgba(0,0,0,0.1)" }}>
                                 <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                                 </svg>
                                 {unread > 0 && (
                                     <span className="absolute text-white text-[9px] font-black flex items-center justify-center"
                                         style={{
-                                            top: -6, right: -6,
-                                            minWidth: 18, height: 18,
+                                            top: -6, right: -6, minWidth: 18, height: 18,
                                             borderRadius: 9,
                                             background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
                                             padding: "0 4px",
@@ -1938,30 +1963,34 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     />
                 </div>
 
-                {/* ── Kolom kanan: Embedded DM Panel ── */}
+                {/* ── Kolom kanan: Embedded DM Panel ──
+                    FIX BUG 1: Di mobile, DM panel tampil full-width menggantikan chat column
+                    (karena chat column punya class "hidden" saat embeddedDMUser ada)
+                */}
                 {embeddedDMUser && (
                     <div
                         className="flex-shrink-0 flex flex-col overflow-hidden w-full md:w-[340px] md:border-l md:border-[#f0f0f8]"
-                        style={{ animation: "dmSlideIn 0.2s ease-out" }}
-                    >
+                        style={{ animation: "dmSlideIn 0.2s ease-out" }}>
                         {/* DM Header */}
                         <div
                             className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5"
-                            style={{
-                                background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
-                                borderBottom: "2px solid transparent",
-                                backgroundClip: "padding-box",
-                            }}
-                        >
+                            style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
+                            {/* FIX BUG 1: Tombol kembali di DM header untuk mobile */}
+                            <button
+                                onClick={() => setEmbeddedDMUser(null)}
+                                className="md:hidden w-7 h-7 flex items-center justify-center rounded-xl transition hover:bg-white/10 flex-shrink-0 mr-1"
+                                style={{ color: "rgba(255,255,255,0.6)" }}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
                             <div
                                 className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[11px]"
                                 style={{
-                                    width: 34, height: 34,
-                                    borderRadius: 10,
+                                    width: 34, height: 34, borderRadius: 10,
                                     background: `linear-gradient(135deg, ${getAvatarColor(embeddedDMUser.role)}cc, ${getAvatarColor(embeddedDMUser.role)})`,
                                     boxShadow: `0 2px 8px ${getAvatarColor(embeddedDMUser.role)}55`,
-                                }}
-                            >
+                                }}>
                                 {getInitials(embeddedDMUser.name)}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -1969,26 +1998,24 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     {embeddedDMUser.name}
                                 </p>
                                 <p className="text-[9.5px] mt-0.5 truncate"
-                                    style={{ color: getAvatarColor(embeddedDMUser.role) }}>
+                                    style={{ color: presenceMap[embeddedDMUser.id]?.is_online ? "#34d399" : "rgba(255,255,255,0.35)" }}>
                                     {presenceMap[embeddedDMUser.id]?.is_online
                                         ? "🟢 online"
                                         : `Terakhir online ${formatLastSeen(presenceMap[embeddedDMUser.id]?.seconds_ago ?? null)}`}
                                 </p>
                             </div>
+                            {/* Close button — desktop only (mobile pakai tombol back di kiri) */}
                             <button
                                 onClick={() => setEmbeddedDMUser(null)}
-                                className="w-7 h-7 flex items-center justify-center rounded-xl transition hover:bg-white/10 flex-shrink-0"
-                                style={{ color: "rgba(255,255,255,0.45)" }}
-                            >
+                                className="hidden md:flex w-7 h-7 items-center justify-center rounded-xl transition hover:bg-white/10 flex-shrink-0"
+                                style={{ color: "rgba(255,255,255,0.45)" }}>
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-                        {/* Accent line */}
                         <div style={{ height: 2, background: "linear-gradient(90deg,#6366f1,#8b5cf6 50%,#ec4899)", flexShrink: 0, opacity: 0.7 }} />
 
-                        {/* DM Messages — pakai EmbeddedDMMessages */}
                         <EmbeddedDMMessages
                             currentUser={currentUser}
                             targetUser={embeddedDMUser}
