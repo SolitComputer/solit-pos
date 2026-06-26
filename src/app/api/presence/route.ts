@@ -8,8 +8,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Sinkron dengan HEARTBEAT_INTERVAL_MS (15s) di usePresence.ts
+// 35 detik = 15s interval + toleransi jaringan lambat ~20s
+const ONLINE_THRESHOLD_MS = 35 * 1000;
+
 // ─── POST: Heartbeat dari client ──────────────────────────────────────────────
-// Dipanggil setiap ~30 detik oleh usePresence hook
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -17,8 +20,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const page = (body.page as string) || "/";
+    // Baca body — bisa gagal jika sendBeacon kirim kosong
+    let body: any = {};
+    try {
+      const text = await request.text();
+      if (text) body = JSON.parse(text);
+    } catch { /* abaikan parse error */ }
+
+    // Handle _clear signal dari sendBeacon saat tab/window ditutup
+    if (body._clear === true) {
+      await supabase
+        .from("user_presence")
+        .delete()
+        .eq("user_id", user.id);
+      return NextResponse.json({ success: true });
+    }
+
+    const page = typeof body.page === "string" ? body.page : "/";
 
     const { error } = await supabase
       .from("user_presence")
@@ -45,7 +63,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ─── GET: Ambil semua user + merge dengan presence data (admin only) ─────────
 // ─── GET: Ambil semua user + merge dengan presence data ──────────────────────
 export async function GET() {
   try {
@@ -53,9 +70,6 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ success: false }, { status: 401 });
     }
-
-    // ✅ HAPUS guard FULL_ACCESS — semua role yang login boleh lihat data presence
-    // Data yang dikembalikan tidak sensitif (hanya nama, role, status online, halaman aktif)
 
     const [usersResult, presenceResult] = await Promise.all([
       supabase
@@ -73,7 +87,6 @@ export async function GET() {
     }
 
     const now = Date.now();
-    const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
 
     const presenceMap = new Map<string, { current_page: string; last_seen: string }>();
     for (const p of presenceResult.data ?? []) {
@@ -111,6 +124,7 @@ export async function GET() {
   }
 }
 
+// ─── DELETE: Manual clear (fallback jika sendBeacon tidak tersedia) ───────────
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getCurrentUser();

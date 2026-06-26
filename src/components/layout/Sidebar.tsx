@@ -161,6 +161,12 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
+  monitorChat: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -190,6 +196,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+    { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
   ],
 };
 
@@ -297,6 +304,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
@@ -516,14 +524,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
   // ── PKL variants — semua share menu yang sama ─────────────────────────────
-  PKL:                 PKL_MENU,
-  PKL_MARKETING:       PKL_MENU,
-  PKL_SALES:           PKL_MENU,
+  PKL: PKL_MENU,
+  PKL_MARKETING: PKL_MENU,
+  PKL_SALES: PKL_MENU,
   PKL_PENYEDIA_BARANG: PKL_MENU,
-  PKL_SOTECH:          PKL_MENU,
-  PKL_ONPOINT:         PKL_MENU,
-  PKL_TEKNISI:         PKL_MENU,
-  PKL_KONTEN:          PKL_MENU,
+  PKL_SOTECH: PKL_MENU,
+  PKL_ONPOINT: PKL_MENU,
+  PKL_TEKNISI: PKL_MENU,
+  PKL_KONTEN: PKL_MENU,
   // ─────────────────────────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
@@ -571,37 +579,37 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
-  ADMIN:                  { label: "Admin / CEO",             className: "bg-violet-50 text-violet-700" },
-  KEPALA_SALES:           { label: "Kepala Sales",            className: "bg-emerald-50 text-emerald-700" },
-  CREW_SALES:             { label: "Crew Sales",              className: "bg-sky-50 text-sky-700" },
-  ACCOUNTING:             { label: "Accounting",              className: "bg-amber-50 text-amber-700" },
-  PENGELOLA_BARANG:       { label: "Pengelola Barang",        className: "bg-blue-50 text-blue-700" },
-  TEKNISI:                { label: "Teknisi",                 className: "bg-orange-50 text-orange-700" },
-  KEPALA_TEKNISI:         { label: "Kepala Teknisi",          className: "bg-red-50 text-red-700" },
-  PENGANTARAN:            { label: "Pengantaran",             className: "bg-teal-50 text-teal-700" },
-  MARKETING:              { label: "Marketing",               className: "bg-pink-50 text-pink-700" },
-  KEBERSIHAN:             { label: "Kebersihan",              className: "bg-cyan-50 text-cyan-700" },
-  KEPALA_MARKETING:       { label: "Kepala Marketing",        className: "bg-rose-50 text-rose-700" },
-  PROGRAMMER:             { label: "Programmer",              className: "bg-indigo-50 text-indigo-700" },
-  SOTECH:                 { label: "Sotech",                  className: "bg-lime-50 text-lime-700" },
-  ASISTEN_CEO:            { label: "Asisten CEO",             className: "bg-purple-50 text-purple-700" },
-  PENYEDIA_BARANG:        { label: "Penyedia Barang",         className: "bg-yellow-50 text-yellow-700" },
-  KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang",  className: "bg-orange-50 text-orange-700" },
-  KONTEN:                 { label: "Konten",                  className: "bg-fuchsia-50 text-fuchsia-700" },
-  KEPALA_ONPOINT:         { label: "Kepala Onpoint",          className: "bg-green-50 text-green-700" },
-  ONPOINT:                { label: "Onpoint",                 className: "bg-emerald-50 text-emerald-700" },
-  KEPALA_SOTECH:          { label: "Kepala Sotech",           className: "bg-lime-50 text-lime-700" },
-  CUSTOMER_SERVICE:       { label: "Customer Service",        className: "bg-sky-50 text-sky-700" },
-  KEPALA_PENGELOLA_BARANG:{ label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
+  KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
+  CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
+  ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
+  KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
+  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
+  MARKETING: { label: "Marketing", className: "bg-pink-50 text-pink-700" },
+  KEBERSIHAN: { label: "Kebersihan", className: "bg-cyan-50 text-cyan-700" },
+  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700" },
+  PROGRAMMER: { label: "Programmer", className: "bg-indigo-50 text-indigo-700" },
+  SOTECH: { label: "Sotech", className: "bg-lime-50 text-lime-700" },
+  ASISTEN_CEO: { label: "Asisten CEO", className: "bg-purple-50 text-purple-700" },
+  PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
+  KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
+  KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
+  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
+  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
+  KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
+  CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
+  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
   // ── PKL variants ──────────────────────────────────────────────────────────
-  PKL:                 { label: "PKL",                  className: "bg-amber-50 text-amber-700" },
-  PKL_MARKETING:       { label: "PKL Marketing",        className: "bg-amber-50 text-amber-700" },
-  PKL_SALES:           { label: "PKL Sales",            className: "bg-amber-50 text-amber-700" },
-  PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang",  className: "bg-amber-50 text-amber-700" },
-  PKL_SOTECH:          { label: "PKL Sotech",           className: "bg-amber-50 text-amber-700" },
-  PKL_ONPOINT:         { label: "PKL Onpoint",          className: "bg-amber-50 text-amber-700" },
-  PKL_TEKNISI:         { label: "PKL Teknisi",          className: "bg-amber-50 text-amber-700" },
-  PKL_KONTEN:          { label: "PKL Konten",           className: "bg-amber-50 text-amber-700" },
+  PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
+  PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
+  PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
+  PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang", className: "bg-amber-50 text-amber-700" },
+  PKL_SOTECH: { label: "PKL Sotech", className: "bg-amber-50 text-amber-700" },
+  PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
+  PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
+  PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
   // ─────────────────────────────────────────────────────────────────────────
 };
 
