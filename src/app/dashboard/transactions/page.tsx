@@ -124,14 +124,12 @@ function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   return { text: "Umum", icon: "👤" };
 }
 
-// ─── PAYMENT BREAKDOWN (TF + Cash detail) ────────────────────────────
-// Membaca field: payment_method, payment_method_2, amount_method_1, amount_method_2
+// ─── PAYMENT BREAKDOWN ────────────────────────────────────────────────
 function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md" }) {
   const method2 = (item.payment_method_2 ?? "").trim();
   const amount1 = Number(item.amount_method_1 ?? 0);
   const amount2 = Number(item.amount_method_2 ?? 0);
 
-  // Hanya tampil jika ada metode kedua dan kedua nominal terisi
   if (!method2 || amount1 <= 0 || amount2 <= 0) return null;
 
   const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
@@ -156,13 +154,11 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
 
   const m1meta = getMethodMeta(item.payment_method ?? "");
   const m2meta = getMethodMeta(method2);
-
   const entries = [
     { meta: m1meta, amount: amount1 },
     { meta: m2meta, amount: amount2 },
   ];
 
-  // ── size="md" → card grid 2 kolom (Mobile card & Detail modal) ──
   if (size === "md") {
     return (
       <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -170,9 +166,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
           const c = colorMap[meta.color] ?? colorMap.gray;
           return (
             <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-2.5 py-1.5`}>
-              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>
-                {meta.icon} {meta.label}
-              </p>
+              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>{meta.icon} {meta.label}</p>
               <p className={`text-xs font-bold ${c.text} font-mono`}>{fmt(amount)}</p>
             </div>
           );
@@ -181,16 +175,12 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
     );
   }
 
-  // ── size="sm" → inline compact (Desktop table row) ──────────────
   return (
     <div className="flex items-center gap-1 mt-1 flex-wrap">
       {entries.map(({ meta, amount }, i) => {
         const c = colorMap[meta.color] ?? colorMap.gray;
         return (
-          <span
-            key={i}
-            className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}
-          >
+          <span key={i} className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}>
             {meta.icon} {fmt(amount)}
           </span>
         );
@@ -199,8 +189,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   );
 }
 
-// ─── SKELETON COMPONENTS ────────────────────────────────────────────
-
+// ─── SKELETON ────────────────────────────────────────────────────────
 function SkeletonPulse({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
@@ -248,6 +237,7 @@ function MobileCardSkeleton() {
   );
 }
 
+// ── DIUBAH: tambah kolom CPU di skeleton row ─────────────────────────
 function TableRowSkeleton() {
   return (
     <tr className="border-b border-gray-100">
@@ -258,7 +248,7 @@ function TableRowSkeleton() {
           <SkeletonPulse className="h-3 w-20" />
         </div>
       </td>
-      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-24" /></div></td>
+      <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-20" /></td>
       <td className="px-3 py-3">
         <div className="space-y-1">
@@ -266,6 +256,7 @@ function TableRowSkeleton() {
           <SkeletonPulse className="h-3 w-12" />
         </div>
       </td>
+      {/* Laptop */}
       <td className="px-3 py-3">
         <div className="space-y-1">
           <SkeletonPulse className="h-3 w-32" />
@@ -275,6 +266,9 @@ function TableRowSkeleton() {
           </div>
         </div>
       </td>
+      {/* CPU — baru */}
+      <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
+      {/* SN */}
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-16" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
@@ -294,21 +288,20 @@ function TableRowSkeleton() {
 function MobileSkeletonList() {
   return (
     <div className="space-y-2">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <MobileCardSkeleton key={i} />
-      ))}
+      {Array.from({ length: 5 }).map((_, i) => (<MobileCardSkeleton key={i} />))}
     </div>
   );
 }
 
+// ── DIUBAH: tambah header CPU + minWidth naik ────────────────────────
 function DesktopSkeletonTable() {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1400px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1560px" }}>
           <thead>
             <tr className="border-b border-gray-300 bg-gray-100">
-              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "SN", "Harga", "Margin", "Metode", "Sumber", "Aksi"].map((h) => (
+              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Aksi"].map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -456,6 +449,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                         <p className="text-xs font-bold text-gray-900 leading-snug">{g.laptop_name}</p>
                       </div>
                       <div className="flex flex-wrap gap-1">
+                        {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
                         {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
                         {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
                       </div>
@@ -507,13 +501,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           )}
         </div>
 
-        {/* ── Payment Method — DIUBAH: tambah PaymentBreakdown ── */}
+        {/* Payment Method */}
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2.5 border border-purple-200">
           <div className="flex items-center gap-2">
             {payStyle.icon}
             <span className="text-xs font-bold text-purple-900">{payStyle.text}</span>
           </div>
-          {/* Breakdown TF + Cash jika split payment */}
           <PaymentBreakdown item={item} size="md" />
         </div>
       </div>
@@ -638,20 +631,23 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
   return null;
 }
 
-// ─── TRANSACTION TABLE ────────────────────────────────────────────────
+// ── DIUBAH: tambah header kolom CPU + minWidth naik ──────────────────
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1440px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1560px" }}>
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50">
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & waktu</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & Waktu</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Kontak</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Sales</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[200px]">Laptop</th>
+              {/* ── Laptop: nama + RAM + Storage saja (CPU dipisah) ── */}
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[180px]">Laptop</th>
+              {/* ── Kolom CPU baru ── */}
+              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">CPU</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
@@ -662,7 +658,16 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
           </thead>
           <tbody className="divide-y divide-gray-100">
             {paginatedTransactions.map((item: any) => (
-              <TransactionTableRow key={item.id} item={item} onPhotoClick={onPhotoClick} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onRestored={onRestored} onRowClick={onRowClick} />
+              <TransactionTableRow
+                key={item.id}
+                item={item}
+                onPhotoClick={onPhotoClick}
+                canEditTransaction={canEditTransaction}
+                canRestoreTransaction={canRestoreTransaction}
+                canSeeFinancials={canSeeFinancials}
+                onRestored={onRestored}
+                onRowClick={onRowClick}
+              />
             ))}
           </tbody>
         </table>
@@ -716,7 +721,7 @@ function StatusBadgeMobile({ item }: { item: any }) {
   );
 }
 
-// ─── TABLE ROW ────────────────────────────────────────────────────────
+// ── DIUBAH: kolom Laptop hanya nama+RAM+Storage, CPU pindah ke td sendiri ──
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -758,6 +763,66 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
+  // ── Helper render isi kolom Laptop (nama + RAM + Storage, TANPA CPU) ──
+  const renderLaptopCell = () => {
+    const grouped: any[] = item.grouped_items ?? [];
+    if (grouped.length > 1) {
+      return (
+        <div className="space-y-1">
+          {grouped.map((g: any, idx: number) => (
+            <div key={idx} className="flex items-start gap-1.5">
+              <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
+                <div className="flex gap-0.5 flex-wrap mt-0.5">
+                  {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
+                  {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-0.5">
+        <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
+        {(item.ram || item.storage) && (
+          <div className="flex items-center gap-1 flex-wrap">
+            {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.ram}</span>}
+            {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Helper render isi kolom CPU ──────────────────────────────────────
+  const renderCpuCell = () => {
+    const grouped: any[] = item.grouped_items ?? [];
+    if (grouped.length > 1) {
+      // Multi-unit: tampilkan CPU tiap group
+      const cpus = grouped.map((g: any) => g.cpu).filter(Boolean);
+      if (cpus.length === 0) return <span className="text-[10px] text-gray-300">—</span>;
+      return (
+        <div className="space-y-1">
+          {grouped.map((g: any, idx: number) => (
+            g.cpu
+              ? <div key={idx} className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 leading-snug">{g.cpu}</div>
+              : <span key={idx} className="text-[10px] text-gray-300">—</span>
+          ))}
+        </div>
+      );
+    }
+    // Single unit
+    if (!item.cpu) return <span className="text-[10px] text-gray-300">—</span>;
+    return (
+      <div className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-1 leading-snug">
+        {item.cpu}
+      </div>
+    );
+  };
+
   return (
     <>
       <tr className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer" onClick={() => onRowClick?.(item)}>
@@ -793,42 +858,14 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </div>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5">
-          {(() => {
-            const grouped: any[] = item.grouped_items ?? [];
-            if (grouped.length > 1) {
-              return (
-                <div className="space-y-1">
-                  {grouped.map((g: any, idx: number) => (
-                    <div key={idx} className="flex items-start gap-1.5">
-                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
-                        <div className="flex gap-0.5 flex-wrap mt-0.5">
-                          {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
-                          {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            }
-            return (
-              <div className="space-y-0.5">
-                <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
-                {(item.cpu || item.ram || item.storage || item.vga) && (
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {item.cpu && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.cpu}</span>}
-                    {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold whitespace-nowrap">{item.ram}</span>}
-                    {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
-                    {item.vga && <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold whitespace-nowrap border border-purple-100">{item.gpu}</span>}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </td>
+
+        {/* ── Kolom Laptop (nama + RAM + Storage, tanpa CPU) ── */}
+        <td className="px-3 py-2.5">{renderLaptopCell()}</td>
+
+        {/* ── Kolom CPU (baru) ── */}
+        <td className="px-3 py-2.5">{renderCpuCell()}</td>
+
+        {/* ── Kolom SN ── */}
         <td className="px-3 py-2.5">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
@@ -836,7 +873,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               return (
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
-                    <div key={idx} className="space-y-0.5">
+                    <div key={idx}>
                       {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
@@ -847,6 +884,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
+
         <td className="px-3 py-2.5 text-right">
           <span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
@@ -857,19 +895,15 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* ── Kolom Metode — DIUBAH: tambah PaymentBreakdown ── */}
         <td className="px-3 py-2.5 text-center">
           <div className="flex flex-col items-center gap-1">
             <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
               {payStyle.icon}
               <span className="text-[9px] font-bold text-gray-700">{payStyle.text.replace(/^[^\s]+ /, "")}</span>
             </div>
-            {/* Breakdown TF + Cash inline di bawah badge */}
             <PaymentBreakdown item={item} size="sm" />
           </div>
         </td>
-
         <td className="px-3 py-2.5 text-center">
           {item.source_platform ? (
             <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
@@ -1084,17 +1118,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   </span>
                 </div>
               )}
-
-              {/* ── Baris Metode — DIUBAH: tambah PaymentBreakdown ── */}
               <div className="pt-1 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Metode</span>
                   <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
                 </div>
-                {/* Breakdown TF + Cash di detail modal */}
                 <PaymentBreakdown item={item} size="md" />
               </div>
-
               {item.source_platform && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Platform</span>
@@ -1181,30 +1211,23 @@ export default function Page() {
     if (search.trim()) {
       const term = search.toLowerCase();
       filtered = filtered.filter((item) => {
-        // Field-field existing
         if (item.invoice_number?.toLowerCase().includes(term)) return true;
         if (item.customer_name?.toLowerCase().includes(term)) return true;
         if (item.customer_phone?.toLowerCase().includes(term)) return true;
         if (item.laptop_name?.toLowerCase().includes(term)) return true;
-
-        // ── Serial Number ──────────────────────────────────────────────
-        // 1. serial_number (string tunggal, format lama)
+        if (item.cpu?.toLowerCase().includes(term)) return true;
         if (item.serial_number?.toLowerCase().includes(term)) return true;
-
-        // 2. serial_numbers (array, transaksi single-unit baru)
         if (Array.isArray(item.serial_numbers)) {
           if (item.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
         }
-
-        // 3. grouped_items[].serial_numbers (transaksi multi-unit)
         if (Array.isArray(item.grouped_items)) {
           for (const g of item.grouped_items) {
+            if (g.cpu?.toLowerCase().includes(term)) return true;
             if (Array.isArray(g.serial_numbers)) {
               if (g.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
             }
           }
         }
-
         return false;
       });
     }
@@ -1390,13 +1413,10 @@ export default function Page() {
       if (tableRows.length > 0) {
         ws.addTable({
           name: "TabelTransaksi",
-          ref:  "A1",
-          headerRow:  true,
-          totalsRow:  false,
-          style: {
-            theme:          "TableStyleMedium7",
-            showRowStripes: true,
-          },
+          ref: "A1",
+          headerRow: true,
+          totalsRow: false,
+          style: { theme: "TableStyleMedium7", showRowStripes: true },
           columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
           rows: tableRows,
         });
@@ -1427,7 +1447,6 @@ export default function Page() {
         };
       });
 
-      // ── Style data rows + format Rupiah ────────────────────────
       tableRows.forEach((_, idx) => {
         const rowNum = idx + 2;
         const row = ws.getRow(rowNum);
@@ -1533,7 +1552,7 @@ export default function Page() {
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <input type="text" placeholder="Cari nota, customer, WA, laptop, SN..."
+              <input type="text" placeholder="Cari nota, customer, WA, laptop, CPU, SN..."
                 className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
