@@ -111,6 +111,7 @@ export async function GET(request: Request) {
         rejection_note, actual_end, proof_photo_url,
         completed_at, duration_minutes, total_pay,
         work_description, auto_completed,
+        is_holiday, is_late,
         created_at, updated_at
       `)
       .gte("request_date", startDate)
@@ -216,6 +217,8 @@ export async function POST(request: Request) {
       work_description,
       proof_photo_url,
       rate_per_hour,
+      is_holiday = false,
+      is_late = false,
     } = body;
 
     // ─── MANUAL INPUT ──────────────────────────────────────────────────────
@@ -309,7 +312,17 @@ export async function POST(request: Request) {
     }
 
     // ─── NORMAL REQUEST ────────────────────────────────────────────────────
-    if (!request_date || !reason || !requested_start) {
+    // is_holiday: request_date & requested_start diisi otomatis oleh server (WIB)
+    const finalRequestDate = is_holiday
+      ? new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : request_date;
+
+    const nowWIBForStart = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+    const finalRequestedStart = is_holiday
+      ? `${String(nowWIBForStart.getUTCHours()).padStart(2, "0")}:${String(nowWIBForStart.getUTCMinutes()).padStart(2, "0")}:00`
+      : requested_start;
+
+    if (!finalRequestDate || !reason || !finalRequestedStart) {
       return NextResponse.json(
         { success: false, message: "request_date, reason, requested_start wajib" },
         { status: 400 }
@@ -327,7 +340,7 @@ export async function POST(request: Request) {
       .from("overtime_requests")
       .select("id, status")
       .eq("user_id", user.id)
-      .eq("request_date", request_date)
+      .eq("request_date", finalRequestDate)
       .in("status", ["PENDING", "APPROVED", "ONGOING"])
       .maybeSingle();
 
@@ -338,14 +351,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // Hitung is_late server-side (lebih akurat dari client)
+    // Telat = jam masuk >= 08:00 WIB
+    const wibHour = nowWIBForStart.getUTCHours();
+    const wibMinute = nowWIBForStart.getUTCMinutes();
+    const serverIsLate = is_holiday
+      ? (wibHour * 60 + wibMinute) >= (8 * 60)   // holiday: pakai jam sekarang
+      : (() => {
+        // normal: parse dari requested_start ("HH:mm:ss")
+        const [h, m] = finalRequestedStart.split(":").map(Number);
+        return !isNaN(h) && (h * 60 + (m || 0)) >= (8 * 60);
+      })();
+
     const { data, error } = await supabase
       .from("overtime_requests")
       .insert({
         user_id: user.id,
-        request_date,
+        request_date: finalRequestDate,
         reason,
         work_description: reqWorkDesc.trim(),
-        requested_start,
+        requested_start: finalRequestedStart,
+        is_holiday,
+        is_late: serverIsLate,
         status: "PENDING",
       })
       .select()
@@ -654,9 +681,9 @@ export async function PATCH(request: Request) {
         );
       }
 
-      if (!rate_per_hour || rate_per_hour < 0) {
+      if (rate_per_hour === undefined || rate_per_hour === null || rate_per_hour < 0) {
         return NextResponse.json(
-          { success: false, message: "rate_per_hour wajib diisi" },
+          { success: false, message: "rate_per_hour wajib diisi (0 untuk nominal tetap)" },
           { status: 400 }
         );
       }

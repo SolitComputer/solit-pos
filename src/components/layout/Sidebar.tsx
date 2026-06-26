@@ -161,10 +161,10 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
-  managementSeller: (
+  monitorChat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 11l18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8a3 3 0 11-5.8-1.6" />
+      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
 };
@@ -183,11 +183,6 @@ const ITEM_ACCESSORIES: MenuItem = {
   href: "/dashboard/accessories",
   icon: Icons.accessories,
 };
-const ITEM_MANAGEMENT_SELLER: MenuItem = {
-  name: "Management Seller",
-  href: "/dashboard/management-seller",
-  icon: Icons.managementSeller,
-};
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -201,6 +196,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+    { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
   ],
 };
 
@@ -221,7 +217,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-    ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -309,6 +304,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
@@ -433,10 +429,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    {
-      label: "Marketing",
-      items: [ITEM_MANAGEMENT_SELLER],
-    },
   ],
   KEBERSIHAN: [
     {
@@ -470,7 +462,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Transaksi",
       items: [
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_MANAGEMENT_SELLER,
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
@@ -653,6 +644,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
   const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
 
+  // ── Preserve scroll position nav saat navigasi ────────────────────────────
   const navRef = useRef<HTMLElement>(null);
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 
@@ -661,7 +653,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
     if (saved) el.scrollTop = parseInt(saved, 10);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // sengaja kosong — hanya restore saat pertama mount
 
   const handleNavScroll = useCallback(() => {
     const el = navRef.current;
