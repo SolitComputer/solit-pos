@@ -2252,11 +2252,11 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
     );
 }
 
-// ─── Modal: Tidak Masuk Hari Ini ──────────────────────────────────────────────
 function AbsentUsersModal({
     date,
     absentUsers,
     isAdmin,
+    mode = "karyawan",
     onAbsenManual,
     onClose,
 }: {
@@ -2268,9 +2268,14 @@ function AbsentUsersModal({
         attendanceStatus: "LATE_MORNING" | "POTENTIALLY_LATE" | "NO_RECORD" | "ABSENT_CONFIRMED" | "WITHIN_TIME";
     }[];
     isAdmin: boolean;
+    mode?: "karyawan" | "pkl";
     onAbsenManual: (userId: string) => void;
     onClose: () => void;
 }) {
+    const isPKL = mode === "pkl";
+    const headerGradient = isPKL ? "from-amber-500 to-yellow-600" : "from-orange-500 to-amber-600";
+    const avatarGradient = isPKL ? "from-amber-400 to-yellow-500" : "from-orange-400 to-amber-500";
+    const modeLabel = isPKL ? "PKL" : "karyawan";
     const STATUS_CONFIG = {
         WITHIN_TIME: {
             label: "Belum Buka Absen",
@@ -2332,10 +2337,10 @@ function AbsentUsersModal({
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                <div className={`bg-gradient-to-r ${headerGradient} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
                     <div>
-                        <p className="font-bold text-white text-base">⚠️ Belum Absen</p>
-                        <p className="text-xs text-white/70 mt-1">{dateLabel} · {absentUsers.length} karyawan</p>
+                        <p className="font-bold text-white text-base">{isPKL ? "🎓 PKL Belum Absen" : "⚠️ Karyawan Belum Absen"}</p>
+                        <p className="text-xs text-white/70 mt-1">{dateLabel} · {absentUsers.length} {modeLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2367,7 +2372,7 @@ function AbsentUsersModal({
                                             className={`flex items-center justify-between gap-3 bg-white border ${cfg.border} rounded-xl px-3.5 py-3 shadow-sm`}
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0`}>
+                                                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-[9px] font-black flex-shrink-0`}>
                                                     {initials(u.name)}
                                                 </div>
                                                 <div className="min-w-0">
@@ -2401,6 +2406,74 @@ function AbsentUsersModal({
                     </button>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function AbsentSummaryBanner({ list, mode, onClick }: {
+    list: {
+        name: string; userId: string;
+        attendanceStatus: "LATE_MORNING" | "POTENTIALLY_LATE" | "NO_RECORD" | "ABSENT_CONFIRMED" | "WITHIN_TIME";
+    }[];
+    mode: "karyawan" | "pkl";
+    onClick: () => void;
+}) {
+    const isPKL = mode === "pkl";
+    const wrapBg = isPKL ? "bg-amber-50/10" : "bg-orange-50/10";
+    const btnBg = isPKL ? "bg-amber-50 border-amber-200 hover:bg-amber-100" : "bg-orange-50 border-orange-200 hover:bg-orange-100";
+    const titleColor = isPKL ? "text-amber-700" : "text-orange-700";
+    const subColor = isPKL ? "text-amber-500" : "text-orange-500";
+    const avatarGrad = isPKL ? "from-amber-400 to-yellow-500" : "from-orange-400 to-amber-500";
+    const arrowColor = isPKL ? "text-amber-400 group-hover:text-amber-600" : "text-orange-400 group-hover:text-orange-600";
+    const icon = isPKL ? "🎓" : "⚠️";
+    const label = isPKL ? "PKL" : "Karyawan";
+
+    const confirmed = list.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED").length;
+    const late = list.filter(u => u.attendanceStatus === "LATE_MORNING").length;
+    const potential = list.filter(u => u.attendanceStatus === "POTENTIALLY_LATE").length;
+    const parts: string[] = [];
+    if (confirmed > 0) parts.push(`${confirmed} tidak hadir`);
+    if (late > 0) parts.push(`${late} absen siang`);
+    if (potential > 0) parts.push(`${potential} berpotensi terlambat`);
+    const summary = parts.join(" · ") || "Klik untuk detail";
+
+    return (
+        <div className={`px-6 pt-3 pb-3 border-b border-gray-50 ${wrapBg}`}>
+            <button
+                onClick={onClick}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-all group ${btnBg}`}
+            >
+                <div className="flex items-center gap-3">
+                    <span className="text-lg">{icon}</span>
+                    <div className="text-left">
+                        <p className={`text-xs font-bold ${titleColor}`}>
+                            {list.length} {label} Belum Absen
+                        </p>
+                        <p className={`text-[10px] mt-0.5 ${subColor}`}>{summary}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex -space-x-1.5">
+                        {list.slice(0, 4).map(u => (
+                            <div
+                                key={u.userId}
+                                className={`w-6 h-6 rounded-full bg-gradient-to-br ${avatarGrad} border-2 border-white flex items-center justify-center text-white text-[8px] font-black`}
+                                title={u.name}
+                            >
+                                {initials(u.name)}
+                            </div>
+                        ))}
+                        {list.length > 4 && (
+                            <div className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-gray-500 text-[8px] font-black">
+                                +{list.length - 4}
+                            </div>
+                        )}
+                    </div>
+                    <svg className={`w-4 h-4 transition-colors ${arrowColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                </div>
+            </button>
         </div>
     );
 }
@@ -2470,7 +2543,7 @@ export default function AttendanceDashboardPage() {
     const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
-    const [showAbsentPopup, setShowAbsentPopup] = useState(false);
+    const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
     const [salaryModalPklOnly, setSalaryModalPklOnly] = useState<boolean | undefined>(undefined);
@@ -3100,6 +3173,15 @@ export default function AttendanceDashboardPage() {
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
     }, [selectedDate, allUsers, mergedAttendances, manualMap, isDayOffForUser, leaveData, calYear, calMonth]);
 
+    const selectedAbsentKaryawan = useMemo(
+        () => selectedAbsentUsers.filter(u => !isPKLRole(u.role)),
+        [selectedAbsentUsers]
+    );
+    const selectedAbsentPKL = useMemo(
+        () => selectedAbsentUsers.filter(u => isPKLRole(u.role)),
+        [selectedAbsentUsers]
+    );
+
     const generateSlipFromRecapan = useCallback(async (userStat: typeof userSummary[0]) => {
         try {
             const sal = salaryMap[userStat.userId];
@@ -3495,7 +3577,7 @@ export default function AttendanceDashboardPage() {
                                             const hasManual = mc > 0;
                                             return (
                                                 <button key={day} onClick={() => {
-                                                    setShowAbsentPopup(false);
+                                                    setAbsentPopupMode(null);
                                                     setSelectedDate(p => p === dk ? null : dk);
                                                 }}
                                                     className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
@@ -3538,12 +3620,20 @@ export default function AttendanceDashboardPage() {
                                             {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">⏰ {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full">✏️ {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
                                             {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 {selectedOffDetail.length} libur</span>}
-                                            {selectedAbsentUsers.length > 0 && calendarPklFilter !== "pkl" && (
+                                            {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
                                                 <button
-                                                    onClick={() => setShowAbsentPopup(true)}
+                                                    onClick={() => setAbsentPopupMode("karyawan")}
                                                     className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
                                                 >
-                                                    ⚠️ {selectedAbsentUsers.length} tidak masuk
+                                                    ⚠️ {selectedAbsentKaryawan.length} karyawan tidak masuk
+                                                </button>
+                                            )}
+                                            {selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                                <button
+                                                    onClick={() => setAbsentPopupMode("pkl")}
+                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full hover:bg-amber-200 transition-all"
+                                                >
+                                                    🎓 {selectedAbsentPKL.length} PKL tidak masuk
                                                 </button>
                                             )}
                                         </div>
@@ -3555,8 +3645,7 @@ export default function AttendanceDashboardPage() {
                                                     ➕ Tambah Manual
                                                 </button>
                                             )}
-                                        <button onClick={() => { setSelectedDate(null); setShowAbsentPopup(false); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        <button onClick={() => { setSelectedDate(null); setAbsentPopupMode(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
                                     </div>
                                 </div>
@@ -3584,56 +3673,19 @@ export default function AttendanceDashboardPage() {
                                     </div>
                                 )}
 
-                                {canManage && selectedAbsentUsers.length > 0 && calendarPklFilter !== "pkl" && (
-                                    <div className="px-6 pt-3 pb-3 border-b border-gray-50 bg-orange-50/10">
-                                        <button
-                                            onClick={() => setShowAbsentPopup(true)}
-                                            className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-all group"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-lg">⚠️</span>
-                                                <div className="text-left">
-                                                    <p className="text-xs font-bold text-orange-700">
-                                                        {selectedAbsentUsers.length} Karyawan Belum Absen
-                                                    </p>
-                                                    <p className="text-[10px] text-orange-500 mt-0.5">
-                                                        {(() => {
-                                                            const confirmed = selectedAbsentUsers.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED").length;
-                                                            const late = selectedAbsentUsers.filter(u => u.attendanceStatus === "LATE_MORNING").length;
-                                                            const potential = selectedAbsentUsers.filter(u => u.attendanceStatus === "POTENTIALLY_LATE").length;
-                                                            const parts: string[] = [];
-                                                            if (confirmed > 0) parts.push(`${confirmed} tidak hadir`);
-                                                            if (late > 0) parts.push(`${late} absen siang`);
-                                                            if (potential > 0) parts.push(`${potential} berpotensi terlambat`);
-                                                            return parts.join(" · ") || "Klik untuk detail";
-                                                        })()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                {/* Mini avatar stack */}
-                                                <div className="flex -space-x-1.5">
-                                                    {selectedAbsentUsers.slice(0, 4).map(u => (
-                                                        <div
-                                                            key={u.userId}
-                                                            className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 border-2 border-white flex items-center justify-center text-white text-[8px] font-black"
-                                                            title={u.name}
-                                                        >
-                                                            {initials(u.name)}
-                                                        </div>
-                                                    ))}
-                                                    {selectedAbsentUsers.length > 4 && (
-                                                        <div className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-gray-500 text-[8px] font-black">
-                                                            +{selectedAbsentUsers.length - 4}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <svg className="w-4 h-4 text-orange-400 group-hover:text-orange-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </button>
-                                    </div>
+                                {canManage && selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
+                                    <AbsentSummaryBanner
+                                        list={selectedAbsentKaryawan}
+                                        mode="karyawan"
+                                        onClick={() => setAbsentPopupMode("karyawan")}
+                                    />
+                                )}
+                                {canManage && selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                    <AbsentSummaryBanner
+                                        list={selectedAbsentPKL}
+                                        mode="pkl"
+                                        onClick={() => setAbsentPopupMode("pkl")}
+                                    />
                                 )}
 
                                 {selectedAttendances.length === 0 ? (
@@ -5400,13 +5452,24 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-            {showAbsentPopup && selectedDate && selectedAbsentUsers.length > 0 && (
+            {absentPopupMode === "karyawan" && selectedDate && selectedAbsentKaryawan.length > 0 && (
                 <AbsentUsersModal
                     date={selectedDate}
-                    absentUsers={selectedAbsentUsers}
+                    absentUsers={selectedAbsentKaryawan}
                     isAdmin={isAdmin}
+                    mode="karyawan"
                     onAbsenManual={(userId) => openAddManual(selectedDate, userId)}
-                    onClose={() => setShowAbsentPopup(false)}
+                    onClose={() => setAbsentPopupMode(null)}
+                />
+            )}
+            {absentPopupMode === "pkl" && selectedDate && selectedAbsentPKL.length > 0 && (
+                <AbsentUsersModal
+                    date={selectedDate}
+                    absentUsers={selectedAbsentPKL}
+                    isAdmin={isAdmin}
+                    mode="pkl"
+                    onAbsenManual={(userId) => openAddManual(selectedDate, userId)}
+                    onClose={() => setAbsentPopupMode(null)}
                 />
             )}
             <style jsx global>{`
