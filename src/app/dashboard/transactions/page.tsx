@@ -117,6 +117,16 @@ function getSourcePlatformBadge(platform: string): { text: string; color: string
   return { text: platform || "-", color: "bg-gray-50 text-gray-700 border-gray-200" };
 }
 
+function getCompanyBadge(company: string): { label: string; color: string } {
+  const cn = (company ?? "").toLowerCase();
+  if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 border-orange-200" };
+  if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 border-blue-200" };
+  if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 border-purple-200" };
+  if (!company || company.trim() === "") return { label: "—", color: "bg-gray-50 text-gray-400 border-gray-100" };
+  return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
+}
+
+// ─── FIX: body function yang terpotong ───────────────────────────────
 function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   const t = (type ?? "UMUM").toUpperCase();
   if (t === "RESELLER") return { text: "Reseller", icon: "🏪" };
@@ -237,7 +247,6 @@ function MobileCardSkeleton() {
   );
 }
 
-// ── DIUBAH: tambah kolom CPU di skeleton row ─────────────────────────
 function TableRowSkeleton() {
   return (
     <tr className="border-b border-gray-100">
@@ -256,7 +265,6 @@ function TableRowSkeleton() {
           <SkeletonPulse className="h-3 w-12" />
         </div>
       </td>
-      {/* Laptop */}
       <td className="px-3 py-3">
         <div className="space-y-1">
           <SkeletonPulse className="h-3 w-32" />
@@ -266,13 +274,12 @@ function TableRowSkeleton() {
           </div>
         </div>
       </td>
-      {/* CPU — baru */}
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
-      {/* SN */}
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-16" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-7 w-20 rounded-lg mx-auto" /></td>
+      <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3">
         <div className="flex items-center justify-center gap-1">
@@ -293,15 +300,14 @@ function MobileSkeletonList() {
   );
 }
 
-// ── DIUBAH: tambah header CPU + minWidth naik ────────────────────────
 function DesktopSkeletonTable() {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1560px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1680px" }}>
           <thead>
             <tr className="border-b border-gray-300 bg-gray-100">
-              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Aksi"].map((h) => (
+              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Toko", "Aksi"].map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -631,12 +637,11 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
   return null;
 }
 
-// ── DIUBAH: tambah header kolom CPU + minWidth naik ──────────────────
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1560px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1680px" }}>
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50">
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
@@ -644,15 +649,14 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Kontak</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Sales</th>
-              {/* ── Laptop: nama + RAM + Storage saja (CPU dipisah) ── */}
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[180px]">Laptop</th>
-              {/* ── Kolom CPU baru ── */}
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">CPU</th>
               <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
               <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Metode</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Sumber</th>
+              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Toko</th>
               <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Aksi</th>
             </tr>
           </thead>
@@ -699,29 +703,6 @@ function StatusBadge({ item }: { item: any }) {
   );
 }
 
-function StatusBadgeMobile({ item }: { item: any }) {
-  const originalStatus = getOriginalStatus(item);
-  if (originalStatus) {
-    return (
-      <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${originalStatus === "RESERVED" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
-          {originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"}
-        </span>
-        <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-100 text-green-700 border border-green-200 flex items-center gap-0.5 whitespace-nowrap">
-          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-          Lunas
-        </span>
-      </div>
-    );
-  }
-  return (
-    <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-      {STATUS_LABEL[item.status] ?? item.status}
-    </span>
-  );
-}
-
-// ── DIUBAH: kolom Laptop hanya nama+RAM+Storage, CPU pindah ke td sendiri ──
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -763,7 +744,6 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-  // ── Helper render isi kolom Laptop (nama + RAM + Storage, TANPA CPU) ──
   const renderLaptopCell = () => {
     const grouped: any[] = item.grouped_items ?? [];
     if (grouped.length > 1) {
@@ -797,11 +777,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
     );
   };
 
-  // ── Helper render isi kolom CPU ──────────────────────────────────────
   const renderCpuCell = () => {
     const grouped: any[] = item.grouped_items ?? [];
     if (grouped.length > 1) {
-      // Multi-unit: tampilkan CPU tiap group
       const cpus = grouped.map((g: any) => g.cpu).filter(Boolean);
       if (cpus.length === 0) return <span className="text-[10px] text-gray-300">—</span>;
       return (
@@ -814,7 +792,6 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         </div>
       );
     }
-    // Single unit
     if (!item.cpu) return <span className="text-[10px] text-gray-300">—</span>;
     return (
       <div className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-1 leading-snug">
@@ -858,14 +835,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </div>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-
-        {/* ── Kolom Laptop (nama + RAM + Storage, tanpa CPU) ── */}
         <td className="px-3 py-2.5">{renderLaptopCell()}</td>
-
-        {/* ── Kolom CPU (baru) ── */}
         <td className="px-3 py-2.5">{renderCpuCell()}</td>
-
-        {/* ── Kolom SN ── */}
         <td className="px-3 py-2.5">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
@@ -884,7 +855,6 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-
         <td className="px-3 py-2.5 text-right">
           <span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
@@ -908,6 +878,16 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           {item.source_platform ? (
             <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
+        </td>
+        <td className="px-3 py-2.5 text-center">
+          {(() => {
+            const badge = getCompanyBadge(item.company_name ?? "");
+            return (
+              <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${badge.color}`}>
+                {badge.label}
+              </span>
+            );
+          })()}
         </td>
         <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center gap-0.5">
@@ -1170,6 +1150,7 @@ export default function Page() {
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
   const [customerType, setCustomerType] = useState("ALL");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [companyName, setCompanyName] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -1186,8 +1167,8 @@ export default function Page() {
     fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
   }, []);
 
-  const canEditTransaction    = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)    : false;
-  const canSeeFinancials      = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS)      : false;
+  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+  const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -1238,6 +1219,15 @@ export default function Page() {
     if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
     if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
     if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
+    if (companyName !== "ALL") {
+      const q = companyName.toLowerCase();
+      filtered = filtered.filter((item) => {
+        const cn = (item.company_name ?? "").toLowerCase();
+        if (q === "sotech") return cn.includes("sotech");
+        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech");
+        return cn === q;
+      });
+    }
 
     filtered.sort((a, b) => {
       const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -1245,7 +1235,7 @@ export default function Page() {
     });
 
     return filtered;
-  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
+  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
@@ -1253,7 +1243,9 @@ export default function Page() {
     return filteredTransactions.slice(start, start + itemsPerPage);
   }, [filteredTransactions, currentPage, itemsPerPage]);
 
-  useEffect(() => { setCurrentPage(1); }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const uniquePaymentMethods = useMemo(() => {
     const methods = new Set(allTransactions.map((t) => t.payment_method).filter(Boolean));
@@ -1265,18 +1257,30 @@ export default function Page() {
     return ["ALL", ...Array.from(platforms)];
   }, [allTransactions]);
 
-  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || dateFrom || dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL";
+  const hasActiveFilter =
+    status !== "ALL" ||
+    customerType !== "ALL" ||
+    !!dateFrom ||
+    !!dateTo ||
+    paymentMethod !== "ALL" ||
+    sourcePlatform !== "ALL" ||
+    companyName !== "ALL";
 
   const resetFilters = () => {
-    setSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
-    setPaymentMethod("ALL"); setSourcePlatform("ALL");
+    setSearch("");
+    setStatus("ALL");
+    setCustomerType("ALL");
+    setDateFrom("");
+    setDateTo("");
+    setPaymentMethod("ALL");
+    setSourcePlatform("ALL");
+    setCompanyName("ALL");
   };
 
   // ─── EXPORT EXCEL ──────────────────────────────────────────────────
   const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
-
     try {
       const wb = new ExcelJS.Workbook();
       wb.creator = "Solit POS";
@@ -1336,14 +1340,12 @@ export default function Page() {
       const LEFT_KEYS = new Set(["invoice", "tanggal"]);
       const CURR_KEYS = new Set(["modal", "jual"]);
       const NUM_KEYS = new Set(["qty"]);
-
       const tableRows: (string | number)[][] = [];
 
       for (const item of filteredTransactions) {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
         const cached = detailCache.get(item.invoice_number);
-
         const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", {
           day: "2-digit", month: "2-digit", year: "numeric",
         });
@@ -1353,69 +1355,43 @@ export default function Page() {
           cached?.grouped_items?.forEach((cg) => {
             if (cg.laptop_name) cachedGroupMap.set(cg.laptop_name, cg.purchase_price_total);
           });
-
           for (const g of grouped) {
             const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
             const modal = canSeeFinancials
               ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0))
               : 0;
-
             tableRows.push([
-              item.invoice_number ?? "",
-              tanggal,
+              item.invoice_number ?? "", tanggal,
               STATUS_LABEL[item.status] ?? item.status ?? "",
-              Number(g.unit_count ?? 1),
-              g.laptop_name ?? "",
-              g.cpu ?? "",
-              g.ram ?? "",
-              g.storage ?? "",
-              item.payment_method ?? "",
-              modal,
-              Number(g.allocated_deal_price ?? 0),
-              item.customer_name ?? "",
-              item.customer_phone ?? "",
-              item.source_platform ?? "",
-              sns.join(", "),
-              item.notes ?? "",
+              Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "",
+              g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal,
+              Number(g.allocated_deal_price ?? 0), item.customer_name ?? "",
+              item.customer_phone ?? "", item.source_platform ?? "",
+              sns.join(", "), item.notes ?? "",
             ]);
           }
         } else {
-          const sns: string[] =
-            Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
-              ? item.serial_numbers
-              : item.serial_number ? [item.serial_number] : [];
-
+          const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+            ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
           const modal = canSeeFinancials
             ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0))
             : 0;
-
           tableRows.push([
-            item.invoice_number ?? "",
-            tanggal,
+            item.invoice_number ?? "", tanggal,
             STATUS_LABEL[item.status] ?? item.status ?? "",
-            1,
-            item.laptop_name ?? "",
-            item.cpu ?? "",
-            item.ram ?? "",
-            item.storage ?? "",
-            item.payment_method ?? "",
-            modal,
-            Number(item.deal_price ?? item.amount ?? 0),
-            item.customer_name ?? "",
-            item.customer_phone ?? "",
-            item.source_platform ?? "",
-            sns.join(", "),
-            item.notes ?? "",
+            1, item.laptop_name ?? "", item.cpu ?? "",
+            item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal,
+            Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "",
+            item.customer_phone ?? "", item.source_platform ?? "",
+            sns.join(", "), item.notes ?? "",
           ]);
         }
       }
 
       if (tableRows.length > 0) {
         ws.addTable({
-          name: "TabelTransaksi",
-          ref: "A1",
-          headerRow: true,
-          totalsRow: false,
+          name: "TabelTransaksi", ref: "A1",
+          headerRow: true, totalsRow: false,
           style: { theme: "TableStyleMedium7", showRowStripes: true },
           columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
           rows: tableRows,
@@ -1480,7 +1456,6 @@ export default function Page() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
-
     } catch (err) {
       console.error("Export error:", err);
       alert("Gagal export Excel. Silakan coba lagi.");
@@ -1507,7 +1482,6 @@ export default function Page() {
             </div>
             <p className="text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
           </div>
-
           <div className="flex items-center gap-2">
             {!isLoading && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200">
@@ -1552,12 +1526,18 @@ export default function Page() {
               <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              <input type="text" placeholder="Cari nota, customer, WA, laptop, CPU, SN..."
+              <input
+                type="text"
+                placeholder="Cari nota, customer, WA, laptop, CPU, SN..."
                 className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                value={search} onChange={(e) => setSearch(e.target.value)} />
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <button onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50">
+            <button
+              onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50"
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {sortOrder === "newest"
                   ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
@@ -1565,22 +1545,27 @@ export default function Page() {
               </svg>
               <span className="hidden sm:inline text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
             </button>
-            <button onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
               </svg>
               Filter
               {hasActiveFilter && (
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-                  {[status !== "ALL", customerType !== "ALL", dateFrom, dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL"].filter(Boolean).length}
+                  {[status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL"].filter(Boolean).length}
                 </span>
               )}
             </button>
           </div>
 
+          {/* ── Filter Panel ── */}
           {showFilters && (
             <div className="pt-3 border-t border-gray-100 space-y-4">
+
+              {/* Status */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Status Transaksi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -1593,6 +1578,7 @@ export default function Page() {
                 </div>
               </div>
 
+              {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1608,10 +1594,13 @@ export default function Page() {
                   </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">✕ Hapus filter tanggal</button>
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">
+                    ✕ Hapus filter tanggal
+                  </button>
                 )}
               </div>
 
+              {/* Sumber Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Sumber / Platform</label>
@@ -1630,6 +1619,7 @@ export default function Page() {
                 </div>
               )}
 
+              {/* Metode Pembayaran */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Metode Pembayaran</label>
@@ -1648,8 +1638,48 @@ export default function Page() {
                 </div>
               )}
 
+              {/* ── Filter Perusahaan ── */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-2 block">Perusahaan / Nama Toko</label>
+                <div className="flex gap-1.5">
+                  {[
+                    { value: "ALL",    label: "Semua",    icon: "🏢", desc: null },
+                    { value: "solit",  label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
+                    { value: "sotech", label: "Sotech",   icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
+                  ].map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setCompanyName(c.value)}
+                      title={c.desc ?? undefined}
+                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${
+                        companyName === c.value
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                      }`}
+                    >
+                      <span>{c.icon}</span>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                {companyName !== "ALL" && (
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    Menampilkan transaksi toko:{" "}
+                    <span className="font-semibold text-gray-600">
+                      {companyName === "solit" ? "Solit 03" : "Sotech"}
+                    </span>
+                    {" "}<span className="text-gray-300">·</span>{" "}
+                    <span className="text-gray-400">termasuk semua variasi penulisan nama</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Reset */}
               {hasActiveFilter && (
-                <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium">
+                <button
+                  onClick={resetFilters}
+                  className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium"
+                >
                   ✕ Reset semua filter
                 </button>
               )}
@@ -1664,23 +1694,47 @@ export default function Page() {
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <div className="text-5xl mb-4 opacity-40">🔍</div>
             <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi ditemukan</p>
-            {hasActiveFilter && <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">Reset filter</button>}
+            {hasActiveFilter && (
+              <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">
+                Reset filter
+              </button>
+            )}
           </div>
         ) : isMobile ? (
           <div className="space-y-2">
             {paginatedTransactions.map((item) => (
-              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials} canRestoreTransaction={canRestoreTransaction} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+              <TransactionCard
+                key={item.id}
+                item={item}
+                onPhotoClick={setPhotoModal}
+                canEditTransaction={canEditTransaction}
+                canSeeFinancials={canSeeFinancials}
+                canRestoreTransaction={canRestoreTransaction}
+                onRestored={() => fetchTransactions()}
+                onRowClick={setDetailItem}
+              />
             ))}
           </div>
         ) : (
-          <TransactionTable paginatedTransactions={paginatedTransactions} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onPhotoClick={setPhotoModal} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+          <TransactionTable
+            paginatedTransactions={paginatedTransactions}
+            canEditTransaction={canEditTransaction}
+            canRestoreTransaction={canRestoreTransaction}
+            canSeeFinancials={canSeeFinancials}
+            onPhotoClick={setPhotoModal}
+            onRestored={() => fetchTransactions()}
+            onRowClick={setDetailItem}
+          />
         )}
 
         {/* ── Pagination ── */}
         {!isLoading && filteredTransactions.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-1">
-            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
               Sebelumnya
             </button>
@@ -1689,8 +1743,11 @@ export default function Page() {
               <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{currentPage}</span>
               <span className="text-xs text-gray-400">dari {totalPages}</span>
             </div>
-            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               Selanjutnya
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
