@@ -840,6 +840,20 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
 
+  // ✅ Hitung sekali, dipakai di dropdown + hint text
+  const allowedRoles = useMemo(() => getManualAllowedRoles(currentUser?.role), [currentUser?.role]);
+  const isFullAdmin = allowedRoles === null; // null = ADMIN/PROGRAMMER/ASISTEN_CEO → semua user
+
+  // ✅ Filter user sesuai hak akses:
+  // - Admin/Programmer/Asisten CEO → semua user tanpa filter
+  // - Kepala divisi → hanya bawahan sesuai DIVISION_HEAD_MAP
+  const filteredUsers = useMemo(() =>
+    allUsers
+      .filter(u => isFullAdmin || allowedRoles!.includes(u.role))
+      .sort((a, b) => a.name.localeCompare(b.name, "id-ID")),
+    [allUsers, allowedRoles, isFullAdmin]
+  );
+
   const previewHours = useMemo(() => {
     if (!startTime || !endTime) return null;
     const d = (new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime()) / 3600000;
@@ -878,23 +892,16 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
         {error && <ErrorBanner msg={error} />}
         <div>
           <label className={lbl}>Nama Karyawan *</label>
-          {(() => {
-            const allowedRoles = getManualAllowedRoles(currentUser?.role);
-            const filtered = allUsers
-              .filter(u => allowedRoles === null || allowedRoles.includes(u.role))
-              .sort((a, b) => a.name.localeCompare(b.name, "id-ID"));
-            return (
-              <select value={targetUserId} onChange={e => setTargetUserId(e.target.value)} className={inp + " cursor-pointer"}>
-                <option value="">— Pilih karyawan —</option>
-                {filtered.map(u => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
-                ))}
-              </select>
-            );
-          })()}
-          {getManualAllowedRoles(currentUser?.role) !== null && (
+          <select value={targetUserId} onChange={e => setTargetUserId(e.target.value)} className={inp + " cursor-pointer"}>
+            <option value="">— Pilih karyawan —</option>
+            {filteredUsers.map(u => (
+              <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
+            ))}
+          </select>
+          {/* ✅ Hint hanya muncul untuk kepala divisi, bukan admin */}
+          {!isFullAdmin && allowedRoles && allowedRoles.length > 0 && (
             <p className="text-[9px] text-gray-400 mt-1.5">
-              Menampilkan bawahan divisimu saja ({getManualAllowedRoles(currentUser?.role)?.map(r => r.replace(/_/g, " ")).join(", ")})
+              Hanya menampilkan bawahanmu: {allowedRoles.map(r => r.replace(/_/g, " ")).join(", ")}
             </p>
           )}
         </div>
