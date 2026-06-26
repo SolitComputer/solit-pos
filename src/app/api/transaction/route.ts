@@ -127,7 +127,6 @@ async function handler(req: NextRequest) {
         serial_numbers: string[];
         purchase_price_total: number;
         selling_price_total: number;
-        // ✅ deal_price aktual dari transaction_items
         allocated_deal_price: number;
         unit_count: number;
       }>();
@@ -159,7 +158,7 @@ async function handler(req: NextRequest) {
             serial_numbers: [],
             purchase_price_total: 0,
             selling_price_total: 0,
-            allocated_deal_price: 0, // ✅ akan diakumulasi
+            allocated_deal_price: 0,
             unit_count: 0,
           });
         }
@@ -194,16 +193,13 @@ async function handler(req: NextRequest) {
 
       const grouped_items = Array.from(laptopGroups.values());
 
-      // ✅ Hitung margin per group berdasarkan deal_price AKTUAL
-      // Jika transaction_items tidak ada (transaksi lama), fallback ke proporsional
       const hasTxItems = items.length > 0;
       const totalAllocated = grouped_items.reduce((s, g) => s + g.allocated_deal_price, 0);
 
       const grouped_items_with_margin = grouped_items.map(g => {
         let finalDealPrice = g.allocated_deal_price;
 
-        // ✅ Jika transaction_items tidak ada atau total tidak match deal price,
-        // gunakan proporsional dari selling_price sebagai fallback
+
         if (!hasTxItems || totalAllocated === 0) {
           const totalSelling = grouped_items.reduce((s, gi) => s + gi.selling_price_total, 0);
           if (totalSelling > 0) {
