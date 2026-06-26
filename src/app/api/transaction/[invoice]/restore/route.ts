@@ -96,9 +96,6 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         .from("laptop_units")
         .update({
           status: "SIAP_JUAL",
-          reserved_by: null,
-          reserved_at: null,
-          sold_at: null,
         })
         .in("id", unitIds);
 
