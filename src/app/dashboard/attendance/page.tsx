@@ -2966,6 +2966,14 @@ export default function AttendanceDashboardPage() {
                 const isPastOrToday = !(isCurrentMonth && dk > todayWIB);
 
                 if (isOffDay) {
+                    const effOnOff = effByName[name]?.[dk];
+                    if (isPastOrToday && (effOnOff === "PRESENT" || effOnOff === "LATE")) {
+                        totalWorkdays++;
+                        pastWorkdays++;
+                        if (effOnOff === "PRESENT") { present++; score += 1; }
+                        else { late++; score += 0.5; }
+                        continue;
+                    }
                     if (isPastOrToday) offDates.push(dk);
                     continue;
                 }
@@ -3201,9 +3209,6 @@ export default function AttendanceDashboardPage() {
             const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
             if (dk > todayWIB) break;
 
-            // Cek apakah hari ini libur
-            if (isDayOffForUser(userName, dk)) continue;
-
             const manualRec = manualByDate[dk];
             const autoRec = autoByDate[dk];
 
@@ -3227,6 +3232,9 @@ export default function AttendanceDashboardPage() {
                 checkInTime = toWIBTime(autoRec.check_in_time || autoRec.created_at);
                 method = "FACE";
             }
+
+            const hadirDiHariLibur = dayStatus === "PRESENT" || dayStatus === "LATE";
+            if (!hadirDiHariLibur && isDayOffForUser(userName, dk)) continue;
 
             if (dayStatus === targetStatus) {
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy });
