@@ -2966,12 +2966,20 @@ export default function AttendanceDashboardPage() {
                 const isPastOrToday = !(isCurrentMonth && dk > todayWIB);
 
                 if (isOffDay) {
+                    const effOnOff = effByName[name]?.[dk];
+                    if (isPastOrToday && (effOnOff === "PRESENT" || effOnOff === "LATE")) {
+                        totalWorkdays++;
+                        pastWorkdays++;
+                        if (effOnOff === "PRESENT") { present++; score += 1; }
+                        else { late++; score += 0.5; }
+                        continue;
+                    }
                     if (isPastOrToday) offDates.push(dk);
-                    continue;                            
+                    continue;
                 }
 
-                totalWorkdays++;                  
-                if (!isPastOrToday) continue;     
+                totalWorkdays++;
+                if (!isPastOrToday) continue;
 
                 pastWorkdays++;
                 const eff = effByName[name]?.[dk];
@@ -3201,9 +3209,6 @@ export default function AttendanceDashboardPage() {
             const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
             if (dk > todayWIB) break;
 
-            // Cek apakah hari ini libur
-            if (isDayOffForUser(userName, dk)) continue;
-
             const manualRec = manualByDate[dk];
             const autoRec = autoByDate[dk];
 
@@ -3227,6 +3232,9 @@ export default function AttendanceDashboardPage() {
                 checkInTime = toWIBTime(autoRec.check_in_time || autoRec.created_at);
                 method = "FACE";
             }
+
+            const hadirDiHariLibur = dayStatus === "PRESENT" || dayStatus === "LATE";
+            if (!hadirDiHariLibur && isDayOffForUser(userName, dk)) continue;
 
             if (dayStatus === targetStatus) {
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy });
@@ -3302,12 +3310,6 @@ export default function AttendanceDashboardPage() {
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
                                     📅 Atur Libur
-                                </button>
-                                <button
-                                    onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShowSwapModal(true); }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
-                                >
-                                    🔄 Tukar Libur
                                 </button>
                             </>
                         )}
@@ -3715,7 +3717,7 @@ export default function AttendanceDashboardPage() {
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.source === "MANUAL" ? "bg-blue-100 text-blue-700 border-blue-200" : a.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
-                                                                    {a.source === "MANUAL" ? "✏️ Manual" : a.method === "FACE" ? "🫦 Wajah" : "⏭ Skip"}
+                                                                    {a.source === "MANUAL" ? "✏️ Manual" : a.method === "FACE" ? "📷 Wajah" : "⏭️ Skip"}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-4">
@@ -5296,6 +5298,8 @@ export default function AttendanceDashboardPage() {
                     onSaved={() => {
                         fetchMonthlyOffs(calYear, calMonth);
                         fetchAllDateOffs();
+                        fetchAllDateWorks();
+                        fetchDayOffs();
                     }}
                 />
             )}

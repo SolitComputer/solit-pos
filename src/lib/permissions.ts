@@ -85,7 +85,7 @@ const SALES_ACCESS: UserRole[] = [
 
 const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
 
-// ─── Service Queue Role Groups ────────────────────────────────────────────────
+const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING"];
 export const SERVICE_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "TEKNISI",
@@ -234,13 +234,16 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
-  "/api/pkl-reports": [
+ "/api/pkl-reports": [
     ...FULL_ACCESS,
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
+
+  "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
+  "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 };
 
 export const PERMISSIONS = {
@@ -318,12 +321,14 @@ export const PERMISSIONS = {
   VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
-  // ✅ Service Queue Permissions
   VIEW_SERVICE: [...SERVICE_VIEW_ROLES] as UserRole[],
   CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
+
+  VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
+  MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(
