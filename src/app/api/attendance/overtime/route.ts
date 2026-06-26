@@ -223,11 +223,32 @@ export async function POST(request: Request) {
 
     // ─── MANUAL INPUT ──────────────────────────────────────────────────────
     if (is_manual === true) {
-      if (!FULL_ACCESS.includes(user.role)) {
+      const isAllowedManual =
+        FULL_ACCESS.includes(user.role) ||
+        Object.keys(DIVISION_HEAD_MAP).includes(user.role);
+
+      if (!isAllowedManual) {
         return NextResponse.json(
           { success: false, message: "Tidak berwenang input lembur manual" },
           { status: 403 }
         );
+      }
+
+      // ✅ Kepala divisi hanya boleh input untuk bawahannya sendiri
+      if (!FULL_ACCESS.includes(user.role)) {
+        const allowedRoles = DIVISION_HEAD_MAP[user.role] ?? [];
+        const { data: targetUserCheck } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", target_user_id)
+          .single();
+
+        if (!targetUserCheck || !allowedRoles.includes(targetUserCheck.role)) {
+          return NextResponse.json(
+            { success: false, message: "Kamu hanya bisa input lembur untuk bawahanmu" },
+            { status: 403 }
+          );
+        }
       }
 
       if (!target_user_id || !request_date || !actual_start_time || !actual_end_time) {

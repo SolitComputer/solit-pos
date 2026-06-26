@@ -126,12 +126,89 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
 }
 
-// ─── FIX: body function yang terpotong ───────────────────────────────
 function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   const t = (type ?? "UMUM").toUpperCase();
   if (t === "RESELLER") return { text: "Reseller", icon: "🏪" };
   if (t === "CORPORATE") return { text: "Korporat", icon: "🏢" };
   return { text: "Umum", icon: "👤" };
+}
+
+// ─── RESTORE MODAL — shared component ────────────────────────────────
+function RestoreModal({
+  item,
+  isPending,
+  restoring,
+  onConfirm,
+  onClose,
+}: {
+  item: any;
+  isPending: boolean;
+  restoring: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const statusLabelMap: Record<string, string> = {
+    RESERVED: "DP",
+    HELD: "Ambil Dulu",
+    PACKING: "Packing",
+    PAID: "Lunas",
+  };
+  const currentLabel = statusLabelMap[item.status] ?? item.status;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className={`px-5 py-4 ${isPending ? "bg-red-700" : "bg-gray-800"}`}>
+          <p className="font-semibold text-white text-sm">
+            {isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}
+          </p>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+            <p className="font-bold mb-1">
+              {isPending
+                ? `Batalkan pesanan "${currentLabel}" untuk ${item.customer_name}?`
+                : `Konfirmasi restore untuk ${item.customer_name}?`}
+            </p>
+            <p className="font-mono text-amber-600">{item.invoice_number}</p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600 space-y-1.5">
+            <p className="font-semibold text-gray-700 mb-1">Yang akan terjadi:</p>
+            <p>• Status transaksi → <span className="font-bold text-red-600">BATAL</span></p>
+            <p>• Unit laptop kembali ke stok <span className="font-bold text-green-700">SIAP JUAL</span></p>
+            {item.status === "PAID" && (
+              <p>• Garansi (jika ada) akan di-<span className="font-bold text-orange-600">VOID</span></p>
+            )}
+            {item.status === "RESERVED" && (
+              <p className="text-amber-700 font-semibold">⚠️ DP yang sudah dibayar diurus manual</p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={restoring}
+            className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60"
+          >
+            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── PAYMENT BREAKDOWN ────────────────────────────────────────────────
@@ -355,6 +432,7 @@ function SerialNumberList({
   );
 }
 
+// ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
 function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -365,7 +443,10 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const [confirmError, setConfirmError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
+  const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
@@ -385,7 +466,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
       const result = await res.json();
-      if (!result.success) { setAlertModal("Gagal restore: " + result.message); return; }
+      if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false);
       onRestored(item.invoice_number);
     } catch { setAlertModal("Terjadi kesalahan saat restore"); }
@@ -563,14 +644,21 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <span className="text-lg">✏️</span><span className="text-[9px] font-semibold">Edit</span>
             </a>
           )}
+          {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
           {isPending && canEditTransaction && (
             <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition" title="Konfirmasi lunas">
               <span className="text-lg">✅</span><span className="text-[9px] font-semibold">Lunas</span>
             </button>
           )}
-          {canRestoreTransaction && item.status === "PAID" && (
-            <button onClick={() => setShowRestoreModal(true)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition" title="Restore transaksi">
-              <span className="text-lg">↩️</span><span className="text-[9px] font-semibold">Restore</span>
+          {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
+          {canRestore && (
+            <button
+              onClick={() => setShowRestoreModal(true)}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
+              title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+            >
+              <span className="text-lg">↩️</span>
+              <span className="text-[9px] font-semibold">{isPending ? "Batal" : "Restore"}</span>
             </button>
           )}
           <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="Lihat receipt">
@@ -581,24 +669,15 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
 
+      {/* ✅ Pakai shared RestoreModal component */}
       {showRestoreModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
-            <div className="p-5">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
-              </div>
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => setShowRestoreModal(false)} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">
-                {restoring ? "Memproses..." : "Ya, Restore"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
       )}
 
       {showConfirmModal && (
@@ -703,6 +782,7 @@ function StatusBadge({ item }: { item: any }) {
   );
 }
 
+// ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -712,7 +792,10 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
+  const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
@@ -732,7 +815,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
       const result = await res.json();
-      if (!result.success) { setAlertModal("Gagal restore: " + result.message); return; }
+      if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false);
       onRestored(item.invoice_number);
     } catch { setAlertModal("Terjadi kesalahan saat restore"); }
@@ -901,13 +984,19 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </a>
             )}
+            {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
             {isPending && canEditTransaction && (
               <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-150" title="Konfirmasi lunas">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
-            {canRestoreTransaction && item.status === "PAID" && (
-              <button onClick={() => setShowRestoreModal(true)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150" title="Restore">
+            {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
+            {canRestore && (
+              <button
+                onClick={() => setShowRestoreModal(true)}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150"
+                title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
               </button>
             )}
@@ -920,24 +1009,15 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
 
+      {/* ✅ Pakai shared RestoreModal component */}
       {showRestoreModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gray-800 px-5 py-4"><p className="font-semibold text-white text-sm">Restore Transaksi</p></div>
-            <div className="p-5">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-                <span className="font-semibold">Konfirmasi restore untuk {item.customer_name}?</span>
-              </div>
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => setShowRestoreModal(false)} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleRestore} disabled={restoring} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">
-                {restoring ? "Memproses..." : "Ya, Restore"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
       )}
 
       {showConfirmModal && (
@@ -1643,19 +1723,18 @@ export default function Page() {
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Perusahaan / Nama Toko</label>
                 <div className="flex gap-1.5">
                   {[
-                    { value: "ALL",    label: "Semua",    icon: "🏢", desc: null },
-                    { value: "solit",  label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
-                    { value: "sotech", label: "Sotech",   icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
+                    { value: "ALL", label: "Semua", icon: "🏢", desc: null },
+                    { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
+                    { value: "sotech", label: "Sotech", icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
                   ].map((c) => (
                     <button
                       key={c.value}
                       onClick={() => setCompanyName(c.value)}
                       title={c.desc ?? undefined}
-                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${
-                        companyName === c.value
+                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value
                           ? "bg-gray-900 text-white border-gray-900"
                           : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                      }`}
+                        }`}
                     >
                       <span>{c.icon}</span>
                       {c.label}
