@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, isFullAccess } from "@/lib/auth";
+import { getCurrentUser, isFullAccess, isDivisionHead } from "@/lib/auth";
+import { DIVISION_MAP } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -38,7 +39,17 @@ export async function GET(request: Request) {
       query = query.gte("work_date", firstDay).lte("work_date", lastDayStr);
     }
 
-    if (!isFullAccess(user.role)) {
+   if (isFullAccess(user.role)) {
+    } else if (isDivisionHead(user.role)) {
+      const subRoles = (DIVISION_MAP[user.role] ?? []) as string[];
+      if (subRoles.length === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const { data: subs } = await supabase
+        .from("users").select("id").in("role", subRoles);
+      const subIds = (subs ?? []).map((s: any) => s.id);
+      query = query.in("user_id", subIds.length ? subIds : ["00000000-0000-0000-0000-000000000000"]);
+    } else {
       query = query.eq("user_id", user.id);
     }
 

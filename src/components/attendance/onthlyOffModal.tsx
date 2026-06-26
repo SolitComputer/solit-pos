@@ -188,10 +188,6 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
       return;
     }
 
-    if (refWeeklyDows.has(dow) && !dateWorkSet.has(dateStr)) {
-      setSwapMode({ weeklyDate: dateStr, dow }); return;
-    }
-
     if (offDateSet.has(dateStr)) {
       const record = userOffs.find(o => o.off_date === dateStr);
       if (!record) return;
@@ -204,6 +200,10 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
       } catch { setError("Gagal menghapus libur"); }
       finally { setDeleting(null); }
       return;
+    }
+
+    if (refWeeklyDows.has(dow) && !dateWorkSet.has(dateStr)) {
+      setSwapMode({ weeklyDate: dateStr, dow }); return;
     }
 
     if (remainingCount <= 0) { setError(`${selectedUser?.name ?? "User"} sudah memiliki ${MAX_OFF} hari libur bulan ini.`); return; }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess, isDivisionHead } from "@/lib/auth";
+import { DIVISION_MAP } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -12,14 +13,23 @@ export async function GET(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
-    // ── Step 1: ambil day_off records ──────────────────────────────────────
     let q = supabase
       .from("user_day_off")
       .select("id, user_id, day_of_week, notes, created_at")
       .order("user_id")
-      .order("day_of_week");
+      .order("day_of_week")
 
-    if (user.role !== "ADMIN") {
+    if (isFullAccess(user.role)) {
+    } else if (isDivisionHead(user.role)) {
+      const subRoles = (DIVISION_MAP[user.role] ?? []) as string[];
+      if (subRoles.length === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      const { data: subs } = await supabase
+        .from("users").select("id").in("role", subRoles);
+      const subIds = (subs ?? []).map((s: any) => s.id);
+      q = q.in("user_id", subIds.length ? subIds : ["00000000-0000-0000-0000-000000000000"]);
+    } else {
       q = q.eq("user_id", user.id);
     }
 
