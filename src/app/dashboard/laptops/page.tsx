@@ -384,10 +384,10 @@ export default function Page() {
                 x.storage?.toLowerCase().includes(t)
             );
         }
-        if (filterStatus === "SIAP_JUAL") {
-            list = list.filter(x => (x.stok_tersedia ?? 0) > 0);
+      if (filterStatus === "SIAP_JUAL") {
+            list = list.filter(x => (x.siap_jual ?? 0) > 0);
         } else if (filterStatus === "BELUM_SIAP") {
-            list = list.filter(x => (x.stok_minus ?? 0) > 0);
+            list = list.filter(x => (x.siap_jual ?? 0) === 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
         if (filterProcessor !== "ALL") {
@@ -762,10 +762,10 @@ export default function Page() {
                                     onChange={e => setFilterSN(e.target.value)}
                                     icon="sn"
                                 />
-                                <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                               <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                     <option value="ALL">Semua Status</option>
                                     <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                    <option value="BELUM_SIAP">⚠️ Laptop Minus</option>
+                                    <option value="BELUM_SIAP">⚠️ Tidak Siap Jual</option>
                                 </FilterSelect>
                                 <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                     {uniqueBrands.map(b => (
