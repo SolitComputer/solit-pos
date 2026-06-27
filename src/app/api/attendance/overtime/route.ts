@@ -282,8 +282,10 @@ export async function POST(request: Request) {
       let totalPay: number;
 
       if (is_holiday === true) {
+        // ✅ Holiday: nominal belum ditentukan saat input manual.
+        //    Bayaran diatur admin via Set Bayaran setelah lembur tersimpan.
         finalRate = 0;
-        totalPay = Math.max(0, Math.round(Number(manualTotalPay) || 0));
+        totalPay = 0;
       } else {
         finalRate = rate_per_hour ?? 0;
         if (!finalRate) {
@@ -305,6 +307,18 @@ export async function POST(request: Request) {
         totalPay = billedHours * finalRate;
       }
 
+      // ✅ Deteksi terlambat server-side untuk lembur hari libur.
+      //    Batas 08:00 WIB — jam mulai >= 08:00 = terlambat.
+      let manualIsLate = false;
+      if (is_holiday === true) {
+        const [lh, lm] = String(actual_start_time).split(":").map(Number);
+        manualIsLate = !Number.isNaN(lh) && (lh * 60 + (lm || 0)) >= 8 * 60;
+      }
+
+      // ✅ Status: ada foto → COMPLETED, belum ada foto → NEED_PROOF
+      //    NEED_PROOF sudah ada di constraint setelah migration Step 1.
+      const insertStatus = proof_photo_url ? "COMPLETED" : "NEED_PROOF";
+
       const { data, error } = await supabase
         .from("overtime_requests")
         .insert({
@@ -312,8 +326,7 @@ export async function POST(request: Request) {
           request_date,
           reason: reason?.trim() || "Input manual oleh admin",
           requested_start: actual_start_time,
-          // ✅ NEED_PROOF jika belum ada foto, COMPLETED jika sudah ada foto
-          status: proof_photo_url ? "COMPLETED" : "NEED_PROOF",
+          status: insertStatus,
           approved_by: user.id,
           approved_at: new Date().toISOString(),
           scheduled_start: actualStart,
@@ -328,6 +341,7 @@ export async function POST(request: Request) {
           completed_at: new Date().toISOString(),
           auto_completed: false,
           is_holiday: is_holiday === true,
+          is_late: manualIsLate,
         })
         .select()
         .single();
