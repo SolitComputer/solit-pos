@@ -115,6 +115,11 @@ export default function CreatePaymentPage() {
     const urlSn = searchParams.get("sn") || "";
     const fromScan = Boolean(urlUnitId && urlSn);
 
+    const urlPrepId = searchParams.get("prep_id") || "";
+    const fromPrep = Boolean(urlPrepId);
+    const [prepOrderNumber, setPrepOrderNumber] = useState("");
+    const [prepLoading, setPrepLoading] = useState(false);
+
     // ── Core state ────────────────────────────────────────────────────────────
     const [step, setStep] = useState(1);
     const [paymentPhoto, setPaymentPhoto] = useState<File | null>(null);
@@ -205,9 +210,8 @@ export default function CreatePaymentPage() {
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
 
-    // ── Draft restore ─────────────────────────────────────────────────────────
     useEffect(() => {
-        if (fromScan) return;
+        if (fromScan || fromPrep) return;
         const draft = loadDraft();
         if (!draft) return;
 
@@ -236,7 +240,7 @@ export default function CreatePaymentPage() {
     // ── Auto-save draft ───────────────────────────────────────────────────────
     const watchedFields = watch();
     useEffect(() => {
-        if (fromScan || isSubmitted) return;
+        if (fromScan || fromPrep || isSubmitted) return;
         saveDraft({
             ...watchedFields,
             _step: step, _customerType: customerType, _sellerType: sellerType,
@@ -278,6 +282,65 @@ export default function CreatePaymentPage() {
         };
         load();
     }, [fromScan, urlUnitId, urlSn, setValue]);
+
+    // ── Load data dari Penyiapan Barang (auto-isi customer + unit) ──────────────
+    useEffect(() => {
+        if (!fromPrep || !urlPrepId) return;
+        const loadPrep = async () => {
+            setPrepLoading(true);
+            try {
+                const res = await fetch(`/api/preparation/${urlPrepId}`);
+                const result = await res.json();
+                if (!result.success || !result.data) return;
+                const prep = result.data;
+
+                setPrepOrderNumber(prep.order_number || "");
+                if (prep.customer_name) setValue("customer_name", prep.customer_name);
+                if (prep.customer_phone) setValue("customer_phone", prep.customer_phone);
+                if (prep.delivery_method === "PENGANTARAN" && prep.delivery_address) {
+                    setValue("pickup_method", "DIANTAR");
+                    setValue("pickup_location", prep.delivery_address);
+                }
+
+                // Resolve tiap SN → unit valid dari stok (SN manual yg tak terdaftar dilewati)
+                const items: any[] = Array.isArray(prep.preparation_items) ? prep.preparation_items : [];
+                const settled = await Promise.allSettled(
+                    items.map((it) =>
+                        fetch(`/api/units/check-sn?sn=${encodeURIComponent(it.serial_number)}`)
+                            .then(r => r.json())
+                            .then(ur => ({ ur, it }))
+                    )
+                );
+
+                const resolved: (UnitItem & { grade?: string; condition_note?: string; purchase_price?: number })[] = [];
+                for (const s of settled) {
+                    if (s.status !== "fulfilled") continue;
+                    const { ur, it } = s.value;
+                    if (!ur.success || !ur.data) continue;
+                    const u = ur.data;
+                    const laptop = u.laptop;
+                    resolved.push({
+                        unit_id: u.id,
+                        laptop_id: laptop?.id ?? "",
+                        serial_number: u.serial_number,
+                        laptop_name: laptop?.laptop_name ?? it.laptop_name ?? "",
+                        grade: u.grade ?? undefined,
+                        selling_price: u.selling_price ?? 0,
+                        purchase_price: u.purchase_price ?? 0,
+                        condition_note: u.condition_note ?? "",
+                    });
+                }
+
+                if (resolved.length > 0) {
+                    setSelectedUnits(resolved);
+                    setValue("units", resolved);
+                }
+            } catch { /* ignore */ } finally {
+                setPrepLoading(false);
+            }
+        };
+        loadPrep();
+    }, [fromPrep, urlPrepId, setValue]);
 
     // ── Search SN ─────────────────────────────────────────────────────────────
     const handleSnSearch = useCallback(async (q: string) => {
@@ -432,6 +495,16 @@ export default function CreatePaymentPage() {
             const result = await res.json();
             if (!result.success) { alert(result.message); return; }
 
+            if (fromPrep && urlPrepId && result.invoice_number) {
+                try {
+                    await fetch(`/api/preparation/${urlPrepId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ transaction_invoice: result.invoice_number }),
+                    });
+                } catch { /* non-blocking */ }
+            }
+
             setIsSubmitted(true);
             clearDraft();
             window.location.href = `/receipt/${result.invoice_number}`;
@@ -474,6 +547,20 @@ export default function CreatePaymentPage() {
                             }`} />
                     ))}
                 </div>
+
+                {fromPrep && (
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-4">
+                        <svg className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <p className="text-xs font-semibold text-emerald-700">
+                                {prepLoading ? "Memuat data penyiapan..." : "Data dari penyiapan barang"}
+                            </p>
+                            {prepOrderNumber && <p className="text-xs text-emerald-600 font-mono">{prepOrderNumber}</p>}
+                        </div>
+                    </div>
+                )}
 
                 {/* Scan banner */}
                 {fromScan && (

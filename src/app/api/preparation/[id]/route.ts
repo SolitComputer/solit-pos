@@ -25,13 +25,39 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
   }
 }
 
+async function patchHandler(req: NextRequest, props: Props, _user: AuthUser) {
+  try {
+    const { id } = await props.params;
+    const { transaction_invoice } = await req.json();
+
+    if (!transaction_invoice) {
+      return NextResponse.json({ success: false, message: "transaction_invoice wajib diisi" }, { status: 400 });
+    }
+
+    const { data: order } = await supabase
+      .from("preparation_orders").select("id").eq("id", id).single();
+    if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("preparation_orders")
+      .update({ transaction_invoice, transaction_linked_at: now, updated_at: now })
+      .eq("id", id).select().single();
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    console.error("[PATCH /api/preparation/[id]]", err);
+    return NextResponse.json({ success: false, message: "Gagal link transaksi" }, { status: 500 });
+  }
+}
+
 async function deleteHandler(_req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
     const { data: order } = await supabase.from("preparation_orders").select("*").eq("id", id).single();
     if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
 
-    // Hanya boleh hapus selama masih MENUNGGU (belum disentuh penyedia)
     if (order.status !== "MENUNGGU") {
       return NextResponse.json({ success: false, message: `Tidak bisa dihapus, status sudah "${order.status}"` }, { status: 400 });
     }
@@ -53,4 +79,5 @@ async function deleteHandler(_req: NextRequest, props: Props, user: AuthUser) {
 }
 
 export const GET = withAuth(getHandler, PREPARATION_VIEW_ROLES);
+export const PATCH = withAuth(patchHandler, PREPARATION_VIEW_ROLES);
 export const DELETE = withAuth(deleteHandler, PREPARATION_CREATE_ROLES);
