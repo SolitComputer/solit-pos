@@ -218,10 +218,9 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 flex-wrap">
             <StatusBadge status={o.status} />
-            {(o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />⏰ Terlambat
-              </span>
+            {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (<span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />⏰ Terlambat
+            </span>
             )}
             {o.is_holiday && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-purple-50 text-purple-700 border-purple-200">
@@ -470,7 +469,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
             <span className="text-gray-400">Jam diminta</span>
             <span className="flex items-center gap-1.5">
               <span className="font-mono font-semibold text-gray-800">{formatTime(o.requested_start)}</span>
-              {(o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start))) && (
+              {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start))) && (
                 <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200">⏰ Terlambat</span>
               )}
               {o.is_holiday && (
@@ -526,11 +525,11 @@ function ReasonGrid({ value, onChange }: { value: string; onChange: (v: string) 
 
 // ─── REQUEST MODAL ─────────────────────────────────────────────────────────
 function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () => void; onSaved: () => void; currentUser: any }) {
-  const [requestDate, setRequestDate] = useState(""), [startTime, setStartTime] = useState("09:00");
+  const today = new Date().toISOString().split("T")[0];
+  const [requestDate, setRequestDate] = useState(today), [startTime, setStartTime] = useState("09:00");
   const [reasonType, setReasonType] = useState(""), [reasonCustom, setReasonCustom] = useState("");
   const [workDescription, setWorkDescription] = useState(""), [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
-  const today = new Date().toISOString().split("T")[0];
   const isLainnya = reasonType === "Lainnya";
 
   // Helper: baca jam WIB sekarang (fresh setiap dipanggil)
@@ -841,7 +840,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
-  const [fixedPay, setFixedPay] = useState<number>(0);
 
   const allowedRoles = useMemo(() => getManualAllowedRoles(currentUser?.role), [currentUser?.role]);
   const isFullAdmin = allowedRoles === null;
@@ -859,12 +857,17 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     return d > 0 ? Math.floor(d) : null;
   }, [startTime, endTime]);
 
+  // ✅ Deteksi terlambat HANYA untuk hari libur — batas 08:00, reaktif ke jam mulai pilihan admin.
+  const holidayIsLate = useMemo(
+    () => isHolidayOvertime && detectLateFromTime(startTime),
+    [isHolidayOvertime, startTime]
+  );
+
   const submit = async () => {
     if (!targetUserId || !requestDate || !startTime || !endTime || !reasonType || !workDescription.trim()) { setError("Semua field wajib diisi"); return; }
     const s = new Date(`1970-01-01T${startTime}:00`).getTime(), e = new Date(`1970-01-01T${endTime}:00`).getTime();
     if (e <= s) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
     if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan"); return; }
-    if (isHolidayOvertime && (!fixedPay || fixedPay <= 0)) { setError("Nominal bayaran hari libur wajib diisi"); return; }
     setSubmitting(true); setError("");
     try {
       let photoUrl: string | null = null;
@@ -882,7 +885,9 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
           proof_photo_url: photoUrl,
           is_holiday: isHolidayOvertime,
-          total_pay: isHolidayOvertime ? Math.round(fixedPay) : undefined,
+          // ✅ Terlambat hanya saat holiday (server tetap hitung ulang sbg otoritas)
+          is_late: isHolidayOvertime ? holidayIsLate : false,
+          // ✅ total_pay TIDAK dikirim — bayaran diatur lewat Set Bayaran di tampilan lembur
         }),
       });
       const d = await res.json();
@@ -913,26 +918,14 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
             ))}
           </select>
-          {/* ✅ Hint hanya muncul untuk kepala divisi, bukan admin */}
           {!isFullAdmin && allowedRoles && allowedRoles.length > 0 && (
             <p className="text-[9px] text-gray-400 mt-1.5">
               Hanya menampilkan bawahanmu: {allowedRoles.map(r => r.replace(/_/g, " ")).join(", ")}
             </p>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
-        </div>
-        {previewHours !== null && (
-          <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5">
-            <span className="text-sm">⏱️</span>
-            <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong></span>
-          </div>
-        )}
 
-        {/* ✅ Toggle Lembur hari libur → bayaran flat */}
+        {/* ✅ Toggle Lembur hari libur — diletakkan SEBELUM jam biar relasi toggle→jam→deteksi telat mengalir */}
         <button
           type="button"
           onClick={() => setIsHolidayOvertime(v => !v)}
@@ -943,26 +936,37 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </span>
           <div className="flex-1">
             <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}>🏖️ Lembur hari libur</p>
-            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Bayaran nominal tetap, tidak dihitung per jam</p>
+            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
           </div>
         </button>
 
-        {/* ✅ Input nominal tetap saat hari libur aktif */}
+        <div className="grid grid-cols-3 gap-2">
+          <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
+          <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
+          <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
+        </div>
+
+        {/* ✅ Info deteksi terlambat saat hari libur aktif (berdasarkan jam mulai) */}
         {isHolidayOvertime && (
-          <div>
-            <label className={lbl}>Nominal Bayaran Hari Libur (Rp) *</label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
-              <input
-                type="number"
-                min={0}
-                value={fixedPay || ""}
-                onChange={e => setFixedPay(parseFloat(e.target.value) || 0)}
-                placeholder="Bebas, contoh: 150000"
-                className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-all"
-              />
+          <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+            <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
+            <div className="text-xs">
+              <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
+                Jam mulai {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {holidayIsLate
+                  ? "Mulai 08:00 ke atas dihitung terlambat di hari libur."
+                  : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
+              </p>
             </div>
-            <p className="text-[9px] text-gray-400 mt-1">Nominal flat untuk lembur di hari libur — durasi {previewHours ?? 0} jam hanya jadi catatan, tidak dikali tarif.</p>
+          </div>
+        )}
+
+        {previewHours !== null && (
+          <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5">
+            <span className="text-sm">⏱️</span>
+            <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
 
@@ -984,7 +988,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
       {photoStep !== "camera" && (
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
-          <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim() || (isHolidayOvertime && (!fixedPay || fixedPay <= 0))} className={primaryBtn}>
+          <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim()} className={primaryBtn}>
             {submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}
           </button>
         </ModalFoot>
@@ -1237,7 +1241,7 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
                     <StatusBadge status={o.status} />
-                    {(o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
+                    {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
                       <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">⏰ Telat</span>
                     )}
                     {o.is_holiday && (
@@ -1639,13 +1643,13 @@ export default function OvertimePage() {
       )}
 
       <style jsx global>{`
-        @keyframes modalUp {
-          from { opacity: 0; transform: translateY(16px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)    scale(1);    }
-        }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+          @keyframes modalUp {
+            from { opacity: 0; transform: translateY(16px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0)    scale(1);    }
+          }
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
     </DashboardLayout>
   );
 }
