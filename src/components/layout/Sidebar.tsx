@@ -198,6 +198,11 @@ const ITEM_MANAGEMENT_SELLER: MenuItem = {
   href: "/dashboard/management-seller",
   icon: Icons.managementSeller,
 };
+const ITEM_PREPARATION: MenuItem = {
+  name: "Penyiapan Barang",
+  href: "/dashboard/preparation",
+  icon: Icons.pendingOrders,
+};
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -230,6 +235,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    ITEM_PREPARATION,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
@@ -271,6 +277,7 @@ const SALES_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    ITEM_PREPARATION,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -498,9 +505,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    {
+ {
       label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
+      items: [
+        ITEM_PREPARATION,
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
     },
   ],
   KEPALA_PENYEDIA_BARANG: [
@@ -520,7 +530,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
+      items: [
+        ITEM_PREPARATION,
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
     },
   ],
   KONTEN: [
