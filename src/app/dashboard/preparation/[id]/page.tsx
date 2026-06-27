@@ -6,17 +6,23 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import DeliveryMap from "@/components/preparation/DeliveryMap";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { supabase } from "@/services/supabase";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean; check_note: string | null }
 interface PrepOrder {
     id: string; order_number: string; customer_name: string; customer_phone: string | null;
     status: string; delivery_method: string | null; notes: string | null;
     created_by_name: string | null; received_by_name: string | null; done_by_name: string | null;
+    received_at: string | null; done_at: string | null;
     delivery_user_name: string | null; delivery_started_at: string | null; delivered_at: string | null;
     delivery_address: string | null; dest_lat: number | null; dest_lng: number | null;
     courier_service: string | null; courier_tracking_number: string | null; courier_note: string | null;
+    transaction_invoice: string | null;
     created_at: string; preparation_items: PrepItem[];
 }
+
+const fmtFull = (iso: string) =>
+    new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 const STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
     MENUNGGU: { label: "Menunggu", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
@@ -176,6 +182,23 @@ export default function PreparationDetailPage() {
     }, [id]);
     useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
+    useEffect(() => {
+        const channel = supabase
+            .channel(`preparation-detail-${id}`)
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "preparation_orders", filter: `id=eq.${id}` },
+                () => { fetchOrder(); }
+            )
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "preparation_items", filter: `preparation_id=eq.${id}` },
+                () => { fetchOrder(); }
+            )
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [id, fetchOrder]);
+
     // ── Live tracking: kirim lokasi device pengantar ──
     const startTracking = useCallback(() => {
         if (!navigator.geolocation || watchIdRef.current != null) return;
@@ -307,23 +330,27 @@ export default function PreparationDetailPage() {
                             </div>
                         </div>
 
-                        {/* Timeline ringkas */}
+                        {/* Timeline ringkas — dengan tanggal & jam */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                             <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
                                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Dibuat</p>
-                                <p className="font-bold text-gray-700 mt-0.5">{order.created_by_name || "—"}</p>
+                                <p className="font-bold text-gray-700 mt-0.5 truncate">{order.created_by_name || "—"}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">{fmtFull(order.created_at)}</p>
                             </div>
                             <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
                                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Diterima</p>
-                                <p className="font-bold text-gray-700 mt-0.5">{order.received_by_name || "—"}</p>
+                                <p className="font-bold text-gray-700 mt-0.5 truncate">{order.received_by_name || "—"}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">{order.received_at ? fmtFull(order.received_at) : "—"}</p>
                             </div>
                             <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
                                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Disiapkan</p>
-                                <p className="font-bold text-gray-700 mt-0.5">{order.done_by_name || "—"}</p>
+                                <p className="font-bold text-gray-700 mt-0.5 truncate">{order.done_by_name || "—"}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">{order.done_at ? fmtFull(order.done_at) : "—"}</p>
                             </div>
                             <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
                                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Pengantar</p>
-                                <p className="font-bold text-gray-700 mt-0.5">{order.delivery_user_name || "—"}</p>
+                                <p className="font-bold text-gray-700 mt-0.5 truncate">{order.delivery_user_name || "—"}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">{order.delivered_at ? fmtFull(order.delivered_at) : order.delivery_started_at ? fmtFull(order.delivery_started_at) : "—"}</p>
                             </div>
                         </div>
 
@@ -437,10 +464,17 @@ export default function PreparationDetailPage() {
                                         `Dikirim via ${order.courier_service || "kurir"}`}
                                 {order.delivered_at && ` · ${new Date(order.delivered_at).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
                             </p>
-                            <Link href="/payment/create"
-                                className="inline-flex items-center gap-2 mt-4 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
-                                💳 Lanjut ke Pembayaran →
-                            </Link>
+                            {order.transaction_invoice ? (
+                                <Link href={`/receipt/${order.transaction_invoice}`}
+                                    className="inline-flex items-center gap-2 mt-4 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
+                                    🧾 Lihat Transaksi {order.transaction_invoice} →
+                                </Link>
+                            ) : (
+                                <Link href={`/payment/create?prep_id=${order.id}`}
+                                    className="inline-flex items-center gap-2 mt-4 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
+                                    💳 Lanjut ke Pembayaran →
+                                </Link>
+                            )}
                         </div>
                     )}
                 </div>
