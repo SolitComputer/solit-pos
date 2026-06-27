@@ -249,5 +249,8 @@ export const config = {
     "/api/service/:path*",
     "/api/accessories/:path*",
     "/dashboard/accessories/:path*",
-    "/api/seller-followups/:path*",],
+    "/api/seller-followups/:path*",
+    "/dashboard/preparation/:path*",
+    "/api/preparation/:path*",
+  ],
 };
