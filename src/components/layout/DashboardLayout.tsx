@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import { usePresence } from "@/hooks/usePresence";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -39,6 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-[#f5f4f0]">
       <ScrollRestorer />
       <Sidebar />
+      <DeliveryAlertListener />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
         <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
