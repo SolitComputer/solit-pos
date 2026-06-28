@@ -3,165 +3,290 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/services/supabase";
 
-interface VoiceNote {
-  id: string; sender_id: string | null; sender_name: string | null;
-  sender_role: string | null; audio_url: string; duration_ms: number | null; created_at: string;
-}
 interface Props {
-  orderId: string; userId: string; userName: string; userRole: string; canTalk: boolean;
+  orderId: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  canTalk: boolean;
 }
 
-const fmtClock = (iso: string) =>
-  new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-
-function pickMime(): string {
-  if (typeof MediaRecorder === "undefined") return "";
-  if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return "audio/webm;codecs=opus";
-  if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
-  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
-  return "";
+interface SignalMsg {
+  type: "hello" | "offer" | "answer" | "ice" | "leave" | "talk";
+  from: string;
+  fromName: string;
+  fromRole: string;
+  to?: string;
+  data?: any;
 }
+
+interface PeerConn {
+  pc: RTCPeerConnection;
+  name: string;
+  role: string;
+  stream: MediaStream;
+  audioEl: HTMLAudioElement | null;
+  pendingIce: RTCIceCandidateInit[];
+  haveRemote: boolean;
+}
+
+// STUN gratis dari Google. Cukup untuk koneksi WiFi↔WiFi / NAT yang ramah.
+// 🔴 PRODUCTION: kalau pengantar pakai DATA SELULER, sering butuh TURN biar
+// koneksi nyambung. Daftar TURN gratis (Metered ~50GB/bln) / Cloudflare / coturn,
+// lalu tambah barisnya di bawah:
+// { urls: "turn:HOST:3478", username: "USER", credential: "PASS" },
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+];
 
 export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, canTalk }: Props) {
-  const [messages, setMessages] = useState<VoiceNote[]>([]);
-  const [recording, setRecording] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [recMs, setRecMs] = useState(0);
+  const [joined, setJoined] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [talking, setTalking] = useState(false);
+  const [listenOnly, setListenOnly] = useState(false);
   const [micError, setMicError] = useState("");
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [peerList, setPeerList] = useState<{ id: string; name: string; role: string; state: string }[]>([]);
+  const [speakers, setSpeakers] = useState<Record<string, string>>({}); // id -> nama yang lagi bicara
 
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recStartRef = useRef(0);
-  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cancelRef = useRef(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const peersRef = useRef<Map<string, PeerConn>>(new Map());
+  const joinedRef = useRef(false);
 
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
-  const queueRef = useRef<string[]>([]);
-  const playingRef = useRef(false);
-  const seenRef = useRef<Set<string>>(new Set());
-
-  // init audio element
-  useEffect(() => { audioElRef.current = new Audio(); audioElRef.current.preload = "auto"; }, []);
-
-  // unlock autoplay di gesture pertama (buat pemantau yg cuma denger)
-  useEffect(() => {
-    const unlock = () => {
-      const a = audioElRef.current;
-      if (a) a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
-    };
-    window.addEventListener("pointerdown", unlock, { once: true });
-    return () => window.removeEventListener("pointerdown", unlock);
+  const syncPeers = useCallback(() => {
+    setPeerList(
+      [...peersRef.current.entries()].map(([id, p]) => ({
+        id, name: p.name, role: p.role, state: p.pc.connectionState,
+      }))
+    );
   }, []);
 
-  // load riwayat (jangan auto-play yg lama)
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/preparation/${orderId}/voice`);
-      const r = await res.json();
-      if (r.success) {
-        setMessages(r.data);
-        (r.data as VoiceNote[]).forEach((m) => seenRef.current.add(m.id));
+  const send = useCallback(
+    (msg: Omit<SignalMsg, "from" | "fromName" | "fromRole">) => {
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "signal",
+        payload: { ...msg, from: userId, fromName: userName, fromRole: userRole } as SignalMsg,
+      });
+    },
+    [userId, userName, userRole]
+  );
+
+  const createPeer = useCallback(
+    (remoteId: string, name: string, role: string): PeerConn => {
+      const existing = peersRef.current.get(remoteId);
+      if (existing) return existing;
+
+      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const remoteStream = new MediaStream();
+      const audioEl = typeof Audio !== "undefined" ? new Audio() : null;
+      if (audioEl) { audioEl.autoplay = true; (audioEl as any).playsInline = true; }
+
+      const local = localStreamRef.current;
+      if (local && local.getAudioTracks().length) {
+        local.getAudioTracks().forEach((t) => pc.addTrack(t, local));
+      } else {
+        pc.addTransceiver("audio", { direction: "recvonly" });
       }
-    } catch { /* ignore */ }
-  }, [orderId]);
-  useEffect(() => { load(); }, [load]);
 
-  // antrian playback (clip masuk diputar berurutan)
-  const enqueue = useCallback((url: string) => {
-    queueRef.current.push(url);
-    if (playingRef.current) return;
-    const next = () => {
-      const u = queueRef.current.shift();
-      if (!u) { playingRef.current = false; return; }
-      playingRef.current = true;
-      const a = audioElRef.current!;
-      a.src = u; a.onended = next; a.onerror = next;
-      a.play().catch(() => { setAutoplayBlocked(true); playingRef.current = false; });
-    };
-    next();
-  }, []);
-
-  // realtime clip masuk
-  useEffect(() => {
-    const ch = supabase
-      .channel(`voice-${orderId}`)
-      .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "delivery_voice_notes", filter: `preparation_id=eq.${orderId}` },
-        (payload) => {
-          const m = payload.new as VoiceNote;
-          if (seenRef.current.has(m.id)) return;
-          seenRef.current.add(m.id);
-          setMessages((prev) => [...prev, m]);
-          if (m.sender_id !== userId) {
-            enqueue(m.audio_url);
-            if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(90);
-          }
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [orderId, userId, enqueue]);
-
-  const upload = useCallback(async (blob: Blob, durMs: number) => {
-    setSending(true);
-    try {
-      const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-      const fd = new FormData();
-      fd.append("audio", blob, `voice.${ext}`);
-      fd.append("duration_ms", String(Math.round(durMs)));
-      const res = await fetch(`/api/preparation/${orderId}/voice`, { method: "POST", body: fd });
-      const r = await res.json();
-      if (!r.success) setMicError(r.message || "Gagal kirim suara");
-    } catch { setMicError("Gagal kirim suara"); } finally { setSending(false); }
-  }, [orderId]);
-
-  const startRec = useCallback(async () => {
-    if (!canTalk || recording || sending) return;
-    setMicError(""); cancelRef.current = false;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mime = pickMime();
-      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
-        const dur = Date.now() - recStartRef.current;
-        setRecording(false); setRecMs(0);
-        if (cancelRef.current || dur < 350 || chunksRef.current.length === 0) return;
-        await upload(new Blob(chunksRef.current, { type: mime || "audio/webm" }), dur);
+      pc.onicecandidate = (e) => {
+        if (e.candidate) send({ type: "ice", to: remoteId, data: e.candidate.toJSON() });
       };
-      recStartRef.current = Date.now();
-      mr.start();
-      mediaRef.current = mr;
-      setRecording(true);
-      recTimerRef.current = setInterval(() => setRecMs(Date.now() - recStartRef.current), 200);
-    } catch {
-      setMicError("Mikrofon ditolak / tidak tersedia");
-      setRecording(false);
+      pc.ontrack = (e) => {
+        e.streams[0]?.getTracks().forEach((t) => remoteStream.addTrack(t));
+        if (audioEl) {
+          audioEl.srcObject = remoteStream;
+          audioEl.play().catch(() => setAudioBlocked(true));
+        }
+      };
+      pc.onconnectionstatechange = () => {
+        syncPeers();
+        if (["failed", "closed"].includes(pc.connectionState)) {
+          const p = peersRef.current.get(remoteId);
+          if (p && pc.connectionState === "failed") {
+            try { p.pc.close(); } catch {}
+            peersRef.current.delete(remoteId);
+            syncPeers();
+          }
+        }
+      };
+
+      const peer: PeerConn = { pc, name, role, stream: remoteStream, audioEl, pendingIce: [], haveRemote: false };
+      peersRef.current.set(remoteId, peer);
+      syncPeers();
+      return peer;
+    },
+    [send, syncPeers]
+  );
+
+  const makeOffer = useCallback(
+    async (remoteId: string) => {
+      const peer = peersRef.current.get(remoteId);
+      if (!peer) return;
+      try {
+        const offer = await peer.pc.createOffer();
+        await peer.pc.setLocalDescription(offer);
+        send({ type: "offer", to: remoteId, data: offer });
+      } catch (e) { console.error("[voice] offer", e); }
+    },
+    [send]
+  );
+
+  const flushIce = async (peer: PeerConn) => {
+    for (const c of peer.pendingIce) {
+      try { await peer.pc.addIceCandidate(c); } catch (e) { console.error("[voice] ice add", e); }
     }
-  }, [canTalk, recording, sending, upload]);
-
-  const stopRec = useCallback((cancel = false) => {
-    cancelRef.current = cancel;
-    if (mediaRef.current && mediaRef.current.state !== "inactive") mediaRef.current.stop();
-  }, []);
-
-  const playOne = (url: string) => {
-    const a = audioElRef.current!;
-    a.src = url; a.play().catch(() => setAutoplayBlocked(true));
+    peer.pendingIce = [];
   };
 
-  useEffect(() => () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    if (recTimerRef.current) clearInterval(recTimerRef.current);
+  const handleSignal = useCallback(
+    async (msg: SignalMsg) => {
+      if (!msg || msg.from === userId) return;
+      if (msg.to && msg.to !== userId) return;
+
+      if (msg.type === "hello") {
+        const isNew = !peersRef.current.has(msg.from);
+        createPeer(msg.from, msg.fromName, msg.fromRole);
+        if (isNew) {
+          send({ type: "hello", to: msg.from }); // balas biar dia kenal aku juga
+          if (userId < msg.from) makeOffer(msg.from); // penentu offer deterministik (hindari glare)
+        }
+        return;
+      }
+
+      if (msg.type === "offer") {
+        const peer = createPeer(msg.from, msg.fromName, msg.fromRole);
+        try {
+          await peer.pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+          peer.haveRemote = true;
+          await flushIce(peer);
+          const answer = await peer.pc.createAnswer();
+          await peer.pc.setLocalDescription(answer);
+          send({ type: "answer", to: msg.from, data: answer });
+        } catch (e) { console.error("[voice] handle offer", e); }
+        return;
+      }
+
+      if (msg.type === "answer") {
+        const peer = peersRef.current.get(msg.from);
+        if (!peer) return;
+        try {
+          await peer.pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+          peer.haveRemote = true;
+          await flushIce(peer);
+        } catch (e) { console.error("[voice] handle answer", e); }
+        return;
+      }
+
+      if (msg.type === "ice") {
+        const peer = peersRef.current.get(msg.from);
+        if (!peer) return;
+        if (peer.haveRemote) {
+          try { await peer.pc.addIceCandidate(msg.data); } catch (e) { console.error("[voice] ice", e); }
+        } else {
+          peer.pendingIce.push(msg.data);
+        }
+        return;
+      }
+
+      if (msg.type === "leave") {
+        const peer = peersRef.current.get(msg.from);
+        if (peer) { try { peer.pc.close(); } catch {} peer.audioEl?.pause(); peersRef.current.delete(msg.from); syncPeers(); }
+        setSpeakers((s) => { const n = { ...s }; delete n[msg.from]; return n; });
+        return;
+      }
+
+      if (msg.type === "talk") {
+        setSpeakers((s) => {
+          const n = { ...s };
+          if (msg.data?.on) n[msg.from] = msg.fromName; else delete n[msg.from];
+          return n;
+        });
+        return;
+      }
+    },
+    [userId, createPeer, makeOffer, send, syncPeers]
+  );
+
+  const join = useCallback(async () => {
+    if (joinedRef.current || connecting) return;
+    setConnecting(true);
+    setMicError("");
+
+    if (canTalk) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        stream.getAudioTracks().forEach((t) => (t.enabled = false)); // PTT: mute sampai ditahan
+        localStreamRef.current = stream;
+        setListenOnly(false);
+      } catch {
+        localStreamRef.current = null;
+        setListenOnly(true);
+        setMicError("Mikrofon ditolak — kamu hanya bisa mendengar");
+      }
+    } else {
+      setListenOnly(true);
+    }
+
+    const channel = supabase.channel(`voice-rtc-${orderId}`, { config: { broadcast: { self: false } } });
+    channel.on("broadcast", { event: "signal" }, (p) => handleSignal(p.payload as SignalMsg));
+    channelRef.current = channel;
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        joinedRef.current = true;
+        setJoined(true);
+        setConnecting(false);
+        send({ type: "hello" }); // umumkan kehadiran ke yang lain
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setConnecting(false);
+        setMicError("Gagal menyambung saluran HT");
+      }
+    });
+  }, [connecting, canTalk, orderId, handleSignal, send]);
+
+  const leave = useCallback(() => {
+    if (joinedRef.current) send({ type: "leave" });
+    peersRef.current.forEach((p) => { try { p.pc.close(); } catch {} p.audioEl?.pause(); });
+    peersRef.current.clear();
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    channelRef.current = null;
+    joinedRef.current = false;
+    setJoined(false);
+    setTalking(false);
+    setSpeakers({});
+    setPeerList([]);
+  }, [send]);
+
+  useEffect(() => () => { if (joinedRef.current) leave(); }, [leave]);
+
+  const startTalk = useCallback(() => {
+    if (!joinedRef.current) return;
+    if (listenOnly) { setMicError("Mikrofon tidak tersedia"); return; }
+    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = true));
+    setTalking(true);
+    send({ type: "talk", data: { on: true } });
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(40);
+  }, [listenOnly, send]);
+
+  const endTalk = useCallback(() => {
+    localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
+    if (talking) send({ type: "talk", data: { on: false } });
+    setTalking(false);
+  }, [talking, send]);
+
+  const enableSound = useCallback(() => {
+    peersRef.current.forEach((p) => p.audioEl?.play().catch(() => {}));
+    setAudioBlocked(false);
   }, []);
 
-  const recSec = (recMs / 1000).toFixed(1);
+  const otherSpeakers = Object.entries(speakers).filter(([id]) => id !== userId);
+  const connectedCount = peerList.filter((p) => p.state === "connected").length;
 
   return (
     <div className="mt-3 bg-[#1a1a2e] rounded-2xl p-4 text-white">
@@ -169,71 +294,111 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
         <div className="flex items-center gap-2">
           <span className="text-base">📻</span>
           <div>
-            <p className="text-sm font-black leading-none">HT Pengantaran</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">Tersambung ke Base (Admin · Programmer · Kepala Sales) & Pengantar</p>
+            <p className="text-sm font-black leading-none">HT Pengantaran <span className="text-emerald-300">· Realtime</span></p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Bicara langsung (live) ke pengantar & tim — tahan tombol untuk bicara</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />LIVE
-        </span>
+        {joined && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {connectedCount > 0 ? `${connectedCount} tersambung` : "menunggu…"}
+          </span>
+        )}
       </div>
 
-      {/* Tombol Push-to-Talk */}
-      <button
-        type="button"
-        disabled={!canTalk || sending}
-        onPointerDown={(e) => { e.preventDefault(); startRec(); }}
-        onPointerUp={(e) => { e.preventDefault(); stopRec(false); }}
-        onPointerLeave={() => stopRec(false)}
-        onPointerCancel={() => stopRec(true)}
-        onContextMenu={(e) => e.preventDefault()}
-        style={{ touchAction: "none", userSelect: "none" }}
-        className={`w-full h-16 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition select-none
-          ${recording ? "bg-red-500 scale-[0.98] shadow-lg shadow-red-900/40"
-            : sending ? "bg-gray-600"
-            : "bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] shadow-lg shadow-emerald-900/30"}
-          disabled:opacity-50`}
-      >
-        {recording ? (
-          <>
-            <span className="w-3 h-3 rounded-full bg-white animate-pulse" />
-            Merekam… {recSec}s — lepas untuk kirim
-          </>
-        ) : sending ? (
-          <>Mengirim…</>
-        ) : (
-          <>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v3m0-3a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z" /></svg>
-            TAHAN UNTUK BICARA
-          </>
-        )}
-      </button>
+      {!joined ? (
+        <>
+          <button
+            type="button"
+            onClick={join}
+            disabled={connecting}
+            className="w-full h-14 rounded-2xl font-black text-sm flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] shadow-lg shadow-emerald-900/30 transition disabled:opacity-50"
+          >
+            {connecting ? "Menyambungkan…" : "🎙️ Sambungkan HT"}
+          </button>
+          <p className="text-[11px] text-gray-400 mt-2 text-center">
+            Tap untuk gabung saluran suara. Begitu pengantar & tim gabung, suara langsung kedengeran realtime.
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Banner siapa yang lagi bicara */}
+          {otherSpeakers.length > 0 && (
+            <div className="mb-3 bg-emerald-500/20 border border-emerald-400/40 rounded-xl px-3 py-2 flex items-center gap-2">
+              <span className="flex gap-0.5 items-end h-4">
+                <span className="w-1 bg-emerald-300 rounded-full animate-pulse" style={{ height: "60%" }} />
+                <span className="w-1 bg-emerald-300 rounded-full animate-pulse" style={{ height: "100%", animationDelay: "120ms" }} />
+                <span className="w-1 bg-emerald-300 rounded-full animate-pulse" style={{ height: "75%", animationDelay: "240ms" }} />
+              </span>
+              <p className="text-xs font-bold text-emerald-200 truncate">
+                🔊 {otherSpeakers.map(([, n]) => n).join(", ")} sedang bicara…
+              </p>
+            </div>
+          )}
 
-      {micError && <p className="text-[11px] text-red-300 mt-2">{micError}</p>}
-      {autoplayBlocked && (
-        <button onClick={() => { setAutoplayBlocked(false); audioElRef.current?.play().catch(() => {}); }}
-          className="mt-2 w-full h-8 rounded-lg bg-amber-400 text-amber-950 text-xs font-bold">
-          🔊 Ketuk untuk aktifkan suara masuk
-        </button>
-      )}
+          {/* Tombol Push-to-Talk */}
+          {canTalk && !listenOnly && (
+            <button
+              type="button"
+              onPointerDown={(e) => { e.preventDefault(); startTalk(); }}
+              onPointerUp={(e) => { e.preventDefault(); endTalk(); }}
+              onPointerLeave={() => endTalk()}
+              onPointerCancel={() => endTalk()}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{ touchAction: "none", userSelect: "none" }}
+              className={`w-full h-16 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition select-none
+                ${talking ? "bg-red-500 scale-[0.98] shadow-lg shadow-red-900/40" : "bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] shadow-lg shadow-emerald-900/30"}`}
+            >
+              {talking ? (
+                <><span className="w-3 h-3 rounded-full bg-white animate-pulse" /> SEDANG BICARA — lepas untuk berhenti</>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v3m0-3a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z" /></svg>
+                  TAHAN UNTUK BICARA
+                </>
+              )}
+            </button>
+          )}
 
-      {/* Riwayat clip */}
-      {messages.length > 0 && (
-        <div className="mt-3 space-y-1.5 max-h-44 overflow-y-auto">
-          {messages.slice(-12).map((m) => {
-            const mine = m.sender_id === userId;
-            return (
-              <button key={m.id} onClick={() => playOne(m.audio_url)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition ${mine ? "bg-emerald-500/15 hover:bg-emerald-500/25" : "bg-white/5 hover:bg-white/10"}`}>
-                <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">▶️</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold truncate">{mine ? "Kamu" : (m.sender_name || "—")}</p>
-                  <p className="text-[10px] text-gray-400">{(m.sender_role || "").replace(/_/g, " ")} · {fmtClock(m.created_at)}{m.duration_ms ? ` · ${(m.duration_ms / 1000).toFixed(1)}s` : ""}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+          {listenOnly && (
+            <div className="bg-white/5 rounded-xl px-3 py-2.5 text-center">
+              <p className="text-xs font-bold text-gray-300">👂 Mode dengar saja</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{micError || "Mikrofon tidak aktif"}</p>
+            </div>
+          )}
+
+          {micError && !listenOnly && <p className="text-[11px] text-red-300 mt-2">{micError}</p>}
+
+          {audioBlocked && (
+            <button onClick={enableSound} className="mt-2 w-full h-8 rounded-lg bg-amber-400 text-amber-950 text-xs font-bold">
+              🔊 Ketuk untuk aktifkan suara
+            </button>
+          )}
+
+          {/* Peserta */}
+          <div className="mt-3">
+            <p className="text-[10px] text-gray-400 font-semibold uppercase mb-1.5">Peserta ({peerList.length + 1})</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-200 text-[11px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Kamu
+              </span>
+              {peerList.map((p) => {
+                const isSpeaking = !!speakers[p.id];
+                const ok = p.state === "connected";
+                return (
+                  <span key={p.id} className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold ${isSpeaking ? "bg-emerald-500/25 text-emerald-200" : ok ? "bg-white/10 text-gray-200" : "bg-white/5 text-gray-400"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-emerald-400 animate-pulse" : ok ? "bg-emerald-400" : "bg-amber-400 animate-pulse"}`} />
+                    {p.name}{!ok && " (menyambung…)"}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          <button onClick={leave} className="mt-3 w-full h-9 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-gray-300 transition">
+            Putus HT
+          </button>
+        </>
       )}
     </div>
   );

@@ -417,8 +417,7 @@ export default function PreparationDetailPage() {
         : (order.delivery_started_at ? new Date(order.delivery_started_at).getTime() : nowTs);
     const elapsedMs = nowTs - startMs;
 
-    const isBaseRole = userRole ? ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES"].includes(userRole) : false;
-    const canVoice = isAssignedDriver || isBaseRole;
+    const canVoice = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_VOICE) : false;
 
     return (
         <DashboardLayout>
@@ -598,7 +597,7 @@ export default function PreparationDetailPage() {
                                     {order.return_started_at && ` · pulang ${fmtElapsed(new Date(order.returned_at).getTime() - new Date(order.return_started_at).getTime())}`}
                                 </p>
                             )}
-                            
+
                             <div className="mt-4">
                                 {order.transaction_invoice
                                     ? <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">🧾 Lihat Transaksi {order.transaction_invoice} →</Link>
