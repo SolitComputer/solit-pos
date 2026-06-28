@@ -103,9 +103,7 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   return (
     <div
       className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${
-        isPedagang
-          ? "bg-amber-100 text-amber-700"
-          : "bg-blue-100 text-blue-700"
+        isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
       }`}
     >
       {initials || "?"}
@@ -151,15 +149,7 @@ function StatPill({ children }: { children: React.ReactNode }) {
 }
 
 // ── Info Cell ─────────────────────────────────────────────────────────────────
-function InfoCell({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+function InfoCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">
@@ -173,12 +163,57 @@ function InfoCell({
   );
 }
 
+// ── WaLink Button (extracted to avoid <a tag being stripped by renderer) ──────
+function WaFollowupButton({
+  f,
+  processing,
+  onFollowup,
+}: {
+  f: Followup;
+  processing: boolean;
+  onFollowup: (id: string) => void;
+}) {
+  const href = waLink(f);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => onFollowup(f.id)}
+      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${
+        processing
+          ? "bg-emerald-400 opacity-70 pointer-events-none"
+          : "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
+      }`}
+    >
+      {processing ? <Spinner /> : <WaIcon />}
+      Chat WA &amp; Follow-up
+    </a>
+  );
+}
+
+function WaChatButton({ f }: { f: Followup }) {
+  const href = waLink(f);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Chat WhatsApp"
+      className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-150 flex-shrink-0"
+    >
+      <WaIcon />
+    </a>
+  );
+}
+
 // ── FollowupCard ──────────────────────────────────────────────────────────────
 function FollowupCard({
   f,
   scope,
   processing,
   canManage,
+  canFollowup,
   onFollowup,
   onArchive,
   onReactivate,
@@ -187,6 +222,7 @@ function FollowupCard({
   scope: Scope;
   processing: boolean;
   canManage: boolean;
+  canFollowup: boolean;
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
   onReactivate: (id: string) => void;
@@ -194,16 +230,14 @@ function FollowupCard({
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
   const isDue = f.is_due && scope === "ACTIVE";
+  const showActions = canManage || canFollowup;
 
   return (
     <div
       className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${
-        isDue
-          ? "border-red-200 shadow-sm shadow-red-50"
-          : "border-gray-200 shadow-sm"
+        isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
       }`}
     >
-      {/* Due accent stripe */}
       {isDue && (
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />
       )}
@@ -226,8 +260,6 @@ function FollowupCard({
             </div>
           </div>
         </div>
-
-        {/* Type tag — small row below */}
         <div className="mt-2.5 flex items-center gap-1.5">
           <span
             className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
@@ -258,8 +290,6 @@ function FollowupCard({
             value={fmtDate(f.next_followup_at)}
           />
         </div>
-
-        {/* Stats */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatPill>🛒 {f.purchase_count}× beli</StatPill>
           <StatPill>📞 {f.followup_count}× FU</StatPill>
@@ -270,65 +300,64 @@ function FollowupCard({
       </div>
 
       {/* ── Card Actions ──────────────────────────────── */}
-      {canManage && (
+      {showActions && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
           {scope === "ACTIVE" ? (
             <>
-              {f.is_due ? (
-                <a
-                  href={waLink(f)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => onFollowup(f.id)}
-                  className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${
-                    processing
-                      ? "bg-emerald-400 opacity-70 pointer-events-none"
-                      : "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
-                  }`}
-                >
-                  {processing ? <Spinner /> : <WaIcon />}
-                  Chat WA &amp; Follow-up
-                </a>
+              {/* Tombol Follow-up: hanya Closing (CREW_SALES) & Admin */}
+              {canFollowup ? (
+                f.is_due ? (
+                  <WaFollowupButton f={f} processing={processing} onFollowup={onFollowup} />
+                ) : (
+                  <button
+                    disabled
+                    title={`Sudah FU. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
+                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed"
+                  >
+                    <CheckIcon />
+                    Sudah FU · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
+                  </button>
+                )
               ) : (
-                <button
-                  disabled
-                  title={`Sudah FU. Aktif lagi ${fmtDate(f.next_followup_at)}`}
-                  className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed"
-                >
-                  <CheckIcon />
-                  Sudah FU ·{" "}
-                  {diff <= 0 ? "hari ini" : `${diff}h lagi`}
-                </button>
+                /* Role lain: info-only, tidak bisa FU */
+                <div className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-semibold border border-gray-100 cursor-default select-none">
+                  {f.is_due ? (
+                    <span>⏰ Perlu Follow-up</span>
+                  ) : (
+                    <>
+                      <CheckIcon />
+                      <span>Sudah FU</span>
+                    </>
+                  )}
+                </div>
               )}
 
-              <button
-                onClick={() => onArchive(f.id)}
-                disabled={processing}
-                title="Arsipkan (stop follow-up)"
-                className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
-              >
-                <ArchiveIcon />
-              </button>
+              {/* Tombol Archive: hanya canManage */}
+              {canManage && (
+                <button
+                  onClick={() => onArchive(f.id)}
+                  disabled={processing}
+                  title="Arsipkan (stop follow-up)"
+                  className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
+                >
+                  <ArchiveIcon />
+                </button>
+              )}
             </>
           ) : (
+            /* Scope ARCHIVED */
             <>
-              <a
-                href={waLink(f)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Chat WhatsApp"
-                className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-150 flex-shrink-0"
-              >
-                <WaIcon />
-              </a>
-              <button
-                onClick={() => onReactivate(f.id)}
-                disabled={processing}
-                className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
-              >
-                {processing ? <Spinner /> : <RefreshIcon />}
-                Aktifkan Lagi
-              </button>
+              <WaChatButton f={f} />
+              {canManage && (
+                <button
+                  onClick={() => onReactivate(f.id)}
+                  disabled={processing}
+                  className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
+                >
+                  {processing ? <Spinner /> : <RefreshIcon />}
+                  Aktifkan Lagi
+                </button>
+              )}
             </>
           )}
         </div>
@@ -361,9 +390,7 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
         <div
           key={c.label}
           className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${
-            c.danger
-              ? "bg-red-50 border-red-200"
-              : "bg-white border-gray-200"
+            c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
           }`}
         >
           <div
@@ -399,7 +426,6 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-pulse">
-      {/* header */}
       <div className="px-4 pt-3.5 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-gray-100 rounded-xl flex-shrink-0" />
@@ -413,7 +439,6 @@ function SkeletonCard() {
         </div>
         <div className="mt-2.5 h-4 w-28 bg-gray-100 rounded-full" />
       </div>
-      {/* body */}
       <div className="px-4 py-3.5 space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="h-14 bg-gray-100 rounded-xl" />
@@ -424,7 +449,6 @@ function SkeletonCard() {
           <div className="h-6 w-16 bg-gray-100 rounded-lg" />
         </div>
       </div>
-      {/* action */}
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
         <div className="h-9 bg-gray-100 rounded-xl" />
       </div>
@@ -452,8 +476,13 @@ export default function ManagementSellerPage() {
   const canView = userRole
     ? hasPermission(userRole, PERMISSIONS.VIEW_SELLER_FOLLOWUP)
     : false;
+
   const canManage = userRole
     ? hasPermission(userRole, PERMISSIONS.MANAGE_SELLER_FOLLOWUP)
+    : false;
+
+  const canFollowup = userRole
+    ? hasPermission(userRole, PERMISSIONS.FOLLOWUP_SELLER)
     : false;
 
   const loadData = async (silent = false) => {
@@ -528,18 +557,12 @@ export default function ManagementSellerPage() {
     );
   }, [tab, userItems, pedagangItems, search]);
 
-  // ── Access Denied ─────────────────────────────────────────────────────────
   if (userRole && !canView) {
     return (
       <DashboardLayout>
         <div className="max-w-sm mx-auto mt-24 text-center px-6">
           <div className="w-14 h-14 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-7 h-7 text-red-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -551,8 +574,7 @@ export default function ManagementSellerPage() {
           <h2 className="text-base font-bold text-gray-800">Akses Ditolak</h2>
           <p className="text-gray-400 text-sm mt-1.5 leading-relaxed">
             Halaman ini hanya untuk{" "}
-            <span className="font-semibold text-gray-600">Kepala Marketing</span>{" "}
-            &amp; Admin.
+            <span className="font-semibold text-gray-600">Kepala Marketing</span> &amp; Admin.
           </p>
         </div>
       </DashboardLayout>
@@ -578,8 +600,6 @@ export default function ManagementSellerPage() {
               User tiap 7 hari &nbsp;·&nbsp; Pedagang tiap 3 hari
             </p>
           </div>
-
-          {/* Scope toggle */}
           <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 flex-shrink-0">
             {(["ACTIVE", "ARCHIVED"] as Scope[]).map((s) => (
               <button
@@ -604,20 +624,8 @@ export default function ManagementSellerPage() {
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              {
-                key: "USER" as Tab,
-                label: "User",
-                icon: "🙋",
-                count: userItems.length,
-                due: userDue,
-              },
-              {
-                key: "PEDAGANG" as Tab,
-                label: "Pedagang",
-                icon: "🏷️",
-                count: pedagangItems.length,
-                due: pedagangDue,
-              },
+              { key: "USER" as Tab, label: "User", icon: "🙋", count: userItems.length, due: userDue },
+              { key: "PEDAGANG" as Tab, label: "Pedagang", icon: "🏷️", count: pedagangItems.length, due: pedagangDue },
             ] as const
           ).map((t) => {
             const isActive = tab === t.key;
@@ -632,7 +640,6 @@ export default function ManagementSellerPage() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {/* Icon box */}
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
                       isActive ? "bg-white/10" : "bg-gray-100"
@@ -641,23 +648,14 @@ export default function ManagementSellerPage() {
                     {t.icon}
                   </div>
                   <div>
-                    <p
-                      className={`text-sm font-bold leading-tight ${
-                        isActive ? "text-white" : "text-gray-900"
-                      }`}
-                    >
+                    <p className={`text-sm font-bold leading-tight ${isActive ? "text-white" : "text-gray-900"}`}>
                       {t.label}
                     </p>
-                    <p
-                      className={`text-[10px] font-medium mt-0.5 ${
-                        isActive ? "text-gray-400" : "text-gray-400"
-                      }`}
-                    >
+                    <p className="text-[10px] font-medium mt-0.5 text-gray-400">
                       {t.count} customer
                     </p>
                   </div>
                 </div>
-
                 {scope === "ACTIVE" && t.due > 0 && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-500 text-white flex-shrink-0">
                     {t.due} FU
@@ -696,15 +694,7 @@ export default function ManagementSellerPage() {
               className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition"
               aria-label="Hapus pencarian"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                aria-hidden="true"
-              >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -742,7 +732,6 @@ export default function ManagementSellerPage() {
           </div>
         ) : (
           <>
-            {/* Due alert banner */}
             {scope === "ACTIVE" && dueCount > 0 && (
               <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
@@ -751,7 +740,6 @@ export default function ManagementSellerPage() {
                 </p>
               </div>
             )}
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {visible.map((f) => (
                 <FollowupCard
@@ -760,6 +748,7 @@ export default function ManagementSellerPage() {
                   scope={scope}
                   processing={processingId === f.id}
                   canManage={canManage}
+                  canFollowup={canFollowup}
                   onFollowup={onFollowup}
                   onArchive={onArchive}
                   onReactivate={onReactivate}

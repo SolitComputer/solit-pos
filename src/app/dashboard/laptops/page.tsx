@@ -765,7 +765,7 @@ export default function Page() {
                                <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                     <option value="ALL">Semua Status</option>
                                     <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                    <option value="BELUM_SIAP">⚠️ Tidak Siap Jual</option>
+                                    <option value="BELUM_SIAP">⚠️ Minus</option>
                                 </FilterSelect>
                                 <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                     {uniqueBrands.map(b => (
