@@ -105,7 +105,7 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = [
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
 ];
-const SERVICE_VIEW_ROLES: UserRole[] = [
+export const SERVICE_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "TEKNISI",
   "KEPALA_TEKNISI",
@@ -264,7 +264,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+"/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
