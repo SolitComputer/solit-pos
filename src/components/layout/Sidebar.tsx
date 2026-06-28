@@ -214,6 +214,13 @@ const ITEM_PREPARATION_HISTORY: MenuItem = {
   href: "/dashboard/preparation/history",
   icon: Icons.deliveryRoute,
 };
+const PREPARATION_PENYEDIA_MENU: MenuGroup = {
+  label: "Penyiapan Barang",
+  items: [
+    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.pendingOrders },
+    { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+  ],
+};
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
@@ -518,10 +525,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
+    PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
       items: [
-        ITEM_PREPARATION,
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -541,10 +548,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
+    PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
       items: [
-        ITEM_PREPARATION,
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
