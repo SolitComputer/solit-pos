@@ -1385,7 +1385,7 @@ export default function Page() {
         { header: "Harga Jual", key: "jual", width: 22 },
         { header: "Nama Customer", key: "customer", width: 24 },
         { header: "No. HP", key: "hp", width: 18 },
-        { header: "Platform", key: "platform", width: 15 },
+        { header: "Toko", key: "toko", width: 15 },         // ← ganti dari "Platform"
         { header: "Serial Number", key: "sn", width: 30 },
         { header: "Catatan", key: "catatan", width: 32 },
       ];
@@ -1446,7 +1446,7 @@ export default function Page() {
               Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "",
               g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal,
               Number(g.allocated_deal_price ?? 0), item.customer_name ?? "",
-              item.customer_phone ?? "", item.source_platform ?? "",
+              item.customer_phone ?? "", item.company_name ?? "",
               sns.join(", "), item.notes ?? "",
             ]);
           }
@@ -1462,7 +1462,7 @@ export default function Page() {
             1, item.laptop_name ?? "", item.cpu ?? "",
             item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal,
             Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "",
-            item.customer_phone ?? "", item.source_platform ?? "",
+            item.customer_phone ?? "", item.company_name ?? "",
             sns.join(", "), item.notes ?? "",
           ]);
         }
@@ -1732,8 +1732,8 @@ export default function Page() {
                       onClick={() => setCompanyName(c.value)}
                       title={c.desc ?? undefined}
                       className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value
-                          ? "bg-gray-900 text-white border-gray-900"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                         }`}
                     >
                       <span>{c.icon}</span>
