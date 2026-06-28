@@ -13,9 +13,47 @@ function getTodayWIBRange(): { start: string; end: string } {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
+// ── Tambah: range untuk bulan tertentu (WIB-aware) ──────────────────
+function getMonthWIBRange(year: number, month: number): { start: string; end: string } {
+  const WIB = 7 * 60 * 60 * 1000;
+  // Awal bulan: 1 bulan ini jam 00:00 WIB = UTC - 7 jam
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - WIB);
+  // Awal bulan berikutnya (exclusive end)
+  const end   = new Date(Date.UTC(year, month, 1, 0, 0, 0) - WIB);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
-    const { start, end } = getTodayWIBRange();
+    const searchParams = req.nextUrl.searchParams;
+    const monthParam = searchParams.get("month");
+    const yearParam  = searchParams.get("year");
+
+    let start: string;
+    let end: string;
+    let limitRows = 10; // default harian
+
+    if (monthParam && yearParam) {
+      const month = parseInt(monthParam, 10);
+      const year  = parseInt(yearParam, 10);
+
+      // Validasi nilai
+      if (
+        isNaN(month) || isNaN(year) ||
+        month < 1 || month > 12 ||
+        year < 2000 || year > 2100
+      ) {
+        return NextResponse.json(
+          { success: false, message: "Parameter month/year tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      ({ start, end } = getMonthWIBRange(year, month));
+      limitRows = 500; // bulan bisa banyak transaksi
+    } else {
+      ({ start, end } = getTodayWIBRange());
+    }
 
     const { data: transactions, error } = await supabase
       .from("transactions")
@@ -24,8 +62,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .gte("paid_at", start)
       .lt("paid_at", end)
       .order("paid_at", { ascending: false, nullsFirst: false })
-      .limit(10);
-      
+      .limit(limitRows);
 
     if (error) {
       return NextResponse.json(
