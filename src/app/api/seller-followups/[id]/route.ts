@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { hasPermission, PERMISSIONS as PERMS, UserRole } from "@/lib/permissions";
 import { nextFollowupISO, normalizeSellerType, SellerType } from "@/lib/sellerFollowup";
 import { logActivity } from "@/lib/activityLogger";
 
@@ -15,6 +16,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     const body = await req.json();
     const action: string | undefined = body.action;
 
+    // ── Double-lock: hanya Closing (CREW_SALES) & Admin yang boleh action "followup" ──
+    if (action === "followup") {
+      if (!hasPermission(user.role as UserRole, PERMS.FOLLOWUP_SELLER)) {
+        return NextResponse.json(
+          { success: false, message: "Hanya tim Closing & Admin yang bisa melakukan follow-up" },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data: existing, error: fetchErr } = await supabase
       .from("seller_followups")
       .select("*")
@@ -22,7 +33,10 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     if (fetchErr || !existing) {
-      return NextResponse.json({ success: false, message: "Data follow-up tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, message: "Data follow-up tidak ditemukan" },
+        { status: 404 }
+      );
     }
 
     const nowISO = new Date().toISOString();
@@ -58,9 +72,13 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    // Log aktivitas — non-blocking (kalau gagal, aksi tetap sukses)
+    // ── Log aktivitas — non-blocking (kalau gagal, aksi tetap sukses) ──
     if (action) {
-      const labelMap: Record<string, string> = { followup: "Follow-up", archive: "Arsip", reactivate: "Aktifkan" };
+      const labelMap: Record<string, string> = {
+        followup: "Follow-up",
+        archive: "Arsip",
+        reactivate: "Aktifkan",
+      };
       try {
         await logActivity({
           userId: user.id,
@@ -89,7 +107,9 @@ async function deleteHandler(req: NextRequest, props: Props, _user: AuthUser) {
   try {
     const { id } = await props.params;
     const { error } = await supabase.from("seller_followups").delete().eq("id", id);
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[DELETE /api/seller-followups/[id]]", err);
