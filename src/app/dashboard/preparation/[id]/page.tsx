@@ -7,7 +7,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import DeliveryMap, { type TrackPoint } from "@/components/preparation/DeliveryMap";
 import StartTripModal, { type StartTripPayload } from "@/components/preparation/StartTripModal";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
-import { haversineM, bearingDeg } from "@/lib/geo";
+import { haversineM, bearingDeg, computeSpeedKmh } from "@/lib/geo";
+import DeliveryVoiceHT from "@/components/preparation/DeliveryVoiceHT";
 import { supabase } from "@/services/supabase";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean; check_note: string | null }
@@ -27,6 +28,14 @@ interface PrepOrder {
 
 const fmtFull = (iso: string) =>
     new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function fmtElapsed(ms: number): string {
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`;
+}
 
 const STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
     MENUNGGU: { label: "Menunggu", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
@@ -167,6 +176,8 @@ export default function PreparationDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string>("User");
+    const [nowTs, setNowTs] = useState<number>(() => Date.now());
     const [showDone, setShowDone] = useState(false);
     const [showStart, setShowStart] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
@@ -185,7 +196,7 @@ export default function PreparationDetailPage() {
 
     useEffect(() => {
         fetch("/api/auth/me").then((r) => r.json())
-            .then((r) => { setUserRole(r.user?.role ?? null); setUserId(r.user?.id ?? null); })
+            .then((r) => { setUserRole(r.user?.role ?? null); setUserId(r.user?.id ?? null); setUserName(r.user?.name ?? "User"); })
             .catch(() => { setUserRole(null); setUserId(null); });
     }, []);
 
@@ -197,6 +208,15 @@ export default function PreparationDetailPage() {
         } catch { /* ignore */ } finally { setIsLoading(false); }
     }, [id]);
     useEffect(() => { fetchOrder(); }, [fetchOrder]);
+
+    // ticking durasi (cuma saat aktif antar/pulang)
+    useEffect(() => {
+        const goActive = order?.status === "DIKIRIM";
+        const retActive = order?.status === "SELESAI" && !!order?.return_started_at && !order?.returned_at;
+        if (!goActive && !retActive) return;
+        const iv = setInterval(() => setNowTs(Date.now()), 1000);
+        return () => clearInterval(iv);
+    }, [order?.status, order?.return_started_at, order?.returned_at]);
 
     // refs turunan
     useEffect(() => {
@@ -387,10 +407,18 @@ export default function PreparationDetailPage() {
     const routeLine: [number, number][] | null = (() => {
         try { return order.route_polyline ? JSON.parse(order.route_polyline) : null; } catch { return null; }
     })();
-    const latestSpeed = points[points.length - 1]?.speed ?? null;
+    const speedKmh = computeSpeedKmh(points);
 
     const isDeliveringGo = order.status === "DIKIRIM" && order.delivery_method === "PENGANTARAN";
     const isReturning = order.status === "SELESAI" && !!order.return_started_at && !order.returned_at;
+
+    const startMs = isReturning
+        ? (order.return_started_at ? new Date(order.return_started_at).getTime() : nowTs)
+        : (order.delivery_started_at ? new Date(order.delivery_started_at).getTime() : nowTs);
+    const elapsedMs = nowTs - startMs;
+
+    const isBaseRole = userRole ? ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES"].includes(userRole) : false;
+    const canVoice = isAssignedDriver || isBaseRole;
 
     return (
         <DashboardLayout>
@@ -496,12 +524,17 @@ export default function PreparationDetailPage() {
 
                             <DeliveryMap points={points} routeLine={routeLine} destination={dest} height={380} />
 
-                            {/* speed besar */}
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-blue-400 font-semibold uppercase">Kecepatan</p><p className="text-lg font-black text-blue-700">{latestSpeed != null ? `${Math.round(latestSpeed * 3.6)}` : "—"}<span className="text-[10px] font-bold"> km/j</span></p></div>
-                                <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-gray-400 font-semibold uppercase">Titik</p><p className="text-lg font-black text-gray-700">{points.length}</p></div>
-                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-emerald-400 font-semibold uppercase">Status</p><p className="text-sm font-black text-emerald-700 mt-1">{isReturning ? "Pulang" : "Antar"}</p></div>
+                            {/* speed + durasi */}
+                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-blue-400 font-semibold uppercase">Kecepatan</p><p className="text-lg font-black text-blue-700 tabular-nums">{speedKmh != null ? `${Math.round(speedKmh)}` : "—"}<span className="text-[10px] font-bold"> km/j</span></p></div>
+                                <div className="bg-[#1a1a2e] rounded-xl p-2.5 text-center"><p className="text-[10px] text-gray-300 font-semibold uppercase">Durasi</p><p className="text-lg font-black text-white tabular-nums">{fmtElapsed(elapsedMs)}</p></div>
+                                <div className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-gray-400 font-semibold uppercase">Titik</p><p className="text-lg font-black text-gray-700 tabular-nums">{points.length}</p></div>
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center"><p className="text-[10px] text-emerald-400 font-semibold uppercase">Fase</p><p className="text-sm font-black text-emerald-700 mt-1">{isReturning ? "Pulang" : "Antar"}</p></div>
                             </div>
+
+                            {canVoice && userId && (
+                                <DeliveryVoiceHT orderId={order.id} userId={userId} userName={userName} userRole={userRole ?? ""} canTalk={canVoice} />
+                            )}
 
                             {/* kontrol PENGANTAR */}
                             {isAssignedDriver && (
@@ -547,6 +580,9 @@ export default function PreparationDetailPage() {
                                 {order.delivery_method === "DIAMBIL_CUSTOMER" ? "Diambil langsung oleh customer" : order.delivery_method === "PENGANTARAN" ? `Diantar oleh ${order.delivery_user_name || "pengantaran"}` : `Dikirim via ${order.courier_service || "kurir"}`}
                                 {order.delivered_at && ` · ${new Date(order.delivered_at).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
                             </p>
+                            {order.delivery_method === "PENGANTARAN" && order.delivery_started_at && order.delivered_at && (
+                                <p className="text-[11px] text-emerald-700 font-bold mt-1">⏱️ Total antar: {fmtElapsed(new Date(order.delivered_at).getTime() - new Date(order.delivery_started_at).getTime())}</p>
+                            )}
 
                             {/* tombol perjalanan pulang utk pengantar */}
                             {order.delivery_method === "PENGANTARAN" && isAssignedDriver && !order.returned_at && (
@@ -556,8 +592,13 @@ export default function PreparationDetailPage() {
                                         : <span className="text-xs text-orange-600 font-semibold">Sedang dalam perjalanan pulang — tracking aktif di atas</span>}
                                 </div>
                             )}
-                            {order.returned_at && <p className="text-[11px] text-gray-400 mt-2">Pengantar kembali ke toko · {fmtFull(order.returned_at)}</p>}
-
+                            {order.returned_at && (
+                                <p className="text-[11px] text-gray-400 mt-2">
+                                    Pengantar kembali ke toko · {fmtFull(order.returned_at)}
+                                    {order.return_started_at && ` · pulang ${fmtElapsed(new Date(order.returned_at).getTime() - new Date(order.return_started_at).getTime())}`}
+                                </p>
+                            )}
+                            
                             <div className="mt-4">
                                 {order.transaction_invoice
                                     ? <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">🧾 Lihat Transaksi {order.transaction_invoice} →</Link>

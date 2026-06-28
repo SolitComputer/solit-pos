@@ -122,4 +122,17 @@ export const fmtDuration = (s: number) => {
     return min < 60 ? `${min} mnt` : `${Math.floor(min / 60)} jam ${min % 60} mnt`;
 };
 export const fmtSpeed = (mps: number | null | undefined) =>
-    mps == null || isNaN(mps) || mps < 0 ? "—" : `${Math.round(mps * 3.6)} km/j`;
+  mps == null || isNaN(mps) || mps < 0 ? "—" : `${Math.round(mps * 3.6)} km/j`;
+
+export function computeSpeedKmh(points: { lat: number; lng: number; t?: number }[]): number | null {
+  const pts = points.filter((p) => p.t != null).slice(-5);
+  if (pts.length < 2) return null;
+  let dist = 0;
+  for (let i = 1; i < pts.length; i++) dist += haversineM(pts[i - 1], pts[i]);
+  const dt = (pts[pts.length - 1].t! - pts[0].t!) / 1000;
+  if (dt <= 0) return null;
+  const mps = dist / dt;
+  if (mps < 0.7) return 0;    
+  if (mps > 45) return null; 
+  return mps * 3.6;
+}

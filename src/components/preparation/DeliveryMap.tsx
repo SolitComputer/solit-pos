@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { reverseGeocode, classifyStop, haversineM, bearingDeg, fmtSpeed } from "@/lib/geo";
+import { reverseGeocode, classifyStop, haversineM, bearingDeg, computeSpeedKmh } from "@/lib/geo";
 
 export interface TrackPoint { lat: number; lng: number; t?: number; speed?: number | null; phase?: "GO" | "RETURN" }
 interface Props {
   points: TrackPoint[];
-  routeLine?: [number, number][] | null;     // rute terencana (opsional)
+  routeLine?: [number, number][] | null;
   destination?: { lat: number; lng: number } | null;
   height?: number;
 }
@@ -14,7 +14,6 @@ interface StopInfo { lat: number; lng: number; durS: number; key: string }
 
 declare global { interface Window { L?: any } }
 
-// Kelompokkan titik diam berurutan → titik berhenti
 function computeStops(points: TrackPoint[]): StopInfo[] {
   const stops: StopInfo[] = [];
   let i = 0;
@@ -52,19 +51,25 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
   const seededRef = useRef(false);
   const lastGeoRef = useRef<{ lat: number; lng: number } | null>(null);
 
+  // live-stop (deteksi berhenti cepat)
+  const lastMoveRef = useRef<number>(Date.now());
+  const stopKeyRef = useRef<string | null>(null);
+
   const [mapType, setMapType] = useState<"road" | "sat">("road");
   const [ready, setReady] = useState(false);
   const [street, setStreet] = useState<string>("Mendeteksi lokasi...");
+  const [liveStop, setLiveStop] = useState<{ emoji: string; kind: string } | null>(null);
 
   const latest = points[points.length - 1] ?? null;
   const stops = useMemo(() => computeStops(points), [points]);
+  const speedKmh = useMemo(() => computeSpeedKmh(points), [points]);
 
   const remainingM = useMemo(() => {
     if (!latest || !destination) return null;
     return haversineM(latest, destination);
   }, [latest, destination]);
 
-  // ── Inject Leaflet sekali, init map ──
+  // ── Init Leaflet ──
   useEffect(() => {
     let cancelled = false;
     const ensureLeaflet = (): Promise<any> =>
@@ -101,9 +106,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
 
       map.on("dragstart", () => { followRef.current = false; });
 
-      // rute terencana (garis putus-putus abu)
       plannedRef.current = L.polyline([], { color: "#94a3b8", weight: 4, opacity: 0.7, dashArray: "8 10" }).addTo(map);
-      // jejak GO (biru) + PULANG (oranye)
       goTrailRef.current = L.polyline([], { color: "#2563eb", weight: 5, opacity: 0.85, lineJoin: "round", lineCap: "round" }).addTo(map);
       returnTrailRef.current = L.polyline([], { color: "#f97316", weight: 5, opacity: 0.85, lineJoin: "round", lineCap: "round" }).addTo(map);
 
@@ -116,7 +119,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       const motoHtml = `
         <div style="position:relative;width:46px;height:46px;">
           <div style="position:absolute;inset:0;border-radius:9999px;background:rgba(37,99,235,.25);animation:motoPulse 1.6s ease-out infinite;"></div>
-          <div class="moto-rot" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform .3s linear;">
+          <div class="moto-rot" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform .25s linear;">
             <div style="width:36px;height:36px;border-radius:9999px;background:#fff;border:3px solid #2563eb;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.4);font-size:19px;">🏍️</div>
           </div>
         </div>`;
@@ -148,7 +151,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     plannedRef.current.setLatLngs(routeLine ?? []);
   }, [routeLine]);
 
-  // ── Points berubah → update trail + glide motor + rotasi + reverse geocode ──
+  // ── Points → trail + glide adaptif + rotasi + nama jalan ──
   useEffect(() => {
     const L = window.L;
     if (!L || !mapRef.current || !motoRef.current || points.length === 0) return;
@@ -159,21 +162,18 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     const target = points[points.length - 1];
     const prev = points[points.length - 2];
 
-    // rotasi marker sesuai arah
     if (prev) {
       const hd = bearingDeg(prev, target);
       const el = motoRef.current.getElement()?.querySelector(".moto-rot") as HTMLElement | null;
       if (el) el.style.transform = `rotate(${hd}deg)`;
     }
 
-    // reverse geocode nama jalan (kalau pindah > 120m dari titik terakhir yg di-geocode)
     const lastGeo = lastGeoRef.current;
     if (!lastGeo || haversineM(lastGeo, target) > 120) {
       lastGeoRef.current = { lat: target.lat, lng: target.lng };
       reverseGeocode(target.lat, target.lng).then((r) => { if (r) setStreet(r.label); });
     }
 
-    // titik pertama → snap & fit
     if (!seededRef.current) {
       seededRef.current = true;
       motoRef.current.setLatLng([target.lat, target.lng]);
@@ -184,17 +184,18 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       return;
     }
 
-    // glide mulus dari posisi marker SEKARANG ke target
+    // Durasi animasi = jeda nyata antar titik → marker jalan terus tanpa freeze
+    let durMs = 1500;
+    if (prev?.t != null && target.t != null) durMs = Math.min(Math.max(target.t - prev.t, 700), 5000);
+
     const cur = motoRef.current.getLatLng();
     const from = { lat: cur.lat, lng: cur.lng };
-    const duration = 1800;
     const startT = performance.now();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const step = (now: number) => {
-      const t = Math.min(1, (now - startT) / duration);
-      const e = 1 - Math.pow(1 - t, 2); // ease-out
-      const lat = from.lat + (target.lat - from.lat) * e;
-      const lng = from.lng + (target.lng - from.lng) * e;
+      const t = Math.min(1, (now - startT) / durMs); // linear = kecepatan konstan, mulus
+      const lat = from.lat + (target.lat - from.lat) * t;
+      const lng = from.lng + (target.lng - from.lng) * t;
       motoRef.current.setLatLng([lat, lng]);
       if (followRef.current && mapRef.current) mapRef.current.panTo([lat, lng], { animate: false });
       if (t < 1) rafRef.current = requestAnimationFrame(step);
@@ -203,7 +204,23 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points]);
 
-  // ── Marker berhenti + klasifikasi ──
+  // ── Deteksi berhenti LIVE (pom bensin/warung/perumahan) ──
+  useEffect(() => {
+    if (!latest || speedKmh == null) return;
+    const now = Date.now();
+    if (speedKmh >= 4) { lastMoveRef.current = now; stopKeyRef.current = null; setLiveStop(null); return; }
+    if (now - lastMoveRef.current > 25000) {
+      const key = `${latest.lat.toFixed(4)},${latest.lng.toFixed(4)}`;
+      if (stopKeyRef.current === key) return;
+      stopKeyRef.current = key;
+      reverseGeocode(latest.lat, latest.lng).then((r) => {
+        const info = classifyStop(r);
+        setLiveStop({ emoji: info.emoji, kind: info.kind });
+      });
+    }
+  }, [points, latest, speedKmh]);
+
+  // ── Marker stop historis ──
   useEffect(() => {
     const L = window.L;
     if (!L || !mapRef.current) return;
@@ -226,7 +243,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     });
   }, [stops]);
 
-  // ── Destination berubah ──
+  // ── Destination ──
   useEffect(() => {
     const L = window.L;
     if (!L || !mapRef.current || !destination) return;
@@ -257,20 +274,29 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
         </div>
       )}
 
-      {/* HUD nama jalan + speed + sisa jarak */}
+      {/* HUD nama jalan + speed (sinkron) + sisa jarak */}
       {ready && (
         <div style={{ position: "absolute", left: 10, right: 10, top: 10, zIndex: 500, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ background: "rgba(26,26,46,.92)", color: "#fff", borderRadius: 12, padding: "7px 12px", display: "flex", alignItems: "center", gap: 12, fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.3)", maxWidth: "92%" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
               <span>🛣️</span>
-              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 180 }}>{street}</span>
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>{street}</span>
             </span>
-            <span style={{ background: "#2563eb", borderRadius: 8, padding: "2px 8px", whiteSpace: "nowrap" }}>{fmtSpeed(latest?.speed)}</span>
+            <span style={{ background: "#2563eb", borderRadius: 8, padding: "2px 8px", whiteSpace: "nowrap" }}>{speedKmh != null ? `${Math.round(speedKmh)} km/j` : "—"}</span>
             {remainingM != null && (
               <span style={{ background: "#10b981", borderRadius: 8, padding: "2px 8px", whiteSpace: "nowrap" }}>
                 {remainingM >= 1000 ? `${(remainingM / 1000).toFixed(1)} km` : `${Math.round(remainingM)} m`}
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Banner LIVE berhenti */}
+      {ready && liveStop && (
+        <div style={{ position: "absolute", left: 10, right: 10, bottom: 56, zIndex: 500, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+          <div style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", borderRadius: 12, padding: "6px 12px", fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.2)", maxWidth: "92%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            ⏸️ Sedang berhenti — {liveStop.emoji} {liveStop.kind}
           </div>
         </div>
       )}
