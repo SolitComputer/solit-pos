@@ -372,6 +372,10 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   ADMIN: ["PENGELOLA_BARANG"],
 };
 
+export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = [
+  "PENGANTARAN",
+];
+
 /** Full access check — ADMIN / PROGRAMMER / ASISTEN_CEO */
 export function isFullAccess(role: string): boolean {
   return (FULL_ACCESS as string[]).includes(role);

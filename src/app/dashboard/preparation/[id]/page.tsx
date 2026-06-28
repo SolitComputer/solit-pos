@@ -14,7 +14,7 @@ interface PrepOrder {
     status: string; delivery_method: string | null; notes: string | null;
     created_by_name: string | null; received_by_name: string | null; done_by_name: string | null;
     received_at: string | null; done_at: string | null;
-    delivery_user_name: string | null; delivery_started_at: string | null; delivered_at: string | null;
+    delivery_user_id: string | null; delivery_user_name: string | null; delivery_started_at: string | null; delivered_at: string | null;
     delivery_address: string | null; dest_lat: number | null; dest_lng: number | null;
     courier_service: string | null; courier_tracking_number: string | null; courier_note: string | null;
     transaction_invoice: string | null;
@@ -32,7 +32,6 @@ const STATUS_META: Record<string, { label: string; badge: string; dot: string }>
     DIBATALKAN: { label: "Batal", badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400" },
 };
 
-// ── Popup pilih metode pengiriman (saat klik Selesai) ──
 function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () => void; onDone: () => void }) {
     const [method, setMethod] = useState<"DIAMBIL_CUSTOMER" | "PENGANTARAN" | "KURIR" | null>(null);
     const [address, setAddress] = useState(order.delivery_address || "");
@@ -44,6 +43,20 @@ function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () =
     const [courierNote, setCourierNote] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+
+    const [drivers, setDrivers] = useState<{ id: string; name: string; role: string }[]>([]);
+    const [driversLoading, setDriversLoading] = useState(false);
+    const [driverId, setDriverId] = useState("");
+
+    useEffect(() => {
+        if (method !== "PENGANTARAN" || drivers.length > 0) return;
+        setDriversLoading(true);
+        fetch("/api/preparation/delivery-users")
+            .then(r => r.json())
+            .then(r => { if (r.success) setDrivers(r.data || []); })
+            .catch(() => { })
+            .finally(() => setDriversLoading(false));
+    }, [method, drivers.length]);
 
     const getGPS = () => {
         setGpsLoading(true);
@@ -58,6 +71,7 @@ function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () =
         setError("");
         if (!method) { setError("Pilih metode pengiriman dulu"); return; }
         if (method === "PENGANTARAN" && !address.trim()) { setError("Alamat tujuan wajib diisi"); return; }
+        if (method === "PENGANTARAN" && !driverId) { setError("Pilih role pengantaran yang bertugas dulu"); return; }
         if (method === "KURIR" && !courierService.trim()) { setError("Nama jasa kurir wajib diisi"); return; }
         setSaving(true);
         try {
@@ -67,6 +81,8 @@ function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () =
                     delivery_method: method,
                     delivery_address: address.trim() || null,
                     dest_lat: destLat, dest_lng: destLng,
+                    delivery_user_id: method === "PENGANTARAN" ? driverId : null,
+                    delivery_user_name: method === "PENGANTARAN" ? (drivers.find(d => d.id === driverId)?.name ?? null) : null,
                     courier_service: courierService.trim() || null,
                     courier_tracking_number: trackingNumber.trim() || null,
                     courier_note: courierNote.trim() || null,
@@ -108,6 +124,34 @@ function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () =
 
                     {method === "PENGANTARAN" && (
                         <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2.5">
+                            {/* Pilih pengantar */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">Pilih Pengantar *</label>
+                                {driversLoading ? (
+                                    <div className="text-xs text-gray-400 py-2">Memuat daftar pengantar...</div>
+                                ) : drivers.length === 0 ? (
+                                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                        Belum ada akun role Pengantaran. Buat dulu di menu Users.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                                        {drivers.map(d => (
+                                            <button key={d.id} type="button" onClick={() => setDriverId(d.id)}
+                                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition ${driverId === d.id ? "border-violet-500 bg-violet-100" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${driverId === d.id ? "bg-violet-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                                    {d.name?.charAt(0)?.toUpperCase() ?? "?"}
+                                                </span>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className={`text-sm font-bold truncate ${driverId === d.id ? "text-violet-800" : "text-gray-700"}`}>{d.name}</p>
+                                                    <p className="text-[10px] text-gray-400">{d.role}</p>
+                                                </div>
+                                                {driverId === d.id && <span className="text-violet-600 flex-shrink-0">✓</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Alamat Tujuan *</label>
                                 <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Alamat lengkap customer" className={inputCls} />
@@ -118,7 +162,6 @@ function DoneModal({ order, onClose, onDone }: { order: PrepOrder; onClose: () =
                             </button>
                         </div>
                     )}
-
                     {method === "KURIR" && (
                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2.5">
                             <div>
@@ -157,20 +200,23 @@ export default function PreparationDetailPage() {
     const [order, setOrder] = useState<PrepOrder | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const [showDone, setShowDone] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Tracking
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [tracking, setTracking] = useState(false);
     const watchIdRef = useRef<number | null>(null);
     const lastPostRef = useRef<number>(0);
+    const assignedRef = useRef<boolean>(false);
 
     const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
     const canDeliver = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_PREPARATION) : false;
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+        fetch("/api/auth/me").then(r => r.json())
+            .then(r => { setUserRole(r.user?.role ?? null); setUserId(r.user?.id ?? null); })
+            .catch(() => { setUserRole(null); setUserId(null); });
     }, []);
 
     const fetchOrder = useCallback(async () => {
@@ -181,6 +227,10 @@ export default function PreparationDetailPage() {
         } catch { /* ignore */ } finally { setIsLoading(false); }
     }, [id]);
     useEffect(() => { fetchOrder(); }, [fetchOrder]);
+
+    useEffect(() => {
+        assignedRef.current = !!userId && !!order && order.delivery_user_id === userId;
+    }, [userId, order]);
 
     useEffect(() => {
         const channel = supabase
@@ -199,8 +249,8 @@ export default function PreparationDetailPage() {
         return () => { supabase.removeChannel(channel); };
     }, [id, fetchOrder]);
 
-    // ── Live tracking: kirim lokasi device pengantar ──
     const startTracking = useCallback(() => {
+        if (!assignedRef.current) return;
         if (!navigator.geolocation || watchIdRef.current != null) return;
         setTracking(true);
         watchIdRef.current = navigator.geolocation.watchPosition(
@@ -209,7 +259,7 @@ export default function PreparationDetailPage() {
                 const lng = pos.coords.longitude;
                 setPoints(prev => [...prev, { lat, lng }]);
                 const now = Date.now();
-                if (now - lastPostRef.current > 7000) { // throttle 7 detik
+                if (now - lastPostRef.current > 4000) { // throttle 4 detik → lebih realtime
                     lastPostRef.current = now;
                     try {
                         await fetch(`/api/preparation/${id}/tracking`, {
@@ -223,7 +273,7 @@ export default function PreparationDetailPage() {
             (err) => console.error("watch error", err),
             { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
         );
-    }, [id]);
+    }, [id, canDeliver]);
 
     const stopTracking = useCallback(() => {
         if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -246,7 +296,7 @@ export default function PreparationDetailPage() {
             } catch { /* ignore */ }
         };
         fetchPoints();
-        const iv = setInterval(fetchPoints, 8000);
+        const iv = setInterval(fetchPoints, 5000);
         return () => { active = false; clearInterval(iv); };
     }, [order, id]);
 
@@ -304,6 +354,7 @@ export default function PreparationDetailPage() {
     const checked = order.preparation_items.filter(it => it.is_checked).length;
     const allChecked = order.preparation_items.length > 0 && checked === order.preparation_items.length;
     const dest = order.dest_lat != null && order.dest_lng != null ? { lat: order.dest_lat, lng: order.dest_lng } : null;
+    const isAssignedDriver = !!userId && order.delivery_user_id === userId;
 
     return (
         <DashboardLayout>
@@ -402,31 +453,53 @@ export default function PreparationDetailPage() {
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                             <div className="flex items-center justify-between mb-3">
                                 <h2 className="text-sm font-bold text-gray-800">🛵 Live Tracking Pengantaran</h2>
-                                {tracking && <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />Mengirim lokasi</span>}
+                                {tracking
+                                    ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />Mengirim lokasi</span>
+                                    : !isAssignedDriver && <span className="text-[11px] font-semibold text-gray-400">Mode pantau</span>}
                             </div>
 
-                            <DeliveryMap points={points} destination={dest} height={320} />
+                            {/* Pengantar yang ditugaskan */}
+                            {order.delivery_user_name && (
+                                <div className="bg-violet-50 border border-violet-200 rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5">
+                                    <span className="w-9 h-9 rounded-full bg-violet-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                        {order.delivery_user_name.charAt(0).toUpperCase()}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] text-violet-500 font-semibold uppercase">Pengantar bertugas</p>
+                                        <p className="text-sm font-bold text-violet-800 truncate">{order.delivery_user_name}</p>
+                                    </div>
+                                    {isAssignedDriver && <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex-shrink-0">Anda</span>}
+                                </div>
+                            )}
 
-                            <div className="mt-3 flex gap-2">
-                                {canDeliver && !order.delivery_started_at && (
-                                    <button onClick={startDelivery} disabled={actionLoading}
-                                        className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition disabled:opacity-50">
-                                        {actionLoading ? "..." : "🚀 Mulai Antar (aktifkan tracking)"}
-                                    </button>
-                                )}
-                                {canDeliver && order.delivery_started_at && !tracking && (
-                                    <button onClick={startTracking}
-                                        className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">
-                                        📍 Lanjut Kirim Lokasi
-                                    </button>
-                                )}
-                                {canDeliver && order.delivery_started_at && (
-                                    <button onClick={completeDelivery} disabled={actionLoading}
-                                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                        {actionLoading ? "..." : "✅ Sudah Sampai"}
-                                    </button>
-                                )}
-                            </div>
+                            {!isAssignedDriver && (
+                                <p className="text-[11px] text-gray-400 mb-2">📡 Lokasi dikirim oleh {order.delivery_user_name || "pengantar"} secara realtime. Anda hanya memantau.</p>
+                            )}
+
+                            <DeliveryMap points={points} destination={dest} height={360} />
+
+                            {isAssignedDriver && (
+                                <div className="mt-3 flex gap-2">
+                                    {!order.delivery_started_at && (
+                                        <button onClick={startDelivery} disabled={actionLoading}
+                                            className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition disabled:opacity-50">
+                                            {actionLoading ? "..." : "🚀 Mulai Antar (aktifkan tracking)"}
+                                        </button>
+                                    )}
+                                    {order.delivery_started_at && !tracking && (
+                                        <button onClick={startTracking}
+                                            className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">
+                                            📍 Lanjut Kirim Lokasi
+                                        </button>
+                                    )}
+                                    {order.delivery_started_at && (
+                                        <button onClick={completeDelivery} disabled={actionLoading}
+                                            className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                            {actionLoading ? "..." : "✅ Sudah Sampai"}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                             {order.delivery_started_at && (
                                 <p className="text-[11px] text-gray-400 mt-2 text-center">
                                     Mulai antar: {new Date(order.delivery_started_at).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit" })}
