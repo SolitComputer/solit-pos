@@ -61,20 +61,34 @@ const TURN_USER = process.env.NEXT_PUBLIC_TURN_USER ?? "";
 const TURN_PASS = process.env.NEXT_PUBLIC_TURN_PASS ?? "";
 
 function buildIceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
+  const stunServers: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
   ];
+
   if (TURN_HOST && TURN_USER && TURN_PASS) {
-    servers.push(
+    // Custom TURN server (direkomendasikan untuk produksi)
+    return [
+      ...stunServers,
       { urls: `turn:${TURN_HOST}:3478`, username: TURN_USER, credential: TURN_PASS },
+      { urls: `turn:${TURN_HOST}:3478?transport=tcp`, username: TURN_USER, credential: TURN_PASS },
       { urls: `turns:${TURN_HOST}:443?transport=tcp`, username: TURN_USER, credential: TURN_PASS },
-    );
+    ];
   }
-  return servers;
+
+  return [
+    ...stunServers,
+    { urls: "stun:openrelay.metered.ca:80" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+  ];
 }
 
 const ICE_SERVERS = buildIceServers();
+const hasCustomTurn = !!(TURN_HOST && TURN_USER && TURN_PASS);
 
 export default function DeliveryVoiceHT({
   orderId, userId, userName, userRole, canTalk, canTarget = false,
@@ -167,7 +181,7 @@ export default function DeliveryVoiceHT({
         // Coba ICE restart dulu sebelum hapus
         restartIce(remoteId);
       } else if (state === "closed") {
-        try { pc.close(); } catch {}
+        try { pc.close(); } catch { }
         peersRef.current.delete(remoteId);
         syncPeers();
         dropTarget(remoteId);
@@ -268,7 +282,7 @@ export default function DeliveryVoiceHT({
 
     if (msg.type === "leave") {
       const peer = peersRef.current.get(msg.from);
-      if (peer) { try { peer.pc.close(); } catch {} peer.audioEl?.pause(); peersRef.current.delete(msg.from); syncPeers(); }
+      if (peer) { try { peer.pc.close(); } catch { } peer.audioEl?.pause(); peersRef.current.delete(msg.from); syncPeers(); }
       setSpeakers(s => { const n = { ...s }; delete n[msg.from]; return n; });
       dropTarget(msg.from);
       return;
@@ -340,7 +354,7 @@ export default function DeliveryVoiceHT({
   const leave = useCallback(() => {
     if (pingTimerRef.current) { clearInterval(pingTimerRef.current); pingTimerRef.current = null; }
     if (joinedRef.current) send({ type: "leave" });
-    peersRef.current.forEach(p => { try { p.pc.close(); } catch {} p.audioEl?.pause(); });
+    peersRef.current.forEach(p => { try { p.pc.close(); } catch { } p.audioEl?.pause(); });
     peersRef.current.clear();
     localStreamRef.current?.getTracks().forEach(t => t.stop());
     localStreamRef.current = null;
@@ -374,7 +388,7 @@ export default function DeliveryVoiceHT({
   }, [talking, send]);
 
   const enableSound = useCallback(() => {
-    peersRef.current.forEach(p => p.audioEl?.play().catch(() => {}));
+    peersRef.current.forEach(p => p.audioEl?.play().catch(() => { }));
     setAudioBlocked(false);
   }, []);
 
@@ -389,7 +403,7 @@ export default function DeliveryVoiceHT({
   const connectedCount = peerList.filter(p => p.state === "connected").length;
   const targetNames = [...targetIds].map(id => peerList.find(p => p.id === id)?.name).filter(Boolean) as string[];
   const targetLabel = targetNames.length === 0 ? "" : targetNames.length === 1 ? targetNames[0] : `${targetNames.length} orang`;
-  const hasTurn = !!(TURN_HOST && TURN_USER && TURN_PASS);
+  const hasTurn = true;
 
   return (
     <div className="mt-3 bg-[#1a1a2e] rounded-2xl p-4 text-white">
@@ -402,8 +416,11 @@ export default function DeliveryVoiceHT({
               {!hasTurn && <span className="text-amber-300 text-[10px] ml-1">(WiFi only)</span>}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              {hasTurn ? "Koneksi TURN aktif — bisa lintas jaringan" : "Tambahkan TURN server untuk lintas operator"}
-            </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {hasCustomTurn
+                  ? "Koneksi TURN aktif — bisa lintas jaringan"
+                  : "TURN publik aktif — bisa lintas operator"}
+              </p>            </p>
           </div>
         </div>
         {joined && (
@@ -565,12 +582,14 @@ export default function DeliveryVoiceHT({
           </div>
 
           {/* Warning kalau tidak ada TURN */}
-          {!hasTurn && (
+          {!hasCustomTurn && (
             <div className="mt-2 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2">
-              <p className="text-[10px] text-amber-300 font-semibold">⚠️ TURN server belum dikonfigurasi</p>
+              <p className="text-[10px] text-amber-300 font-semibold">
+                📡 TURN publik (OpenRelay) — bisa lintas operator
+              </p>
               <p className="text-[10px] text-amber-400 mt-0.5">
-                Koneksi mungkin gagal jika pengantar pakai data seluler berbeda.
-                Set NEXT_PUBLIC_TURN_HOST/USER/PASS di .env untuk fix ini.
+                Koneksi lintas 4G/WiFi aktif via fallback gratis.
+                Untuk performa lebih stabil, set NEXT_PUBLIC_TURN_HOST/USER/PASS di Vercel env.
               </p>
             </div>
           )}

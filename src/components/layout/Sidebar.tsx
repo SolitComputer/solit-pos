@@ -206,7 +206,7 @@ const ITEM_MANAGEMENT_SELLER: MenuItem = {
   icon: Icons.managementSeller,
 };
 const ITEM_PREPARATION: MenuItem = {
-  name: "Penyiapan Barang",
+  name: "Dashboard Penyiapan",
   href: "/dashboard/preparation",
   icon: Icons.pendingOrders,
 };
@@ -236,7 +236,12 @@ const PREPARATION_PENYEDIA_MENU: MenuGroup = {
 const PREPARATION_SALES_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
-    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+  ],
+};
+const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
+  label: "Pengantaran",
+  items: [
     { name: "Siap Dikirim 🔔", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute },
   ],
@@ -245,6 +250,7 @@ const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
     { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
+    { name: "Antrian Penyiapan", href: "/dashboard/preparation/antrian", icon: Icons.pendingOrders },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
   ],
 };
@@ -426,24 +432,27 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
   CREW_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
-  ],
-  PENGANTARAN: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    PENGANTARAN_TRANSAKSI,
-    PREPARATION_PENGANTARAN_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
   SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
+  ],
+  PENGANTARAN: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    PENGANTARAN_TRANSAKSI,
+    PREPARATION_PENGANTARAN_MENU, // ← UPDATED (now includes Antrian Penyiapan)
   ],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],

@@ -292,10 +292,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   // Antrian & Done = khusus Penyedia Barang + Admin
-  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
-  "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
-  // Siap Kirim = Sales lihat dan dispatch
-  "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
+  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES, "PENGANTARAN"],
+  "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES, "PENGANTARAN"],
+  "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES, "PENGANTARAN"],
   // Pengantaran = role Pengantaran + Admin + Sales (untuk monitor)
   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
   "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
