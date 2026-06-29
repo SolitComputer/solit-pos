@@ -177,6 +177,12 @@ const Icons = {
       <path d="M16 13c-.29 0-.62.02-.97.05C16.19 13.89 17 15.02 17 16.35V19h7v-2c0-2.66-5.33-4-8-4z" />
     </svg>
   ),
+  deliveryRoute: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" />
+      <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -202,6 +208,18 @@ const ITEM_PREPARATION: MenuItem = {
   name: "Penyiapan Barang",
   href: "/dashboard/preparation",
   icon: Icons.pendingOrders,
+};
+const ITEM_PREPARATION_HISTORY: MenuItem = {
+  name: "Riwayat Pengantaran",
+  href: "/dashboard/preparation/history",
+  icon: Icons.deliveryRoute,
+};
+const PREPARATION_PENYEDIA_MENU: MenuGroup = {
+  label: "Penyiapan Barang",
+  items: [
+    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.pendingOrders },
+    { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+  ],
 };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
@@ -236,6 +254,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     ITEM_PREPARATION,
+    ITEM_PREPARATION_HISTORY,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
@@ -278,6 +297,7 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     ITEM_PREPARATION,
+    ITEM_PREPARATION_HISTORY,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -505,10 +525,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
- {
+    PREPARATION_PENYEDIA_MENU,
+    {
       label: "Transaksi",
       items: [
-        ITEM_PREPARATION,
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -528,10 +548,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
+    PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
       items: [
-        ITEM_PREPARATION,
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
       ],
     },
@@ -554,14 +574,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
   // ── PKL variants ──────────────────────────────────────────────────────────
-  PKL:                 PKL_MENU,
-  PKL_MARKETING:       PKL_MENU,
-  PKL_SALES:           PKL_MENU,
+  PKL: PKL_MENU,
+  PKL_MARKETING: PKL_MENU,
+  PKL_SALES: PKL_MENU,
   PKL_PENYEDIA_BARANG: PKL_MENU,
-  PKL_SOTECH:          PKL_MENU,
-  PKL_ONPOINT:         PKL_MENU,
-  PKL_TEKNISI:         PKL_MENU,
-  PKL_KONTEN:          PKL_MENU,
+  PKL_SOTECH: PKL_MENU,
+  PKL_ONPOINT: PKL_MENU,
+  PKL_TEKNISI: PKL_MENU,
+  PKL_KONTEN: PKL_MENU,
   // ─────────────────────────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
@@ -609,37 +629,37 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
-  ADMIN:                   { label: "Admin / CEO",             className: "bg-violet-50 text-violet-700" },
-  KEPALA_SALES:            { label: "Kepala Sales",            className: "bg-emerald-50 text-emerald-700" },
-  CREW_SALES:              { label: "Crew Sales",              className: "bg-sky-50 text-sky-700" },
-  ACCOUNTING:              { label: "Accounting",              className: "bg-amber-50 text-amber-700" },
-  PENGELOLA_BARANG:        { label: "Pengelola Barang",        className: "bg-blue-50 text-blue-700" },
-  TEKNISI:                 { label: "Teknisi",                 className: "bg-orange-50 text-orange-700" },
-  KEPALA_TEKNISI:          { label: "Kepala Teknisi",          className: "bg-red-50 text-red-700" },
-  PENGANTARAN:             { label: "Pengantaran",             className: "bg-teal-50 text-teal-700" },
-  MARKETING:               { label: "Marketing",               className: "bg-pink-50 text-pink-700" },
-  KEBERSIHAN:              { label: "Kebersihan",              className: "bg-cyan-50 text-cyan-700" },
-  KEPALA_MARKETING:        { label: "Kepala Marketing",        className: "bg-rose-50 text-rose-700" },
-  PROGRAMMER:              { label: "Programmer",              className: "bg-indigo-50 text-indigo-700" },
-  SOTECH:                  { label: "Sotech",                  className: "bg-lime-50 text-lime-700" },
-  ASISTEN_CEO:             { label: "Asisten CEO",             className: "bg-purple-50 text-purple-700" },
-  PENYEDIA_BARANG:         { label: "Penyedia Barang",         className: "bg-yellow-50 text-yellow-700" },
-  KEPALA_PENYEDIA_BARANG:  { label: "Kepala Penyedia Barang",  className: "bg-orange-50 text-orange-700" },
-  KONTEN:                  { label: "Konten",                  className: "bg-fuchsia-50 text-fuchsia-700" },
-  KEPALA_ONPOINT:          { label: "Kepala Onpoint",          className: "bg-green-50 text-green-700" },
-  ONPOINT:                 { label: "Onpoint",                 className: "bg-emerald-50 text-emerald-700" },
-  KEPALA_SOTECH:           { label: "Kepala Sotech",           className: "bg-lime-50 text-lime-700" },
-  CUSTOMER_SERVICE:        { label: "Customer Service",        className: "bg-sky-50 text-sky-700" },
+  ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
+  KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
+  CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
+  ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
+  KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
+  PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
+  MARKETING: { label: "Marketing", className: "bg-pink-50 text-pink-700" },
+  KEBERSIHAN: { label: "Kebersihan", className: "bg-cyan-50 text-cyan-700" },
+  KEPALA_MARKETING: { label: "Kepala Marketing", className: "bg-rose-50 text-rose-700" },
+  PROGRAMMER: { label: "Programmer", className: "bg-indigo-50 text-indigo-700" },
+  SOTECH: { label: "Sotech", className: "bg-lime-50 text-lime-700" },
+  ASISTEN_CEO: { label: "Asisten CEO", className: "bg-purple-50 text-purple-700" },
+  PENYEDIA_BARANG: { label: "Penyedia Barang", className: "bg-yellow-50 text-yellow-700" },
+  KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia Barang", className: "bg-orange-50 text-orange-700" },
+  KONTEN: { label: "Konten", className: "bg-fuchsia-50 text-fuchsia-700" },
+  KEPALA_ONPOINT: { label: "Kepala Onpoint", className: "bg-green-50 text-green-700" },
+  ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
+  KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
+  CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
   // ── PKL variants ──────────────────────────────────────────────────────────
-  PKL:                 { label: "PKL",                 className: "bg-amber-50 text-amber-700" },
-  PKL_MARKETING:       { label: "PKL Marketing",       className: "bg-amber-50 text-amber-700" },
-  PKL_SALES:           { label: "PKL Sales",           className: "bg-amber-50 text-amber-700" },
+  PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
+  PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
+  PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
   PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang", className: "bg-amber-50 text-amber-700" },
-  PKL_SOTECH:          { label: "PKL Sotech",          className: "bg-amber-50 text-amber-700" },
-  PKL_ONPOINT:         { label: "PKL Onpoint",         className: "bg-amber-50 text-amber-700" },
-  PKL_TEKNISI:         { label: "PKL Teknisi",         className: "bg-amber-50 text-amber-700" },
-  PKL_KONTEN:          { label: "PKL Konten",          className: "bg-amber-50 text-amber-700" },
+  PKL_SOTECH: { label: "PKL Sotech", className: "bg-amber-50 text-amber-700" },
+  PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
+  PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
+  PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
   // ─────────────────────────────────────────────────────────────────────────
 };
 
@@ -777,6 +797,11 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
                     if (item.href === "/dashboard") return false;
                     if (item.href === "/dashboard/attendance") {
                       return pathname === "/dashboard/attendance";
+                    }
+                    if (item.href === "/dashboard/preparation") {
+                      return pathname === "/dashboard/preparation" ||
+                        (pathname.startsWith("/dashboard/preparation/") &&
+                          !pathname.startsWith("/dashboard/preparation/history"));
                     }
                     if (item.href === "/dashboard/laptops") {
                       return (
