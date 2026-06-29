@@ -68,12 +68,6 @@ const statusMap: Record<string, string> = {
   PACKING: "bg-purple-100 text-purple-800",
 };
 
-const MONTH_NAMES = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
 
@@ -94,9 +88,11 @@ function getPaymentStyle(method: string): { text: string; icon: React.ReactNode;
   const m = (method ?? "").toUpperCase();
   const hasCash = m.includes("TUNAI") || m.includes("CASH");
   const hasTransfer = m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI");
+
   if (hasTransfer && hasCash) {
     return {
-      text: "🏦💰 TF + Tunai", bg: "teal",
+      text: "🏦💰 TF + Tunai",
+      bg: "teal",
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M16 3h5v5" /><path d="M21 3l-6 6" />
@@ -137,35 +133,76 @@ function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   return { text: "Umum", icon: "👤" };
 }
 
-// ─── RESTORE MODAL ────────────────────────────────────────────────────
-function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
-  item: any; isPending: boolean; restoring: boolean; onConfirm: () => void; onClose: () => void;
+// ─── RESTORE MODAL — shared component ────────────────────────────────
+function RestoreModal({
+  item,
+  isPending,
+  restoring,
+  onConfirm,
+  onClose,
+}: {
+  item: any;
+  isPending: boolean;
+  restoring: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
 }) {
-  const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PAID: "Lunas" };
+  const statusLabelMap: Record<string, string> = {
+    RESERVED: "DP",
+    HELD: "Ambil Dulu",
+    PACKING: "Packing",
+    PAID: "Lunas",
+  };
   const currentLabel = statusLabelMap[item.status] ?? item.status;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
         <div className={`px-5 py-4 ${isPending ? "bg-red-700" : "bg-gray-800"}`}>
-          <p className="font-semibold text-white text-sm">{isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}</p>
+          <p className="font-semibold text-white text-sm">
+            {isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}
+          </p>
         </div>
+
+        {/* Body */}
         <div className="p-5 space-y-3">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-            <p className="font-bold mb-1">{isPending ? `Batalkan pesanan "${currentLabel}" untuk ${item.customer_name}?` : `Konfirmasi restore untuk ${item.customer_name}?`}</p>
+            <p className="font-bold mb-1">
+              {isPending
+                ? `Batalkan pesanan "${currentLabel}" untuk ${item.customer_name}?`
+                : `Konfirmasi restore untuk ${item.customer_name}?`}
+            </p>
             <p className="font-mono text-amber-600">{item.invoice_number}</p>
           </div>
+
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600 space-y-1.5">
             <p className="font-semibold text-gray-700 mb-1">Yang akan terjadi:</p>
             <p>• Status transaksi → <span className="font-bold text-red-600">BATAL</span></p>
             <p>• Unit laptop kembali ke stok <span className="font-bold text-green-700">SIAP JUAL</span></p>
-            {item.status === "PAID" && <p>• Garansi (jika ada) akan di-<span className="font-bold text-orange-600">VOID</span></p>}
-            {item.status === "RESERVED" && <p className="text-amber-700 font-semibold">⚠️ DP yang sudah dibayar diurus manual</p>}
+            {item.status === "PAID" && (
+              <p>• Garansi (jika ada) akan di-<span className="font-bold text-orange-600">VOID</span></p>
+            )}
+            {item.status === "RESERVED" && (
+              <p className="text-amber-700 font-semibold">⚠️ DP yang sudah dibayar diurus manual</p>
+            )}
           </div>
         </div>
+
+        {/* Footer */}
         <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-          <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={onConfirm} disabled={restoring} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">
+          <button
+            onClick={onClose}
+            className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={restoring}
+            className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60"
+          >
             {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
           </button>
         </div>
@@ -179,24 +216,36 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   const method2 = (item.payment_method_2 ?? "").trim();
   const amount1 = Number(item.amount_method_1 ?? 0);
   const amount2 = Number(item.amount_method_2 ?? 0);
+
   if (!method2 || amount1 <= 0 || amount2 <= 0) return null;
+
   const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
+
   const getMethodMeta = (m: string): { label: string; icon: string; color: string } => {
     const upper = m.toUpperCase();
-    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI")) return { label: "Transfer", icon: "🏦", color: "blue" };
-    if (upper.includes("TUNAI") || upper.includes("CASH")) return { label: "Tunai", icon: "💵", color: "emerald" };
-    if (upper.includes("QRIS") || upper.includes("QR")) return { label: "QRIS", icon: "📱", color: "purple" };
+    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI"))
+      return { label: "Transfer", icon: "🏦", color: "blue" };
+    if (upper.includes("TUNAI") || upper.includes("CASH"))
+      return { label: "Tunai", icon: "💵", color: "emerald" };
+    if (upper.includes("QRIS") || upper.includes("QR"))
+      return { label: "QRIS", icon: "📱", color: "purple" };
     return { label: m, icon: "💳", color: "gray" };
   };
+
   const colorMap: Record<string, { bg: string; border: string; text: string; label: string }> = {
     blue: { bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-800", label: "text-blue-500" },
     emerald: { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-800", label: "text-emerald-500" },
     purple: { bg: "bg-purple-50", border: "border-purple-100", text: "text-purple-800", label: "text-purple-500" },
     gray: { bg: "bg-gray-50", border: "border-gray-100", text: "text-gray-800", label: "text-gray-500" },
   };
+
   const m1meta = getMethodMeta(item.payment_method ?? "");
   const m2meta = getMethodMeta(method2);
-  const entries = [{ meta: m1meta, amount: amount1 }, { meta: m2meta, amount: amount2 }];
+  const entries = [
+    { meta: m1meta, amount: amount1 },
+    { meta: m2meta, amount: amount2 },
+  ];
+
   if (size === "md") {
     return (
       <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -212,6 +261,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
       </div>
     );
   }
+
   return (
     <div className="flex items-center gap-1 mt-1 flex-wrap">
       {entries.map(({ meta, amount }, i) => {
@@ -230,38 +280,77 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
 function SkeletonPulse({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
+
 function MobileCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1 space-y-1.5"><SkeletonPulse className="h-4 w-32" /><SkeletonPulse className="h-3 w-24" /></div>
+          <div className="flex-1 space-y-1.5">
+            <SkeletonPulse className="h-4 w-32" />
+            <SkeletonPulse className="h-3 w-24" />
+          </div>
           <SkeletonPulse className="h-6 w-16 rounded-lg flex-shrink-0" />
         </div>
         <SkeletonPulse className="h-3 w-28" />
       </div>
       <div className="px-4 py-3 space-y-3">
-        <div className="flex items-center justify-between"><SkeletonPulse className="h-3 w-20" /><SkeletonPulse className="h-5 w-20 rounded-lg" /></div>
-        <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5"><SkeletonPulse className="h-3 w-40" /><div className="flex gap-1.5"><SkeletonPulse className="h-4 w-16 rounded-md" /><SkeletonPulse className="h-4 w-12 rounded-md" /></div></div>
-        <div className="grid grid-cols-2 gap-2"><SkeletonPulse className="h-16 rounded-lg" /><SkeletonPulse className="h-16 rounded-lg" /></div>
+        <div className="flex items-center justify-between">
+          <SkeletonPulse className="h-3 w-20" />
+          <SkeletonPulse className="h-5 w-20 rounded-lg" />
+        </div>
+        <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
+          <SkeletonPulse className="h-3 w-40" />
+          <div className="flex gap-1.5">
+            <SkeletonPulse className="h-4 w-16 rounded-md" />
+            <SkeletonPulse className="h-4 w-12 rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <SkeletonPulse className="h-16 rounded-lg" />
+          <SkeletonPulse className="h-16 rounded-lg" />
+        </div>
         <SkeletonPulse className="h-10 rounded-lg" />
       </div>
       <div className="px-4 py-3 border-t border-gray-100">
         <SkeletonPulse className="h-9 w-full rounded-lg mb-2" />
-        <div className="grid grid-cols-3 gap-2"><SkeletonPulse className="h-14 rounded-lg" /><SkeletonPulse className="h-14 rounded-lg" /><SkeletonPulse className="h-14 rounded-lg" /></div>
+        <div className="grid grid-cols-3 gap-2">
+          <SkeletonPulse className="h-14 rounded-lg" />
+          <SkeletonPulse className="h-14 rounded-lg" />
+          <SkeletonPulse className="h-14 rounded-lg" />
+        </div>
       </div>
     </div>
   );
 }
+
 function TableRowSkeleton() {
   return (
     <tr className="border-b border-gray-100">
       <td className="px-3 py-3"><SkeletonPulse className="h-5 w-14 rounded-lg" /></td>
-      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-28" /><SkeletonPulse className="h-3 w-20" /></div></td>
+      <td className="px-3 py-3">
+        <div className="space-y-1">
+          <SkeletonPulse className="h-3 w-28" />
+          <SkeletonPulse className="h-3 w-20" />
+        </div>
+      </td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-20" /></td>
-      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-16" /><SkeletonPulse className="h-3 w-12" /></div></td>
-      <td className="px-3 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-32" /><div className="flex gap-1"><SkeletonPulse className="h-3 w-12" /><SkeletonPulse className="h-3 w-10" /></div></div></td>
+      <td className="px-3 py-3">
+        <div className="space-y-1">
+          <SkeletonPulse className="h-3 w-16" />
+          <SkeletonPulse className="h-3 w-12" />
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <div className="space-y-1">
+          <SkeletonPulse className="h-3 w-32" />
+          <div className="flex gap-1">
+            <SkeletonPulse className="h-3 w-12" />
+            <SkeletonPulse className="h-3 w-10" />
+          </div>
+        </div>
+      </td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-3 py-3"><SkeletonPulse className="h-3 w-16" /></td>
       <td className="px-3 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
@@ -269,13 +358,25 @@ function TableRowSkeleton() {
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-7 w-20 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-3 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
-      <td className="px-3 py-3"><div className="flex items-center justify-center gap-1"><SkeletonPulse className="h-7 w-7 rounded-lg" /><SkeletonPulse className="h-7 w-7 rounded-lg" /><SkeletonPulse className="h-7 w-7 rounded-lg" /></div></td>
+      <td className="px-3 py-3">
+        <div className="flex items-center justify-center gap-1">
+          <SkeletonPulse className="h-7 w-7 rounded-lg" />
+          <SkeletonPulse className="h-7 w-7 rounded-lg" />
+          <SkeletonPulse className="h-7 w-7 rounded-lg" />
+        </div>
+      </td>
     </tr>
   );
 }
+
 function MobileSkeletonList() {
-  return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <MobileCardSkeleton key={i} />)}</div>;
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 5 }).map((_, i) => (<MobileCardSkeleton key={i} />))}
+    </div>
+  );
 }
+
 function DesktopSkeletonTable() {
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
@@ -288,7 +389,9 @@ function DesktopSkeletonTable() {
               ))}
             </tr>
           </thead>
-          <tbody>{Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)}</tbody>
+          <tbody>
+            {Array.from({ length: 8 }).map((_, i) => (<TableRowSkeleton key={i} />))}
+          </tbody>
         </table>
       </div>
       <div className="text-center text-xs text-gray-400 py-2 border-t border-gray-200 bg-gray-50">← Scroll untuk melihat lebih banyak kolom →</div>
@@ -296,16 +399,20 @@ function DesktopSkeletonTable() {
   );
 }
 
-function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true }: {
+function SerialNumberList({
+  serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true,
+}: {
   serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (serials.length === 0) return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
+
   const visible = expanded ? serials : serials.slice(0, maxVisible);
   const hidden = serials.length - maxVisible;
   const badge = size === "md"
     ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
     : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
+
   return (
     <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
       {visible.map((sn, i) => <span key={i} className={badge}>{sn}</span>)}
@@ -336,7 +443,9 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const [confirmError, setConfirmError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
@@ -371,6 +480,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+      {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
@@ -389,6 +499,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         {item.customer_phone && <p className="text-xs text-gray-600 font-semibold mt-1.5">📱 {item.customer_phone}</p>}
       </div>
 
+      {/* Content */}
       <div className="px-4 py-3 space-y-3">
         {item.source_platform && (
           <div className="flex items-center justify-between gap-2">
@@ -404,9 +515,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         {item.sales_name && (
           <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
             <span className="text-xs font-bold text-gray-900 flex-1">👤 {item.sales_name}</span>
-            {item.employee_role && <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap">{item.employee_role}</span>}
+            {item.employee_role && (
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap">{item.employee_role}</span>
+            )}
           </div>
         )}
+
+        {/* Laptop Info */}
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
           {(() => {
@@ -425,7 +540,9 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                         {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
                         {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
                       </div>
-                      {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
+                      {g.serial_numbers?.length > 0 && (
+                        <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -443,7 +560,8 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                   </div>
                 )}
                 {(() => {
-                  const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
+                  const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+                    ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
                   if (sns.length === 0) return null;
                   return <div className="mt-1"><SerialNumberList serials={sns} maxVisible={4} size="md" emptyDash={false} /></div>;
                 })()}
@@ -451,6 +569,8 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             );
           })()}
         </div>
+
+        {/* Price & Margin */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2.5 border border-blue-200">
             <p className="text-[10px] text-blue-600 font-semibold mb-1">💰 Harga Jual</p>
@@ -467,30 +587,52 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             </div>
           )}
         </div>
+
+        {/* Payment Method */}
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2.5 border border-purple-200">
-          <div className="flex items-center gap-2">{payStyle.icon}<span className="text-xs font-bold text-purple-900">{payStyle.text}</span></div>
+          <div className="flex items-center gap-2">
+            {payStyle.icon}
+            <span className="text-xs font-bold text-purple-900">{payStyle.text}</span>
+          </div>
           <PaymentBreakdown item={item} size="md" />
         </div>
       </div>
 
+      {/* Action Buttons */}
       <div className="px-4 py-3 border-t border-gray-100 space-y-2">
         {showDetails && (
           <div className="bg-gray-50 rounded-lg p-2.5 text-xs space-y-1.5 mb-2 border border-gray-200">
-            <div className="flex justify-between"><span className="text-gray-500">Invoice:</span><span className="font-mono font-bold text-gray-900">{item.invoice_number}</span></div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Invoice:</span>
+              <span className="font-mono font-bold text-gray-900">{item.invoice_number}</span>
+            </div>
             {(() => {
-              const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
+              const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+                ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
               if (sns.length === 0) return null;
-              return <div className="flex justify-between gap-2"><span className="text-gray-500 shrink-0">SN:</span><SerialNumberList serials={sns} maxVisible={4} size="md" align="end" emptyDash={false} /></div>;
+              return (
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500 shrink-0">SN:</span>
+                  <SerialNumberList serials={sns} maxVisible={4} size="md" align="end" emptyDash={false} />
+                </div>
+              );
             })()}
-            <div className="flex justify-between"><span className="text-gray-500">Waktu:</span><span className="font-mono font-bold text-gray-900">{formatDateTime(item.created_at)}</span></div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Waktu:</span>
+              <span className="font-mono font-bold text-gray-900">{formatDateTime(item.created_at)}</span>
+            </div>
           </div>
         )}
+
         <div className="grid grid-cols-2 gap-2 mb-2">
           <button onClick={() => setShowDetails(!showDetails)} className="h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
             {showDetails ? "Sembunyikan" : "Info"} Detail
           </button>
-          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition">🔍 Lihat Laptop</button>
+          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition">
+            🔍 Lihat Laptop
+          </button>
         </div>
+
         <div className="grid grid-cols-3 gap-2">
           {item.payment_photo && (
             <button onClick={() => onPhotoClick(item.payment_photo)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition" title="Bukti pembayaran">
@@ -502,14 +644,21 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <span className="text-lg">✏️</span><span className="text-[9px] font-semibold">Edit</span>
             </a>
           )}
+          {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
           {isPending && canEditTransaction && (
             <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition" title="Konfirmasi lunas">
               <span className="text-lg">✅</span><span className="text-[9px] font-semibold">Lunas</span>
             </button>
           )}
+          {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
           {canRestore && (
-            <button onClick={() => setShowRestoreModal(true)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition" title={isPending ? "Batalkan pesanan" : "Restore transaksi"}>
-              <span className="text-lg">↩️</span><span className="text-[9px] font-semibold">{isPending ? "Batal" : "Restore"}</span>
+            <button
+              onClick={() => setShowRestoreModal(true)}
+              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
+              title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+            >
+              <span className="text-lg">↩️</span>
+              <span className="text-[9px] font-semibold">{isPending ? "Batal" : "Restore"}</span>
             </button>
           )}
           <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="Lihat receipt">
@@ -519,7 +668,18 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       </div>
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
-      {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
+
+      {/* ✅ Pakai shared RestoreModal component */}
+      {showRestoreModal && (
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
+      )}
+
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
@@ -581,7 +741,16 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
           </thead>
           <tbody className="divide-y divide-gray-100">
             {paginatedTransactions.map((item: any) => (
-              <TransactionTableRow key={item.id} item={item} onPhotoClick={onPhotoClick} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onRestored={onRestored} onRowClick={onRowClick} />
+              <TransactionTableRow
+                key={item.id}
+                item={item}
+                onPhotoClick={onPhotoClick}
+                canEditTransaction={canEditTransaction}
+                canRestoreTransaction={canRestoreTransaction}
+                canSeeFinancials={canSeeFinancials}
+                onRestored={onRestored}
+                onRowClick={onRowClick}
+              />
             ))}
           </tbody>
         </table>
@@ -613,6 +782,7 @@ function StatusBadge({ item }: { item: any }) {
   );
 }
 
+// ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
 function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -622,7 +792,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
+  // ✅ isPending mencakup RESERVED, HELD, PACKING
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  // ✅ Bisa restore: PAID atau semua status pending
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
@@ -704,7 +876,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
       );
     }
     if (!item.cpu) return <span className="text-[10px] text-gray-300">—</span>;
-    return <div className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-1 leading-snug">{item.cpu}</div>;
+    return (
+      <div className="text-[9px] font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-1 leading-snug">
+        {item.cpu}
+      </div>
+    );
   };
 
   return (
@@ -731,7 +907,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             )}
           </div>
         </td>
-        <td className="px-3 py-2.5">{item.customer_phone ? <span className="text-[10px] font-medium text-gray-600">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}</td>
+        <td className="px-3 py-2.5">
+          {item.customer_phone ? <span className="text-[10px] font-medium text-gray-600">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
+        </td>
         <td className="px-3 py-2.5">
           {item.sales_name ? (
             <div className="space-y-0.5">
@@ -749,7 +927,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
               return (
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
-                    <div key={idx}>{g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}</div>
+                    <div key={idx}>
+                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
+                    </div>
                   ))}
                 </div>
               );
@@ -758,7 +938,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-        <td className="px-3 py-2.5 text-right"><span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span></td>
+        <td className="px-3 py-2.5 text-right">
+          <span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
+        </td>
         <td className="px-3 py-2.5 text-right">
           {item.other !== undefined && item.other !== null ? (
             <span className={`text-[11px] font-bold font-mono ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"}`}>
@@ -783,7 +965,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <td className="px-3 py-2.5 text-center">
           {(() => {
             const badge = getCompanyBadge(item.company_name ?? "");
-            return <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${badge.color}`}>{badge.label}</span>;
+            return (
+              <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${badge.color}`}>
+                {badge.label}
+              </span>
+            );
           })()}
         </td>
         <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
@@ -798,13 +984,19 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </a>
             )}
+            {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
             {isPending && canEditTransaction && (
               <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-150" title="Konfirmasi lunas">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
+            {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
             {canRestore && (
-              <button onClick={() => setShowRestoreModal(true)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150" title={isPending ? "Batalkan pesanan" : "Restore transaksi"}>
+              <button
+                onClick={() => setShowRestoreModal(true)}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-150"
+                title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
               </button>
             )}
@@ -816,7 +1008,18 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
       </tr>
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
-      {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
+
+      {/* ✅ Pakai shared RestoreModal component */}
+      {showRestoreModal && (
+        <RestoreModal
+          item={item}
+          isPending={isPending}
+          restoring={restoring}
+          onConfirm={handleRestore}
+          onClose={() => setShowRestoreModal(false)}
+        />
+      )}
+
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
@@ -875,6 +1078,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
@@ -890,10 +1094,14 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Sales</p>
               {item.sales_name ? (
-                <><p className="text-sm font-bold text-gray-800">{item.sales_name}</p>{item.employee_role && <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}</>
+                <>
+                  <p className="text-sm font-bold text-gray-800">{item.sales_name}</p>
+                  {item.employee_role && <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}
+                </>
               ) : <p className="text-sm text-gray-300">—</p>}
             </div>
           </div>
+
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💻 {isMulti ? `Detail Laptop (${grouped.length} item)` : "Detail Laptop"}</p>
             <div className="space-y-2">
@@ -915,15 +1123,28 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                     <div className="px-3.5 py-2 border-b border-gray-100">
                       <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Serial Number</p>
                       <div className="flex flex-wrap gap-1">
-                        {g.serial_numbers.map((sn: string, i: number) => <span key={i} className="font-mono text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{sn}</span>)}
+                        {g.serial_numbers.map((sn: string, i: number) => (
+                          <span key={i} className="font-mono text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{sn}</span>
+                        ))}
                       </div>
                     </div>
                   )}
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
-                      <div><p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Deal</p><p className="text-xs font-bold text-blue-700 font-mono">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p></div>
-                      <div><p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Modal</p><p className="text-xs font-bold text-gray-700 font-mono">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p></div>
-                      <div><p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Margin</p><p className={`text-xs font-bold font-mono ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}</p></div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Deal</p>
+                        <p className="text-xs font-bold text-blue-700 font-mono">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Modal</p>
+                        <p className="text-xs font-bold text-gray-700 font-mono">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Margin</p>
+                        <p className={`text-xs font-bold font-mono ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          {(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -935,19 +1156,33 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
               )}
             </div>
           </div>
+
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💰 Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 space-y-2.5">
-              <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Total Harga Jual</span><span className="text-sm font-bold text-gray-900 font-mono">Rp{totalDeal.toLocaleString("id-ID")}</span></div>
-              {Number(item.dp_amount) > 0 && <div className="flex items-center justify-between"><span className="text-xs text-gray-500">DP</span><span className="text-sm font-bold text-blue-700 font-mono">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span></div>}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Total Harga Jual</span>
+                <span className="text-sm font-bold text-gray-900 font-mono">Rp{totalDeal.toLocaleString("id-ID")}</span>
+              </div>
+              {Number(item.dp_amount) > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">DP</span>
+                  <span className="text-sm font-bold text-blue-700 font-mono">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                </div>
+              )}
               {canSeeFinancials && totalMargin !== 0 && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-600">Total Margin</span>
-                  <span className={`text-sm font-bold font-mono ${totalMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>{totalMargin >= 0 ? "+" : ""}Rp{Math.abs(totalMargin).toLocaleString("id-ID")}</span>
+                  <span className={`text-sm font-bold font-mono ${totalMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {totalMargin >= 0 ? "+" : ""}Rp{Math.abs(totalMargin).toLocaleString("id-ID")}
+                  </span>
                 </div>
               )}
               <div className="pt-1 space-y-1.5">
-                <div className="flex items-center justify-between"><span className="text-xs text-gray-500">Metode</span><span className="text-xs font-bold text-gray-700">{payStyle.text}</span></div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Metode</span>
+                  <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
+                </div>
                 <PaymentBreakdown item={item} size="md" />
               </div>
               {item.source_platform && (
@@ -958,6 +1193,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
               )}
             </div>
           </div>
+
           {item.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
               <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">Catatan</p>
@@ -965,6 +1201,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
             </div>
           )}
         </div>
+
         <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
           <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">📄 Receipt</a>
           <a href={`/payment/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition">✏️ Edit</a>
@@ -977,76 +1214,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
   return createPortal(modalContent, document.body);
 }
 
-// ─── MONTH-YEAR PICKER TABS ───────────────────────────────────────────
-// ─── MONTH-YEAR PICKER TABS ───────────────────────────────────────────
-function MonthYearTabs({
-  selectedMonth,
-  selectedYear,
-  onSelect,
-}: {
-  selectedMonth: number;
-  selectedYear: number;
-  onSelect: (month: number, year: number) => void;
-}) {
-  const now = new Date();
-
-  // ── Hanya tampilkan Juni 2026 s/d bulan sekarang ──────────────────
-  const tabs = useMemo(() => {
-    const START_MONTH = 6;  // Juni
-    const START_YEAR  = 2026;
-
-    const result: { month: number; year: number; label: string }[] = [];
-    let y = now.getFullYear();
-    let m = now.getMonth() + 1; // bulan sekarang
-
-    while (y > START_YEAR || (y === START_YEAR && m >= START_MONTH)) {
-      result.push({
-        month: m,
-        year: y,
-        label: `${MONTH_SHORT[m - 1]} ${y}`,
-      });
-      m--;
-      if (m === 0) { m = 12; y--; }
-    }
-
-    return result;
-  }, []);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 pt-3 pb-0">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">📅 Pilih Bulan</p>
-      </div>
-      <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto scrollbar-hide">
-        {tabs.map((t) => {
-          const isActive = t.month === selectedMonth && t.year === selectedYear;
-          const isCurrentMonth = t.month === now.getMonth() + 1 && t.year === now.getFullYear();
-          return (
-            <button
-              key={`${t.year}-${t.month}`}
-              onClick={() => onSelect(t.month, t.year)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold border transition whitespace-nowrap ${
-                isActive
-                  ? "bg-gray-900 text-white border-gray-900 shadow-sm"
-                  : isCurrentMonth
-                  ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {t.label}
-              {isCurrentMonth && !isActive && <span className="ml-1 text-[9px] font-bold text-blue-400">●</span>}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── MAIN PAGE ────────────────────────────────────────────────────────
 export default function Page() {
-  const now = new Date();
-
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -1067,10 +1236,6 @@ export default function Page() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [detailItem, setDetailItem] = useState<any | null>(null);
 
-  // ── State bulan & tahun aktif ──────────────────────────────────────
-  const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
-
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
@@ -1086,10 +1251,7 @@ export default function Page() {
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
-  // ── Fetch ulang tiap ganti bulan/tahun ────────────────────────────
-  useEffect(() => {
-    fetchTransactions();
-  }, [selectedMonth, selectedYear]);
+  useEffect(() => { fetchTransactions(); }, []);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
@@ -1104,29 +1266,8 @@ export default function Page() {
     }
   };
 
-  // ── Handle tab change: reset filter & page ─────────────────────────
-  const handleMonthSelect = (month: number, year: number) => {
-    setSelectedMonth(month);
-    setSelectedYear(year);
-    setCurrentPage(1);
-    setSearch("");
-    setStatus("ALL");
-    setCustomerType("ALL");
-    setDateFrom("");
-    setDateTo("");
-    setPaymentMethod("ALL");
-    setSourcePlatform("ALL");
-    setCompanyName("ALL");
-  };
-
   const filteredTransactions = useMemo(() => {
     let filtered = [...allTransactions];
-
-    // ── Filter bulan & tahun aktif ──────────────────────────────────
-    filtered = filtered.filter((item) => {
-      const d = new Date(item.created_at);
-      return d.getFullYear() === selectedYear && d.getMonth() + 1 === selectedMonth;
-    });
 
     if (search.trim()) {
       const term = search.toLowerCase();
@@ -1174,7 +1315,7 @@ export default function Page() {
     });
 
     return filtered;
-  }, [allTransactions, selectedMonth, selectedYear, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
+  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
@@ -1184,7 +1325,7 @@ export default function Page() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName, selectedMonth, selectedYear]);
+  }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const uniquePaymentMethods = useMemo(() => {
     const methods = new Set(allTransactions.map((t) => t.payment_method).filter(Boolean));
@@ -1244,7 +1385,7 @@ export default function Page() {
         { header: "Harga Jual", key: "jual", width: 22 },
         { header: "Nama Customer", key: "customer", width: 24 },
         { header: "No. HP", key: "hp", width: 18 },
-        { header: "Toko", key: "toko", width: 15 },
+        { header: "Toko", key: "toko", width: 15 },         // ← ganti dari "Platform"
         { header: "Serial Number", key: "sn", width: 30 },
         { header: "Catatan", key: "catatan", width: 32 },
       ];
@@ -1255,6 +1396,7 @@ export default function Page() {
         purchase_price_total: number;
         grouped_items?: Array<{ laptop_name: string; purchase_price_total: number; margin: number }>;
       };
+
       const detailCache = new Map<string, DetailCache>();
 
       if (canSeeFinancials) {
@@ -1284,26 +1426,52 @@ export default function Page() {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
         const cached = detailCache.get(item.invoice_number);
-        const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const tanggal = new Date(item.created_at).toLocaleDateString("id-ID", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+        });
 
         if (isMulti) {
           const cachedGroupMap = new Map<string, number>();
-          cached?.grouped_items?.forEach((cg) => { if (cg.laptop_name) cachedGroupMap.set(cg.laptop_name, cg.purchase_price_total); });
+          cached?.grouped_items?.forEach((cg) => {
+            if (cg.laptop_name) cachedGroupMap.set(cg.laptop_name, cg.purchase_price_total);
+          });
           for (const g of grouped) {
             const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
-            const modal = canSeeFinancials ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0)) : 0;
-            tableRows.push([item.invoice_number ?? "", tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "", g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal, Number(g.allocated_deal_price ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+            const modal = canSeeFinancials
+              ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0))
+              : 0;
+            tableRows.push([
+              item.invoice_number ?? "", tanggal,
+              STATUS_LABEL[item.status] ?? item.status ?? "",
+              Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "",
+              g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal,
+              Number(g.allocated_deal_price ?? 0), item.customer_name ?? "",
+              item.customer_phone ?? "", item.company_name ?? "",
+              sns.join(", "), item.notes ?? "",
+            ]);
           }
         } else {
-          const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
-          const modal = canSeeFinancials ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0)) : 0;
-          tableRows.push([item.invoice_number ?? "", tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", 1, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+          const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
+            ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
+          const modal = canSeeFinancials
+            ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0))
+            : 0;
+          tableRows.push([
+            item.invoice_number ?? "", tanggal,
+            STATUS_LABEL[item.status] ?? item.status ?? "",
+            1, item.laptop_name ?? "", item.cpu ?? "",
+            item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal,
+            Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "",
+            item.customer_phone ?? "", item.company_name ?? "",
+            sns.join(", "), item.notes ?? "",
+          ]);
         }
       }
 
       if (tableRows.length > 0) {
         ws.addTable({
-          name: "TabelTransaksi", ref: "A1", headerRow: true, totalsRow: false,
+          name: "TabelTransaksi", ref: "A1",
+          headerRow: true, totalsRow: false,
           style: { theme: "TableStyleMedium7", showRowStripes: true },
           columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
           rows: tableRows,
@@ -1328,7 +1496,12 @@ export default function Page() {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
         cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
         cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle" };
-        cell.border = { top: { style: "thin", color: { argb: "FFCBD5E1" } }, left: { style: "thin", color: { argb: "FFCBD5E1" } }, bottom: { style: "medium", color: { argb: "FF94A3B8" } }, right: { style: "thin", color: { argb: "FFCBD5E1" } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFCBD5E1" } },
+          left: { style: "thin", color: { argb: "FFCBD5E1" } },
+          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+          right: { style: "thin", color: { argb: "FFCBD5E1" } },
+        };
       });
 
       tableRows.forEach((_, idx) => {
@@ -1339,7 +1512,12 @@ export default function Page() {
           const key = COL_DEFS[colNum - 1]?.key ?? "";
           cell.font = { size: 10, name: "Arial", color: { argb: "FF111827" } };
           cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle", wrapText: false };
-          cell.border = { top: { style: "hair", color: { argb: "FFCBD5E1" } }, left: { style: "hair", color: { argb: "FFCBD5E1" } }, bottom: { style: "hair", color: { argb: "FFCBD5E1" } }, right: { style: "hair", color: { argb: "FFCBD5E1" } } };
+          cell.border = {
+            top: { style: "hair", color: { argb: "FFCBD5E1" } },
+            left: { style: "hair", color: { argb: "FFCBD5E1" } },
+            bottom: { style: "hair", color: { argb: "FFCBD5E1" } },
+            right: { style: "hair", color: { argb: "FFCBD5E1" } },
+          };
           if (CURR_KEYS.has(key)) cell.numFmt = '"Rp "#,##0';
           if (NUM_KEYS.has(key)) cell.numFmt = "0";
         });
@@ -1351,8 +1529,10 @@ export default function Page() {
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      const monthLabel = MONTH_NAMES[selectedMonth - 1];
-      link.download = `Transaksi_Solit_${monthLabel}_${selectedYear}.xlsx`;
+      const dateStr = new Date()
+        .toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
+        .replace(/\//g, "-");
+      link.download = `Transaksi_Solit_${dateStr}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1368,7 +1548,9 @@ export default function Page() {
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
-      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} />}
+      {detailItem && (
+        <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} />
+      )}
 
       <div className={`${isMobile ? "px-4" : "max-w-[1600px] mx-auto px-6"} py-6 space-y-5`}>
 
@@ -1379,12 +1561,7 @@ export default function Page() {
               <div className="w-1.5 h-7 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
               <h1 className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-900`}>Riwayat Transaksi</h1>
             </div>
-            <p className="text-sm text-gray-500 ml-5">
-              {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-              {selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear() && (
-                <span className="ml-2 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">Bulan ini</span>
-              )}
-            </p>
+            <p className="text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
           </div>
           <div className="flex items-center gap-2">
             {!isLoading && (
@@ -1400,21 +1577,28 @@ export default function Page() {
                 title="Export ke Excel"
               >
                 {isExporting ? (
-                  <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg><span className="hidden sm:inline">Mengekspor...</span></>
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="hidden sm:inline">Mengekspor...</span>
+                  </>
                 ) : (
-                  <><svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg><span className="hidden sm:inline">Export Excel</span></>
+                  <>
+                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <polyline points="8 13 12 17 16 13" />
+                      <line x1="12" y1="17" x2="12" y2="11" />
+                    </svg>
+                    <span className="hidden sm:inline">Export Excel</span>
+                  </>
                 )}
               </button>
             )}
           </div>
         </div>
-
-        {/* ── Month/Year Tabs ── */}
-        <MonthYearTabs
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onSelect={handleMonthSelect}
-        />
 
         {/* ── Search + Filter ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
@@ -1458,8 +1642,11 @@ export default function Page() {
             </button>
           </div>
 
+          {/* ── Filter Panel ── */}
           {showFilters && (
             <div className="pt-3 border-t border-gray-100 space-y-4">
+
+              {/* Status */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Status Transaksi</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -1471,31 +1658,40 @@ export default function Page() {
                   ))}
                 </div>
               </div>
+
+              {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Dari</label>
-                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Sampai</label>
-                    <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
+                    <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">✕ Hapus filter tanggal</button>
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">
+                    ✕ Hapus filter tanggal
+                  </button>
                 )}
               </div>
+
+              {/* Sumber Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Sumber / Platform</label>
                   <div className="flex flex-wrap gap-1.5">
                     {uniqueSourcePlatforms.map((p) => {
                       const badge = p !== "ALL" ? getSourcePlatformBadge(p as string) : null;
+                      const isActive = sourcePlatform === p;
                       return (
                         <button key={p as string} onClick={() => setSourcePlatform(p as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${sourcePlatform === p ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {p === "ALL" ? "Semua" : badge?.text ?? (p as string)}
                         </button>
                       );
@@ -1503,15 +1699,18 @@ export default function Page() {
                   </div>
                 </div>
               )}
+
+              {/* Metode Pembayaran */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-2 block">Metode Pembayaran</label>
                   <div className="flex flex-wrap gap-1.5">
                     {uniquePaymentMethods.map((m) => {
                       const style = m !== "ALL" ? getPaymentStyle(m as string) : null;
+                      const isActive = paymentMethod === m;
                       return (
                         <button key={m as string} onClick={() => setPaymentMethod(m as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${paymentMethod === m ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {m === "ALL" ? "Semua" : style?.text ?? (m as string)}
                         </button>
                       );
@@ -1519,6 +1718,8 @@ export default function Page() {
                   </div>
                 </div>
               )}
+
+              {/* ── Filter Perusahaan ── */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Perusahaan / Nama Toko</label>
                 <div className="flex gap-1.5">
@@ -1527,21 +1728,38 @@ export default function Page() {
                     { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
                     { value: "sotech", label: "Sotech", icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
                   ].map((c) => (
-                    <button key={c.value} onClick={() => setCompanyName(c.value)} title={c.desc ?? undefined}
-                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"}`}>
-                      <span>{c.icon}</span>{c.label}
+                    <button
+                      key={c.value}
+                      onClick={() => setCompanyName(c.value)}
+                      title={c.desc ?? undefined}
+                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                        }`}
+                    >
+                      <span>{c.icon}</span>
+                      {c.label}
                     </button>
                   ))}
                 </div>
                 {companyName !== "ALL" && (
                   <p className="text-[10px] text-gray-400 mt-1.5">
-                    Menampilkan transaksi toko: <span className="font-semibold text-gray-600">{companyName === "solit" ? "Solit 03" : "Sotech"}</span>
-                    {" "}<span className="text-gray-300">·</span>{" "}<span className="text-gray-400">termasuk semua variasi penulisan nama</span>
+                    Menampilkan transaksi toko:{" "}
+                    <span className="font-semibold text-gray-600">
+                      {companyName === "solit" ? "Solit 03" : "Sotech"}
+                    </span>
+                    {" "}<span className="text-gray-300">·</span>{" "}
+                    <span className="text-gray-400">termasuk semua variasi penulisan nama</span>
                   </p>
                 )}
               </div>
+
+              {/* Reset */}
               {hasActiveFilter && (
-                <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium">
+                <button
+                  onClick={resetFilters}
+                  className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium"
+                >
                   ✕ Reset semua filter
                 </button>
               )}
@@ -1555,27 +1773,48 @@ export default function Page() {
         ) : paginatedTransactions.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
             <div className="text-5xl mb-4 opacity-40">🔍</div>
-            <p className="text-gray-500 text-sm font-medium">
-              Tidak ada transaksi di {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-            </p>
+            <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi ditemukan</p>
             {hasActiveFilter && (
-              <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">Reset filter</button>
+              <button onClick={resetFilters} className="mt-3 text-xs text-blue-600 hover:underline">
+                Reset filter
+              </button>
             )}
           </div>
         ) : isMobile ? (
           <div className="space-y-2">
             {paginatedTransactions.map((item) => (
-              <TransactionCard key={item.id} item={item} onPhotoClick={setPhotoModal} canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials} canRestoreTransaction={canRestoreTransaction} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+              <TransactionCard
+                key={item.id}
+                item={item}
+                onPhotoClick={setPhotoModal}
+                canEditTransaction={canEditTransaction}
+                canSeeFinancials={canSeeFinancials}
+                canRestoreTransaction={canRestoreTransaction}
+                onRestored={() => fetchTransactions()}
+                onRowClick={setDetailItem}
+              />
             ))}
           </div>
         ) : (
-          <TransactionTable paginatedTransactions={paginatedTransactions} canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction} canSeeFinancials={canSeeFinancials} onPhotoClick={setPhotoModal} onRestored={() => fetchTransactions()} onRowClick={setDetailItem} />
+          <TransactionTable
+            paginatedTransactions={paginatedTransactions}
+            canEditTransaction={canEditTransaction}
+            canRestoreTransaction={canRestoreTransaction}
+            canSeeFinancials={canSeeFinancials}
+            onPhotoClick={setPhotoModal}
+            onRestored={() => fetchTransactions()}
+            onRowClick={setDetailItem}
+          />
         )}
 
         {/* ── Pagination ── */}
         {!isLoading && filteredTransactions.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-1">
-            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
               Sebelumnya
             </button>
@@ -1584,7 +1823,11 @@ export default function Page() {
               <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{currentPage}</span>
               <span className="text-xs text-gray-400">dari {totalPages}</span>
             </div>
-            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium">
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+            >
               Selanjutnya
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
