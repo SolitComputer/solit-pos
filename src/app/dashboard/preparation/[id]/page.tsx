@@ -418,6 +418,7 @@ export default function PreparationDetailPage() {
     const elapsedMs = nowTs - startMs;
 
     const canVoice = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_VOICE) : false;
+    const canTargetVoice = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_VOICE_TARGET) : false; // ← NEW    
 
     return (
         <DashboardLayout>
@@ -610,6 +611,9 @@ export default function PreparationDetailPage() {
 
             {showDone && <DoneModal order={order} onClose={() => setShowDone(false)} onDone={fetchOrder} />}
             {showStart && <StartTripModal defaultAddress={order.delivery_address} onClose={() => setShowStart(false)} onConfirm={async (p) => { await handleStartTrip(p); setShowStart(false); }} />}
+            {canVoice && userId && (
+                <DeliveryVoiceHT orderId={order.id} userId={userId} userName={userName} userRole={userRole ?? ""} canTalk={canVoice} canTarget={canTargetVoice} />
+            )}
         </DashboardLayout>
     );
 

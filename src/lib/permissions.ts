@@ -104,6 +104,13 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = [
 ];
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", // ← biar penyedia juga bisa pakai HT
+];
+
+// Role yang boleh memilih TUJUAN HT (directed/japri). Selain ini → selalu broadcast ke semua.
+export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
 ];
 export const SERVICE_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS,
@@ -264,11 +271,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-"/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
+  "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
+  "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
 
 };
 
@@ -359,6 +368,7 @@ export const PERMISSIONS = {
 
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
+  DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[], 
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],

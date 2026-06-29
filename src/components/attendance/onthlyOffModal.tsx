@@ -57,8 +57,19 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
   const [error, setError] = useState("");
   const [noteInput, setNoteInput] = useState("");
 
-  const apiYear = calYear;
-  const apiMonth = calMonth + 1;
+  const [viewYear, setViewYear] = useState(calYear);
+  const [viewMonth, setViewMonth] = useState(calMonth);
+
+  const apiYear = viewYear;
+  const apiMonth = viewMonth + 1;
+
+  const shiftMonth = (delta: number) => {
+    const d = new Date(viewYear, viewMonth + delta, 1);
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+    setError("");
+  };
+  const isOtherMonth = viewYear !== calYear || viewMonth !== calMonth;
 
   const fetchOffs = useCallback(async () => {
     setLoading(true);
@@ -123,14 +134,14 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
       .sort();
   }, [dateWorks, selectedUserId, refWeeklyDows, apiMonth]);
 
-  const calDays = useMemo(() => {
-    const firstDow = new Date(calYear, calMonth, 1).getDay();
-    const dim = new Date(calYear, calMonth + 1, 0).getDate();
+const calDays = useMemo(() => {
+    const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+    const dim = new Date(viewYear, viewMonth + 1, 0).getDate();
     const cells: (number | null)[] = [];
     for (let i = 0; i < firstDow; i++) cells.push(null);
     for (let d = 1; d <= dim; d++) cells.push(d);
     return cells;
-  }, [calYear, calMonth]);
+  }, [viewYear, viewMonth]);
 
   const todayStr = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
   const selectedUser = users.find(u => u.id === selectedUserId);
@@ -227,9 +238,28 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
         <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
           <div>
             <p className="font-bold text-white text-base">📅 Atur Hari Libur</p>
-            <p className="text-xs text-white/70 mt-1">
-              {MONTH_NAMES[calMonth]} {calYear} · Maks. {MAX_OFF} hari libur per orang
-            </p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <button
+                onClick={() => shiftMonth(-1)}
+                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all text-[11px]"
+                title="Bulan sebelumnya"
+              >◀</button>
+              <p className="text-xs text-white/80 font-semibold min-w-[130px] text-center">
+                {MONTH_NAMES[viewMonth]} {viewYear}
+              </p>
+              <button
+                onClick={() => shiftMonth(1)}
+                className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all text-[11px]"
+                title="Bulan berikutnya"
+              >▶</button>
+            </div>
+            {isOtherMonth ? (
+              <p className="text-[10px] text-amber-300 mt-1.5 flex items-center gap-1">
+                ⚠️ Mengatur {MONTH_NAMES[viewMonth]} {viewYear} — untuk libur yang lewat ke bulan depan
+              </p>
+            ) : (
+              <p className="text-[10px] text-white/50 mt-1.5">Maks. {MAX_OFF} hari libur bulanan per orang</p>
+            )}
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,25 +286,22 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                     <button
                       key={u.id}
                       onClick={() => { setSelectedUserId(u.id); setError(""); }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                        isActive
-                          ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${isActive
+                        ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
-                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${
-                        isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-                      }`}>
+                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
+                        }`}>
                         {initials(u.name)}
                       </span>
                       <span>{u.name}</span>
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
-                        count >= MAX_OFF
-                          ? "bg-red-500 text-white"
-                          : count > 0
-                            ? (isActive ? "bg-white/30 text-white" : "bg-blue-100 text-blue-700")
-                            : (isActive ? "bg-white/20 text-white/60" : "bg-gray-100 text-gray-400")
-                      }`}>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${count >= MAX_OFF
+                        ? "bg-red-500 text-white"
+                        : count > 0
+                          ? (isActive ? "bg-white/30 text-white" : "bg-blue-100 text-blue-700")
+                          : (isActive ? "bg-white/20 text-white/60" : "bg-gray-100 text-gray-400")
+                        }`}>
                         {count}/{MAX_OFF}
                       </span>
                     </button>
@@ -311,16 +338,14 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                 <div className="flex flex-col items-end gap-1">
                   <div className="flex items-center gap-1">
                     {Array.from({ length: MAX_OFF }).map((_, i) => (
-                      <div key={i} className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-all ${
-                        i < usedCount ? "bg-red-500 border-red-500 text-white" : "bg-gray-100 border-gray-200 text-gray-300"
-                      }`}>
+                      <div key={i} className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-all ${i < usedCount ? "bg-red-500 border-red-500 text-white" : "bg-gray-100 border-gray-200 text-gray-300"
+                        }`}>
                         {i < usedCount ? "✕" : ""}
                       </div>
                     ))}
                   </div>
-                  <p className={`text-[10px] font-bold ${
-                    remainingCount === 0 ? "text-red-500" : remainingCount === 1 ? "text-amber-500" : "text-emerald-600"
-                  }`}>
+                  <p className={`text-[10px] font-bold ${remainingCount === 0 ? "text-red-500" : remainingCount === 1 ? "text-amber-500" : "text-emerald-600"
+                    }`}>
                     {remainingCount === 0 ? "Kuota penuh" : `Sisa ${remainingCount} hari`}
                   </p>
                 </div>
@@ -362,7 +387,7 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                     {calDays.map((day, idx) => {
                       if (day === null) return <div key={`e-${idx}`} />;
 
-                      const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(day)}`;
+                      const dk = `${viewYear}-${pad2(viewMonth + 1)}-${pad2(day)}`;
                       const dow = new Date(dk + "T12:00:00").getDay();
 
                       const isOff = offDateSet.has(dk);                       // libur bulanan (merah)
@@ -387,12 +412,12 @@ export function MonthlyOffModal({ users, calYear, calMonth, onClose, onSaved }: 
                           disabled={!clickable || isBusy}
                           title={
                             isBusy ? "Loading..."
-                            : isOff ? `Klik untuk hapus libur ${dk}`
-                            : isCanceled ? "Libur mingguan dibatalkan (masuk) — klik untuk kembalikan jadi libur"
-                            : isWeeklyActive ? "Libur mingguan — klik untuk batalkan (jadi masuk)"
-                            : isDateOffRef ? "Libur (data lama) — read-only"
-                            : remainingCount <= 0 ? `Kuota libur penuh (maks ${MAX_OFF})`
-                            : `Klik untuk set libur ${dk}`
+                              : isOff ? `Klik untuk hapus libur ${dk}`
+                                : isCanceled ? "Libur mingguan dibatalkan (masuk) — klik untuk kembalikan jadi libur"
+                                  : isWeeklyActive ? "Libur mingguan — klik untuk batalkan (jadi masuk)"
+                                    : isDateOffRef ? "Libur (data lama) — read-only"
+                                      : remainingCount <= 0 ? `Kuota libur penuh (maks ${MAX_OFF})`
+                                        : `Klik untuk set libur ${dk}`
                           }
                           className={`
                             relative flex flex-col items-center justify-center h-11 rounded-xl text-xs font-bold transition-all duration-200

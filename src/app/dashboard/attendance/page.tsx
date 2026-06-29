@@ -2869,6 +2869,17 @@ export default function AttendanceDashboardPage() {
         return m;
     }, [monthlyOffs, allUsers]);
 
+    const monthlyOffNoteByName = useMemo(() => {
+        const m: Record<string, Record<string, string>> = {};
+        monthlyOffs.forEach(o => {
+            const uInfo = allUsers.find(u => u.id === o.user_id);
+            if (!uInfo || !o.notes) return;
+            if (!m[uInfo.name]) m[uInfo.name] = {};
+            m[uInfo.name][o.off_date] = o.notes;
+        });
+        return m;
+    }, [monthlyOffs, allUsers]);
+
     const isDayOffForUser = (name: string, dk: string) => {
         if (monthlyOffByName[name]?.has(dk)) return true;
         if (dateWorkByName[name]?.has(dk)) return false;
@@ -2903,7 +2914,7 @@ export default function AttendanceDashboardPage() {
             result.push({ name, role: roleByName[name] ?? "", reason });
         };
 
-        Object.entries(monthlyOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur Bulanan"); });
+        Object.entries(monthlyOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, monthlyOffNoteByName[name]?.[dk] || "Libur Bulanan"); });
         Object.entries(dayOffByName).forEach(([name, dows]) => { if (dows.has(dow)) add(name, "Libur Mingguan"); });
         Object.entries(dateOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur / Tukar"); });
         leaveData.forEach(ld => { if (ld.requests.some(r => r.leave_date === dk)) add(ld.user.name, "Cuti"); });
@@ -5362,7 +5373,7 @@ export default function AttendanceDashboardPage() {
                 <MonthlyOffModal
                     users={
                         isAdmin
-                            ? allUsers.filter(u => u.id !== currentUser?.id)
+                            ? allUsers
                             : allUsers.filter(u => {
                                 const subs = DIVISION_MAP[currentUser?.role as string] ?? [];
                                 return (subs as string[]).includes(u.role);

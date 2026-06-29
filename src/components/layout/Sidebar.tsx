@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { UserRole } from "@/lib/auth";
+import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 
 const CACHE_KEY = "solit_sidebar_user";
 
@@ -214,6 +215,11 @@ const ITEM_PREPARATION_HISTORY: MenuItem = {
   href: "/dashboard/preparation/history",
   icon: Icons.deliveryRoute,
 };
+const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
+  name: "Tugas Antar Saya",
+  href: "/dashboard/preparation/pengantaran",
+  icon: Icons.deliveryRoute,
+};
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
@@ -317,6 +323,19 @@ const SALES_TRANSAKSI: MenuGroup = {
   ],
 };
 
+const PENGANTARAN_TRANSAKSI: MenuGroup = {
+  label: "Transaksi",
+  items: [
+    { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+    ITEM_PREPARATION_PENGANTARAN,
+    ITEM_PREPARATION,
+    ITEM_PREPARATION_HISTORY,
+    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Scanner", href: "/scan", icon: Icons.scanner },
+  ],
+};
+
 // ── PKL shared menu ───────────────────────────────────────────────────────────
 const PKL_MENU: MenuGroup[] = [
   {
@@ -382,7 +401,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
   KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, PENGANTARAN_TRANSAKSI],
   SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
@@ -681,8 +700,8 @@ function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-function NavItem({ item, isActive, onClick }: {
-  item: MenuItem; isActive: boolean; onClick?: () => void;
+function NavItem({ item, isActive, onClick, badge }: {
+  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number;
 }) {
   return (
     <Link
@@ -697,13 +716,19 @@ function NavItem({ item, isActive, onClick }: {
         {item.icon}
       </span>
       <span className="flex-1 truncate">{item.name}</span>
+      {badge && badge > 0 ? (
+        <span className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white"}`}>
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
 
-function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: {
+function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, badges }: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
   onClose?: () => void; onLogout: () => void;
+  badges?: Record<string, number>;
 }) {
   const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
@@ -817,7 +842,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
                         (pathname.startsWith("/dashboard/preparation/") &&
                           !pathname.startsWith("/dashboard/preparation/antrian") &&
                           !pathname.startsWith("/dashboard/preparation/done") &&
-                          !pathname.startsWith("/dashboard/preparation/history"));
+                          !pathname.startsWith("/dashboard/preparation/history") &&
+                          !pathname.startsWith("/dashboard/preparation/pengantaran"));
                     }
                     if (item.href === "/dashboard/laptops") {
                       return (
@@ -839,6 +865,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
                       item={item}
                       isActive={isActive}
                       onClick={onClose}
+                      badge={badges?.[item.href]}
                     />
                   );
                 })}
@@ -869,7 +896,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
-
+""
   useEffect(() => {
     setMounted(true);
     const cached = getCachedUser();
@@ -907,7 +934,12 @@ export default function Sidebar() {
     ? (ROLE_MENUS[user.role as UserRole] ?? [])
     : [];
 
-  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout };
+  const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
+  const badges: Record<string, number> = {
+    "/dashboard/preparation/pengantaran": deliveryBadge,
+  };
+
+  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout, badges };
 
   void mounted;
 
@@ -939,12 +971,11 @@ export default function Sidebar() {
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
           }`}
       >
-        <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
+        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
       </aside>
-
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} />
+        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
       </aside>
     </>
   );
