@@ -46,8 +46,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
   SOTECH: "/dashboard",
-  PENYEDIA_BARANG: "/dashboard/transactions",
-  KEPALA_PENYEDIA_BARANG: "/dashboard/transactions",
+  PENYEDIA_BARANG: "/dashboard/preparation/antrian",
+  KEPALA_PENYEDIA_BARANG: "/dashboard/preparation/antrian",
   KONTEN: "/dashboard",
   KEPALA_ONPOINT: "/dashboard",
   ONPOINT: "/dashboard",
@@ -101,7 +101,11 @@ export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
 ];
 export const PREPARATION_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PREPARATION_PENYEDIA_ROLES, "PENGANTARAN",
-];export const SERVICE_VIEW_ROLES: UserRole[] = [
+];
+export const DELIVERY_VOICE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...SALES_ACCESS,
+];
+export const SERVICE_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS,
   "TEKNISI",
   "KEPALA_TEKNISI",
@@ -249,7 +253,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
- "/api/pkl-reports": [
+  "/api/pkl-reports": [
     ...FULL_ACCESS,
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
@@ -260,8 +264,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+"/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
+  "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
+
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
+
 };
 
 export const PERMISSIONS = {
@@ -347,9 +355,10 @@ export const PERMISSIONS = {
 
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
   MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
-FOLLOWUP_SELLER: [...FULL_ACCESS, "KEPALA_MARKETING", "CREW_SALES"] as UserRole[],
+  FOLLOWUP_SELLER: [...FULL_ACCESS, "KEPALA_MARKETING", "CREW_SALES"] as UserRole[],
 
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
+  DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],

@@ -301,13 +301,53 @@ function getUserStartDate(
     calMonth: number
 ): string {
     const firstOfMonth = `${calYear}-${pad2(calMonth + 1)}-01`;
+    const lastOfMonth = `${calYear}-${pad2(calMonth + 1)}-${pad2(new Date(calYear, calMonth + 1, 0).getDate())}`;
+
     if (!userCreatedAt) return firstOfMonth;
 
     const createdWIB = new Date(
         new Date(userCreatedAt).getTime() + 7 * 60 * 60 * 1000
     ).toISOString().slice(0, 10);
 
-    return createdWIB > firstOfMonth ? createdWIB : firstOfMonth;
+    if (createdWIB > lastOfMonth) return createdWIB;
+
+    return firstOfMonth;
+}
+
+function computeMonthlySalary(
+    salary: UserSalary | undefined,
+    allowance: UserAllowances | undefined,
+    overtimeAmount: number,
+    stat: { totalWorkdays: number; score: number; pct: number } | undefined
+) {
+    const isPercentage = salary?.salary_type === "PERCENTAGE";
+
+    // Gaji pokok: FIXED = penuh · PERCENTAGE = (pokok / hari kerja) × skor kehadiran
+    const salaryIncome = salary
+        ? isPercentage
+            ? stat && stat.totalWorkdays > 0
+                ? Math.round((salary.base_salary / stat.totalWorkdays) * stat.score)
+                : 0
+            : salary.base_salary
+        : 0;
+
+    //    PERCENTAGE → disesuaikan % kehadiran
+    const allowanceFactor = isPercentage ? (stat?.pct ?? 0) / 100 : 1;
+    const allowanceWife = Math.round((allowance?.allowance_wife || 0) * allowanceFactor);
+    const allowanceChild = Math.round((allowance?.allowance_child || 0) * allowanceFactor);
+
+    // Potongan: selalu langsung (tidak disesuaikan %)
+    const deductionLoan = allowance?.deduction_loan || 0;
+    const deductionPension = allowance?.deduction_pension || 0;
+
+    const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtimeAmount;
+    const totalDeduction = deductionLoan + deductionPension;
+    const netSalary = grossIncome - totalDeduction;
+
+    return {
+        salaryIncome, allowanceWife, allowanceChild, overtime: overtimeAmount,
+        grossIncome, deductionLoan, deductionPension, totalDeduction, netSalary,
+    };
 }
 
 // ─── Modal Shell ──────────────────────────────────────────────────────────────
@@ -4153,28 +4193,11 @@ export default function AttendanceDashboardPage() {
                                                 const allow = allowanceMap[u.userId];
                                                 const overtime = overtimeTotal[u.userId] || 0;
 
-                                                // Hitung gaji pokok
-                                                const salaryIncome =
-                                                    sal && sal.salary_type === "FIXED"
-                                                        ? sal.base_salary
-                                                        : sal && u.totalWorkdays > 0
-                                                            ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                            : 0;
-
-                                                // Tunjangan (disesuaikan % kehadiran)
-                                                const allowanceWife =
-                                                    Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
-                                                const allowanceChild =
-                                                    Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
-
-                                                // Potongan (langsung)
-                                                const deductionLoan = allow?.deduction_loan || 0;
-                                                const deductionPension = allow?.deduction_pension || 0;
-
-                                                // Total
-                                                const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
-                                                const totalDeduction = deductionLoan + deductionPension;
-                                                const netSalary = grossIncome - totalDeduction;
+                                                const {
+                                                    allowanceWife, allowanceChild,
+                                                    grossIncome, deductionLoan, deductionPension,
+                                                    netSalary,
+                                                } = computeMonthlySalary(sal, allow, overtime, u);
 
                                                 return (
                                                     <tr key={u.name} className="hover:bg-gray-50/60 transition-colors duration-200 border-2 border-gray-200">
@@ -4388,20 +4411,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.filter(u => {
-                                                            const uInfo = allUsers.find(au => au.id === u.userId);
-                                                            return uInfo ? !isPKLRole(uInfo.role) : true;
-                                                        }).reduce((sum, u) => {
-                                                            const sal = salaryMap[u.userId];
-                                                            return (
-                                                                sum +
-                                                                (sal && sal.salary_type === "FIXED"
-                                                                    ? sal.base_salary
-                                                                    : sal && u.totalWorkdays > 0
-                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                                        : 0)
-                                                            );
-                                                        }, 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + computeMonthlySalary(salaryMap[u.userId], allowanceMap[u.userId], overtimeTotal[u.userId] || 0, u).salaryIncome, 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Gaji Pokok</span>
@@ -4409,10 +4421,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => {
-                                                            const allow = allowanceMap[u.userId];
-                                                            return sum + (Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0);
-                                                        }, 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + computeMonthlySalary(salaryMap[u.userId], allowanceMap[u.userId], 0, u).allowanceWife, 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Tunjangan Istri</span>
@@ -4420,10 +4431,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-emerald-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => {
-                                                            const allow = allowanceMap[u.userId];
-                                                            return sum + (Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0);
-                                                        }, 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + computeMonthlySalary(salaryMap[u.userId], allowanceMap[u.userId], 0, u).allowanceChild, 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Tunjangan Anak</span>
@@ -4431,7 +4441,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-orange-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => sum + (overtimeTotal[u.userId] || 0), 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + (overtimeTotal[u.userId] || 0), 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Lemburan</span>
@@ -4440,7 +4452,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
                                                     -{formatRupiah(
-                                                        userSummary.reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + ((allowanceMap[u.userId]?.deduction_loan || 0) + (allowanceMap[u.userId]?.deduction_pension || 0)), 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Total Potongan</span>
@@ -4448,23 +4462,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-blue-600 text-xs block">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => {
-                                                            const sal = salaryMap[u.userId];
-                                                            const allow = allowanceMap[u.userId];
-                                                            const overtime = overtimeTotal[u.userId] || 0;
-
-                                                            const salaryIncome =
-                                                                sal && sal.salary_type === "FIXED"
-                                                                    ? sal.base_salary
-                                                                    : sal && u.totalWorkdays > 0
-                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                                        : 0;
-
-                                                            const allowanceWife = Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
-                                                            const allowanceChild = Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
-
-                                                            return sum + salaryIncome + allowanceWife + allowanceChild + overtime;
-                                                        }, 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + computeMonthlySalary(salaryMap[u.userId], allowanceMap[u.userId], overtimeTotal[u.userId] || 0, u).grossIncome, 0)
                                                     )}
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Gross</span>
@@ -4472,28 +4472,9 @@ export default function AttendanceDashboardPage() {
                                             <td className="px-3 py-4 text-right">
                                                 <span className="font-mono font-black text-emerald-700 text-sm block bg-gradient-to-br from-emerald-100 to-green-100 px-2 py-1 rounded-lg border border-emerald-200">
                                                     {formatRupiah(
-                                                        userSummary.reduce((sum, u) => {
-                                                            const sal = salaryMap[u.userId];
-                                                            const allow = allowanceMap[u.userId];
-                                                            const overtime = overtimeTotal[u.userId] || 0;
-
-                                                            const salaryIncome =
-                                                                sal && sal.salary_type === "FIXED"
-                                                                    ? sal.base_salary
-                                                                    : sal && u.totalWorkdays > 0
-                                                                        ? Math.round((sal.base_salary / u.totalWorkdays) * u.score)
-                                                                        : 0;
-
-                                                            const allowanceWife = Math.round((allow?.allowance_wife || 0) * (u.pct / 100)) || 0;
-                                                            const allowanceChild = Math.round((allow?.allowance_child || 0) * (u.pct / 100)) || 0;
-                                                            const deductionLoan = allow?.deduction_loan || 0;
-                                                            const deductionPension = allow?.deduction_pension || 0;
-
-                                                            const grossIncome = salaryIncome + allowanceWife + allowanceChild + overtime;
-                                                            const totalDeduction = deductionLoan + deductionPension;
-
-                                                            return sum + (grossIncome - totalDeduction);
-                                                        }, 0)
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + computeMonthlySalary(salaryMap[u.userId], allowanceMap[u.userId], overtimeTotal[u.userId] || 0, u).netSalary, 0)
                                                     )}
                                                 </span>
                                             </td>
@@ -5098,34 +5079,77 @@ export default function AttendanceDashboardPage() {
                                                     </div>
                                                 )}
 
-                                                {/* Estimasi gaji bulan ini */}
-                                                {myStat && (
-                                                    <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5">
-                                                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-1">
-                                                            {mySalary.salary_type === "FIXED"
-                                                                ? "💰 Gaji Bulan Ini"
-                                                                : "📊 Estimasi Gaji (berdasarkan kehadiran)"}
-                                                        </p>
-                                                        <p className="text-2xl font-black text-white font-mono">
-                                                            {formatRupiah(
-                                                                mySalary.salary_type === "FIXED"
-                                                                    ? mySalary.base_salary
-                                                                    : myStat.totalWorkdays > 0
-                                                                        ? Math.round((mySalary.base_salary / myStat.totalWorkdays) * myStat.score)
-                                                                        : 0
-                                                            )}
-                                                        </p>
-                                                        {mySalary.salary_type === "FIXED" ? (
-                                                            <p className="text-[11px] text-white/60 mt-1">
-                                                                Gaji penuh · tidak tergantung kehadiran
-                                                            </p>
-                                                        ) : (
-                                                            <p className="text-[11px] text-white/60 mt-1">
-                                                                {formatRupiah(mySalary.base_salary)} × {formatPct(myStat.pct)}% kehadiran
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                {/* Rincian & gaji bersih — sama dengan halaman admin */}
+                                                {myStat && (() => {
+                                                    const c = computeMonthlySalary(
+                                                        mySalary,
+                                                        allowanceMap[currentUser?.id ?? ""],
+                                                        overtimeTotal[currentUser?.id ?? ""] || 0,
+                                                        myStat
+                                                    );
+                                                    const pokok = c.salaryIncome;
+                                                    const tWife = c.allowanceWife;
+                                                    const tChild = c.allowanceChild;
+                                                    const dLoan = c.deductionLoan;
+                                                    const dPension = c.deductionPension;
+                                                    const myOt = c.overtime;
+                                                    const gross = c.grossIncome;
+                                                    const net = c.netSalary;
+                                                    return (
+                                                        <>
+                                                            <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl p-4 space-y-2">
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📋 Rincian Gaji Bulan Ini</p>
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-gray-500">Gaji Pokok{mySalary.salary_type === "PERCENTAGE" ? ` (${formatPct(myStat.pct)}%)` : ""}</span>
+                                                                    <span className="font-bold text-gray-800 font-mono">{formatRupiah(pokok)}</span>
+                                                                </div>
+                                                                {tWife > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-gray-500">Tunjangan Istri</span>
+                                                                        <span className="font-bold text-emerald-700 font-mono">+{formatRupiah(tWife)}</span>
+                                                                    </div>
+                                                                )}
+                                                                {tChild > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-gray-500">Tunjangan Anak</span>
+                                                                        <span className="font-bold text-emerald-700 font-mono">+{formatRupiah(tChild)}</span>
+                                                                    </div>
+                                                                )}
+                                                                {myOt > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-gray-500">Lemburan</span>
+                                                                        <span className="font-bold text-orange-600 font-mono">+{formatRupiah(myOt)}</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
+                                                                    <span className="text-gray-600 font-semibold">Total Penghasilan</span>
+                                                                    <span className="font-black text-blue-600 font-mono">{formatRupiah(gross)}</span>
+                                                                </div>
+                                                                {dLoan > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-gray-500">Cicilan Kasbon</span>
+                                                                        <span className="font-bold text-red-600 font-mono">-{formatRupiah(dLoan)}</span>
+                                                                    </div>
+                                                                )}
+                                                                {dPension > 0 && (
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="text-gray-500">Dana Pensiun</span>
+                                                                        <span className="font-bold text-red-600 font-mono">-{formatRupiah(dPension)}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5">
+                                                                <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-1">💰 Gaji Bersih Bulan Ini</p>
+                                                                <p className="text-3xl font-black text-white font-mono">{formatRupiah(net)}</p>
+                                                                <p className="text-[11px] text-white/60 mt-1">
+                                                                    {mySalary.salary_type === "FIXED"
+                                                                        ? "Gaji tetap + tunjangan + lembur − potongan"
+                                                                        : `${formatPct(myStat.pct)}% kehadiran · tunjangan & lembur penuh − potongan`}
+                                                                </p>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
 
                                                 {/* Info tambahan untuk FIXED — tetap tampilkan persentase */}
                                                 {mySalary.salary_type === "FIXED" && myStat && (
