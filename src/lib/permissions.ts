@@ -1,3 +1,9 @@
+// src/lib/permissions.ts — UPDATED
+// Perubahan utama:
+// 1. Tambah DISPATCH_PREPARATION permission (sales pilih metode kirim)
+// 2. Tambah route /dashboard/preparation/siap-kirim
+// 3. PREPARATION_DELIVERY_PERSON_ROLES tetap hanya PENGANTARAN
+
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -41,7 +47,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_PENGELOLA_BARANG: "/dashboard/laptops",
   TEKNISI: "/dashboard/service/antrian",
   KEPALA_TEKNISI: "/dashboard/service/antrian",
-  PENGANTARAN: "/dashboard",
+  PENGANTARAN: "/dashboard/preparation/pengantaran",
   MARKETING: "/dashboard/laptops",
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
@@ -87,49 +93,67 @@ const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG
 
 const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING"];
 
+// ─── Preparation Roles ────────────────────────────────────────────────────────
+
+/** Sales yang bisa CREATE format penyiapan */
 const PREPARATION_SALES_ROLES: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
   "KEPALA_ONPOINT", "ONPOINT",
 ];
+
+/** Penyedia barang yang cek & tandai done */
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
 ];
+
+/** Siapa yang buat format penyiapan (Sales + Admin) */
 export const PREPARATION_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
+
+/** Siapa yang bisa terima & done-in penyiapan (Penyedia + Admin) */
 export const PREPARATION_DONE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_PENYEDIA_ROLES];
+
+/**
+ * Siapa yang bisa DISPATCH (pilih metode pengiriman) setelah penyedia done.
+ * Ini adalah Sales/Kepala Sales — BUKAN penyedia barang.
+ */
+export const PREPARATION_DISPATCH_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
+
+/** Role yang boleh handle delivery tracking */
 export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
   ...FULL_ACCESS, "PENGANTARAN", ...PREPARATION_PENYEDIA_ROLES,
 ];
+
+/** Semua yang bisa lihat penyiapan */
 export const PREPARATION_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PREPARATION_PENYEDIA_ROLES, "PENGANTARAN",
-];
-export const DELIVERY_VOICE_ROLES: UserRole[] = [
-  ...FULL_ACCESS, ...SALES_ACCESS,
-  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", // ← biar penyedia juga bisa pakai HT
+  ...FULL_ACCESS,
+  ...PREPARATION_SALES_ROLES,
+  ...PREPARATION_PENYEDIA_ROLES,
+  "PENGANTARAN",
 ];
 
-// Role yang boleh memilih TUJUAN HT (directed/japri). Selain ini → selalu broadcast ke semua.
+/** Role yang MENJADI pengantar (bukan yang assign) */
+export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
+
+// ─── Voice / HT Roles ────────────────────────────────────────────────────────
+export const DELIVERY_VOICE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...SALES_ACCESS,
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+];
+
 export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
 ];
+
+// ─── Service Roles ────────────────────────────────────────────────────────────
 export const SERVICE_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS,
-  "TEKNISI",
-  "KEPALA_TEKNISI",
-  "CUSTOMER_SERVICE",
+  ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
 ];
-
 export const SERVICE_CREATE_ROLES: UserRole[] = [
-  ...FULL_ACCESS,
-  "KEPALA_TEKNISI",
-  "CUSTOMER_SERVICE",
-  "TEKNISI",
+  ...FULL_ACCESS, "KEPALA_TEKNISI", "CUSTOMER_SERVICE", "TEKNISI",
 ];
-
 export const SERVICE_TEKNISI_ROLES: UserRole[] = [
-  ...FULL_ACCESS,
-  "TEKNISI",
-  "KEPALA_TEKNISI",
+  ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
 ];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
@@ -170,7 +194,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
 
-  // ✅ Service Queue Routes
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
@@ -183,8 +206,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/api/group-chat": ALL_ROLES.filter(r => !r.startsWith("PKL")),
-
-  // ✅ FIX: Tambah push notification route
   "/api/push/subscribe": [...ALL_ROLES],
 
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG"],
@@ -237,20 +258,17 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/day-off": [...ALL_ROLES],
   "/api/attendance/date-off": [...ALL_ROLES],
   "/api/attendance/shift-config": [
-    ...FULL_ACCESS,
-    "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_MARKETING",
+    ...FULL_ACCESS, "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_MARKETING",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
   ],
   "/api/attendance/schedule": [...FULL_ACCESS],
   "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/overtime/rates": [
-    ...FULL_ACCESS,
-    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    ...FULL_ACCESS, "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
   ],
   "/api/attendance": [...ALL_ROLES],
-
   "/api/service": [...SERVICE_VIEW_ROLES],
 
   "/dashboard/pkl-reports": [
@@ -271,16 +289,23 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
+  // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  // Antrian & Done = khusus Penyedia Barang + Admin
   "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
+  // Siap Kirim = Sales lihat dan dispatch
+  "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
+  // Pengantaran = role Pengantaran + Admin + Sales (untuk monitor)
   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
+  "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
-
+  "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
 };
 
+// ─── PERMISSIONS object ───────────────────────────────────────────────────────
 export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 
@@ -366,12 +391,17 @@ export const PERMISSIONS = {
   MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
   FOLLOWUP_SELLER: [...FULL_ACCESS, "KEPALA_MARKETING", "CREW_SALES"] as UserRole[],
 
+  // ── Preparation permissions ─────────────────────────────────────────────────
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
-  DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
-  DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[], 
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
+  /** Sales pilih metode pengiriman setelah penyedia done */
+  DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
+
+  // ── Voice HT ────────────────────────────────────────────────────────────────
+  DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
+  DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(
@@ -381,6 +411,7 @@ export function hasPermission(
   return (allowed as UserRole[]).includes(role);
 }
 
+// ─── Division management ──────────────────────────────────────────────────────
 export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_TEKNISI: ["TEKNISI", "PKL_TEKNISI"],
   KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES"],
@@ -391,49 +422,44 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   ADMIN: ["PENGELOLA_BARANG"],
 };
 
-export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = [
-  "PENGANTARAN",
+export const PKL_ROLES: UserRole[] = [
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
 ];
+export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 
-/** Full access check — ADMIN / PROGRAMMER / ASISTEN_CEO */
-export function isFullAccess(role: string): boolean {
-  return (FULL_ACCESS as string[]).includes(role);
+export function isPKLRole(role?: string): boolean {
+  if (!role) return false;
+  return role === "PKL" || role.startsWith("PKL_");
 }
 
-/** Apakah role adalah kepala divisi (punya bawahan di DIVISION_MAP) */
+export function isFullAccess(role: string): boolean {
+  return (["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as string[]).includes(role);
+}
 export function isDivisionHead(role: string): boolean {
   return Object.keys(DIVISION_MAP).includes(role);
 }
-
-/** Ambil daftar role bawahan dari seorang kepala divisi */
 export function getSubordinateRoles(headRole: string): UserRole[] {
   return DIVISION_MAP[headRole] ?? [];
 }
-
-/** Apakah targetRole adalah bawahan langsung dari headRole */
 export function isSubordinate(headRole: string, targetRole: string): boolean {
   return (getSubordinateRoles(headRole) as string[]).includes(targetRole);
 }
-
 export function canManageAttendance(role: string): boolean {
   return isFullAccess(role) || isDivisionHead(role);
 }
-
 export function canApproveOvertime(role: string): boolean {
   return isFullAccess(role) || isDivisionHead(role);
 }
-
 export function getManageableRoles(role: string): UserRole[] {
   if (isFullAccess(role)) return [...ALL_ROLES];
   if (isDivisionHead(role)) return getSubordinateRoles(role);
   return [];
 }
-
 export function canManageTargetRole(actorRole: string, targetRole: string): boolean {
   if (isFullAccess(actorRole)) return true;
   return isSubordinate(actorRole, targetRole);
 }
-
 export function canViewOvertimePay(role: string): boolean {
   const PAY_VIEW: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -442,11 +468,9 @@ export function canViewOvertimePay(role: string): boolean {
   ];
   return (PAY_VIEW as string[]).includes(role);
 }
-
 export function canViewSalary(role: string): boolean {
   return (["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as string[]).includes(role);
 }
-
 export function getDivisionLabel(headRole: string): string {
   const labels: Record<string, string> = {
     KEPALA_TEKNISI: "Divisi Teknisi",
@@ -458,15 +482,4 @@ export function getDivisionLabel(headRole: string): string {
     ADMIN: "Pengelola Barang",
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
-}
-export const PKL_ROLES: UserRole[] = [
-  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-];
-
-export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
-
-export function isPKLRole(role?: string): boolean {
-  if (!role) return false;
-  return role === "PKL" || role.startsWith("PKL_");
 }
