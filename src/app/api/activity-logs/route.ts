@@ -10,12 +10,13 @@ const supabaseAdmin = createClient(
 export const GET = withAuth(
   async (req: NextRequest, _ctx, user) => {
     const { searchParams } = new URL(req.url);
-    const page   = parseInt(searchParams.get("page")  ?? "1");
-    const limit  = parseInt(searchParams.get("limit") ?? "20");
+    const page = parseInt(searchParams.get("page") ?? "1");
+    const limit = parseInt(searchParams.get("limit") ?? "20");
     const entity = searchParams.get("entity");
     const action = searchParams.get("action");
-    const from   = (page - 1) * limit;
-    const to     = from + limit - 1;
+    const userName = searchParams.get("user_name");
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
     let query = supabaseAdmin
       .from("activity_logs")
@@ -25,6 +26,7 @@ export const GET = withAuth(
 
     if (entity) query = query.eq("entity", entity);
     if (action) query = query.eq("action", action);
+    if (userName) query = query.ilike("user_name", `%${userName}%`);
 
     const { data, error, count } = await query;
 
