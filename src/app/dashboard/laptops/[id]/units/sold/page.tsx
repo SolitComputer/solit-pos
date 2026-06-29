@@ -43,6 +43,150 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
     );
 }
 
+// ── Inline Edit Cell ──────────────────────────────────────────────────────────
+function EditablePriceCell({
+    unitId,
+    value,
+    onSaved,
+}: {
+    unitId: string;
+    value: number;
+    onSaved: (unitId: string, newPrice: number) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [inputVal, setInputVal] = useState(String(value));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    // Sync jika value berubah dari luar
+    useEffect(() => {
+        if (!editing) setInputVal(String(value));
+    }, [value, editing]);
+
+    const handleSave = async () => {
+        const parsed = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            setError("Nominal tidak valid");
+            return;
+        }
+        if (parsed === value) {
+            setEditing(false);
+            return;
+        }
+
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/units/${unitId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ purchase_price: parsed }),
+            });
+            const result = await res.json();
+            if (!result.success) {
+                setError(result.message || "Gagal menyimpan");
+                return;
+            }
+            onSaved(unitId, parsed);
+            setEditing(false);
+        } catch {
+            setError("Koneksi gagal");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") handleSave();
+        if (e.key === "Escape") {
+            setEditing(false);
+            setInputVal(String(value));
+            setError("");
+        }
+    };
+
+    if (editing) {
+        return (
+            <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1">
+                    <input
+                        type="number"
+                        value={inputVal}
+                        onChange={e => { setInputVal(e.target.value); setError(""); }}
+                        onKeyDown={handleKeyDown}
+                        autoFocus
+                        className="w-36 h-7 border border-violet-400 rounded-lg px-2 text-xs text-right tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                        min={0}
+                    />
+                    {/* Simpan */}
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-7 h-7 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition disabled:opacity-60"
+                        title="Simpan"
+                    >
+                        {saving ? (
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        ) : (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </button>
+                    {/* Batal */}
+                    <button
+                        onClick={() => { setEditing(false); setInputVal(String(value)); setError(""); }}
+                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition"
+                        title="Batal"
+                    >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                {error && <p className="text-[10px] text-red-500 font-medium">{error}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-end gap-1.5 group/cell">
+            <span className="text-xs text-gray-500 tabular-nums">{fmt(value)}</span>
+            <button
+                onClick={() => { setEditing(true); setInputVal(String(value)); }}
+                className="opacity-0 group-hover/cell:opacity-100 w-5 h-5 flex items-center justify-center bg-violet-100 hover:bg-violet-200 text-violet-600 rounded transition"
+                title="Edit harga modal"
+            >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+            </button>
+        </div>
+    );
+}
+
+// ── Toast notifikasi ringan ───────────────────────────────────────────────────
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+    useEffect(() => {
+        const t = setTimeout(onDone, 2500);
+        return () => clearTimeout(t);
+    }, [onDone]);
+
+    return (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-4">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            {message}
+        </div>
+    );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SoldUnitsPage() {
     const params = useParams();
     const laptopId = params.id as string;
@@ -51,6 +195,7 @@ export default function SoldUnitsPage() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const [toast, setToast] = useState("");
 
     const fmtDate = (iso: string) => {
         if (!iso) return "—";
@@ -71,7 +216,6 @@ export default function SoldUnitsPage() {
 
             if (laptopData.data) setLaptop(laptopData.data);
             if (unitsData.data) {
-                // Hanya SOLD
                 const sold = (unitsData.data as LaptopUnit[])
                     .filter(u => u.status === "SOLD")
                     .map(u => ({
@@ -88,12 +232,21 @@ export default function SoldUnitsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    // Callback setelah save berhasil — update local state tanpa refetch
+    const handlePriceSaved = useCallback((unitId: string, newPrice: number) => {
+        setUnits(prev => prev.map(u =>
+            u.id === unitId ? { ...u, purchase_price: newPrice } : u
+        ));
+        setToast("Harga modal berhasil diperbarui!");
+    }, []);
+
     const filtered = units.filter(u =>
         !search || u.serial_number.toLowerCase().includes(search.toLowerCase())
     );
 
     const totalRevenue = units.reduce((s, u) => s + (u.selling_price || 0), 0);
-    const totalMargin = units.reduce((s, u) => s + ((u.selling_price || 0) - (u.purchase_price || 0)), 0);
+    const totalModal = units.reduce((s, u) => s + (u.purchase_price || 0), 0);
+    const totalMargin = totalRevenue - totalModal;
 
     return (
         <DashboardLayout>
@@ -144,7 +297,7 @@ export default function SoldUnitsPage() {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                             <p className="text-xs text-gray-400">Total Terjual</p>
                             <p className="text-xl font-bold text-blue-600 mt-1">{units.length} unit</p>
@@ -153,12 +306,26 @@ export default function SoldUnitsPage() {
                             <p className="text-xs text-gray-400">Total Revenue</p>
                             <p className="text-xl font-bold text-gray-800 mt-1">{fmt(totalRevenue)}</p>
                         </div>
-                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 col-span-2 sm:col-span-1">
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                            <p className="text-xs text-gray-400">Total Modal</p>
+                            <p className="text-xl font-bold text-gray-600 mt-1">{fmt(totalModal)}</p>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                             <p className="text-xs text-gray-400">Total Margin</p>
                             <p className={`text-xl font-bold mt-1 ${totalMargin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                                 {totalMargin >= 0 ? "+" : ""}{fmt(totalMargin)}
                             </p>
                         </div>
+                    </div>
+
+                    {/* Info edit hint */}
+                    <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <p className="text-xs text-violet-700 font-medium">
+                            Hover kolom <span className="font-bold">Harga Modal</span> lalu klik ikon pensil untuk mengedit. Perubahan akan otomatis sync ke riwayat transaksi &amp; dashboard profit.
+                        </p>
                     </div>
 
                     {/* Search */}
@@ -199,7 +366,12 @@ export default function SoldUnitsPage() {
                                             <Th>Grade</Th>
                                             <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
-                                            <Th right>Harga Modal</Th>
+                                            <Th right>
+                                                <span className="flex items-center justify-end gap-1">
+                                                    Harga Modal
+                                                    <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
+                                                </span>
+                                            </Th>
                                             <Th right>Harga Jual</Th>
                                             <Th right>Margin</Th>
                                         </tr>
@@ -209,7 +381,7 @@ export default function SoldUnitsPage() {
                                             const g = GRADE_STYLE[unit.grade];
                                             const margin = (unit.selling_price || 0) - (unit.purchase_price || 0);
                                             return (
-                                                <tr key={unit.id} className="hover:bg-gray-50/60 transition-colors">
+                                                <tr key={unit.id} className="hover:bg-gray-50/60 transition-colors group">
                                                     <td className="px-4 py-3">
                                                         <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
                                                             {unit.serial_number}
@@ -230,8 +402,13 @@ export default function SoldUnitsPage() {
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
                                                     </td>
-                                                    <td className="px-4 py-3 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">
-                                                        {fmt(unit.purchase_price)}
+                                                    {/* ── Editable purchase_price ── */}
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        <EditablePriceCell
+                                                            unitId={unit.id}
+                                                            value={unit.purchase_price}
+                                                            onSaved={handlePriceSaved}
+                                                        />
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">
                                                         {fmt(unit.selling_price)}
@@ -257,6 +434,9 @@ export default function SoldUnitsPage() {
                     )}
                 </div>
             </main>
+
+            {/* Toast */}
+            {toast && <Toast message={toast} onDone={() => setToast("")} />}
         </DashboardLayout>
     );
 }

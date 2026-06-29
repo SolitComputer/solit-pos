@@ -23,7 +23,7 @@ interface User {
 const ALL_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-  "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
+  "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -36,7 +36,7 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",
   KEPALA_SALES: "Kepala Sales", KEPALA_MARKETING: "Kepala Marketing", KEPALA_TEKNISI: "Kepala Teknisi",
   CREW_SALES: "Crew Sales", SOTECH: "Sotech", ACCOUNTING: "Accounting",
-  PENGELOLA_BARANG: "Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
+  PENGELOLA_BARANG: "Pengelola Barang", KEPALA_PENGELOLA_BARANG:"Kepala Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
@@ -51,7 +51,7 @@ const ROLE_ICON: Record<string, string> = {
   ADMIN: "👑", PROGRAMMER: "💻", ASISTEN_CEO: "🤝",
   KEPALA_SALES: "📊", KEPALA_MARKETING: "🎯", KEPALA_TEKNISI: "🔩",
   CREW_SALES: "💼", SOTECH: "🛠️", ACCOUNTING: "💰",
-  PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
+  PENGELOLA_BARANG: "📦", KEPALA_PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
   MARKETING: "📱", KEBERSIHAN: "🧹",
   PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
   KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
@@ -96,7 +96,8 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   ADMIN: "#7c3aed", PROGRAMMER: "#4f46e5", ASISTEN_CEO: "#9333ea",
   KEPALA_SALES: "#059669", KEPALA_MARKETING: "#e11d48", KEPALA_TEKNISI: "#dc2626",
   CREW_SALES: "#0284c7", SOTECH: "#65a30d", ACCOUNTING: "#d97706",
-  PENGELOLA_BARANG: "#2563eb", TEKNISI: "#ea580c", PENGANTARAN: "#0d9488",
+  PENGELOLA_BARANG: "#2563eb", KEPALA_PENGELOLA_BARANG: "#1d4ed8", TEKNISI: "#ea580c",
+  PENGANTARAN: "#0d9488",
   MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
   KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
@@ -131,18 +132,17 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
     <div
-      className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${
-        type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
-      }`}
+      className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+        }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}
     >
       {type === "ok"
         ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
         : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
       }
       {msg}
     </div>
@@ -185,8 +185,8 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
       <optgroup label="— Magang (PKL) —">
         {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
           "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
+            <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+          ))}
       </optgroup>
       <optgroup label="— Layanan —">
         <option value="CUSTOMER_SERVICE">🎧 Customer Service</option>
@@ -609,11 +609,11 @@ export default function UsersPage() {
     [users, activeTab]
   );
 
-  const enrolled    = users.filter(u => u.face_embedding).length;
-  const pwNotSet    = users.filter(u => !u.password_set).length;
-  const fullAccess  = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
+  const enrolled = users.filter(u => u.face_embedding).length;
+  const pwNotSet = users.filter(u => !u.password_set).length;
+  const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
   const totalKaryawan = users.filter(u => !isPKLRole(u.role)).length;
-  const totalPKL    = users.filter(u => isPKLRole(u.role)).length;
+  const totalPKL = users.filter(u => isPKLRole(u.role)).length;
   const showOnlinePanel = isAdmin || isKepala;
 
   return (
@@ -711,10 +711,10 @@ export default function UsersPage() {
           {/* ── Stat Cards ── */}
           {!loading && isAdmin && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon="👥" value={users.length}   label="Total User"       sub="terdaftar"             accent="linear-gradient(180deg, #94a3b8, #64748b)" />
-              <StatCard icon="👑" value={fullAccess}     label="Akses Penuh"      sub="admin & programmer"    accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
-              <StatCard icon="😊" value={enrolled}       label="Wajah Terdaftar"  sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
-              <StatCard icon="⚠️" value={pwNotSet}      label="Belum Set PW"     sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
+              <StatCard icon="👥" value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+              <StatCard icon="👑" value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
+              <StatCard icon="😊" value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
+              <StatCard icon="⚠️" value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
                 accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
             </div>
           )}
@@ -726,7 +726,7 @@ export default function UsersPage() {
               <div className="flex gap-1.5">
                 {([
                   { key: "karyawan", label: "Karyawan", emoji: "👥", count: totalKaryawan },
-                  { key: "pkl",      label: "PKL",       emoji: "🎓", count: totalPKL },
+                  { key: "pkl", label: "PKL", emoji: "🎓", count: totalPKL },
                 ] as const).map(t => (
                   <button key={t.key}
                     onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
@@ -867,7 +867,7 @@ export default function UsersPage() {
                   <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 340px)" }}>
                     {filtered.map((user, idx) => {
                       const avatarColor = getAvatarColor(user.role);
-                      const badgeStyle  = ROLE_BADGE_STYLE[user.role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+                      const badgeStyle = ROLE_BADGE_STYLE[user.role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
                       const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
 
                       return (

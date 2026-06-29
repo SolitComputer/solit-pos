@@ -9,6 +9,7 @@ interface Props {
   userName: string;
   userRole: string;
   canTalk: boolean;
+  canTarget?: boolean; // NEW: boleh memilih tujuan HT (directed talk)
 }
 
 interface SignalMsg {
@@ -40,7 +41,7 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun1.l.google.com:19302" },
 ];
 
-export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, canTalk }: Props) {
+export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, canTalk, canTarget = false }: Props) {
   const [joined, setJoined] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [talking, setTalking] = useState(false);
@@ -49,11 +50,14 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [peerList, setPeerList] = useState<{ id: string; name: string; role: string; state: string }[]>([]);
   const [speakers, setSpeakers] = useState<Record<string, string>>({}); // id -> nama yang lagi bicara
+  const [targetIds, setTargetIds] = useState<Set<string>>(new Set()); // NEW: tujuan HT terpilih (kosong = semua)
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, PeerConn>>(new Map());
   const joinedRef = useRef(false);
+  const targetIdsRef = useRef<Set<string>>(new Set()); // NEW: mirror buat dibaca di callback PTT
+  useEffect(() => { targetIdsRef.current = targetIds; }, [targetIds]);
 
   const syncPeers = useCallback(() => {
     setPeerList(
@@ -61,6 +65,14 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
         id, name: p.name, role: p.role, state: p.pc.connectionState,
       }))
     );
+  }, []);
+
+  // NEW: buang id dari daftar tujuan kalau peernya keluar/gagal
+  const dropTarget = useCallback((id: string) => {
+    setTargetIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const n = new Set(prev); n.delete(id); return n;
+    });
   }, []);
 
   const send = useCallback(
@@ -109,6 +121,7 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
             try { p.pc.close(); } catch {}
             peersRef.current.delete(remoteId);
             syncPeers();
+            dropTarget(remoteId); // NEW
           }
         }
       };
@@ -118,7 +131,7 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
       syncPeers();
       return peer;
     },
-    [send, syncPeers]
+    [send, syncPeers, dropTarget]
   );
 
   const makeOffer = useCallback(
@@ -195,19 +208,29 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
         const peer = peersRef.current.get(msg.from);
         if (peer) { try { peer.pc.close(); } catch {} peer.audioEl?.pause(); peersRef.current.delete(msg.from); syncPeers(); }
         setSpeakers((s) => { const n = { ...s }; delete n[msg.from]; return n; });
+        dropTarget(msg.from); // NEW
         return;
       }
 
       if (msg.type === "talk") {
+        // NEW: directed talk. `targets` kosong = broadcast ke semua (perilaku lama).
+        // Penerima yang TIDAK termasuk target → mute audio si pengirim (lokal).
+        // Catatan: audio tetap mengalir P2P ke semua peer, hanya di-mute di sisi
+        // penerima yang bukan tujuan — cukup untuk HT internal, bukan privasi jaringan.
+        const targets: string[] = Array.isArray(msg.data?.targets) ? msg.data.targets : [];
+        const forMe = targets.length === 0 || targets.includes(userId);
+        const peer = peersRef.current.get(msg.from);
+        if (peer?.audioEl) peer.audioEl.muted = msg.data?.on ? !forMe : false;
         setSpeakers((s) => {
           const n = { ...s };
-          if (msg.data?.on) n[msg.from] = msg.fromName; else delete n[msg.from];
+          if (msg.data?.on && forMe) n[msg.from] = msg.fromName;
+          else delete n[msg.from];
           return n;
         });
         return;
       }
     },
-    [userId, createPeer, makeOffer, send, syncPeers]
+    [userId, createPeer, makeOffer, send, syncPeers, dropTarget]
   );
 
   const join = useCallback(async () => {
@@ -261,6 +284,7 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
     setTalking(false);
     setSpeakers({});
     setPeerList([]);
+    setTargetIds(new Set()); // NEW: reset tujuan
   }, [send]);
 
   useEffect(() => () => { if (joinedRef.current) leave(); }, [leave]);
@@ -270,7 +294,9 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
     if (listenOnly) { setMicError("Mikrofon tidak tersedia"); return; }
     localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = true));
     setTalking(true);
-    send({ type: "talk", data: { on: true } });
+    // NEW: sertakan daftar tujuan (hanya peer yang masih ada)
+    const targets = [...targetIdsRef.current].filter((id) => peersRef.current.has(id));
+    send({ type: "talk", data: { on: true, targets } });
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(40);
   }, [listenOnly, send]);
 
@@ -285,8 +311,23 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
     setAudioBlocked(false);
   }, []);
 
+  // NEW: toggle / clear tujuan
+  const toggleTarget = useCallback((id: string) => {
+    setTargetIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }, []);
+  const clearTargets = useCallback(() => setTargetIds(new Set()), []);
+
   const otherSpeakers = Object.entries(speakers).filter(([id]) => id !== userId);
   const connectedCount = peerList.filter((p) => p.state === "connected").length;
+  const targetNames = [...targetIds] // NEW
+    .map((id) => peerList.find((p) => p.id === id)?.name)
+    .filter(Boolean) as string[];
+  const targetLabel = targetNames.length === 0 // NEW
+    ? "" : targetNames.length === 1 ? targetNames[0] : `${targetNames.length} orang`;
 
   return (
     <div className="mt-3 bg-[#1a1a2e] rounded-2xl p-4 text-white">
@@ -336,6 +377,41 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
             </div>
           )}
 
+          {/* NEW: pemilih tujuan HT — hanya role tertentu & kalau punya mic */}
+          {canTarget && !listenOnly && peerList.length > 0 && (
+            <div className="mb-3 bg-white/5 rounded-xl p-2.5">
+              <p className="text-[10px] text-gray-400 font-semibold uppercase mb-1.5">Tujukan HT ke</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={clearTargets}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${targetIds.size === 0 ? "bg-emerald-500 text-white" : "bg-white/10 text-gray-300 hover:bg-white/15"}`}
+                >
+                  📢 Semua
+                </button>
+                {peerList.map((p) => {
+                  const sel = targetIds.has(p.id);
+                  const ok = p.state === "connected";
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleTarget(p.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 ${sel ? "bg-emerald-500 text-white" : ok ? "bg-white/10 text-gray-200 hover:bg-white/15" : "bg-white/5 text-gray-400"}`}
+                    >
+                      {sel && <span>✓</span>}{p.name}{!ok && " (…)"}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                {targetIds.size === 0
+                  ? "Suara kedengeran ke semua peserta."
+                  : `Hanya ${targetNames.join(", ") || "—"} yang dengar.`}
+              </p>
+            </div>
+          )}
+
           {/* Tombol Push-to-Talk */}
           {canTalk && !listenOnly && (
             <button
@@ -350,11 +426,11 @@ export default function DeliveryVoiceHT({ orderId, userId, userName, userRole, c
                 ${talking ? "bg-red-500 scale-[0.98] shadow-lg shadow-red-900/40" : "bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] shadow-lg shadow-emerald-900/30"}`}
             >
               {talking ? (
-                <><span className="w-3 h-3 rounded-full bg-white animate-pulse" /> SEDANG BICARA — lepas untuk berhenti</>
+                <><span className="w-3 h-3 rounded-full bg-white animate-pulse" /> {targetLabel ? `BICARA KE ${targetLabel.toUpperCase()} — lepas` : "SEDANG BICARA — lepas untuk berhenti"}</>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-14 0m7 7v3m0-3a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z" /></svg>
-                  TAHAN UNTUK BICARA
+                  {targetLabel ? `TAHAN — KE ${targetLabel.toUpperCase()}` : "TAHAN UNTUK BICARA"}
                 </>
               )}
             </button>
