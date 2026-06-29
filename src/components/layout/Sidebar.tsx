@@ -222,6 +222,22 @@ const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   ],
 };
 
+const ADMIN_PENYEDIA_MENU: MenuGroup = {
+  label: "Penyedia Barang",
+  items: [
+    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
+    { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+  ],
+};
+
+const ADMIN_PENGANTARAN_MENU: MenuGroup = {
+  label: "Pengantaran",
+  items: [
+    { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute },
+  ],
+};
+
 // ── Shared group builders ─────────────────────────────────────────────────────
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
@@ -253,8 +269,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    ITEM_PREPARATION,
-    ITEM_PREPARATION_HISTORY,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
@@ -336,7 +350,7 @@ const PKL_MENU: MenuGroup[] = [
 
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU],
+  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
   PROGRAMMER: [
     {
       label: "Overview",
@@ -350,7 +364,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
     },
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
   ASISTEN_CEO: [
     {
@@ -364,7 +378,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
   KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
@@ -801,6 +815,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: 
                     if (item.href === "/dashboard/preparation") {
                       return pathname === "/dashboard/preparation" ||
                         (pathname.startsWith("/dashboard/preparation/") &&
+                          !pathname.startsWith("/dashboard/preparation/antrian") &&
+                          !pathname.startsWith("/dashboard/preparation/done") &&
                           !pathname.startsWith("/dashboard/preparation/history"));
                     }
                     if (item.href === "/dashboard/laptops") {
