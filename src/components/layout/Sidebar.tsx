@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { UserRole } from "@/lib/auth";
+import { mergeMenuGroups } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 
 const CACHE_KEY = "solit_sidebar_user";
@@ -162,14 +163,12 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
-  // ── BARU: Monitor Chat ────────────────────────────────────────────────────
   monitorChat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
-  // ── BARU: Management Seller ───────────────────────────────────────────────
   managementSeller: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
@@ -230,9 +229,10 @@ const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   items: [
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    // Penyedia TIDAK lihat Siap Kirim / Dispatch (itu urusan Sales)
+    // Penyedia TIDAK lihat Siap Kirim (itu urusan Sales)
   ],
 };
+
 const PREPARATION_SALES_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
@@ -246,6 +246,7 @@ const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute },
   ],
 };
+
 const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
@@ -254,7 +255,6 @@ const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
   ],
 };
-
 
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
@@ -278,9 +278,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -324,9 +322,7 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
     ...extra,
   ],
 });
@@ -345,8 +341,6 @@ const SALES_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    // HAPUS: ITEM_PREPARATION, ITEM_PREPARATION_HISTORY dari sini
-    // (sudah dipindah ke PREPARATION_SALES_MENU)
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -357,8 +351,6 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    // HAPUS: ITEM_PREPARATION_PENGANTARAN, ITEM_PREPARATION, ITEM_PREPARATION_HISTORY
-    // (sudah dipindah ke PREPARATION_PENGANTARAN_MENU)
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -370,8 +362,7 @@ const PKL_MENU: MenuGroup[] = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI,
-      ITEM_PKL_REPORT,
+      ITEM_ABSENSI, ITEM_PKL_REPORT,
     ],
   },
   {
@@ -383,15 +374,11 @@ const PKL_MENU: MenuGroup[] = [
   },
   {
     label: "Transaksi",
-    items: [
-      { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    ],
+    items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
   },
   {
     label: "Tools",
-    items: [
-      { name: "Scanner", href: "/scan", icon: Icons.scanner },
-    ],
+    items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }],
   },
 ];
 
@@ -630,7 +617,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    PREPARATION_PENYEDIA_MENU,   // ← sama, TANPA Siap Kirim
+    PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
@@ -653,7 +640,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-  // ── PKL variants ──────────────────────────────────────────────────────────
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
   PKL_SALES: PKL_MENU,
@@ -662,7 +648,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_ONPOINT: PKL_MENU,
   PKL_TEKNISI: PKL_MENU,
   PKL_KONTEN: PKL_MENU,
-  // ─────────────────────────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -731,7 +716,6 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
-  // ── PKL variants ──────────────────────────────────────────────────────────
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
   PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
@@ -740,13 +724,34 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
   PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
   PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
-  // ─────────────────────────────────────────────────────────────────────────
 };
 
 function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
+// ── Multi-role: tampilkan semua role sebagai badge bertumpuk (dari HEAD) ───────
+function RoleBadges({ user }: { user: any }) {
+  const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
+  if (roles.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5 mt-0.5">
+      {roles.map(role => {
+        const meta = ROLE_META[role as UserRole];
+        return (
+          <span
+            key={role}
+            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}
+          >
+            {meta?.label ?? role}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── NavItem dengan badge support (dari origin/develop) ────────────────────────
 function NavItem({ item, isActive, onClick, badge }: {
   item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number;
 }) {
@@ -777,7 +782,6 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
   onClose?: () => void; onLogout: () => void;
   badges?: Record<string, number>;
 }) {
-  const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
   const initials = user?.name ? getInitials(user.name) : "?";
 
   const navRef = useRef<HTMLElement>(null);
@@ -841,11 +845,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
-              {roleMeta && (
-                <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5 ${roleMeta.className}`}>
-                  {roleMeta.label}
-                </span>
-              )}
+              {/* Multi-role badges dari HEAD */}
+              <RoleBadges user={user} />
             </div>
           </div>
         )}
@@ -944,7 +945,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
-  ""
+
   useEffect(() => {
     setMounted(true);
     const cached = getCachedUser();
@@ -978,16 +979,23 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const groups: MenuGroup[] = user?.role
-    ? (ROLE_MENUS[user.role as UserRole] ?? [])
+  // ✅ Multi-role: ambil semua roles, merge menu (dari HEAD)
+  const userRoles: string[] =
+    Array.isArray(user?.roles) && user.roles.length > 0
+      ? user.roles
+      : user?.role
+        ? [user.role]
+        : [];
+
+  const groups: MenuGroup[] = userRoles.length > 0
+    ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
 
+  // ✅ Delivery badge (dari origin/develop)
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
   };
-
-  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout, badges };
 
   void mounted;
 
@@ -1008,22 +1016,27 @@ export default function Sidebar() {
 
       {/* Mobile overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       {/* Mobile sidebar */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
+        <SidebarContent
+          user={user} loading={loading} groups={groups} pathname={pathname}
+          onClose={() => setOpen(false)} onLogout={handleLogout} badges={badges}
+        />
       </aside>
+
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
+        <SidebarContent
+          user={user} loading={loading} groups={groups} pathname={pathname}
+          onLogout={handleLogout} badges={badges}
+        />
       </aside>
     </>
   );

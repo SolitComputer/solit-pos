@@ -1,8 +1,9 @@
-// src/lib/permissions.ts — UPDATED
-// Perubahan utama:
+// src/lib/permissions.ts
+// Gabungan HEAD (punya Ikmal) + origin/develop (punya teman):
 // 1. Tambah DISPATCH_PREPARATION permission (sales pilih metode kirim)
 // 2. Tambah route /dashboard/preparation/siap-kirim
 // 3. PREPARATION_DELIVERY_PERSON_ROLES tetap hanya PENGANTARAN
+// 4. Multi-Role Helpers (mergeMenuGroups, getEffectivePermissions, dll) dari HEAD
 
 export type UserRole =
   | "ADMIN"
@@ -36,6 +37,8 @@ export type UserRole =
   | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
+// ─── Default Redirect ─────────────────────────────────────────────────────────
+// Ambil dari HEAD (punya Ikmal) karena PENGANTARAN redirect ke /dashboard/preparation/pengantaran
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
   PROGRAMMER: "/dashboard",
@@ -114,7 +117,7 @@ export const PREPARATION_DONE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATIO
 
 /**
  * Siapa yang bisa DISPATCH (pilih metode pengiriman) setelah penyedia done.
- * Ini adalah Sales/Kepala Sales — BUKAN penyedia barang.
+ * Dari origin/develop — Sales/Kepala Sales, BUKAN penyedia barang.
  */
 export const PREPARATION_DISPATCH_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
 
@@ -289,7 +292,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-  // ── Preparation routes ─────────────────────────────────────────────────────
+  // ── Preparation routes (dari origin/develop) ───────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   // Antrian & Done = khusus Penyedia Barang + Admin
   "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES, "PENGANTARAN"],
@@ -394,7 +397,7 @@ export const PERMISSIONS = {
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
-  /** Sales pilih metode pengiriman setelah penyedia done */
+  /** Sales pilih metode pengiriman setelah penyedia done (dari origin/develop) */
   DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
 
@@ -425,6 +428,7 @@ export const PKL_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
 ];
+
 export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 
 export function isPKLRole(role?: string): boolean {
@@ -481,4 +485,104 @@ export function getDivisionLabel(headRole: string): string {
     ADMIN: "Pengelola Barang",
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
+}
+
+// ─── Multi-Role Helpers (dari HEAD / punya Ikmal) ─────────────────────────────
+
+/**
+ * Ambil primary role (role pertama / role utama).
+ * Dipakai untuk redirect, sidebar menu, dan display label.
+ */
+export function getPrimaryRole(roles: string[]): UserRole {
+  return (roles[0] as UserRole) ?? "CREW_SALES";
+}
+
+/**
+ * Cek apakah user (dengan array roles) punya permission tertentu.
+ * Return true jika SALAH SATU role-nya ada di allowed list.
+ */
+export function hasAnyRole(
+  userRoles: string[],
+  allowed: readonly UserRole[] | UserRole[]
+): boolean {
+  return userRoles.some(r => (allowed as string[]).includes(r));
+}
+
+/**
+ * Gabungkan semua route permissions dari semua roles yang dimiliki user.
+ * Dipakai di middleware untuk cek akses route.
+ */
+export function getEffectivePermissions(userRoles: string[]): Set<string> {
+  const routes = new Set<string>();
+  for (const [route, allowedRoles] of Object.entries(ROUTE_PERMISSIONS)) {
+    if (userRoles.some(r => (allowedRoles as string[]).includes(r))) {
+      routes.add(route);
+    }
+  }
+  return routes;
+}
+
+/**
+ * Gabungkan menu sidebar dari semua roles (union, deduplicate by href).
+ * Primary role punya prioritas urutan group.
+ */
+export function mergeMenuGroups(
+  roleMenus: Record<string, any[]>,
+  userRoles: string[]
+): any[] {
+  const seenHrefs = new Set<string>();
+  const result: any[] = [];
+
+  for (const role of userRoles) {
+    const groups = roleMenus[role] ?? [];
+    for (const group of groups) {
+      let existingGroup = result.find((g: any) => g.label === group.label);
+      if (!existingGroup) {
+        existingGroup = { label: group.label, items: [] };
+        result.push(existingGroup);
+      }
+      for (const item of group.items) {
+        if (!seenHrefs.has(item.href)) {
+          seenHrefs.add(item.href);
+          existingGroup.items.push(item);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ambil default redirect terbaik dari semua roles.
+ * Priority: FULL_ACCESS → /dashboard, lainnya ikut primary role.
+ */
+export function getEffectiveRedirect(
+  userRoles: string[],
+  redirectMap: Record<string, string>
+): string {
+  const PRIORITY_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+  for (const r of userRoles) {
+    if (PRIORITY_ROLES.includes(r)) return "/dashboard";
+  }
+  const primary = getPrimaryRole(userRoles);
+  return redirectMap[primary] ?? "/dashboard";
+}
+
+/**
+ * Cek apakah user memiliki akses penuh (salah satu rolenya FULL_ACCESS).
+ */
+export function isFullAccessMulti(userRoles: string[]): boolean {
+  return userRoles.some(r => isFullAccess(r));
+}
+
+
+export function getEffectiveSubordinates(userRoles: string[]): UserRole[] {
+  const result = new Set<UserRole>();
+  for (const role of userRoles) {
+    for (const sub of getSubordinateRoles(role)) {
+      result.add(sub);
+    }
+  }
+  return Array.from(result);
 }

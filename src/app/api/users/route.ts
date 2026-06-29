@@ -5,8 +5,8 @@ import bcrypt from "bcryptjs";
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
-function isFullAccess(role: string): boolean {
-  return FULL_ACCESS_ROLES.has(role);
+function isFullAccess(roles: string[]): boolean {
+  return roles.some(r => FULL_ACCESS_ROLES.has(r));
 }
 
 function normalizePhone(raw: string): string {
@@ -17,24 +17,24 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
+// ── GET — ambil semua user ─────────────────────────────────────────────────
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
+  const userRoles: string[] = user.roles ?? [user.role];
+
   const FULL_ACCESS_SET = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
   const KEPALA_SET = new Set([
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
   ]);
 
-  const isAdmin = FULL_ACCESS_SET.has(user.role);
-  const isKepala = KEPALA_SET.has(user.role);
+  const isAdmin = userRoles.some(r => FULL_ACCESS_SET.has(r));
+  const isKepala = !isAdmin && userRoles.some(r => KEPALA_SET.has(r));
 
-  // ✅ Admin → semua field lengkap
-  // ✅ Kepala → nama, role, shift, phone (tapi tidak ada face/password/force_logout info)
-  // ✅ Lainnya → hanya nama dan role
   const selectFields = isAdmin
-    ? "id, name, phone_number, email, role, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
     : isKepala
-      ? "id, name, phone_number, role, shift"
-      : "id, name, role";
+      ? "id, name, phone_number, role, roles, shift"
+      : "id, name, role, roles";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -48,6 +48,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const users = (data ?? []).map((u: any) => ({
     ...u,
+    // Normalize roles: pastikan selalu array
+    roles: Array.isArray(u.roles) && u.roles.length > 0
+      ? u.roles
+      : [u.role].filter(Boolean),
     shift: u.shift ?? "PAGI",
     password_set: isAdmin ? (u.password_set ?? false) : false,
     face_embedding: isAdmin
@@ -55,7 +59,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       : false,
     force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
     phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
-    // Kepala tidak dapat email
     email: isAdmin ? (u.email ?? null) : null,
   }));
 
@@ -64,20 +67,29 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
 // ── POST — buat user baru ──────────────────────────────────────────────────
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  if (!isFullAccess(user.role)) {
+  const userRoles: string[] = user.roles ?? [user.role];
+  if (!isFullAccess(userRoles)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
   const body = await req.json();
-  const { name, phone_number, role, shift = "PAGI" } = body;
+  const { name, phone_number, roles: inputRoles, role: inputRole, shift = "PAGI" } = body;
 
-  if (!name || !phone_number || !role) {
+  // Support input roles array ATAU role tunggal (backward compat)
+  const rolesArray: string[] = Array.isArray(inputRoles) && inputRoles.length > 0
+    ? inputRoles
+    : inputRole
+      ? [inputRole]
+      : [];
+
+  if (!name || !phone_number || rolesArray.length === 0) {
     return NextResponse.json(
-      { success: false, message: "Nama, nomor WA, dan role wajib diisi" },
+      { success: false, message: "Nama, nomor WA, dan minimal 1 role wajib diisi" },
       { status: 400 }
     );
   }
 
+  const primaryRole = rolesArray[0];
   const normalizedPhone = normalizePhone(String(phone_number));
 
   const { data: existing } = await supabaseAdmin
@@ -100,13 +112,14 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     .insert({
       name,
       phone_number: normalizedPhone,
-      role,
+      role: primaryRole,      // primary role (kolom lama)
+      roles: rolesArray,      // semua roles (kolom baru)
       shift,
       password: tempPassword,
       password_set: false,
       created_by: user.id,
     })
-    .select("id, name, phone_number, role, shift, password_set")
+    .select("id, name, phone_number, role, roles, shift, password_set")
     .single();
 
   if (error) {
@@ -116,9 +129,10 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, user: newUser });
 }
 
-// ── PUT — update user (edit, reset password, force logout) ────────────────
+// ── PUT — update user ──────────────────────────────────────────────────────
 async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
-  if (!isFullAccess(currentUser.role)) {
+  const currentUserRoles: string[] = currentUser.roles ?? [currentUser.role];
+  if (!isFullAccess(currentUserRoles)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
@@ -129,13 +143,22 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
   }
 
-  const { id, name, phone_number, role, shift, _resetPassword, _forceLogout } = body;
+  const {
+    id,
+    name,
+    phone_number,
+    roles: inputRoles,
+    role: inputRole,
+    shift,
+    _resetPassword,
+    _forceLogout,
+  } = body;
 
   if (!id) {
     return NextResponse.json({ success: false, message: "ID user wajib" }, { status: 400 });
   }
 
-  // ── ✅ NEW: Handle force logout ────────────────────────────────────────────
+  // ── Handle force logout ────────────────────────────────────────────────────
   if (_forceLogout === true) {
     if (id === currentUser.id) {
       return NextResponse.json(
@@ -143,24 +166,17 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
         { status: 400 }
       );
     }
-
     const { error } = await supabaseAdmin
       .from("users")
       .update({ force_logout_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) {
-      console.error("[force-logout] DB error:", error);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
-
-    console.log(
-      `[force-logout] Admin ${currentUser.name} force-logout user ${id}`
-    );
-
     return NextResponse.json({
       success: true,
-      message: "Session user berhasil di-logout. Akan diaplikasikan saat user reload halaman.",
+      message: "Session user berhasil di-logout.",
     });
   }
 
@@ -182,8 +198,21 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   const updates: Record<string, any> = {};
 
   if (name !== undefined && name !== null) updates.name = name;
-  if (role !== undefined && role !== null) updates.role = role;
   if (shift !== undefined && shift !== null) updates.shift = shift;
+
+  // Update roles — support array atau string tunggal
+  const rolesArray: string[] | null =
+    Array.isArray(inputRoles) && inputRoles.length > 0
+      ? inputRoles
+      : inputRole
+        ? [inputRole]
+        : null;
+
+  if (rolesArray !== null) {
+    updates.roles = rolesArray;
+    updates.role = rolesArray[0]; // sync primary role
+  }
+
   if (phone_number !== undefined && phone_number !== null && phone_number !== "") {
     updates.phone_number = normalizePhone(String(phone_number));
   }
@@ -199,7 +228,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     .from("users")
     .update(updates)
     .eq("id", id)
-    .select("id, name, phone_number, role, shift")
+    .select("id, name, phone_number, role, roles, shift")
     .single();
 
   if (error) {
@@ -211,7 +240,8 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
 
 // ── DELETE — hapus user ────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
-  if (!isFullAccess(currentUser.role)) {
+  const currentUserRoles: string[] = currentUser.roles ?? [currentUser.role];
+  if (!isFullAccess(currentUserRoles)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
   }
 
@@ -221,7 +251,6 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
   if (!id) {
     return NextResponse.json({ success: false, message: "ID user wajib" }, { status: 400 });
   }
-
   if (id === currentUser.id) {
     return NextResponse.json(
       { success: false, message: "Tidak bisa menghapus akun sendiri" },
