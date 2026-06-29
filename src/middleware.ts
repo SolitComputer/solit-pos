@@ -30,6 +30,9 @@ const FACE_API_WHITELIST = [
   "/api/push/subscribe",
 ];
 
+// ✅ Didefinisikan di sini (sebelumnya hilang)
+const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
+
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
 
@@ -99,6 +102,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("token")?.value;
 
+  // ── Public routes ──────────────────────────────────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
@@ -108,8 +112,11 @@ export async function middleware(request: NextRequest) {
         if (!exempt && isWithinSystemHours() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
+        // ✅ Multi-role: gunakan primary role untuk redirect default
+        const userRoles: string[] = user.roles ?? [user.role];
+        const primaryRole = (userRoles[0] ?? user.role) as UserRole;
         return NextResponse.redirect(
-          new URL(ROLE_DEFAULT_REDIRECT[user.role as UserRole], request.url)
+          new URL(ROLE_DEFAULT_REDIRECT[primaryRole] ?? "/dashboard", request.url)
         );
       }
     }
@@ -144,14 +151,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── Verifikasi JWT + inject headers ─────────────────────────────────────────
+  // ── Verifikasi JWT ─────────────────────────────────────────────────────────
   const user = await verifyToken(token);
   if (!user) {
     return clearSessionAndRedirect(new URL("/login", request.url));
   }
 
+  // ✅ Selalu ada setelah guard di atas — ambil roles array
+  const userRoles: string[] = user.roles ?? [user.role];
+  const primaryRole = (userRoles[0] ?? user.role) as UserRole;
+
   const isPageRoute = !pathname.startsWith("/api/");
 
+  // ── Auto logout & force logout check (page routes only) ───────────────────
   if (isPageRoute) {
     const issuedAt: number = (user as any).iat ?? 0;
     const autoLogoutThreshold = getAutoLogoutThreshold();
@@ -170,7 +182,7 @@ export async function middleware(request: NextRequest) {
       const { data: userRecord } = await supabase
         .from("users")
         .select("force_logout_at")
-        .eq("id", (user as any).id)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (userRecord?.force_logout_at) {
@@ -182,10 +194,11 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch {
-      // fail-open
+      // fail-open: jangan block request jika DB tidak bisa diakses
     }
   }
 
+  // ── Attendance / face-verify gate ─────────────────────────────────────────
   if (PROTECTED_PREFIXES.some(p => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
     const hasAttended = hasAttendanceBypass(request, user.id);
@@ -196,30 +209,34 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
-  if (
-    (user.role === "PKL" || (user.role as string).startsWith("PKL_")) &&
-    PKL_BLOCKED_ROUTES.some(r => pathname.startsWith(r))
-  ) {
+  // ── PKL block: hanya block jika SEMUA roles adalah PKL ────────────────────
+  // ✅ Fix: sebelumnya cek user.role tunggal, sekarang cek seluruh roles array
+  const allPKL = userRoles.every((r: string) => r === "PKL" || r.startsWith("PKL_"));
+  if (allPKL && PKL_BLOCKED_ROUTES.some(r => pathname.startsWith(r))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
+
+  // ── Route permission check ────────────────────────────────────────────────
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter(route => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
 
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
-    if (!allowed.includes(user.role as UserRole)) {
+    // ✅ Multi-role: akses granted jika SALAH SATU role ada di allowed list
+    const hasAccess = userRoles.some((r: string) => (allowed as string[]).includes(r));
+    if (!hasAccess) {
       return NextResponse.redirect(
-        new URL(ROLE_DEFAULT_REDIRECT[user.role as UserRole], request.url)
+        new URL(ROLE_DEFAULT_REDIRECT[primaryRole] ?? "/dashboard", request.url)
       );
     }
   }
 
-  // ✅ Headers diset di sini — group-chat dan messages sekarang dapat headers ini
+  // ── Inject user headers untuk API routes ─────────────────────────────────
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
-  response.headers.set("x-user-role", user.role);
+  response.headers.set("x-user-role", user.role);          // primary role
+  response.headers.set("x-user-roles", userRoles.join(",")); // ✅ semua roles (NEW)
   response.headers.set("x-user-name", user.name);
   return response;
 }
@@ -250,7 +267,7 @@ export const config = {
     "/api/accessories/:path*",
     "/dashboard/accessories/:path*",
     "/api/seller-followups/:path*",
-    "/dashboard/preparation/:path*",
+    "/dashboard/preparation/:path*",  
     "/api/preparation/:path*",
   ],
 };

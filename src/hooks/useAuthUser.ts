@@ -6,6 +6,7 @@ interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
+  roles: UserRole[]; // ✅ tambahkan ini
 }
 
 let _cached: AuthUser | null = null;
@@ -17,7 +18,14 @@ async function fetchUser(): Promise<AuthUser | null> {
   _promise = fetch("/api/auth/me")
     .then(r => r.ok ? r.json() : null)
     .then(json => {
-      _cached = json?.user ?? null;
+      const u = json?.user ?? null;
+      if (u) {
+        // ✅ Normalize: pastikan roles selalu array yang valid
+        u.roles = Array.isArray(u.roles) && u.roles.length > 0
+          ? u.roles
+          : [u.role].filter(Boolean);
+      }
+      _cached = u;
       return _cached;
     })
     .catch(() => null);

@@ -37,19 +37,41 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL"],
 };
 
-function canViewPay(role?: string) { return !!role && (PAY_VIEW_ROLES as readonly string[]).includes(role); }
-function isAdminRole(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
-function canSetPay(role?: string) { return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role); }
-function canInputManual(role?: string) {
-  if (!role) return false;
-  if ((FULL_ACCESS_ROLES as readonly string[]).includes(role)) return true;
-  return Object.keys(DIVISION_HEAD_MAP).includes(role);
+// ✅ Ganti seluruh blok fungsi helper di awal file dengan ini:
+
+function canViewPay(roles?: string | string[]): boolean {
+  const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  return arr.some(r => (PAY_VIEW_ROLES as readonly string[]).includes(r));
 }
-function getManualAllowedRoles(role?: string): string[] | null {
-  if (!role) return null;
-  if ((FULL_ACCESS_ROLES as readonly string[]).includes(role)) return null; // null = semua user
-  return DIVISION_HEAD_MAP[role] ?? [];
-} function isDivisionHead(role?: string) { return !!role && (DIVISION_HEAD_ROLES as readonly string[]).includes(role); }
+
+function isAdminRole(roles?: string | string[]): boolean {
+  const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  return arr.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r));
+}
+
+function canSetPay(roles?: string | string[]): boolean {
+  const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  return arr.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r));
+}
+
+function canInputManual(roles?: string | string[]): boolean {
+  const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  if (arr.length === 0) return false;
+  if (arr.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r))) return true;
+  return arr.some(r => Object.keys(DIVISION_HEAD_MAP).includes(r));
+}
+
+function getManualAllowedRoles(roles?: string | string[]): string[] | null {
+  const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
+  if (arr.length === 0) return [];
+  if (arr.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r))) return null;
+  const merged = new Set<string>();
+  for (const role of arr) {
+    const subordinates = DIVISION_HEAD_MAP[role];
+    if (subordinates) subordinates.forEach(s => merged.add(s));
+  }
+  return merged.size > 0 ? Array.from(merged) : [];
+}
 
 function canApproveTarget(approverRole?: string, targetRole?: string): boolean {
   if (!approverRole || !targetRole) return false;
@@ -841,7 +863,18 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
 
-  const allowedRoles = useMemo(() => getManualAllowedRoles(currentUser?.role), [currentUser?.role]);
+  // ✅ AFTER
+  const userRoles = useMemo<string[]>(
+    () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
+      ? (currentUser.roles as string[])
+      : currentUser?.role ? [currentUser.role as string] : [],
+    [currentUser]
+  );
+
+  const allowedRoles = useMemo(
+    () => getManualAllowedRoles(userRoles),
+    [userRoles]
+  );
   const isFullAdmin = allowedRoles === null;
 
   const filteredUsers = useMemo(() =>
@@ -902,9 +935,9 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
         icon="✏️"
         title="Input Lembur Manual"
         sub={
-          isAdminRole(currentUser?.role)
+          userRoles.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r))
             ? "Admin · Asisten CEO · Programmer"
-            : `${currentUser?.role?.replace(/_/g, " ") ?? "Kepala Divisi"} · Bawahan divisimu`
+            : `${userRoles.map(r => r.replace(/_/g, " ")).join(" & ")} · Bawahan divisimu`
         }
         onClose={onClose}
       />
@@ -1482,7 +1515,7 @@ export default function OvertimePage() {
     { label: "Selesai", value: overtimes.filter(o => o.status === "COMPLETED").length, icon: "✓", color: "text-blue-600", accent: "from-blue-50 to-blue-100/30" },
   ];
 
-  const userCanViewPay = canViewPay(currentUser?.role);
+  const userCanViewPay = canViewPay(currentUser?.roles ?? currentUser?.role);
 
   return (
     <DashboardLayout>
@@ -1501,7 +1534,7 @@ export default function OvertimePage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {canInputManual(currentUser?.role) && (
+              {canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : [])) && (
                 <button onClick={() => setShowManualModal(true)}
                   className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                   <span>✏️</span><span className="hidden sm:inline">Input Manual</span>

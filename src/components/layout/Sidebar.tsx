@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { UserRole } from "@/lib/auth";
-import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
+import { mergeMenuGroups } from "@/lib/permissions"; // ✅ TOP-LEVEL import
 
 const CACHE_KEY = "solit_sidebar_user";
 
@@ -162,14 +162,12 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
-  // ── BARU: Monitor Chat ────────────────────────────────────────────────────
   monitorChat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
-  // ── BARU: Management Seller ───────────────────────────────────────────────
   managementSeller: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
@@ -190,65 +188,19 @@ const Icons = {
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
-const ITEM_PKL_REPORT: MenuItem = {
-  name: "Laporan Kerja PKL",
-  href: "/dashboard/pkl-reports",
-  icon: Icons.pklReport,
-};
-const ITEM_ACCESSORIES: MenuItem = {
-  name: "Data Aksesori",
-  href: "/dashboard/accessories",
-  icon: Icons.accessories,
-};
-const ITEM_MANAGEMENT_SELLER: MenuItem = {
-  name: "Management Seller",
-  href: "/dashboard/management-seller",
-  icon: Icons.managementSeller,
-};
-const ITEM_PREPARATION: MenuItem = {
-  name: "Penyiapan Barang",
-  href: "/dashboard/preparation",
-  icon: Icons.pendingOrders,
-};
-const ITEM_PREPARATION_HISTORY: MenuItem = {
-  name: "Riwayat Pengantaran",
-  href: "/dashboard/preparation/history",
-  icon: Icons.deliveryRoute,
-};
-const ITEM_SIAP_KIRIM: MenuItem = {
-  name: "Siap Dikirim 🔔",
-  href: "/dashboard/preparation/siap-kirim",
-  icon: Icons.serviceQueue,
-};
-const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
-  name: "Tugas Antar Saya",
-  href: "/dashboard/preparation/pengantaran",
-  icon: Icons.deliveryRoute,
-};
+const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard/pkl-reports", icon: Icons.pklReport };
+const ITEM_ACCESSORIES: MenuItem = { name: "Data Aksesori", href: "/dashboard/accessories", icon: Icons.accessories };
+const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
+const ITEM_PREPARATION: MenuItem = { name: "Penyiapan Barang", href: "/dashboard/preparation", icon: Icons.pendingOrders };
+const ITEM_PREPARATION_HISTORY: MenuItem = { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute };
+
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
-    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
+    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.pendingOrders },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    // Penyedia TIDAK lihat Siap Kirim / Dispatch (itu urusan Sales)
   ],
 };
-const PREPARATION_SALES_MENU: MenuGroup = {
-  label: "Penyiapan Barang",
-  items: [
-    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
-    { name: "Siap Dikirim 🔔", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
-    { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute },
-  ],
-};
-const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
-  label: "Pengantaran",
-  items: [
-    { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
-    { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
-  ],
-};
-
 
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
@@ -256,7 +208,6 @@ const ADMIN_PENYEDIA_MENU: MenuGroup = {
     { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    { name: "Siap Dikirim", href: "/dashboard/preparation/siap-kirim", icon: Icons.pendingOrders },
   ],
 };
 
@@ -272,9 +223,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -318,9 +267,7 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
     ...extra,
   ],
 });
@@ -339,20 +286,8 @@ const SALES_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    // HAPUS: ITEM_PREPARATION, ITEM_PREPARATION_HISTORY dari sini
-    // (sudah dipindah ke PREPARATION_SALES_MENU)
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-    { name: "Scanner", href: "/scan", icon: Icons.scanner },
-  ],
-};
-
-const PENGANTARAN_TRANSAKSI: MenuGroup = {
-  label: "Transaksi",
-  items: [
-    { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-    { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    // HAPUS: ITEM_PREPARATION_PENGANTARAN, ITEM_PREPARATION, ITEM_PREPARATION_HISTORY
-    // (sudah dipindah ke PREPARATION_PENGANTARAN_MENU)
+    ITEM_PREPARATION,
+    ITEM_PREPARATION_HISTORY,
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -364,8 +299,7 @@ const PKL_MENU: MenuGroup[] = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI,
-      ITEM_PKL_REPORT,
+      ITEM_ABSENSI, ITEM_PKL_REPORT,
     ],
   },
   {
@@ -377,15 +311,11 @@ const PKL_MENU: MenuGroup[] = [
   },
   {
     label: "Transaksi",
-    items: [
-      { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    ],
+    items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
   },
   {
     label: "Tools",
-    items: [
-      { name: "Scanner", href: "/scan", icon: Icons.scanner },
-    ],
+    items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }],
   },
 ];
 
@@ -421,30 +351,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
-  KEPALA_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-  ],
-  CREW_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-  ],
-  PENGANTARAN: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    PENGANTARAN_TRANSAKSI,
-    PREPARATION_PENGANTARAN_MENU,
-  ],
-  SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-  ],
+  KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
@@ -621,7 +531,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    PREPARATION_PENYEDIA_MENU,   // ← sama, TANPA Siap Kirim
+    PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
@@ -644,7 +554,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-  // ── PKL variants ──────────────────────────────────────────────────────────
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
   PKL_SALES: PKL_MENU,
@@ -653,7 +562,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_ONPOINT: PKL_MENU,
   PKL_TEKNISI: PKL_MENU,
   PKL_KONTEN: PKL_MENU,
-  // ─────────────────────────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
@@ -698,7 +606,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 };
 
-// ── Role meta ─────────────────────────────────────────────────────────────────
+// ── Role meta — untuk display label di sidebar ────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
@@ -722,7 +630,6 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
   KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
-  // ── PKL variants ──────────────────────────────────────────────────────────
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
   PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
@@ -731,15 +638,48 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
   PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
   PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
-  // ─────────────────────────────────────────────────────────────────────────
 };
 
 function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-function NavItem({ item, isActive, onClick, badge }: {
-  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number;
+// ── Ambil label untuk multi-role display ─────────────────────────────────────
+// Tidak dipakai lagi — diganti komponen RoleBadges di bawah
+function getRoleDisplayLabel(user: any): string {
+  const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
+  if (roles.length === 0) return "";
+  return ROLE_META[roles[0] as UserRole]?.label ?? roles[0];
+}
+
+// ── Tampilkan semua role sebagai badge bertumpuk ──────────────────────────────
+function RoleBadges({ user }: { user: any }) {
+  const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
+  if (roles.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5 mt-0.5">
+      {roles.map(role => {
+        const meta = ROLE_META[role as UserRole];
+        return (
+          <span
+            key={role}
+            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}
+          >
+            {meta?.label ?? role}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function getRoleDisplayClass(user: any): string {
+  const primaryRole = user?.roles?.[0] ?? user?.role;
+  return ROLE_META[primaryRole as UserRole]?.className ?? "bg-gray-50 text-gray-700";
+}
+
+function NavItem({ item, isActive, onClick }: {
+  item: MenuItem; isActive: boolean; onClick?: () => void;
 }) {
   return (
     <Link
@@ -754,21 +694,16 @@ function NavItem({ item, isActive, onClick, badge }: {
         {item.icon}
       </span>
       <span className="flex-1 truncate">{item.name}</span>
-      {badge && badge > 0 ? (
-        <span className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white"}`}>
-          {badge > 99 ? "99+" : badge}
-        </span>
-      ) : null}
     </Link>
   );
 }
 
-function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, badges }: {
+function SidebarContent({ user, loading, groups, pathname, onClose, onLogout }: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
   onClose?: () => void; onLogout: () => void;
-  badges?: Record<string, number>;
 }) {
-  const roleMeta = user?.role ? ROLE_META[user.role as UserRole] : null;
+  const roleLabel = user ? getRoleDisplayLabel(user) : "";
+  const roleClass = user ? getRoleDisplayClass(user) : "";
   const initials = user?.name ? getInitials(user.name) : "?";
 
   const navRef = useRef<HTMLElement>(null);
@@ -832,11 +767,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
-              {roleMeta && (
-                <span className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md mt-0.5 ${roleMeta.className}`}>
-                  {roleMeta.label}
-                </span>
-              )}
+              <RoleBadges user={user} />
             </div>
           </div>
         )}
@@ -880,9 +811,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
                         (pathname.startsWith("/dashboard/preparation/") &&
                           !pathname.startsWith("/dashboard/preparation/antrian") &&
                           !pathname.startsWith("/dashboard/preparation/done") &&
-                          !pathname.startsWith("/dashboard/preparation/history") &&
-                          !pathname.startsWith("/dashboard/preparation/pengantaran") &&
-                          !pathname.startsWith("/dashboard/preparation/siap-kirim"));
+                          !pathname.startsWith("/dashboard/preparation/history"));
                     }
                     if (item.href === "/dashboard/laptops") {
                       return (
@@ -904,7 +833,6 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
                       item={item}
                       isActive={isActive}
                       onClick={onClose}
-                      badge={badges?.[item.href]}
                     />
                   );
                 })}
@@ -935,7 +863,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
-  ""
+
   useEffect(() => {
     setMounted(true);
     const cached = getCachedUser();
@@ -969,16 +897,19 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  const groups: MenuGroup[] = user?.role
-    ? (ROLE_MENUS[user.role as UserRole] ?? [])
+  // ✅ Multi-role: ambil semua roles, merge menu dari semua roles
+  const userRoles: string[] =
+    Array.isArray(user?.roles) && user.roles.length > 0
+      ? user.roles
+      : user?.role
+        ? [user.role]
+        : [];
+
+  const groups: MenuGroup[] = userRoles.length > 0
+    ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
 
-  const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
-  const badges: Record<string, number> = {
-    "/dashboard/preparation/pengantaran": deliveryBadge,
-  };
-
-  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout, badges };
+  const contentProps = { user, loading, groups, pathname, onLogout: handleLogout };
 
   void mounted;
 
@@ -1010,11 +941,12 @@ export default function Sidebar() {
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
           }`}
       >
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
+        <SidebarContent {...contentProps} onClose={() => setOpen(false)} />
       </aside>
+
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
-        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} badges={badges} />
+        <SidebarContent user={user} loading={loading} groups={groups} pathname={pathname} onLogout={handleLogout} />
       </aside>
     </>
   );

@@ -13,6 +13,7 @@ interface User {
   phone_number: string | null;
   email: string | null;
   role: string;
+  roles: string[];
   shift: "PAGI" | "SORE";
   password_set: boolean;
   face_enrolled_at: string | null;
@@ -36,7 +37,7 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",
   KEPALA_SALES: "Kepala Sales", KEPALA_MARKETING: "Kepala Marketing", KEPALA_TEKNISI: "Kepala Teknisi",
   CREW_SALES: "Crew Sales", SOTECH: "Sotech", ACCOUNTING: "Accounting",
-  PENGELOLA_BARANG: "Pengelola Barang", KEPALA_PENGELOLA_BARANG:"Kepala Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
+  PENGELOLA_BARANG: "Pengelola Barang", KEPALA_PENGELOLA_BARANG: "Kepala Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
@@ -268,7 +269,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState("CREW_SALES");
+  const [roles, setRoles] = useState<string[]>(["CREW_SALES"]);
   const [shift, setShift] = useState<"PAGI" | "SORE">("PAGI");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -280,7 +281,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
     try {
       const res = await fetch("/api/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), role, shift }),
+        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), roles, shift }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -316,14 +317,8 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
           <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
         </Field>
-        <Field label="Role">
-          <RoleSelect value={role} onChange={setRole} />
-          {FULL_ACCESS_ROLES.has(role) && (
-            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
-              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
-              ⚠️ Role ini memiliki akses penuh ke semua fitur
-            </div>
-          )}
+        <Field label="Role (bisa pilih lebih dari 1)">
+          <MultiRoleSelect values={roles} onChange={setRoles} />
         </Field>
         <Field label="Shift Kerja">
           <div className="flex gap-2">
@@ -357,11 +352,135 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
+// ── MultiRoleSelect ───────────────────────────────────────────────────────────
+function MultiRoleSelect({
+  values,
+  onChange,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const ALL_ROLE_GROUPS = [
+    { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
+    { label: "Management", roles: ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+    { label: "Operasional", roles: ["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"] },
+    { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
+    { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
+    { label: "Magang (PKL)", roles: ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"] },
+  ];
+
+  const toggle = (role: string) => {
+    if (values.includes(role)) {
+      // Jangan hapus kalau cuma 1 role tersisa
+      if (values.length === 1) return;
+      onChange(values.filter(r => r !== role));
+    } else {
+      onChange([...values, role]);
+    }
+  };
+
+  const setPrimary = (role: string) => {
+    if (!values.includes(role)) return;
+    onChange([role, ...values.filter(r => r !== role)]);
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Selected roles chips */}
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl min-h-[40px]"
+          style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
+          {values.map((role, idx) => {
+            const badge = ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+            const isPrimary = idx === 0;
+            return (
+              <div key={role}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
+                style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}>
+                {isPrimary && (
+                  <span className="text-[8px] font-black px-1 py-0.5 rounded mr-0.5"
+                    style={{ background: badge.text, color: badge.bg }}>
+                    UTAMA
+                  </span>
+                )}
+                <span>{ROLE_ICON[role] || "👤"} {ROLE_LABEL[role] ?? role}</span>
+                {!isPrimary && (
+                  <button
+                    type="button"
+                    onClick={() => setPrimary(role)}
+                    title="Jadikan role utama"
+                    className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity text-[9px] font-black"
+                  >
+                    ↑
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => toggle(role)}
+                  className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Role picker grouped */}
+      <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
+        {ALL_ROLE_GROUPS.map(group => (
+          <div key={group.label}>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
+              style={{ color: "#94a3b8" }}>
+              {group.label}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {group.roles.map(role => {
+                const isSelected = values.includes(role);
+                const badge = ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggle(role)}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 border"
+                    style={isSelected
+                      ? { background: badge.bg, color: badge.text, borderColor: badge.border, boxShadow: `0 0 0 1.5px ${badge.border}` }
+                      : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
+                    }
+                  >
+                    {isSelected && "✓ "}
+                    {ROLE_ICON[role] || "👤"} {ROLE_LABEL[role] ?? role}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {values.some(r => FULL_ACCESS_ROLES.has(r)) && (
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
+          style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
+          ⚠️ Salah satu role memiliki akses penuh ke semua fitur
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── EditUserModal ─────────────────────────────────────────────────────────────
 function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
-  const [role, setRole] = useState(user.role);
+  const [roles, setRoles] = useState<string[]>(
+    Array.isArray(user.roles) && user.roles.length > 0
+      ? user.roles
+      : [user.role]
+  );
   const [shift, setShift] = useState<"PAGI" | "SORE">(user.shift ?? "PAGI");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -371,7 +490,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
     try {
       const res = await fetch("/api/users", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: user.id, name, phone_number: phone, role, shift }),
+        body: JSON.stringify({ id: user.id, name, phone_number: phone, roles, shift }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -402,14 +521,8 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
         <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
-        <Field label="Role">
-          <RoleSelect value={role} onChange={setRole} />
-          {FULL_ACCESS_ROLES.has(role) && (
-            <div className="flex items-center gap-1.5 mt-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
-              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
-              ⚠️ Role ini memiliki akses penuh ke semua fitur
-            </div>
-          )}
+        <Field label="Role (bisa pilih lebih dari 1)">
+          <MultiRoleSelect values={roles} onChange={setRoles} />
         </Field>
         <Field label="Shift">
           <div className="flex gap-2">
@@ -533,11 +646,23 @@ export default function UsersPage() {
 
   useEffect(() => {
     getCurrentUserClient().then(u => {
-      if (u) {
-        setIsAdmin(FULL_ACCESS_ROLES.has(u.role));
-        setIsKepala(KEPALA_ROLES.has(u.role));
-        setCurrentUserInfo({ id: u.id, name: u.name, role: u.role });
-      }
+      if (!u) return;
+
+      // ✅ Gunakan roles array, bukan hanya primary role
+      const userRoles: string[] =
+        Array.isArray(u.roles) && u.roles.length > 0
+          ? u.roles
+          : [u.role];
+
+      // isAdmin = true jika SALAH SATU rolenya adalah FULL_ACCESS
+      const admin = userRoles.some(r => FULL_ACCESS_ROLES.has(r));
+
+      // isKepala = true jika TIDAK admin DAN SALAH SATU rolenya adalah KEPALA
+      const kepala = !admin && userRoles.some(r => KEPALA_ROLES.has(r));
+
+      setIsAdmin(admin);
+      setIsKepala(kepala);
+      setCurrentUserInfo({ id: u.id, name: u.name, role: u.role });
     });
   }, []);
 
@@ -901,18 +1026,19 @@ export default function UsersPage() {
                                 <span className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>
                                   {user.name}
                                 </span>
-                                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                  style={{ background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}` }}>
-                                  {ROLE_ICON[user.role] || "👤"} {ROLE_LABEL[user.role] ?? user.role}
-                                </span>
-                                {(isAdmin || isKepala) && user.shift && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                    style={user.shift === "PAGI"
-                                      ? { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }
-                                      : { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>
-                                    {user.shift === "PAGI" ? "🌅" : "🌆"} {user.shift}
-                                  </span>
-                                )}
+                                {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
+                                  const bs = ROLE_BADGE_STYLE[r] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+                                  return (
+                                    <span key={r}
+                                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                      style={{ background: bs.bg, color: bs.text, border: `1px solid ${bs.border}` }}>
+                                      {i === 0 && user.roles?.length > 1 && (
+                                        <span className="text-[8px] font-black opacity-60">★</span>
+                                      )}
+                                      {ROLE_ICON[r] || "👤"} {ROLE_LABEL[r] ?? r}
+                                    </span>
+                                  );
+                                })}
                                 {isAdmin && !user.password_set && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                     style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>

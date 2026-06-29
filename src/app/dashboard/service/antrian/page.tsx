@@ -168,10 +168,10 @@ function StatCard({
 // ── Action Button ─────────────────────────────────────────────────────────────
 function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
   const map: Record<string, string> = {
-    blue:   "bg-blue-50 text-blue-700 hover:bg-blue-100 ring-blue-200",
-    green:  "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-emerald-200",
+    blue: "bg-blue-50 text-blue-700 hover:bg-blue-100 ring-blue-200",
+    green: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-emerald-200",
     orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 ring-orange-200",
-    rose:   "bg-rose-50 text-rose-700 hover:bg-rose-100 ring-rose-200",
+    rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 ring-rose-200",
   };
   return (
     <button
@@ -205,8 +205,10 @@ export default function AntrianPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  const canCreate = user ? hasPermission(user.role as UserRole, SERVICE_CREATE_ROLES) : false;
-  const canAction = user ? hasPermission(user.role as UserRole, SERVICE_TEKNISI_ROLES) : false;
+  // ✅ AFTER — ganti 2 baris ini
+  const userRoles = user?.roles ?? (user?.role ? [user.role] : []);
+  const canCreate = userRoles.some(r => (SERVICE_CREATE_ROLES as string[]).includes(r));
+  const canAction = userRoles.some(r => (SERVICE_TEKNISI_ROLES as string[]).includes(r));
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
