@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { PREPARATION_DONE_ROLES, PREPARATION_DELIVERY_PERSON_ROLES } from "@/lib/permissions";
+import {
+  PREPARATION_DISPATCH_ROLES,
+  PREPARATION_DONE_ROLES,
+  PREPARATION_DELIVERY_PERSON_ROLES,
+} from "@/lib/permissions";
 
-// Daftar akun role Pengantaran untuk dipilih saat assign pengantaran
+// Admin client — bypass RLS, sama seperti di history/route.ts
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);
+
+// Yang boleh ambil daftar pengantar = dispatch (Sales) + done (Penyedia) + Admin
+const ASSIGN_DRIVER_ROLES = [
+  ...new Set([...PREPARATION_DISPATCH_ROLES, ...PREPARATION_DONE_ROLES]),
+];
+
 async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from("users")
       .select("id, name, role")
       .in("role", PREPARATION_DELIVERY_PERSON_ROLES)
@@ -20,5 +35,4 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   }
 }
 
-// Yang boleh assign = yang boleh selesaikan penyiapan (penyedia/sales/admin)
-export const GET = withAuth(getHandler, PREPARATION_DONE_ROLES);
+export const GET = withAuth(getHandler, ASSIGN_DRIVER_ROLES);
