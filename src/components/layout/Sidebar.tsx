@@ -215,6 +215,11 @@ const ITEM_PREPARATION_HISTORY: MenuItem = {
   href: "/dashboard/preparation/history",
   icon: Icons.deliveryRoute,
 };
+const ITEM_SIAP_KIRIM: MenuItem = {
+  name: "Siap Dikirim 🔔",
+  href: "/dashboard/preparation/siap-kirim",
+  icon: Icons.serviceQueue,
+};
 const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
   name: "Tugas Antar Saya",
   href: "/dashboard/preparation/pengantaran",
@@ -223,10 +228,27 @@ const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
-    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.pendingOrders },
+    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+    // Penyedia TIDAK lihat Siap Kirim / Dispatch (itu urusan Sales)
   ],
 };
+const PREPARATION_SALES_MENU: MenuGroup = {
+  label: "Penyiapan Barang",
+  items: [
+    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    { name: "Siap Dikirim 🔔", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
+    { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.deliveryRoute },
+  ],
+};
+const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
+  label: "Pengantaran",
+  items: [
+    { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
+    { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
+  ],
+};
+
 
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
@@ -234,6 +256,7 @@ const ADMIN_PENYEDIA_MENU: MenuGroup = {
     { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+    { name: "Siap Dikirim", href: "/dashboard/preparation/siap-kirim", icon: Icons.pendingOrders },
   ],
 };
 
@@ -316,8 +339,8 @@ const SALES_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    ITEM_PREPARATION,
-    ITEM_PREPARATION_HISTORY,
+    // HAPUS: ITEM_PREPARATION, ITEM_PREPARATION_HISTORY dari sini
+    // (sudah dipindah ke PREPARATION_SALES_MENU)
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -328,9 +351,8 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    ITEM_PREPARATION_PENGANTARAN,
-    ITEM_PREPARATION,
-    ITEM_PREPARATION_HISTORY,
+    // HAPUS: ITEM_PREPARATION_PENGANTARAN, ITEM_PREPARATION, ITEM_PREPARATION_HISTORY
+    // (sudah dipindah ke PREPARATION_PENGANTARAN_MENU)
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -399,10 +421,30 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
-  KEPALA_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  CREW_SALES: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  PENGANTARAN: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, PENGANTARAN_TRANSAKSI],
-  SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_SALES: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+  ],
+  CREW_SALES: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+  ],
+  PENGANTARAN: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    PENGANTARAN_TRANSAKSI,
+    PREPARATION_PENGANTARAN_MENU,
+  ],
+  SOTECH: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+  ],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
@@ -561,9 +603,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_PENYEDIA_MENU,
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
   KEPALA_PENYEDIA_BARANG: [
@@ -581,12 +621,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_PENYEDIA_MENU,   // ← sama, TANPA Siap Kirim
     {
       label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
   KONTEN: [
@@ -843,7 +881,8 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
                           !pathname.startsWith("/dashboard/preparation/antrian") &&
                           !pathname.startsWith("/dashboard/preparation/done") &&
                           !pathname.startsWith("/dashboard/preparation/history") &&
-                          !pathname.startsWith("/dashboard/preparation/pengantaran"));
+                          !pathname.startsWith("/dashboard/preparation/pengantaran") &&
+                          !pathname.startsWith("/dashboard/preparation/siap-kirim"));
                     }
                     if (item.href === "/dashboard/laptops") {
                       return (
@@ -896,7 +935,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
-""
+  ""
   useEffect(() => {
     setMounted(true);
     const cached = getCachedUser();

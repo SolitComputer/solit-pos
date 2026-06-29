@@ -1,4 +1,3 @@
-// src/components/layout/DashboardLayout.tsx
 "use client";
 
 import Sidebar from "./Sidebar";
