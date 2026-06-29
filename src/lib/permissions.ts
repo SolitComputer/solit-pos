@@ -264,7 +264,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-"/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
 
@@ -459,4 +459,107 @@ export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 export function isPKLRole(role?: string): boolean {
   if (!role) return false;
   return role === "PKL" || role.startsWith("PKL_");
+}
+
+// ─── Multi-Role Helpers ───────────────────────────────────────────────────────
+
+/**
+ * Ambil primary role (role pertama / role utama).
+ * Dipakai untuk redirect, sidebar menu, dan display label.
+ */
+export function getPrimaryRole(roles: string[]): UserRole {
+  return (roles[0] as UserRole) ?? "CREW_SALES";
+}
+
+/**
+ * Cek apakah user (dengan array roles) punya permission tertentu.
+ * Return true jika SALAH SATU role-nya ada di allowed list.
+ */
+export function hasAnyRole(
+  userRoles: string[],
+  allowed: readonly UserRole[] | UserRole[]
+): boolean {
+  return userRoles.some(r => (allowed as string[]).includes(r));
+}
+
+/**
+ * Gabungkan semua route permissions dari semua roles yang dimiliki user.
+ * Dipakai di middleware untuk cek akses route.
+ */
+export function getEffectivePermissions(userRoles: string[]): Set<string> {
+  const routes = new Set<string>();
+  for (const [route, allowedRoles] of Object.entries(ROUTE_PERMISSIONS)) {
+    if (userRoles.some(r => (allowedRoles as string[]).includes(r))) {
+      routes.add(route);
+    }
+  }
+  return routes;
+}
+
+/**
+ * Gabungkan menu sidebar dari semua roles (union, deduplicate by href).
+ * Primary role punya prioritas urutan group.
+ */
+export function mergeMenuGroups(
+  roleMenus: Record<string, any[]>,
+  userRoles: string[]
+): any[] {
+  const seenHrefs = new Set<string>();
+  const result: any[] = [];
+
+  for (const role of userRoles) {
+    const groups = roleMenus[role] ?? [];
+    for (const group of groups) {
+      // Cari group dengan label yang sama di result
+      let existingGroup = result.find((g: any) => g.label === group.label);
+      if (!existingGroup) {
+        existingGroup = { label: group.label, items: [] };
+        result.push(existingGroup);
+      }
+      for (const item of group.items) {
+        if (!seenHrefs.has(item.href)) {
+          seenHrefs.add(item.href);
+          existingGroup.items.push(item);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ambil default redirect terbaik dari semua roles.
+ * Priority: FULL_ACCESS → /dashboard, lainnya ikut primary role.
+ */
+export function getEffectiveRedirect(
+  userRoles: string[],
+  redirectMap: Record<string, string>
+): string {
+  const PRIORITY_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+  for (const r of userRoles) {
+    if (PRIORITY_ROLES.includes(r)) return "/dashboard";
+  }
+  const primary = getPrimaryRole(userRoles);
+  return redirectMap[primary] ?? "/dashboard";
+}
+
+/**
+ * Cek apakah user memiliki akses penuh (salah satu rolenya FULL_ACCESS).
+ */
+export function isFullAccessMulti(userRoles: string[]): boolean {
+  return userRoles.some(r => isFullAccess(r));
+}
+
+/**
+ * Gabungkan DIVISION_MAP untuk semua roles kepala yang dimiliki user.
+ */
+export function getEffectiveSubordinates(userRoles: string[]): UserRole[] {
+  const result = new Set<UserRole>();
+  for (const role of userRoles) {
+    for (const sub of getSubordinateRoles(role)) {
+      result.add(sub);
+    }
+  }
+  return Array.from(result);
 }
