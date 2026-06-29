@@ -26,7 +26,6 @@ const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 
-// ✅ Tiap kepala divisi hanya bisa input manual untuk PKL divisinya sendiri
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_SALES: ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES", "PKL_SALES", "PKL"],
   KEPALA_MARKETING: ["MARKETING", "KONTEN", "KEPALA_MARKETING", "PKL_MARKETING", "PKL_KONTEN", "PKL"],
@@ -36,8 +35,6 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
   KEPALA_SOTECH: ["SOTECH", "KEPALA_SOTECH", "PKL_SOTECH", "PKL"],
   KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "PKL"],
 };
-
-// ✅ Ganti seluruh blok fungsi helper di awal file dengan ini:
 
 function canViewPay(roles?: string | string[]): boolean {
   const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
@@ -96,17 +93,14 @@ function calcDuration(start: string | null, end: string | null): string {
   return m > 0 ? `${h}j ${m}m` : `${h} jam`;
 }
 
-// ✅ Deteksi telat dari jam (string "HH:mm" / "HH:mm:ss" atau ISO). Lewat 07:59 = telat.
 function detectLateFromTime(timeStr: string | null | undefined): boolean {
   if (!timeStr) return false;
-  const LATE_THRESHOLD = 8 * 60; // 08:00 → lewat 07:59 = telat
+  const LATE_THRESHOLD = 8 * 60;
   let totalMin: number;
   if (timeStr.includes("T")) {
-    // ISO → konversi ke WIB
     const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
     totalMin = w.getUTCHours() * 60 + w.getUTCMinutes();
   } else {
-    // "HH:mm" / "HH:mm:ss"
     const [h, m] = timeStr.split(":").map(Number);
     if (Number.isNaN(h)) return false;
     totalMin = h * 60 + (m || 0);
@@ -193,7 +187,6 @@ function ModalWrapper({ children, onClose, preventClose, wide }: { children: Rea
         style={{ animation: "modalUp 0.28s cubic-bezier(0.22,1,0.36,1)" }}
         onClick={e => e.stopPropagation()}
       >
-        {/* drag handle for mobile */}
         <div className="flex justify-center pt-3 pb-0 sm:hidden">
           <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
@@ -235,14 +228,13 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
     <ModalWrapper onClose={onClose} wide>
       <ModalHead icon="📋" title="Detail Lemburan" sub={`${o.users?.name} · ${dateStr}`} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[72vh] overflow-y-auto">
-
-        {/* ── Status row ── */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 flex-wrap">
             <StatusBadge status={o.status} />
-            {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (<span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />⏰ Terlambat
-            </span>
+            {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />⏰ Terlambat
+              </span>
             )}
             {o.is_holiday && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-purple-50 text-purple-700 border-purple-200">
@@ -252,8 +244,6 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
           </div>
           <span className="text-[10px] text-gray-400">{new Date(o.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
         </div>
-
-        {/* ── Time grid ── */}
         <div className="grid grid-cols-3 gap-2">
           {[["Mulai", formatTime(o.actual_start ?? o.scheduled_start)], ["Selesai", formatTime(o.actual_end ?? o.scheduled_end)], ["Durasi", duration]].map(([k, v]) => (
             <div key={k} className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
@@ -262,8 +252,6 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             </div>
           ))}
         </div>
-
-        {/* ── Alasan & Rincian ── */}
         <div className="space-y-2">
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Alasan</p>
@@ -274,8 +262,6 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             <p className="text-xs text-gray-700 leading-relaxed">{o.work_description || "—"}</p>
           </div>
         </div>
-
-        {/* ── Total Bayaran ── */}
         {userCanViewPay && (
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-4">
             <div className="flex items-end justify-between">
@@ -289,8 +275,6 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             </div>
           </div>
         )}
-
-        {/* ── Foto Bukti ── */}
         {o.proof_photo_url && (
           <div>
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Foto Bukti</p>
@@ -302,25 +286,19 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             </button>
           </div>
         )}
-
-        {/* ── Alasan Ditolak ── */}
         {o.status === "REJECTED" && o.rejection_note && (
           <div className="bg-red-50 border border-red-100 rounded-xl p-3.5">
             <p className="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1.5">Alasan Ditolak</p>
             <p className="text-xs text-red-700">{o.rejection_note}</p>
           </div>
         )}
-
-        {/* ── Approver ── */}
         {o.approver && (
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Disetujui oleh</p>
             <p className="text-xs text-gray-800 font-semibold">{o.approver.name}</p>
           </div>
         )}
-
       </div>
-
       <ModalFoot>
         <div className="flex-1 flex gap-2 flex-wrap">
           {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && (
@@ -498,7 +476,8 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
                 <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">🏖️ Hari Libur</span>
               )}
             </span>
-          </div>       {o.reason && (
+          </div>
+          {o.reason && (
             <div className="pt-2 border-t border-violet-200">
               <p className="text-[9px] text-violet-400 font-bold uppercase tracking-wider mb-1">Alasan</p>
               <p className="text-xs text-gray-700">{o.reason}</p>
@@ -554,7 +533,6 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
   const isLainnya = reasonType === "Lainnya";
 
-  // Helper: baca jam WIB sekarang (fresh setiap dipanggil)
   const getNowWIB = useCallback(() => {
     const w = new Date(Date.now() + 7 * 60 * 60 * 1000);
     const hh = String(w.getUTCHours()).padStart(2, "0");
@@ -565,9 +543,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
   }, []);
 
   const [nowWIB, setNowWIB] = useState(() => getNowWIB());
-  useEffect(() => {
-    setNowWIB(getNowWIB());
-  }, [isHolidayOvertime, getNowWIB]);
+  useEffect(() => { setNowWIB(getNowWIB()); }, [isHolidayOvertime, getNowWIB]);
 
   const submit = async () => {
     if (!isHolidayOvertime) {
@@ -578,11 +554,9 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
     if (!workDescription.trim()) { setError("Rincian pekerjaan wajib diisi"); return; }
     setSubmitting(true); setError("");
     try {
-      // Baca jam fresh saat tombol Submit ditekan (bukan nilai stale dari state)
       const freshNow = getNowWIB();
       const finalDate = isHolidayOvertime ? freshNow.dateKey : requestDate;
       const finalStart = isHolidayOvertime ? `${freshNow.time}:00` : `${startTime}:00`;
-
       const res = await fetch("/api/attendance/overtime", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -606,19 +580,14 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
       <ModalHead icon="📝" title="Ajukan Lemburan" sub={currentUser?.name || "Karyawan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-4 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
-
-        {/* ✅ Tanggal & jam — disembunyikan saat mode hari libur */}
         {!isHolidayOvertime && (
           <div className="grid grid-cols-2 gap-2.5">
             <div><label className={lbl}>Tanggal *</label><input type="date" min={today} value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
             <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
           </div>
         )}
-
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {isLainnya && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Tuliskan alasan spesifik..." className={inp} autoFocus /></div>}
-
-        {/* ✅ Toggle Lembur di hari libur */}
         <button
           type="button"
           onClick={() => setIsHolidayOvertime(v => !v)}
@@ -632,8 +601,6 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-violet-200" : "text-gray-400"}`}>Tanggal & jam dideteksi otomatis saat pengajuan</p>
           </div>
         </button>
-
-        {/* ✅ Info auto-detect saat mode hari libur aktif */}
         {isHolidayOvertime && (
           <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${nowWIB.isLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
             <span className="text-sm">{nowWIB.isLate ? "⏰" : "✅"}</span>
@@ -641,7 +608,6 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
               <p className={`font-semibold ${nowWIB.isLate ? "text-amber-700" : "text-emerald-700"}`}>
                 Terdeteksi jam {nowWIB.time} WIB {nowWIB.isLate ? "· Terlambat" : "· Tepat waktu"}
               </p>
-              {/* ✅ Telat tetap boleh ajukan — hanya statusnya yang berbeda */}
               <p className="text-[10px] text-gray-400 mt-0.5">
                 {nowWIB.isLate
                   ? "Kamu terlambat (lewat 07:59), tapi tetap bisa mengajukan — status dicatat sebagai Terlambat."
@@ -650,7 +616,6 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
             </div>
           </div>
         )}
-
         <div>
           <label className={lbl}>Rincian Pekerjaan *</label>
           <textarea value={workDescription} onChange={e => setWorkDescription(e.target.value)} placeholder="Pekerjaan yang akan dikerjakan saat lembur..." rows={3} className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none placeholder:text-gray-300" />
@@ -660,13 +625,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
         <button
           onClick={submit}
-          disabled={
-            submitting ||
-            (!isHolidayOvertime && !requestDate) ||
-            !reasonType ||
-            (isLainnya && !reasonCustom.trim()) ||
-            !workDescription.trim()
-          }
+          disabled={submitting || (!isHolidayOvertime && !requestDate) || !reasonType || (isLainnya && !reasonCustom.trim()) || !workDescription.trim()}
           className={primaryBtn}
         >
           {submitting ? <><Spinner /><span>Mengirim...</span></> : "📝 Ajukan"}
@@ -683,10 +642,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
   const [rate, setRate] = useState(o.rate_per_hour || 100000);
-  const [fixedPay, setFixedPay] = useState(o.total_pay ?? 0); // ✅ nominal tetap
+  const [fixedPay, setFixedPay] = useState(o.total_pay ?? 0);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
-  // ✅ Total tergantung mode
   const totalPay = payMode === "PER_JAM" ? rate * hours : fixedPay;
 
   const save = async () => {
@@ -694,7 +652,6 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
     if (payMode === "TETAP" && fixedPay < 0) { setError("Nominal harus >= 0"); return; }
     setSaving(true); setError("");
     try {
-      // ✅ Untuk mode TETAP, rate_per_hour di-set 0 (penanda nominal flat)
       const res = await fetch("/api/attendance/overtime", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -716,8 +673,6 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
       <ModalHead icon="💰" title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[65vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
-
-        {/* ✅ Toggle mode bayar */}
         <div className="grid grid-cols-2 gap-2">
           {(["PER_JAM", "TETAP"] as const).map(m => (
             <button key={m} type="button" onClick={() => setPayMode(m)}
@@ -726,7 +681,6 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
             </button>
           ))}
         </div>
-
         <div className="rounded-xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
           <div className="flex items-end justify-between mb-4">
             <div>
@@ -741,14 +695,11 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           <div className="border-t border-white/10 pt-3.5">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Bayaran</p>
             <p className="text-xl font-bold text-emerald-400">{formatRupiah(Math.round(totalPay))}</p>
-            {/* ✅ Breakdown hanya untuk Per Jam */}
             {payMode === "PER_JAM"
               ? <p className="text-[9px] text-gray-500 mt-0.5">{hours} jam × {formatRupiah(Math.round(rate))}</p>
               : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
           </div>
         </div>
-
-        {/* ✅ Input berubah sesuai mode */}
         {payMode === "PER_JAM" ? (
           <div>
             <label className={lbl}>Tarif Per Jam (Rp)</label>
@@ -863,7 +814,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
 
-  // ✅ AFTER
   const userRoles = useMemo<string[]>(
     () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
       ? (currentUser.roles as string[])
@@ -871,10 +821,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     [currentUser]
   );
 
-  const allowedRoles = useMemo(
-    () => getManualAllowedRoles(userRoles),
-    [userRoles]
-  );
+  const allowedRoles = useMemo(() => getManualAllowedRoles(userRoles), [userRoles]);
   const isFullAdmin = allowedRoles === null;
 
   const filteredUsers = useMemo(() =>
@@ -890,7 +837,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     return d > 0 ? Math.floor(d) : null;
   }, [startTime, endTime]);
 
-  // ✅ Deteksi terlambat HANYA untuk hari libur — batas 08:00, reaktif ke jam mulai pilihan admin.
   const holidayIsLate = useMemo(
     () => isHolidayOvertime && detectLateFromTime(startTime),
     [isHolidayOvertime, startTime]
@@ -918,9 +864,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
           proof_photo_url: photoUrl,
           is_holiday: isHolidayOvertime,
-          // ✅ Terlambat hanya saat holiday (server tetap hitung ulang sbg otoritas)
           is_late: isHolidayOvertime ? holidayIsLate : false,
-          // ✅ total_pay TIDAK dikirim — bayaran diatur lewat Set Bayaran di tampilan lembur
         }),
       });
       const d = await res.json();
@@ -957,8 +901,6 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             </p>
           )}
         </div>
-
-        {/* ✅ Toggle Lembur hari libur — diletakkan SEBELUM jam biar relasi toggle→jam→deteksi telat mengalir */}
         <button
           type="button"
           onClick={() => setIsHolidayOvertime(v => !v)}
@@ -972,14 +914,11 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
           </div>
         </button>
-
         <div className="grid grid-cols-3 gap-2">
           <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
         </div>
-
-        {/* ✅ Info deteksi terlambat saat hari libur aktif (berdasarkan jam mulai) */}
         {isHolidayOvertime && (
           <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
             <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
@@ -988,21 +927,17 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
                 Jam mulai {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">
-                {holidayIsLate
-                  ? "Mulai 08:00 ke atas dihitung terlambat di hari libur."
-                  : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
+                {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
               </p>
             </div>
           </div>
         )}
-
         {previewHours !== null && (
           <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5">
             <span className="text-sm">⏱️</span>
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
-
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {reasonType === "Lainnya" && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Alasan spesifik..." className={inp} autoFocus /></div>}
         <div>
@@ -1198,7 +1133,6 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
         <button onClick={onBack} className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all flex-shrink-0 active:scale-95">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
@@ -1209,8 +1143,6 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
           <p className="text-[10px] text-gray-400 mt-0.5">{role.replace(/_/g, " ")} · {overtimes.length} lemburan</p>
         </div>
       </div>
-
-      {/* Stats strip */}
       <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50/60">
         <div className="grid grid-cols-4 divide-x divide-gray-200">
           {[
@@ -1232,8 +1164,6 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
           </div>
         )}
       </div>
-
-      {/* Filter chips */}
       {statuses.length > 1 && (
         <div className="px-5 py-2.5 border-b border-gray-100 flex gap-1.5 overflow-x-auto scrollbar-hide">
           {["Semua", ...statuses].map(s => {
@@ -1248,8 +1178,6 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
           })}
         </div>
       )}
-
-      {/* List */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
           <span className="text-3xl">📭</span>
@@ -1258,14 +1186,12 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
       ) : (
         <div className="divide-y divide-gray-50">
           {filtered.map(o => {
-            const cfg = STATUS_CONFIG[o.status] ?? STATUS_CONFIG["PENDING"];
             const isMyUrgent = currentUser?.id === userId && (o.status === "NEED_PROOF" || (o.status === "ONGOING" && !o.actual_end));
             const duration = calcDuration(o.actual_start ?? o.scheduled_start, o.actual_end ?? o.scheduled_end);
             const dateObj = new Date(o.request_date + "T12:00:00");
             return (
               <button key={o.id} onClick={() => onDetailOpen(o)}
                 className={`w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-gray-50/80 transition-colors group ${isMyUrgent ? "bg-orange-50/30" : ""}`}>
-                {/* Date block */}
                 <div className="w-10 flex-shrink-0 text-center">
                   <p className="text-base font-black text-gray-800 leading-none">{dateObj.getDate()}</p>
                   <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">{MONTH_NAMES[dateObj.getMonth()].substring(0, 3)}</p>
@@ -1314,7 +1240,6 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Toolbar */}
       <div className="px-5 py-4 border-b border-gray-100 space-y-3">
         <div className="flex items-center justify-between">
           <p className="font-bold text-gray-900 text-sm">Daftar Karyawan</p>
@@ -1342,8 +1267,6 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
           )}
         </div>
       </div>
-
-      {/* Rows */}
       {loading ? (
         <div className="divide-y divide-gray-50">
           {Array(5).fill(0).map((_, i) => (
@@ -1372,7 +1295,6 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
             const totalPay = items.reduce((s, o) => s + (o.total_pay ?? 0), 0);
             const statusCounts: Record<string, number> = {};
             items.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
-
             return (
               <button key={user.id} onClick={() => onSelectUser(user.id)}
                 className="w-full px-5 py-4 flex items-center gap-3.5 hover:bg-gray-50/80 transition-colors text-left group">
@@ -1433,14 +1355,40 @@ export default function OvertimePage() {
   const autoCompletingIds = useRef<Set<string>>(new Set());
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
-  const fetchOvertimes = useCallback(async () => { const r = await fetch("/api/attendance/overtime"); const d = await r.json(); if (d.success) setOvertimes(d.data || []); }, []);
-  const fetchAllUsers = useCallback(async () => { const r = await fetch("/api/users"); const d = await r.json(); if (d.success) setAllUsers(d.users || []); }, []);
 
+  // ✅ FIX: fetchOvertimes sekarang terima year & month sebagai param
+  // Sebelumnya selalu fetch bulan ini saja, jadi input manual bulan lalu tidak muncul
+  const fetchOvertimes = useCallback(async (year?: number, month?: number) => {
+    const y = year ?? new Date().getFullYear();
+    const m = month ?? (new Date().getMonth() + 1);
+    const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m}`);
+    const d = await r.json();
+    if (d.success) setOvertimes(d.data || []);
+  }, []);
+
+  const fetchAllUsers = useCallback(async () => {
+    const r = await fetch("/api/users");
+    const d = await r.json();
+    if (d.success) setAllUsers(d.users || []);
+  }, []);
+
+  // ✅ FIX: Helper refetch selalu pakai calendarMonth yang aktif saat itu
+  // Dipakai di semua modal onSaved/onDeleted supaya setelah aksi, data yang
+  // ditampilkan tetap sesuai bulan yang sedang dilihat user (bukan reset ke bulan ini)
+  const refetch = useCallback(() => {
+    fetchOvertimes(calendarMonth.year, calendarMonth.month + 1);
+  }, [fetchOvertimes, calendarMonth]);
+
+  // ✅ FIX: useEffect fetch data ikut calendarMonth sebagai dependency
+  // Setiap kali user navigasi ke bulan lain di kalender, data di-fetch ulang
   useEffect(() => {
     if (currentUser === null) return;
     setLoading(true);
-    Promise.all([fetchOvertimes(), fetchAllUsers()]).finally(() => setLoading(false));
-  }, [fetchOvertimes, fetchAllUsers, currentUser?.role]);
+    Promise.all([
+      fetchOvertimes(calendarMonth.year, calendarMonth.month + 1),
+      fetchAllUsers(),
+    ]).finally(() => setLoading(false));
+  }, [fetchOvertimes, fetchAllUsers, currentUser?.role, calendarMonth]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1456,14 +1404,20 @@ export default function OvertimePage() {
     return () => clearInterval(id);
   }, [overtimes, currentUser]);
 
+  // ✅ FIX: handleAutoComplete pakai refetch() bukan fetchOvertimes() tanpa param
   const handleAutoComplete = async (overtime: OvertimeRequest) => {
     if (autoCompletingIds.current.has(overtime.id)) return;
     autoCompletingIds.current.add(overtime.id);
     try {
       const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: overtime.id, action: "COMPLETE", proof_photo_url: null, auto_completed: true }) });
       const d = await res.json();
-      if (d.success) { await fetchOvertimes(); setCompleteData({ ...overtime, ...d.data, auto_completed: true }); setTimeout(() => { autoCompletingIds.current.delete(overtime.id); }, 5000); }
-      else autoCompletingIds.current.delete(overtime.id);
+      if (d.success) {
+        refetch();
+        setCompleteData({ ...overtime, ...d.data, auto_completed: true });
+        setTimeout(() => { autoCompletingIds.current.delete(overtime.id); }, 5000);
+      } else {
+        autoCompletingIds.current.delete(overtime.id);
+      }
     } catch { autoCompletingIds.current.delete(overtime.id); }
   };
 
@@ -1564,7 +1518,6 @@ export default function OvertimePage() {
 
           {/* ── Calendar ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Calendar header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-sm flex-shrink-0 shadow-sm">📅</div>
@@ -1582,15 +1535,12 @@ export default function OvertimePage() {
                   className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-base">›</button>
               </div>
             </div>
-
             <div className="p-4 overflow-x-auto">
-              {/* Day headers */}
               <div className="grid grid-cols-7 gap-1 mb-2 min-w-[280px]">
                 {DAY_NAMES.map((d, i) => (
                   <div key={d} className={`text-center text-[9px] font-bold py-1 uppercase tracking-wider ${i === 0 ? "text-red-400" : "text-gray-400"}`}>{d}</div>
                 ))}
               </div>
-              {/* Day cells */}
               <div className="grid grid-cols-7 gap-1 min-w-[280px]">
                 {calDays.map((day, idx) => {
                   if (!day) return <div key={`e-${idx}`} />;
@@ -1612,7 +1562,6 @@ export default function OvertimePage() {
                 })}
               </div>
             </div>
-
             {selectedDate && (
               <div className="px-4 pb-4">
                 <div className="flex items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5">
@@ -1658,14 +1607,15 @@ export default function OvertimePage() {
       </div>
 
       {/* ── Modals ── */}
-      {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { fetchOvertimes(); setShowRequestModal(false); }} currentUser={currentUser} />}
-      {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { fetchOvertimes(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
-      {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { fetchOvertimes(); setApproveData(null); }} />}
-      {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { fetchOvertimes(); setSetPayData(null); }} />}
-      {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={() => { fetchOvertimes(); setCompleteData(null); }} isAutoCompleted={completeData.auto_completed} />}
+      {/* ✅ FIX: Semua onSaved/onDeleted pakai refetch() bukan fetchOvertimes() */}
+      {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { refetch(); setShowRequestModal(false); }} currentUser={currentUser} />}
+      {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { refetch(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
+      {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { refetch(); setApproveData(null); }} />}
+      {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { refetch(); setSetPayData(null); }} />}
+      {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={() => { refetch(); setCompleteData(null); }} isAutoCompleted={completeData.auto_completed} />}
       {proofPhotoData && <ProofPhotoModal overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
-      {editData && <EditOvertimeModal overtime={editData} onClose={() => setEditData(null)} onSaved={() => { fetchOvertimes(); setEditData(null); }} />}
-      {deleteData && <DeleteConfirmModal overtime={deleteData} onClose={() => setDeleteData(null)} onDeleted={() => { fetchOvertimes(); setDeleteData(null); }} canViewPay={userCanViewPay} />}
+      {editData && <EditOvertimeModal overtime={editData} onClose={() => setEditData(null)} onSaved={() => { refetch(); setEditData(null); }} />}
+      {deleteData && <DeleteConfirmModal overtime={deleteData} onClose={() => setDeleteData(null)} onDeleted={() => { refetch(); setDeleteData(null); }} canViewPay={userCanViewPay} />}
       {detailData && (
         <OvertimeDetailModal
           overtime={detailData} onClose={() => setDetailData(null)} userCanViewPay={userCanViewPay} currentUser={currentUser}

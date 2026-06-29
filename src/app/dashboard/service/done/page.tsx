@@ -214,12 +214,14 @@ export default function DonePage() {
     setPickupChoice({ open: false, order: null });
   };
 
-  const handleConfirmDialog = async () => {
+  // ✅ FIX — tambahkan parameter reason dan kirim ke API
+  const handleConfirmDialog = async (reason?: string) => {
     const res = await fetch(`/api/service/${dialog.orderId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: dialog.action === "diambil_langsung" ? "diambil" : dialog.action,
+        ...(reason ? { alasan: reason } : {}), // ✅ forward reason sebagai alasan
       }),
     });
     const json = await res.json();
@@ -232,7 +234,7 @@ export default function DonePage() {
     );
     refresh();
   };
-
+  
   const openTidakJadiDialog = (order: ServiceOrder) => {
     setDialog({
       open: true,
