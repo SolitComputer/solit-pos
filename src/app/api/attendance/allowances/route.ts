@@ -71,31 +71,24 @@ export async function POST(request: Request) {
     }
 
     console.log("[allowances POST] Received user_id:", user_id);
+    
+    const { data: targetUser, error: targetErr } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user_id)
+      .maybeSingle();
 
-    // ✅ CRITICAL FIX: Validasi ke auth.users bukan public.users
-    // FK constraint user_allowances.user_id -> auth.users.id
-    try {
-      const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(user_id);
-      
-      if (authError || !authUser.user) {
-        console.error("[allowances POST] User TIDAK ada di auth.users:", {
-          user_id,
-          error: authError?.message,
-          authUserExists: !!authUser.user,
-        });
-        return NextResponse.json(
-          {
-            success: false,
-            message: `User ID ${user_id} tidak ada di sistem auth. Hubungi admin.`,
-          },
-          { status: 400 }
-        );
-      }
-      console.log("[allowances POST] ✅ User ditemukan di auth.users:", authUser.user.email);
-    } catch (authCheckErr: any) {
-      console.error("[allowances POST] Gagal cek auth.users:", authCheckErr.message);
+    if (targetErr) {
+      console.error("[allowances POST] Gagal cek users:", targetErr.message);
       return NextResponse.json(
-        { success: false, message: `Error validasi user: ${authCheckErr.message}` },
+        { success: false, message: `Error validasi user: ${targetErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!targetUser) {
+      return NextResponse.json(
+        { success: false, message: `User ID ${user_id} tidak ditemukan di database.` },
         { status: 400 }
       );
     }
@@ -130,7 +123,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("[allowances POST] Upsert error:", error.code, error.message);
-      
+
       // Jika masih FK error, berarti user_id benar-benar tidak ada
       if (error.code === "23503") {
         return NextResponse.json(
