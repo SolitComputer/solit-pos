@@ -8,6 +8,119 @@ import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 
+// ── BarcodeScanModal ──────────────────────────────────────────────────────────
+function BarcodeScanModal({
+  onScan, onClose,
+}: { onScan: (code: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState("");
+  const [detected, setDetected] = useState<string | null>(null);
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let animId = 0;
+
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+
+        if (!("BarcodeDetector" in window)) {
+          setError("Browser ini belum mendukung scan otomatis. Gunakan Chrome 88+ / Edge.\nMasih bisa ketik SN manual.");
+          return;
+        }
+
+        const detector = new (window as any).BarcodeDetector({
+          formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix"],
+        });
+
+        const scan = async () => {
+          if (doneRef.current || !videoRef.current) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            if (codes.length > 0 && !doneRef.current) {
+              doneRef.current = true;
+              const value = (codes[0].rawValue as string).trim();
+              setDetected(value);
+              setTimeout(() => { onScan(value); onClose(); }, 700);
+              return;
+            }
+          } catch { }
+          if (!doneRef.current) animId = requestAnimationFrame(scan);
+        };
+        animId = requestAnimationFrame(scan);
+      } catch {
+        setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diberikan.");
+      }
+    })();
+
+    return () => {
+      doneRef.current = true;
+      cancelAnimationFrame(animId);
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [onScan, onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-gray-900 px-4 py-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-white font-bold text-sm">📷 Scan Barcode Serial Number</p>
+            <p className="text-gray-400 text-[11px]">Arahkan kamera ke barcode SN laptop</p>
+          </div>
+          <button onClick={onClose} className="text-gray-300 hover:text-white p-1">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="bg-black relative" style={{ aspectRatio: "4/3" }}>
+          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+          {/* Viewfinder overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="relative w-3/4 h-2/5">
+              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-emerald-400 rounded-tl" />
+              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-emerald-400 rounded-tr" />
+              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-emerald-400 rounded-bl" />
+              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-emerald-400 rounded-br" />
+              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-emerald-400 opacity-60 animate-pulse" />
+            </div>
+          </div>
+          {detected && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="bg-emerald-500 text-white px-6 py-3 rounded-2xl text-center shadow-xl">
+                <p className="text-sm font-black">✅ Terbaca!</p>
+                <p className="font-mono text-xs mt-1">{detected}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error ? (
+          <div className="px-4 py-3 bg-red-50 border-t border-red-100">
+            <p className="text-xs text-red-700 whitespace-pre-line">{error}</p>
+          </div>
+        ) : (
+          !detected && (
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-center">
+              <p className="text-xs text-gray-500">Deteksi otomatis — langsung terbaca tanpa perlu tap</p>
+            </div>
+          )
+        )}
+        <div className="px-4 py-3 border-t border-gray-100">
+          <button onClick={onClose} className="w-full h-9 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -20,6 +133,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [manualSN, setManualSN] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showBarcode, setShowBarcode] = useState(false);
 
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setSnResults([]); return; }
@@ -117,10 +231,28 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             )}
 
             <div className="flex gap-2 mt-2">
-              <input value={manualSN} onChange={e => setManualSN(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
-                placeholder="Atau ketik SN manual..." className={`${inputCls} font-mono`} />
-              <button type="button" onClick={addManual} className="px-4 h-10 rounded-xl bg-[#1a1a2e] text-white text-sm font-semibold hover:bg-[#16213e] transition whitespace-nowrap">+ Tambah</button>
+              <input
+                value={manualSN}
+                onChange={(e) => setManualSN(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addManual(); } }}
+                placeholder="Atau ketik SN manual..."
+                className={`${inputCls} font-mono flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowBarcode(true)}
+                className="px-3 h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap"
+                title="Scan barcode SN"
+              >
+                📷
+              </button>
+              <button
+                type="button"
+                onClick={addManual}
+                className="px-4 h-10 rounded-xl bg-[#1a1a2e] text-white text-sm font-semibold hover:bg-[#16213e] transition whitespace-nowrap"
+              >
+                + Tambah
+              </button>
             </div>
 
             {items.length > 0 && (
@@ -147,6 +279,17 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           </div>
 
           {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+          {showBarcode && (
+            <BarcodeScanModal
+              onScan={(sn) => {
+                const clean = sn.trim();
+                if (clean && !items.some((i) => i.serial_number.toLowerCase() === clean.toLowerCase())) {
+                  setItems((prev) => [...prev, { serial_number: clean }]);
+                }
+              }}
+              onClose={() => setShowBarcode(false)}
+            />
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
@@ -321,8 +464,12 @@ export default function PreparationPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Penyiapan Barang</h1>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
+                    Dashboard Penyiapan  {/* was "Penyiapan Barang" */}
+                  </h1>
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                    Format SN dari sales → disiapkan penyedia barang
+                  </p>                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />LIVE
                   </span>
                 </div>
