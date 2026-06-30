@@ -583,10 +583,12 @@ export default function SalarySlipPrintClient({
           <div className="table-section">
             <div className="table-header">Potongan</div>
             <div className="table-body">
-              <TableRow label="Pelanggaran" amount={slip.deduction_violation} />
               <TableRow label="Cicilan Pinjaman" amount={slip.deduction_loan} />
               <TableRow label="Dana Pensiun" amount={slip.deduction_pension} />
-              {/* spacer rows to match height */}
+              {/* ✅ FIX: baris "Pelanggaran" dihapus — deduction_violation selalu 0 dari backend.
+                  Spacer ditambah jadi 4 (dari 3) biar tinggi tabel Potongan tetap sejajar
+                  dengan tabel Penghasilan yang punya 6 baris */}
+              <TableRow label="" amount={null} spacer />
               <TableRow label="" amount={null} spacer />
               <TableRow label="" amount={null} spacer />
               <TableRow label="" amount={null} spacer />

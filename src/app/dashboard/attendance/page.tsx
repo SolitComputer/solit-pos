@@ -2626,7 +2626,15 @@ export default function AttendanceDashboardPage() {
             setSalaries(d.data?.map((s: any) => s) || []);
         }
     }, []);
-    const fetchLeaveData = useCallback(async (y: number, m: number) => { const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`); const d = await r.json(); if (d.success) setLeaveData(d.data || []); }, []);
+    const fetchLeaveData = useCallback(async (y: number, m: number) => {
+        const r = await fetch(`/api/attendance/leave?year=${y}&month=${m + 1}`);
+        const d = await r.json();
+        if (d.success) {
+            const raw = d.data;
+            console.log("[fetchLeaveData] raw response:", raw); // 🔍 sementara, buat ngecek shape asli — boleh dihapus setelah dicek
+            setLeaveData(Array.isArray(raw) ? raw : raw ? [raw] : []);
+        }
+    }, []);
     const fetchAllowances = useCallback(async () => {
         const r = await fetch("/api/attendance/allowances");
         const d = await r.json();
@@ -2918,7 +2926,7 @@ export default function AttendanceDashboardPage() {
         Object.entries(monthlyOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, monthlyOffNoteByName[name]?.[dk] || "Libur Bulanan"); });
         Object.entries(dayOffByName).forEach(([name, dows]) => { if (dows.has(dow)) add(name, "Libur Mingguan"); });
         Object.entries(dateOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur / Tukar"); });
-        leaveData.forEach(ld => { if (ld.requests.some(r => r.leave_date === dk)) add(ld.user.name, "Cuti"); });
+        leaveData.forEach(ld => { if (ld?.requests?.some(r => r.leave_date === dk)) add(ld?.user?.name, "Cuti"); });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
     };
@@ -3059,7 +3067,7 @@ export default function AttendanceDashboardPage() {
 
             // Tanggal cuti user ini → diperlakukan sebagai hari libur (tidak dihitung kewajiban hadir)
             const userLeaveSet = new Set<string>(
-                (leaveData.find(ld => ld.user.id === userId)?.requests ?? [])
+                (leaveData.find(ld => ld?.user?.id === userId)?.requests ?? [])
                     .map(r => r.leave_date)
             );
 
@@ -3177,8 +3185,8 @@ export default function AttendanceDashboardPage() {
             const manualRec = manualMap[`${u.id}_${selectedDate}`];
             if (manualRec && (manualRec.status === "PRESENT" || manualRec.status === "LATE")) return;
 
-            const hasLeave = leaveData.find(ld => ld.user.id === u.id)
-                ?.requests.some(r => r.leave_date === selectedDate);
+            const hasLeave = leaveData.find(ld => ld?.user?.id === u.id)
+                ?.requests?.some(r => r.leave_date === selectedDate);
             if (hasLeave) return;
 
             const reason = manualRec?.status as "ABSENT" | "SICK" | "PERMIT" | undefined;
