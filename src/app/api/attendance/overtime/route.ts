@@ -279,7 +279,18 @@ export async function POST(request: Request) {
 
       const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
       const actualStart = `${request_date}T${fmt(actual_start_time)}+07:00`;
-      const actualEnd = `${request_date}T${fmt(actual_end_time)}+07:00`;
+
+      // ✅ FIX: pakai actual_end_date kalau dikirim frontend (overnight)
+      // Kalau tidak dikirim (payload lama) tapi end <= start, auto-detect overnight di server
+      let resolvedEndDate = body.actual_end_date || request_date;
+      let actualEnd = `${resolvedEndDate}T${fmt(actual_end_time)}+07:00`;
+
+      if (!body.actual_end_date && new Date(actualEnd).getTime() <= new Date(actualStart).getTime()) {
+        const nextDay = new Date(`${request_date}T00:00:00`);
+        nextDay.setDate(nextDay.getDate() + 1);
+        resolvedEndDate = nextDay.toISOString().slice(0, 10);
+        actualEnd = `${resolvedEndDate}T${fmt(actual_end_time)}+07:00`;
+      }
 
       if (new Date(actualEnd).getTime() <= new Date(actualStart).getTime()) {
         return NextResponse.json(
