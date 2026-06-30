@@ -1,13 +1,3 @@
-<<<<<<< HEAD
-=======
-// src/lib/permissions.ts
-// Gabungan HEAD (punya Ikmal) + origin/develop (punya teman):
-// 1. Tambah DISPATCH_PREPARATION permission (sales pilih metode kirim)
-// 2. Tambah route /dashboard/preparation/siap-kirim
-// 3. PREPARATION_DELIVERY_PERSON_ROLES tetap hanya PENGANTARAN
-// 4. Multi-Role Helpers (mergeMenuGroups, getEffectivePermissions, dll) dari HEAD
-
->>>>>>> origin/branch-moreno
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -40,8 +30,6 @@ export type UserRole =
   | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
-// ─── Default Redirect ─────────────────────────────────────────────────────────
-// Ambil dari HEAD (punya Ikmal) karena PENGANTARAN redirect ke /dashboard/preparation/pengantaran
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
   PROGRAMMER: "/dashboard",
@@ -108,17 +96,6 @@ const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
 ];
 export const PREPARATION_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
 export const PREPARATION_DONE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_PENYEDIA_ROLES];
-<<<<<<< HEAD
-=======
-
-/**
- * Siapa yang bisa DISPATCH (pilih metode pengiriman) setelah penyedia done.
- * Dari origin/develop — Sales/Kepala Sales, BUKAN penyedia barang.
- */
-export const PREPARATION_DISPATCH_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
-
-/** Role yang boleh handle delivery tracking */
->>>>>>> origin/branch-moreno
 export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
   ...FULL_ACCESS, "PENGANTARAN", ...PREPARATION_PENYEDIA_ROLES,
 ];
@@ -287,22 +264,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
   "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
 
-<<<<<<< HEAD
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
-=======
-  // ── Preparation routes (dari origin/develop) ───────────────────────────────
-  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
-  // Antrian & Done = khusus Penyedia Barang + Admin
-  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
-  "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
-  // Siap Kirim = Sales lihat dan dispatch (BARU dari origin/develop)
-  "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
-  // Pengantaran = role Pengantaran + Admin + Penyedia (untuk monitor)
-  "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
-  "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
->>>>>>> origin/branch-moreno
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
 
@@ -397,11 +361,6 @@ export const PERMISSIONS = {
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
-<<<<<<< HEAD
-=======
-  /** Sales pilih metode pengiriman setelah penyedia done (dari origin/develop) */
-  DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
->>>>>>> origin/branch-moreno
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
 } as const;
 
@@ -425,16 +384,6 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = [
   "PENGANTARAN",
 ];
-<<<<<<< HEAD
-=======
-
-export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
-
-export function isPKLRole(role?: string): boolean {
-  if (!role) return false;
-  return role === "PKL" || role.startsWith("PKL_");
-}
->>>>>>> origin/branch-moreno
 
 /** Full access check — ADMIN / PROGRAMMER / ASISTEN_CEO */
 export function isFullAccess(role: string): boolean {
@@ -499,7 +448,6 @@ export function getDivisionLabel(headRole: string): string {
     ADMIN: "Pengelola Barang",
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");
-<<<<<<< HEAD
 }
 export const PKL_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -511,11 +459,9 @@ export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 export function isPKLRole(role?: string): boolean {
   if (!role) return false;
   return role === "PKL" || role.startsWith("PKL_");
-=======
->>>>>>> origin/branch-moreno
 }
 
-// ─── Multi-Role Helpers (dari HEAD / punya Ikmal) ─────────────────────────────
+// ─── Multi-Role Helpers ───────────────────────────────────────────────────────
 
 /**
  * Ambil primary role (role pertama / role utama).
@@ -564,6 +510,7 @@ export function mergeMenuGroups(
   for (const role of userRoles) {
     const groups = roleMenus[role] ?? [];
     for (const group of groups) {
+      // Cari group dengan label yang sama di result
       let existingGroup = result.find((g: any) => g.label === group.label);
       if (!existingGroup) {
         existingGroup = { label: group.label, items: [] };
@@ -604,7 +551,9 @@ export function isFullAccessMulti(userRoles: string[]): boolean {
   return userRoles.some(r => isFullAccess(r));
 }
 
-
+/**
+ * Gabungkan DIVISION_MAP untuk semua roles kepala yang dimiliki user.
+ */
 export function getEffectiveSubordinates(userRoles: string[]): UserRole[] {
   const result = new Set<UserRole>();
   for (const role of userRoles) {
