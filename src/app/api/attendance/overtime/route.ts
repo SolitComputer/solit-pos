@@ -118,7 +118,10 @@ export async function GET(request: Request) {
       .lte("request_date", endDate)
       .order("created_at", { ascending: false });
 
-    if (status) q = q.eq("status", status);
+    if (status) {
+      const statusList = status.split(",").map((s) => s.trim()).filter(Boolean);
+      q = statusList.length > 1 ? q.in("status", statusList) : q.eq("status", statusList[0]);
+    }
 
     // ✅ AFTER
     const userRoles: string[] = user.roles ?? [user.role];
@@ -307,9 +310,17 @@ export async function POST(request: Request) {
       let finalRate: number;
       let totalPay: number;
 
-      if (is_holiday === true) {
-        // ✅ Holiday: nominal belum ditentukan saat input manual.
-        //    Bayaran diatur admin via Set Bayaran setelah lembur tersimpan.
+      // ✅ FIX: kalau admin isi nominal langsung di form manual → pakai itu (mode nominal tetap),
+      //    berlaku untuk lembur biasa MAUPUN hari libur. Nominal tetap tersimpan walau belum upload foto.
+      const hasManualPay =
+        manualTotalPay !== undefined &&
+        manualTotalPay !== null &&
+        Number(manualTotalPay) > 0;
+
+      if (hasManualPay) {
+        finalRate = rate_per_hour ? Math.round(Number(rate_per_hour)) : 0;
+        totalPay = Math.round(Number(manualTotalPay));
+      } else if (is_holiday === true) {
         finalRate = 0;
         totalPay = 0;
       } else {
@@ -510,16 +521,15 @@ export async function PATCH(request: Request) {
     // ─── APPROVE ──────────────────────────────────────────────────────────
     if (action === "APPROVE") {
       if (!canApprove(user.role, targetUser?.role ?? "", user.id, overtime.user_id)) {
-        return NextResponse.json(
-          { success: false, message: "Tidak berwenang menyetujui" },
-          { status: 403 }
-        );
+        return NextResponse.json({ success: false, message: "Tidak berwenang menyetujui" }, { status: 403 });
       }
       if (!scheduled_start || !scheduled_end) {
-        return NextResponse.json(
-          { success: false, message: "scheduled_start dan scheduled_end wajib saat approve" },
-          { status: 400 }
-        );
+        return NextResponse.json({ success: false, message: "scheduled_start dan scheduled_end wajib saat approve" }, { status: 400 });
+      }
+
+      // ✅ FIX: guard durasi. Overnight tetap lolos karena frontend kirim tanggal selesai +1 hari.
+      if (new Date(scheduled_end).getTime() <= new Date(scheduled_start).getTime()) {
+        return NextResponse.json({ success: false, message: "Jam selesai harus lebih besar dari jam mulai" }, { status: 400 });
       }
 
       if (overtime.status !== "PENDING") {

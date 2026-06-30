@@ -23,6 +23,7 @@ type User = { id: string; name: string; role: string };
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+const PAYABLE_OVERTIME_STATUSES = ["COMPLETED", "NEED_PROOF"] as const;
 const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 
@@ -452,13 +453,36 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ FIX: deteksi overnight — jam selesai <= jam mulai = lembur lewat tengah malam (selesai besok)
+  const isOvernight = useMemo(() => {
+    if (!scheduledStart || !scheduledEnd) return false;
+    return scheduledEnd <= scheduledStart;
+  }, [scheduledStart, scheduledEnd]);
+
+  // ✅ FIX: tanggal selesai = request_date + 1 hari kalau overnight
+  const endDateResolved = useMemo(
+    () => (isOvernight ? addDaysToDateStr(o.request_date, 1) : o.request_date),
+    [isOvernight, o.request_date]
+  );
+
   const approve = async () => {
     if (!scheduledStart || !scheduledEnd) { setError("Jam mulai & selesai wajib diisi"); return; }
-    if (new Date(`1970-01-01T${scheduledEnd}:00`).getTime() <= new Date(`1970-01-01T${scheduledStart}:00`).getTime()) { setError("Jam selesai harus lebih besar"); return; }
+    // ✅ FIX: dulu nolak end <= start (selalu salah untuk overnight). Sekarang cuma tolak kalau SAMA PERSIS (durasi 0).
+    if (scheduledStart === scheduledEnd) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     setApproving(true); setError("");
     try {
-      const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
-      const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, action: "APPROVE", scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`, scheduled_end: `${o.request_date}T${fmt(scheduledEnd)}+07:00` }) });
+      const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: o.id,
+          action: "APPROVE",
+          scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`,
+          // ✅ FIX: pakai endDateResolved (tanggal+1 saat overnight), bukan o.request_date yang sama
+          scheduled_end: `${endDateResolved}T${fmt(scheduledEnd)}+07:00`,
+        }),
+      });
       const d = await res.json();
       if (!res.ok || !d.success) { setError(d.message || `Error ${res.status}`); return; }
       onSaved(); onClose();
@@ -496,6 +520,16 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           <div><label className={lbl}>Jam Mulai *</label><input type="time" value={scheduledStart} onChange={e => setScheduledStart(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Selesai *</label><input type="time" value={scheduledEnd} onChange={e => setScheduledEnd(e.target.value)} className={inp} /></div>
         </div>
+        {/* ✅ FIX: indikator overnight, konsisten dgn Edit & Manual modal */}
+        {isOvernight && (
+          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+            <span className="text-sm">🌙</span>
+            <span className="text-xs text-blue-700">
+              Lewat tengah malam — selesai dicatat{" "}
+              <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
+            </span>
+          </div>
+        )}
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
@@ -821,6 +855,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
+  const [manualPay, setManualPay] = useState<string>("");
 
   const userRoles = useMemo<string[]>(
     () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
@@ -887,6 +922,8 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           proof_photo_url: photoUrl,
           is_holiday: isHolidayOvertime,
           is_late: isHolidayOvertime ? holidayIsLate : false,
+
+          total_pay: manualPay.trim() ? Math.round(Number(manualPay)) : undefined,
         }),
       });
       const d = await res.json();
@@ -936,21 +973,34 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
           </div>
         </button>
-        <div className="grid grid-cols-3 gap-2">
-          <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
-        </div>
+        {/* ✅ Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
+        {!isHolidayOvertime && (
+          <div className="grid grid-cols-3 gap-2">
+            <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
+            <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
+            <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
+          </div>
+        )}
+
+        {/* ✅ Mode hari libur: kotak khusus muncul di bawah toggle saat diaktifkan */}
         {isHolidayOvertime && (
-          <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
-            <div className="text-xs">
-              <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
-                Jam mulai {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
-              </p>
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-3.5 space-y-3">
+            <p className="text-[9px] font-bold text-purple-400 uppercase tracking-widest">Jam Lembur Hari Libur</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
+              <div><label className={lbl}>Jam Masuk *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
+              <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
+            </div>
+            <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+              <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
+              <div className="text-xs">
+                <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
+                  Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -960,15 +1010,28 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
-        {isOvernight && (
-          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
-            <span className="text-sm">🌙</span>
-            <span className="text-xs text-blue-700">
-              Lembur melewati tengah malam — akan tercatat selesai pada{" "}
-              <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
-            </span>
+        {/* ✅ FIX: input nominal langsung — nominal tetap tersimpan walau belum upload foto */}
+        <div>
+          <label className={lbl}>
+            Nominal Bayaran <span className="normal-case font-normal text-gray-400">(opsional)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+            <input
+              type="number"
+              min={0}
+              value={manualPay}
+              onChange={e => setManualPay(e.target.value)}
+              placeholder={isHolidayOvertime ? "Isi nominal lembur libur di sini" : "Kosongkan = otomatis dari tarif/jam"}
+              className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+            />
           </div>
-        )}
+          <p className="text-[9px] text-gray-400 mt-1">
+            {isHolidayOvertime
+              ? "Lembur hari libur tidak punya tarif otomatis — isi nominal di sini, atau atur nanti via tombol Set Bayaran."
+              : "Kosong → dihitung dari tarif per jam × durasi. Diisi → pakai nominal ini (tetap), tidak dikali jam."}
+          </p>
+        </div>
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {reasonType === "Lainnya" && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Alasan spesifik..." className={inp} autoFocus /></div>}
         <div>
@@ -1177,7 +1240,12 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
   const sorted = useMemo(() => [...overtimes].sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()), [overtimes]);
   const filtered = useMemo(() => filterStatus === "Semua" ? sorted : sorted.filter(o => o.status === filterStatus), [sorted, filterStatus]);
   const statuses = useMemo(() => [...new Set(overtimes.map(o => o.status))], [overtimes]);
-  const totalPay = useMemo(() => overtimes.filter(o => o.status === "COMPLETED").reduce((s, o) => s + (o.total_pay ?? 0), 0), [overtimes]);
+  const totalPay = useMemo(
+    () => overtimes
+      .filter(o => (PAYABLE_OVERTIME_STATUSES as readonly string[]).includes(o.status))
+      .reduce((s, o) => s + (o.total_pay ?? 0), 0),
+    [overtimes]
+  );
   const counts = {
     total: overtimes.length,
     pending: overtimes.filter(o => o.status === "PENDING").length,

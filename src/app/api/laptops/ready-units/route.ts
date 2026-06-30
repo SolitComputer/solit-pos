@@ -49,6 +49,7 @@ export const GET = withAuth(handler, [
   "ADMIN",
   "PROGRAMMER",
   "ASISTEN_CEO",
+  "KEPALA_PENGELOLA_BARANG",
   "PENGELOLA_BARANG",
   "KEPALA_SALES",
   "CREW_SALES",
