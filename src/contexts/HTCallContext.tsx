@@ -29,10 +29,16 @@ interface HTCtx {
 const Ctx = createContext<HTCtx | null>(null);
 export const useHTCall = () => {
   const c = useContext(Ctx);
-  if (!c) throw new Error("useHTCall harus dipakai di dalam HTCallProvider");
+  if (!c) {
+    return {
+      ready: false, me: null, online: [], state: "idle" as const, peer: null,
+      muted: false, connState: "",
+      callUser: () => {}, accept: () => {}, reject: () => {},
+      hangUp: () => {}, toggleMute: () => {},
+    };
+  }
   return c;
 };
-
 const RING_TIMEOUT = 30000;
 const ELIGIBLE = new Set<string>(DELIVERY_VOICE_ROLES as readonly string[]);
 const genId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
