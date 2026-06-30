@@ -23,6 +23,7 @@ type User = { id: string; name: string; role: string };
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+const PAYABLE_OVERTIME_STATUSES = ["COMPLETED", "NEED_PROOF"] as const;
 const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 
@@ -821,6 +822,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
+  const [manualPay, setManualPay] = useState<string>("");
 
   const userRoles = useMemo<string[]>(
     () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
@@ -887,6 +889,8 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           proof_photo_url: photoUrl,
           is_holiday: isHolidayOvertime,
           is_late: isHolidayOvertime ? holidayIsLate : false,
+
+          total_pay: manualPay.trim() ? Math.round(Number(manualPay)) : undefined,
         }),
       });
       const d = await res.json();
@@ -973,15 +977,28 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
-        {isOvernight && (
-          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
-            <span className="text-sm">🌙</span>
-            <span className="text-xs text-blue-700">
-              Lembur melewati tengah malam — akan tercatat selesai pada{" "}
-              <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
-            </span>
+        {/* ✅ FIX: input nominal langsung — nominal tetap tersimpan walau belum upload foto */}
+        <div>
+          <label className={lbl}>
+            Nominal Bayaran <span className="normal-case font-normal text-gray-400">(opsional)</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
+            <input
+              type="number"
+              min={0}
+              value={manualPay}
+              onChange={e => setManualPay(e.target.value)}
+              placeholder={isHolidayOvertime ? "Isi nominal lembur libur di sini" : "Kosongkan = otomatis dari tarif/jam"}
+              className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+            />
           </div>
-        )}
+          <p className="text-[9px] text-gray-400 mt-1">
+            {isHolidayOvertime
+              ? "Lembur hari libur tidak punya tarif otomatis — isi nominal di sini, atau atur nanti via tombol Set Bayaran."
+              : "Kosong → dihitung dari tarif per jam × durasi. Diisi → pakai nominal ini (tetap), tidak dikali jam."}
+          </p>
+        </div>
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {reasonType === "Lainnya" && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Alasan spesifik..." className={inp} autoFocus /></div>}
         <div>
@@ -1190,7 +1207,12 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
   const sorted = useMemo(() => [...overtimes].sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()), [overtimes]);
   const filtered = useMemo(() => filterStatus === "Semua" ? sorted : sorted.filter(o => o.status === filterStatus), [sorted, filterStatus]);
   const statuses = useMemo(() => [...new Set(overtimes.map(o => o.status))], [overtimes]);
-  const totalPay = useMemo(() => overtimes.filter(o => o.status === "COMPLETED").reduce((s, o) => s + (o.total_pay ?? 0), 0), [overtimes]);
+  const totalPay = useMemo(
+    () => overtimes
+      .filter(o => (PAYABLE_OVERTIME_STATUSES as readonly string[]).includes(o.status))
+      .reduce((s, o) => s + (o.total_pay ?? 0), 0),
+    [overtimes]
+  );
   const counts = {
     total: overtimes.length,
     pending: overtimes.filter(o => o.status === "PENDING").length,

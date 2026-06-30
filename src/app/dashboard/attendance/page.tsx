@@ -1956,8 +1956,8 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     <p className="text-[9px] font-bold text-red-600 uppercase tracking-wide mb-1">Potongan</p>
                     <p className="text-xs font-black text-red-600 font-mono">-{formatRupiah(slip.total_deduction)}</p>
                     <div className="mt-1.5 space-y-0.5">
-                        {slip.deduction_loan > 0 && <p className="text-[9px] text-gray-500">Kasbon: {formatRupiah(slip.deduction_loan)}</p>}
-                        {slip.deduction_pension > 0 && <p className="text-[9px] text-gray-500">Pensiun: {formatRupiah(slip.deduction_pension)}</p>}
+                        {slip.deduction_loan > 0 && <p className="text-[9px] text-gray-500">Kasbon: -{formatRupiah(slip.deduction_loan)}</p>}
+                        {slip.deduction_pension > 0 && <p className="text-[9px] text-gray-500">Pensiun: -{formatRupiah(slip.deduction_pension)}</p>}
                         {slip.total_deduction === 0 && <p className="text-[9px] text-gray-300">Tidak ada</p>}
                     </div>
                 </div>
@@ -2653,7 +2653,7 @@ export default function AttendanceDashboardPage() {
 
     const fetchOvertimeTotal = useCallback(async (y: number, m: number) => {
         try {
-            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m + 1}&status=COMPLETED`);
+            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m + 1}&status=COMPLETED,NEED_PROOF`);
             const d = await r.json();
             if (d.success) {
                 const map: Record<string, number> = {};
@@ -2997,6 +2997,7 @@ export default function AttendanceDashboardPage() {
     const userSummary = useMemo(() => {
         type UserStat = {
             name: string; present: number; late: number; score: number;
+            leave: number; leaveDates: string[];          // ✅ tambah ini
             pastWorkdays: number; totalWorkdays: number; pct: number;
             remainingDays: number; userId: string;
             absences: AbsenceItem[]; offDates: string[];
@@ -3065,17 +3066,20 @@ export default function AttendanceDashboardPage() {
             const userInfo = allUsers.find(u => u.id === userId);
             const userStartDate = getUserStartDate(userInfo?.created_at, calYear, calMonth);
 
-            // Tanggal cuti user ini → diperlakukan sebagai hari libur (tidak dihitung kewajiban hadir)
             const userLeaveSet = new Set<string>(
                 (leaveData.find(ld => ld?.user?.id === userId)?.requests ?? [])
                     .map(r => r.leave_date)
             );
+            Object.entries(manualByName[name] ?? {}).forEach(([date, mr]) => {
+                if (mr.status === "LEAVE") userLeaveSet.add(date);
+            });
 
-            let present = 0, late = 0, score = 0;
+            let present = 0, late = 0, score = 0, leave = 0;   // ✅ + leave
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
-            let totalWorkdays = 0; // total hari kerja sebulan (rule SAMA dengan loop evaluasi)
-            let pastWorkdays = 0;  // hari kerja yang sudah lewat / hari ini
+            const leaveDates: string[] = [];
+            let totalWorkdays = 0;
+            let pastWorkdays = 0;
 
             for (let d = 1; d <= dim; d++) {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
@@ -3087,18 +3091,27 @@ export default function AttendanceDashboardPage() {
 
                 const dow = new Date(dk + "T12:00:00").getDay();
 
-                // ── Penentuan hari libur dengan rule TERPADU ──
-                // date_work (tukar libur masuk) menang: hari itu jadi hari KERJA walau libur mingguan
                 const isDateWork = allDateWorks.some(dw => dw.user_id === userId && dw.work_date === dk);
                 const isMonthlyOff = monthlyOffByName[name]?.has(dk) ?? false;
                 const isWeeklyOff = dows.has(dow) && !isDateWork;
                 const isDateOff = offs.has(dk) && !isDateWork;
                 const isLeave = userLeaveSet.has(dk);
-                const isOffDay = isMonthlyOff || isWeeklyOff || isDateOff || isLeave;
-
+                const isScheduledOff = isMonthlyOff || isWeeklyOff || isDateOff;
                 const isPastOrToday = !(isCurrentMonth && dk > todayWIB);
 
-                if (isOffDay) {
+
+                if (isLeave && !isScheduledOff) {
+                    totalWorkdays++;
+                    if (isPastOrToday) {
+                        pastWorkdays++;
+                        leave++;
+                        score += 1;
+                        leaveDates.push(dk);
+                    }
+                    continue;
+                }
+
+                if (isScheduledOff) {
                     const effOnOff = effByName[name]?.[dk];
                     if (isPastOrToday && (effOnOff === "PRESENT" || effOnOff === "LATE")) {
                         totalWorkdays++;
@@ -3133,7 +3146,7 @@ export default function AttendanceDashboardPage() {
                 "";
 
             result.push({
-                name, present, late, score, pastWorkdays, totalWorkdays, pct,
+                name, present, late, score, leave, leaveDates, pastWorkdays, totalWorkdays, pct,
                 remainingDays: totalWorkdays - pastWorkdays,
                 userId: resolvedUserId,
                 absences, offDates,
@@ -3939,7 +3952,7 @@ export default function AttendanceDashboardPage() {
                             <div>
                                 <p className="text-base font-bold text-gray-800">Ringkasan Kehadiran — {MONTH_NAMES[calMonth]} {calYear}</p>
                                 <p className="text-[10px] text-gray-400 mt-1">
-                                    Tepat=1.0 · Terlambat=0.5 · Tidak Hadir=0 ·
+                                    Tepat=1.0 · Terlambat=0.5 · Cuti=1.0 (dihitung hadir) · Tidak Hadir=0 ·
                                     <span className="text-blue-500 font-semibold"> % dihitung dari total hari kerja bulan ini</span>
                                 </p>
                             </div>
@@ -3980,6 +3993,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
@@ -4127,7 +4141,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
@@ -4691,6 +4705,19 @@ export default function AttendanceDashboardPage() {
                                                                 ) : <span className="text-gray-200 text-sm font-black">—</span>}
                                                             </td>
 
+                                                            <td className="px-4 py-4 text-center">
+                                                                {u.leave > 0 ? (
+                                                                    <span
+                                                                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 text-sm font-black border border-cyan-200"
+                                                                        title={`Cuti (dihitung hadir): ${u.leaveDates.map(d => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })).join(", ")}`}
+                                                                    >
+                                                                        {u.leave}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-gray-200 text-sm font-black">—</span>
+                                                                )}
+                                                            </td>
+
                                                             {/* Kehadiran % */}
                                                             <td className="px-4 py-4 text-center">
                                                                 <div className="flex flex-col items-center gap-1">
@@ -5079,6 +5106,10 @@ export default function AttendanceDashboardPage() {
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-red-500">{myStat.absences.length}</p>
                                                                 <p className="text-[10px] text-gray-400 font-medium mt-1">❌ Tidak Hadir</p>
+                                                            </div>
+                                                            <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                                                                <p className="text-2xl font-black text-cyan-600">{myStat.leave}</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">🌴 Cuti</p>
                                                             </div>
                                                         </div>
 
