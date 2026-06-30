@@ -936,21 +936,34 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
           </div>
         </button>
-        <div className="grid grid-cols-3 gap-2">
-          <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
-          <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
-        </div>
+        {/* ✅ Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
+        {!isHolidayOvertime && (
+          <div className="grid grid-cols-3 gap-2">
+            <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
+            <div><label className={lbl}>Jam Mulai *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
+            <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
+          </div>
+        )}
+
+        {/* ✅ Mode hari libur: kotak khusus muncul di bawah toggle saat diaktifkan */}
         {isHolidayOvertime && (
-          <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
-            <div className="text-xs">
-              <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
-                Jam mulai {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
-              </p>
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-3.5 space-y-3">
+            <p className="text-[9px] font-bold text-purple-400 uppercase tracking-widest">Jam Lembur Hari Libur</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
+              <div><label className={lbl}>Jam Masuk *</label><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inp} /></div>
+              <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
+            </div>
+            <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+              <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
+              <div className="text-xs">
+                <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
+                  Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
+                </p>
+              </div>
             </div>
           </div>
         )}
