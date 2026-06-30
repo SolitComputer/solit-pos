@@ -521,16 +521,15 @@ export async function PATCH(request: Request) {
     // ─── APPROVE ──────────────────────────────────────────────────────────
     if (action === "APPROVE") {
       if (!canApprove(user.role, targetUser?.role ?? "", user.id, overtime.user_id)) {
-        return NextResponse.json(
-          { success: false, message: "Tidak berwenang menyetujui" },
-          { status: 403 }
-        );
+        return NextResponse.json({ success: false, message: "Tidak berwenang menyetujui" }, { status: 403 });
       }
       if (!scheduled_start || !scheduled_end) {
-        return NextResponse.json(
-          { success: false, message: "scheduled_start dan scheduled_end wajib saat approve" },
-          { status: 400 }
-        );
+        return NextResponse.json({ success: false, message: "scheduled_start dan scheduled_end wajib saat approve" }, { status: 400 });
+      }
+
+      // ✅ FIX: guard durasi. Overnight tetap lolos karena frontend kirim tanggal selesai +1 hari.
+      if (new Date(scheduled_end).getTime() <= new Date(scheduled_start).getTime()) {
+        return NextResponse.json({ success: false, message: "Jam selesai harus lebih besar dari jam mulai" }, { status: 400 });
       }
 
       if (overtime.status !== "PENDING") {

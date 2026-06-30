@@ -453,13 +453,36 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ FIX: deteksi overnight — jam selesai <= jam mulai = lembur lewat tengah malam (selesai besok)
+  const isOvernight = useMemo(() => {
+    if (!scheduledStart || !scheduledEnd) return false;
+    return scheduledEnd <= scheduledStart;
+  }, [scheduledStart, scheduledEnd]);
+
+  // ✅ FIX: tanggal selesai = request_date + 1 hari kalau overnight
+  const endDateResolved = useMemo(
+    () => (isOvernight ? addDaysToDateStr(o.request_date, 1) : o.request_date),
+    [isOvernight, o.request_date]
+  );
+
   const approve = async () => {
     if (!scheduledStart || !scheduledEnd) { setError("Jam mulai & selesai wajib diisi"); return; }
-    if (new Date(`1970-01-01T${scheduledEnd}:00`).getTime() <= new Date(`1970-01-01T${scheduledStart}:00`).getTime()) { setError("Jam selesai harus lebih besar"); return; }
+    // ✅ FIX: dulu nolak end <= start (selalu salah untuk overnight). Sekarang cuma tolak kalau SAMA PERSIS (durasi 0).
+    if (scheduledStart === scheduledEnd) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     setApproving(true); setError("");
     try {
-      const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
-      const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, action: "APPROVE", scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`, scheduled_end: `${o.request_date}T${fmt(scheduledEnd)}+07:00` }) });
+      const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: o.id,
+          action: "APPROVE",
+          scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`,
+          // ✅ FIX: pakai endDateResolved (tanggal+1 saat overnight), bukan o.request_date yang sama
+          scheduled_end: `${endDateResolved}T${fmt(scheduledEnd)}+07:00`,
+        }),
+      });
       const d = await res.json();
       if (!res.ok || !d.success) { setError(d.message || `Error ${res.status}`); return; }
       onSaved(); onClose();
@@ -497,6 +520,16 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           <div><label className={lbl}>Jam Mulai *</label><input type="time" value={scheduledStart} onChange={e => setScheduledStart(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Selesai *</label><input type="time" value={scheduledEnd} onChange={e => setScheduledEnd(e.target.value)} className={inp} /></div>
         </div>
+        {/* ✅ FIX: indikator overnight, konsisten dgn Edit & Manual modal */}
+        {isOvernight && (
+          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+            <span className="text-sm">🌙</span>
+            <span className="text-xs text-blue-700">
+              Lewat tengah malam — selesai dicatat{" "}
+              <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
+            </span>
+          </div>
+        )}
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
