@@ -8,7 +8,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import DeliveryMap, { type TrackPoint } from "@/components/preparation/DeliveryMap";
 import StartTripModal, { type StartTripPayload } from "@/components/preparation/StartTripModal";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
-import { haversineM, bearingDeg, computeSpeedKmh } from "@/lib/geo";
+import { computeSpeedKmh } from "@/lib/geo";
+import { useDeliveryTracker, type TrackerPoint } from "@/hooks/useDeliveryTracker";
+import TrackingStatusBadge from "@/components/preparation/TrackingStatusBadge";
 import DeliveryVoiceHT from "@/components/preparation/DeliveryVoiceHT";
 import { supabase } from "@/services/supabase";
 
@@ -29,6 +31,7 @@ interface PrepOrder {
     return_started_at: string | null; returned_at: string | null;
     courier_service: string | null; courier_tracking_number: string | null; courier_note: string | null;
     transaction_invoice: string | null;
+    tracking_status: string | null; tracking_reason: string | null; tracking_last_ping: string | null;
     created_at: string; preparation_items: PrepItem[];
 }
 
@@ -312,13 +315,8 @@ export default function PreparationDetailPage() {
     const [actionLoading, setActionLoading] = useState(false);
 
     const [points, setPoints] = useState<TrackPoint[]>([]);
-    const [tracking, setTracking] = useState(false);
-    const [signalLost, setSignalLost] = useState(false);
-    const watchIdRef = useRef<number | null>(null);
-    const lastPostRef = useRef<number>(0);
-    const lastPtRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
     const isAssignedRef = useRef(false);
-    const returnActiveRef = useRef(false);
+    const phaseRef = useRef<"GO" | "RETURN">("GO");
 
     // Permissions
     const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
@@ -358,7 +356,7 @@ export default function PreparationDetailPage() {
 
     useEffect(() => {
         isAssignedRef.current = !!userId && !!order && order.delivery_user_id === userId;
-        returnActiveRef.current = !!order && order.status === "SELESAI" && !!order.return_started_at && !order.returned_at;
+        phaseRef.current = (!!order && order.status === "SELESAI" && !!order.return_started_at && !order.returned_at) ? "RETURN" : "GO";
     }, [userId, order]);
 
     // Realtime order updates
@@ -402,82 +400,22 @@ export default function PreparationDetailPage() {
         return () => { supabase.removeChannel(ch); };
     }, [id]);
 
-    const postTracking = useCallback(async (p: { lat: number; lng: number; accuracy: number | null; speed: number | null; heading: number | null }) => {
-        try {
-            const r = await fetch(`/api/preparation/${id}/tracking`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p),
-            });
-            if (!r.ok) throw new Error("fail");
-            setSignalLost(false);
-        } catch {
-            const key = `track_buf_${id}`;
-            const arr = JSON.parse(localStorage.getItem(key) || "[]");
-            arr.push(p);
-            localStorage.setItem(key, JSON.stringify(arr.slice(-300)));
-            setSignalLost(true);
-        }
-    }, [id]);
-
-    const flushBuffer = useCallback(async () => {
-        const key = `track_buf_${id}`;
-        const arr = JSON.parse(localStorage.getItem(key) || "[]");
-        if (!arr.length) return;
-        const remain: any[] = [];
-        for (const p of arr) {
-            try {
-                const r = await fetch(`/api/preparation/${id}/tracking`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
-                if (!r.ok) remain.push(p);
-            } catch { remain.push(p); }
-        }
-        localStorage.setItem(key, JSON.stringify(remain));
-        if (remain.length === 0) setSignalLost(false);
-    }, [id]);
-
-    useEffect(() => {
-        const onOnline = () => flushBuffer();
-        window.addEventListener("online", onOnline);
-        return () => window.removeEventListener("online", onOnline);
-    }, [flushBuffer]);
-
-    const startTracking = useCallback(() => {
-        if (!isAssignedRef.current || !navigator.geolocation || watchIdRef.current != null) return;
-        setTracking(true);
-        watchIdRef.current = navigator.geolocation.watchPosition(
-            pos => {
-                const lat = pos.coords.latitude, lng = pos.coords.longitude, now = Date.now();
-                let speed: number | null = pos.coords.speed;
-                let heading: number | null = pos.coords.heading;
-                const prev = lastPtRef.current;
-                if ((speed == null || isNaN(speed)) && prev) {
-                    const dt = (now - prev.t) / 1000, d = haversineM(prev, { lat, lng });
-                    speed = dt > 0 ? d / dt : 0;
-                }
-                if ((heading == null || isNaN(heading)) && prev) heading = bearingDeg(prev, { lat, lng });
-                lastPtRef.current = { lat, lng, t: now };
-                setPoints(prev2 => [...prev2, { lat, lng, t: now, speed, phase: returnActiveRef.current ? "RETURN" : "GO" }]);
-                if (now - lastPostRef.current > 3000) {
-                    lastPostRef.current = now;
-                    postTracking({ lat, lng, accuracy: pos.coords.accuracy ?? null, speed, heading });
-                }
-            },
-            err => console.error("watch error", err),
-            { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
-        );
-    }, [postTracking]);
-
-    const stopTracking = useCallback(() => {
-        if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-        setTracking(false);
+    const handlePoint = useCallback((p: TrackerPoint) => {
+        setPoints(prev => [...prev, { lat: p.lat, lng: p.lng, t: p.t, speed: p.speed, phase: p.phase }]);
     }, []);
 
-    useEffect(() => () => stopTracking(), [stopTracking]);
+    // Tracker aktif HANYA kalau user = pengantar yang ditugaskan & order lagi fase jalan/pulang
+    const _isAssigned = !!userId && order?.delivery_user_id === userId;
+    const _goActive = order?.status === "DIKIRIM" && order?.delivery_method === "PENGANTARAN" && !!order?.delivery_started_at;
+    const _retActive = order?.status === "SELESAI" && !!order?.return_started_at && !order?.returned_at;
+    const trackerEnabled = !!_isAssigned && (!!_goActive || !!_retActive);
 
-    useEffect(() => {
-        if (!order || !isAssignedRef.current) return;
-        const goActive = order.status === "DIKIRIM" && order.delivery_method === "PENGANTARAN" && !!order.delivery_started_at;
-        const retActive = order.status === "SELESAI" && !!order.return_started_at && !order.returned_at;
-        if ((goActive || retActive) && watchIdRef.current == null) startTracking();
-    }, [order, startTracking]);
+    const tracker = useDeliveryTracker({
+        orderId: id,
+        enabled: trackerEnabled,
+        phaseRef,
+        onPoint: handlePoint,
+    });
 
     const toggleItem = async (item: PrepItem) => {
         if (!order || order.status !== "DIPROSES" || !canDone) return;
@@ -507,8 +445,7 @@ export default function PreparationDetailPage() {
         });
         const result = await res.json();
         if (!result.success) throw new Error(result.message);
-        await fetchOrder();
-        startTracking();
+        await fetchOrder(); // begitu delivery_started_at keisi, tracker otomatis mulai
     };
 
     const completeDelivery = async () => {
@@ -519,7 +456,7 @@ export default function PreparationDetailPage() {
                 body: JSON.stringify({ action: "COMPLETE" }),
             });
             const result = await res.json();
-            if (result.success) { stopTracking(); await fetchOrder(); } else alert(result.message);
+            if (result.success) { await fetchOrder(); } else alert(result.message); // tracker auto-stop saat status berubah
         } catch { alert("Gagal"); } finally { setActionLoading(false); }
     };
 
@@ -533,8 +470,6 @@ export default function PreparationDetailPage() {
             const result = await res.json();
             if (result.success) {
                 await fetchOrder();
-                if (action === "RETURN_START") startTracking();
-                else stopTracking();
             } else alert(result.message);
         } catch { alert("Gagal"); } finally { setActionLoading(false); }
     };
@@ -705,15 +640,38 @@ export default function PreparationDetailPage() {
                     {/* ── LIVE TRACKING PENGANTARAN ── */}
                     {(isDeliveringGo || isReturning) && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between mb-3 gap-2">
                                 <h2 className="text-sm font-bold text-gray-800">🛵 Live Tracking {isReturning ? "Pulang" : "Pengantaran"}</h2>
-                                <div className="flex items-center gap-2">
-                                    {signalLost && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">📵 Buffer</span>}
-                                    {tracking
-                                        ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />Live</span>
-                                        : !isAssignedDriver && <span className="text-[11px] font-semibold text-gray-400">Mode pantau</span>}
+                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                    {isAssignedDriver ? (
+                                        <>
+                                            {tracker.bufferedCount > 0 && (
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">📵 {tracker.bufferedCount} tertahan</span>
+                                            )}
+                                            {tracker.wakeLockActive && (
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">🔆 Layar aktif</span>
+                                            )}
+                                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${tracker.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : tracker.status === "NO_PERMISSION" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${tracker.status === "ACTIVE" ? "bg-emerald-500 animate-pulse" : tracker.status === "NO_PERMISSION" ? "bg-red-500" : "bg-amber-500"}`} />
+                                                {tracker.status === "ACTIVE" ? "Live" : tracker.status === "ACQUIRING" ? "Cari GPS" : tracker.status === "HIDDEN" ? "Dijeda" : tracker.status === "NO_PERMISSION" ? "Izin off" : tracker.status === "NO_SIGNAL" ? "No GPS" : tracker.status === "OFFLINE" ? "Offline" : "Stop"}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <TrackingStatusBadge order={order} />
+                                    )}
                                 </div>
                             </div>
+
+                            {/* Status detail buat pengantar (poin #2 & #3) */}
+                            {isAssignedDriver && tracker.status !== "ACTIVE" && (
+                                <div className={`mb-3 rounded-xl px-3 py-2.5 text-xs border ${tracker.status === "NO_PERMISSION" ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                                    <p className="font-bold">{tracker.statusLabel}</p>
+                                    {tracker.status === "HIDDEN" && <p className="mt-0.5 opacity-80">Buka lagi app ini & jangan kunci layar biar lokasi terus terkirim.</p>}
+                                    {tracker.status === "NO_PERMISSION" && <p className="mt-0.5 opacity-80">Aktifkan izin lokasi: Setelan → Situs → Lokasi → Izinkan, lalu refresh.</p>}
+                                    {tracker.status === "NO_SIGNAL" && <p className="mt-0.5 opacity-80">Pindah ke area terbuka & pastikan GPS HP nyala.</p>}
+                                    {tracker.status === "OFFLINE" && <p className="mt-0.5 opacity-80">Lokasi disimpan otomatis & dikirim ulang saat internet balik.</p>}
+                                </div>
+                            )}
 
                             {order.delivery_user_name && (
                                 <div className="bg-violet-50 border border-violet-200 rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5">
@@ -762,8 +720,7 @@ export default function PreparationDetailPage() {
                                     )}
                                     {isDeliveringGo && order.delivery_started_at && (
                                         <div className="flex gap-2">
-                                            {!tracking && <button onClick={startTracking} className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">📍 Lanjut Kirim Lokasi</button>}
-                                            <button onClick={completeDelivery} disabled={actionLoading} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                            {!tracker.isTracking && <button onClick={tracker.startWatch} className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">📍 Lanjut Kirim Lokasi</button>}                                            <button onClick={completeDelivery} disabled={actionLoading} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
                                                 {actionLoading ? "..." : "✅ Sampai ke Customer"}
                                             </button>
                                         </div>
