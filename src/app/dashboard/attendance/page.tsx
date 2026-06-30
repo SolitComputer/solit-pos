@@ -2653,7 +2653,7 @@ export default function AttendanceDashboardPage() {
 
     const fetchOvertimeTotal = useCallback(async (y: number, m: number) => {
         try {
-            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m + 1}&status=COMPLETED`);
+            const r = await fetch(`/api/attendance/overtime?year=${y}&month=${m + 1}&status=COMPLETED,NEED_PROOF`);
             const d = await r.json();
             if (d.success) {
                 const map: Record<string, number> = {};
