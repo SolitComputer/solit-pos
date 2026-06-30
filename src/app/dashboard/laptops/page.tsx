@@ -5,7 +5,7 @@ import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 
 interface LaptopUnit {
     id: string;
@@ -56,10 +56,10 @@ const EMPTY_FORM = {
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
-    SIAP_JUAL:  { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500",  label: "Siap Jual"   },
-    BELUM_SIAP: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-yellow-400", label: "Belum Siap"  },
-    SERVICE:    { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-blue-500",   label: "Service"     },
-    SOLD:       { badge: "bg-red-50 text-red-700 border-red-200",     dot: "bg-red-500",    label: "Sold"        },
+    SIAP_JUAL: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500", label: "Siap Jual" },
+    BELUM_SIAP: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-yellow-400", label: "Belum Siap" },
+    SERVICE: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-blue-500", label: "Service" },
+    SOLD: { badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", label: "Sold" },
 };
 
 const Shimmer = ({
@@ -225,13 +225,12 @@ function DeleteConfirmModal({
                             value={inputName}
                             onChange={e => setInputName(e.target.value)}
                             placeholder="Ketik nama laptop di atas..."
-                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                inputName.length > 0
+                            className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
                                     ? isMatch
                                         ? "border-green-400 focus:ring-green-200 bg-green-50/30"
                                         : "border-red-300 focus:ring-red-200"
                                     : "border-gray-200 focus:ring-gray-200"
-                            }`}
+                                }`}
                             autoFocus
                         />
                         {inputName.length > 0 && !isMatch && (
@@ -272,38 +271,42 @@ function DeleteConfirmModal({
 }
 
 export default function Page() {
-    const [laptops, setLaptops]                         = useState<Laptop[]>([]);
-    const [isLoading, setIsLoading]                     = useState(true);
-    const [search, setSearch]                           = useState("");
-    const [filterStatus, setFilterStatus]               = useState("ALL");
-    const [filterBrand, setFilterBrand]                 = useState("ALL");
-    const [filterProcessor, setFilterProcessor]         = useState("ALL");
-    const [filterRam, setFilterRam]                     = useState("ALL");
-    const [filterPriceRange, setFilterPriceRange]       = useState("ALL");
-    const [sortBy, setSortBy]                           = useState("DEFAULT");
-    const [filterSN, setFilterSN]                       = useState("");
+    const [laptops, setLaptops] = useState<Laptop[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [filterStatus, setFilterStatus] = useState("ALL");
+    const [filterBrand, setFilterBrand] = useState("ALL");
+    const [filterProcessor, setFilterProcessor] = useState("ALL");
+    const [filterRam, setFilterRam] = useState("ALL");
+    const [filterPriceRange, setFilterPriceRange] = useState("ALL");
+    const [sortBy, setSortBy] = useState("DEFAULT");
+    const [filterSN, setFilterSN] = useState("");
 
-    const [modalMode, setModalMode]                     = useState<ModalMode>(null);
-    const [selectedLaptop, setSelectedLaptop]           = useState<Laptop | null>(null);
-    const [formData, setFormData]                       = useState<Record<string, string>>(EMPTY_FORM);
-    const [formLoading, setFormLoading]                 = useState(false);
-    const [detailLoading, setDetailLoading]             = useState(false);
-    const [barcodeTarget, setBarcodeTarget]             = useState<{ id: string; name: string } | null>(null);
-    const [userRole, setUserRole]                       = useState<UserRole | null>(null);
+    const [modalMode, setModalMode] = useState<ModalMode>(null);
+    const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
+    const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
+    const [formLoading, setFormLoading] = useState(false);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
 
-    const canEditLaptop    = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_LAPTOP)   : false;
-    const canCreateLaptop  = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_LAPTOP) : false;
-    const canExport        = userRole ? hasPermission(userRole, [
+    // ✅ Multi-role: simpan SEMUA roles user (bukan cuma 1 primary role)
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+
+    // ✅ Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
+    // sehingga user dengan kombinasi role apapun (mis. KEPALA_TEKNISI + KEPALA_PENGELOLA_BARANG)
+    // akan dapat akses kalau SALAH SATU dari role-nya punya izin.
+    const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
+    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
+    const canExport = hasAnyRole(userRoles, [
         "ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
         "MARKETING", "KEPALA_MARKETING",
-    ] as UserRole[]) : false;
-    const canViewUnits     = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_UNITS) : false;
-    const canViewTotalStok = userRole
-        ? hasPermission(userRole, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"] as UserRole[])
-        : false;
+    ] as UserRole[]);
+    const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
+    const canViewTotalStok = hasAnyRole(userRoles, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"] as UserRole[]);
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
 
-    const [alertModal, setAlertModal]           = useState<string | null>(null);
-    const [confirmModal, setConfirmModal]       = useState<{ message: string; onConfirm: () => void } | null>(null);
+    const [alertModal, setAlertModal] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
@@ -312,11 +315,20 @@ export default function Page() {
 
     useEffect(() => { fetchLaptops(); }, []);
 
+    // ✅ Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal kalau belum ada array
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
-            .then(r => setUserRole(r.user?.role ?? null))
-            .catch(() => setUserRole(null));
+            .then(r => {
+                const roles: string[] =
+                    Array.isArray(r.user?.roles) && r.user.roles.length > 0
+                        ? r.user.roles
+                        : r.user?.role
+                            ? [r.user.role]
+                            : [];
+                setUserRoles(roles as UserRole[]);
+            })
+            .catch(() => setUserRoles([]));
     }, []);
 
     useEffect(() => {
@@ -327,16 +339,16 @@ export default function Page() {
     const fetchLaptops = async () => {
         setIsLoading(true);
         try {
-            const res    = await fetch("/api/laptops");
+            const res = await fetch("/api/laptops");
             const result = await res.json();
             const normalized = (result.data || []).map((l: Laptop) => ({
                 ...l,
                 selling_price: Math.round(Number(l.selling_price) || 0),
-                qty:           (l.laptop_units || []).length,
+                qty: (l.laptop_units || []).length,
                 stok_tersedia: (l.laptop_units || []).filter((u: LaptopUnit) => u.status !== "SOLD").length,
-                siap_jual:     (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
-                stok_minus:    (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length,
-                terjual:       (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SOLD").length,
+                siap_jual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
+                stok_minus: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length,
+                terjual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SOLD").length,
             }));
             setLaptops(normalized);
         } catch {
@@ -373,7 +385,7 @@ export default function Page() {
                 "1-2": [1_000_000, 2_000_000],
                 "2-3": [2_000_000, 3_000_000],
                 "3-4": [3_000_000, 4_000_000],
-                "4+":  [4_000_000, Infinity],
+                "4+": [4_000_000, Infinity],
             };
             const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
             list = list.filter(x => x.selling_price >= min && x.selling_price < max);
@@ -383,11 +395,11 @@ export default function Page() {
             list = list.filter(x => x.laptop_units?.some(u => u.serial_number.toLowerCase().includes(snQ)));
         }
         switch (sortBy) {
-            case "AZ":         list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
-            case "ZA":         list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
-            case "PRICE_ASC":  list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
+            case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
+            case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
+            case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
-            case "SN":         list.sort((a, b) => a.id.localeCompare(b.id)); break;
+            case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
     }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
@@ -396,17 +408,17 @@ export default function Page() {
         const types = new Set<string>();
         laptops.forEach(x => {
             const cpu = (x.cpu || "").toLowerCase();
-            if      (cpu.includes("i3"))                                                              types.add("Intel i3");
-            else if (cpu.includes("i5"))                                                              types.add("Intel i5");
-            else if (cpu.includes("i7"))                                                              types.add("Intel i7");
-            else if (cpu.includes("i9"))                                                              types.add("Intel i9");
-            else if (cpu.includes("ryzen 3"))                                                         types.add("AMD Ryzen 3");
-            else if (cpu.includes("ryzen 5"))                                                         types.add("AMD Ryzen 5");
-            else if (cpu.includes("ryzen 7"))                                                         types.add("AMD Ryzen 7");
-            else if (cpu.includes("ryzen 9"))                                                         types.add("AMD Ryzen 9");
+            if (cpu.includes("i3")) types.add("Intel i3");
+            else if (cpu.includes("i5")) types.add("Intel i5");
+            else if (cpu.includes("i7")) types.add("Intel i7");
+            else if (cpu.includes("i9")) types.add("Intel i9");
+            else if (cpu.includes("ryzen 3")) types.add("AMD Ryzen 3");
+            else if (cpu.includes("ryzen 5")) types.add("AMD Ryzen 5");
+            else if (cpu.includes("ryzen 7")) types.add("AMD Ryzen 7");
+            else if (cpu.includes("ryzen 9")) types.add("AMD Ryzen 9");
             else if (cpu.includes("apple m") || cpu.includes("m1") || cpu.includes("m2") || cpu.includes("m3")) types.add("Apple Silicon");
-            else if (cpu.includes("celeron"))                                                         types.add("Intel Celeron");
-            else if (cpu.includes("pentium"))                                                         types.add("Intel Pentium");
+            else if (cpu.includes("celeron")) types.add("Intel Celeron");
+            else if (cpu.includes("pentium")) types.add("Intel Pentium");
         });
         return ["ALL", ...Array.from(types).sort()];
     }, [laptops]);
@@ -428,7 +440,7 @@ export default function Page() {
         setModalMode("detail");
         setDetailLoading(true);
         try {
-            const res    = await fetch(`/api/laptops/${laptop.id}`);
+            const res = await fetch(`/api/laptops/${laptop.id}`);
             const result = await res.json();
             if (result.data) setSelectedLaptop(result.data);
         } catch { /* use cached */ } finally {
@@ -439,16 +451,16 @@ export default function Page() {
     const openEdit = (laptop: Laptop) => {
         setSelectedLaptop(laptop);
         setFormData({
-            laptop_name:    laptop.laptop_name    || "",
-            brand:          laptop.brand          || "",
-            cpu:            laptop.cpu            || "",
-            ram:            laptop.ram            || "",
-            storage:        laptop.storage        || "",
-            gpu:            laptop.gpu            || "",
-            display:        laptop.display        || "",
-            selling_price:  String(laptop.selling_price || ""),
+            laptop_name: laptop.laptop_name || "",
+            brand: laptop.brand || "",
+            cpu: laptop.cpu || "",
+            ram: laptop.ram || "",
+            storage: laptop.storage || "",
+            gpu: laptop.gpu || "",
+            display: laptop.display || "",
+            selling_price: String(laptop.selling_price || ""),
             condition_note: laptop.condition_note || "",
-            notes:          laptop.notes          || "",
+            notes: laptop.notes || "",
         });
         setModalMode("edit");
     };
@@ -462,10 +474,10 @@ export default function Page() {
         e.preventDefault();
         setFormLoading(true);
         try {
-            const res    = await fetch("/api/laptops/create", {
-                method:  "POST",
+            const res = await fetch("/api/laptops/create", {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
+                body: JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
             });
             const result = await res.json();
             if (!result.success) { showAlert(result.message || "Gagal menambahkan laptop"); return; }
@@ -482,10 +494,10 @@ export default function Page() {
         if (!selectedLaptop) return;
         setFormLoading(true);
         try {
-            const res    = await fetch(`/api/laptops/${selectedLaptop.id}`, {
-                method:  "PUT",
+            const res = await fetch(`/api/laptops/${selectedLaptop.id}`, {
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
+                body: JSON.stringify({ ...formData, selling_price: Number(formData.selling_price) }),
             });
             const result = await res.json();
             if (!result.success) { showAlert(result.message); return; }
@@ -501,7 +513,7 @@ export default function Page() {
         const laptop = laptops.find(l => l.id === id);
         if (!laptop) return;
         try {
-            const res    = await fetch(`/api/laptops/${id}/units`);
+            const res = await fetch(`/api/laptops/${id}/units`);
             const result = await res.json();
             setDeleteConfirmModal({ laptop, unitCount: result.data?.length ?? 0 });
         } catch {
@@ -515,71 +527,71 @@ export default function Page() {
         wb.creator = "Solit Inventory";
         wb.created = new Date();
         const ws = wb.addWorksheet("Data Laptop", {
-            views:     [{ state: "frozen", ySplit: 1 }],
+            views: [{ state: "frozen", ySplit: 1 }],
             pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
         });
 
         const COLOR = {
-            headerBg:    "FF4B5563",
-            headerFg:    "FFFFFFFF",
-            rowEven:     "FFF8FAFC",
-            rowOdd:      "FFFFFFFF",
+            headerBg: "FF4B5563",
+            headerFg: "FFFFFFFF",
+            rowEven: "FFF8FAFC",
+            rowOdd: "FFFFFFFF",
             borderColor: "FFE2E8F0",
-            subTextFg:   "FF64748B",
+            subTextFg: "FF64748B",
             // Status colors
-            siapBg:      "FFD1FAE5", // green-100
-            siapFg:      "FF065F46", // green-900
-            minusBg:     "FFFEE2E2", // red-100
-            minusFg:     "FF7F1D1D", // red-900
-            terjualBg:   "FFDBEAFE", // blue-100
-            terjualFg:   "FF1E3A8A", // blue-900
+            siapBg: "FFD1FAE5", // green-100
+            siapFg: "FF065F46", // green-900
+            minusBg: "FFFEE2E2", // red-100
+            minusFg: "FF7F1D1D", // red-900
+            terjualBg: "FFDBEAFE", // blue-100
+            terjualFg: "FF1E3A8A", // blue-900
         };
 
         ws.columns = [
-            { header: "No",           key: "no",          width: 6  },
-            { header: "Product",      key: "product",     width: 35 },
-            { header: "CPU",          key: "cpu",         width: 28 },
-            { header: "RAM",          key: "ram",         width: 14 },
-            { header: "HDD/SSD",      key: "storage",     width: 16 },
-            { header: "Stock Total",  key: "stock",       width: 13 },
-            { header: "Siap Jual",    key: "siap_jual",   width: 12 },
-            { header: "Minus",        key: "minus",       width: 10 },
-            { header: "Terjual",      key: "terjual",     width: 10 },
-            { header: "Price Store",  key: "price_store", width: 18 },
+            { header: "No", key: "no", width: 6 },
+            { header: "Product", key: "product", width: 35 },
+            { header: "CPU", key: "cpu", width: 28 },
+            { header: "RAM", key: "ram", width: 14 },
+            { header: "HDD/SSD", key: "storage", width: 16 },
+            { header: "Stock Total", key: "stock", width: 13 },
+            { header: "Siap Jual", key: "siap_jual", width: 12 },
+            { header: "Minus", key: "minus", width: 10 },
+            { header: "Terjual", key: "terjual", width: 10 },
+            { header: "Price Store", key: "price_store", width: 18 },
         ];
 
         // Header row styling
         const headerRow = ws.getRow(1);
         headerRow.height = 32;
         headerRow.eachCell(cell => {
-            cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-            cell.font      = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
-            cell.border    = {
-                top:    { style: "thin",   color: { argb: COLOR.borderColor } },
-                left:   { style: "thin",   color: { argb: COLOR.borderColor } },
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
+            cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
+            cell.border = {
+                top: { style: "thin", color: { argb: COLOR.borderColor } },
+                left: { style: "thin", color: { argb: COLOR.borderColor } },
                 bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-                right:  { style: "thin",   color: { argb: COLOR.borderColor } },
+                right: { style: "thin", color: { argb: COLOR.borderColor } },
             };
             cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
         // Data rows
         filteredLaptops.forEach((item, idx) => {
-            const rowBg    = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
+            const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
             const siapJual = (item.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
-            const minus    = item.stok_minus ?? 0;
-            const terjual  = item.terjual    ?? 0;
+            const minus = item.stok_minus ?? 0;
+            const terjual = item.terjual ?? 0;
 
             const row = ws.addRow({
-                no:          idx + 1,
-                product:     item.laptop_name   || "",
-                cpu:         item.cpu           || "",
-                ram:         item.ram           || "",
-                storage:     item.storage       || "",
-                stock:       item.stok_tersedia ?? 0,
-                siap_jual:   siapJual,
-                minus:       minus,
-                terjual:     terjual,
+                no: idx + 1,
+                product: item.laptop_name || "",
+                cpu: item.cpu || "",
+                ram: item.ram || "",
+                storage: item.storage || "",
+                stock: item.stok_tersedia ?? 0,
+                siap_jual: siapJual,
+                minus: minus,
+                terjual: terjual,
                 price_store: item.selling_price || 0,
             });
 
@@ -589,27 +601,27 @@ export default function Page() {
                 const key = ws.getColumn(colNum).key as string;
 
                 // Base styling
-                cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-                cell.border    = {
-                    top:    { style: "hair", color: { argb: COLOR.borderColor } },
-                    left:   { style: "hair", color: { argb: COLOR.borderColor } },
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+                cell.border = {
+                    top: { style: "hair", color: { argb: COLOR.borderColor } },
+                    left: { style: "hair", color: { argb: COLOR.borderColor } },
                     bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-                    right:  { style: "hair", color: { argb: COLOR.borderColor } },
+                    right: { style: "hair", color: { argb: COLOR.borderColor } },
                 };
-                cell.font      = { size: 10, name: "Arial" };
+                cell.font = { size: 10, name: "Arial" };
                 cell.alignment = { vertical: "middle" };
 
                 // Per-column overrides
                 if (key === "no") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font      = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
                 } else if (key === "product") {
-                    cell.font      = { size: 10, name: "Arial", bold: true };
+                    cell.font = { size: 10, name: "Arial", bold: true };
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                 } else if (["cpu", "ram", "storage", "stock"].includes(key)) {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                 } else if (key === "price_store") {
-                    cell.numFmt    = '"Rp "#,##0';
+                    cell.numFmt = '"Rp "#,##0';
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                 }
 
@@ -643,19 +655,19 @@ export default function Page() {
         });
 
         const buffer = await wb.xlsx.writeBuffer();
-        const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const link   = document.createElement("a");
-        link.href     = URL.createObjectURL(blob);
+        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
         link.download = `data_laptop_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    const totalSisa      = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
-    const totalSiapJual  = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
-    const totalMinus     = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
-    const totalTerjual   = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
+    const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
+    const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
+    const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
+    const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
     return (
         <>
@@ -758,7 +770,7 @@ export default function Page() {
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                                 <SearchInput placeholder="Cari nama, brand, CPU..." value={search} onChange={e => setSearch(e.target.value)} icon="search" />
-                                <SearchInput placeholder="Cari Serial Number..."   value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
+                                <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
                                 <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                     <option value="ALL">Semua Status</option>
                                     <option value="SIAP_JUAL">✅ Siap Jual</option>
@@ -804,10 +816,10 @@ export default function Page() {
 
                             {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
                                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                    {filterProcessor  !== "ALL"     && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
-                                    {filterRam        !== "ALL"     && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
-                                    {filterPriceRange !== "ALL"     && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
-                                    {sortBy           !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
+                                    {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
+                                    {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
+                                    {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                    {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
                                 </div>
                             )}
                         </div>
@@ -897,7 +909,7 @@ export default function Page() {
                                                     )}
                                                     <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                                         <div className="flex items-center justify-end gap-1">
-                                                            {userRole && hasPermission(userRole, PERMISSIONS.VIEW_BARCODE) && (
+                                                            {canViewBarcode && (
                                                                 <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
                                                                     className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
                                                                     title="Lihat Barcode">
@@ -941,12 +953,12 @@ export default function Page() {
                                         )}
                                     </p>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa}     dot="bg-gray-400"  color="text-gray-800"  />}
+                                        {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
                                         <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
                                         {canViewTotalStok && (
                                             <>
-                                                <FooterStat label="Minus"   value={totalMinus}   dot="bg-red-500"   color="text-red-500"  />
-                                                <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500"  color="text-blue-600" />
+                                                <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
+                                                <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500" color="text-blue-600" />
                                             </>
                                         )}
                                     </div>
@@ -1057,11 +1069,13 @@ export default function Page() {
                                     <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug">{selectedLaptop.laptop_name}</h3>
                                     <p className="text-sm text-gray-400 mt-0.5 font-medium">{selectedLaptop.brand || "—"}</p>
                                     <div className="flex flex-wrap gap-2 mt-3">
-                                        {(() => { const s = STATUS_STYLE[selectedLaptop.status]; return s ? (
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${s.badge}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
-                                            </span>
-                                        ) : null; })()}
+                                        {(() => {
+                                            const s = STATUS_STYLE[selectedLaptop.status]; return s ? (
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${s.badge}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                         {selectedLaptop.ready_to_sell && (
                                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                                                 ✓ Ready to Sell
@@ -1082,10 +1096,10 @@ export default function Page() {
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spesifikasi Teknis</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                     {[
-                                        { label: "CPU",     value: selectedLaptop.cpu     },
-                                        { label: "RAM",     value: selectedLaptop.ram     },
+                                        { label: "CPU", value: selectedLaptop.cpu },
+                                        { label: "RAM", value: selectedLaptop.ram },
                                         { label: "Storage", value: selectedLaptop.storage },
-                                        { label: "GPU",     value: selectedLaptop.gpu     },
+                                        { label: "GPU", value: selectedLaptop.gpu },
                                         { label: "Display", value: selectedLaptop.display },
                                     ].map(({ label, value }) => (
                                         <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
@@ -1170,7 +1184,7 @@ export default function Page() {
                             const id = deleteConfirmModal.laptop.id;
                             setDeleteConfirmModal(null);
                             try {
-                                const res    = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                                const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
                                 const result = await res.json();
                                 if (!result.success) { showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`); return; }
                                 if (modalMode === "detail") closeModal();
@@ -1190,7 +1204,7 @@ export default function Page() {
 // ═══════════════════════════════════════════════════════
 // SHARED STYLE CONSTANTS
 // ═══════════════════════════════════════════════════════
-const inputCls    = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150";
+const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150";
 const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150 resize-none";
 
 // ═══════════════════════════════════════════════════════
@@ -1308,12 +1322,12 @@ function SkeletonTable() {
                     <tbody>
                         {[1, 2, 3, 4, 5, 6].map(r => (
                             <tr key={r} className="border-b border-gray-50">
-                                <td className="px-4 py-3.5"><Shimmer w={24}  h={12} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={140} h={13} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={60}  h={12} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={44}  h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={60}  h={12} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
+                                <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={13} /></div></td>
@@ -1343,15 +1357,15 @@ function ModalDetailSkeleton() {
                     <div className="flex gap-2 mt-2"><Shimmer w={80} h={24} r="8px" /></div>
                 </div>
                 <div className="text-right space-y-1">
-                    <Shimmer w={50}  h={9}  />
+                    <Shimmer w={50} h={9} />
                     <Shimmer w={100} h={24} />
                 </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {[1, 2, 3, 4, 5].map(i => (
                     <div key={i} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                        <Shimmer w={40}   h={9}  className="mb-1.5" />
-                        <Shimmer w="80%"  h={13} />
+                        <Shimmer w={40} h={9} className="mb-1.5" />
+                        <Shimmer w="80%" h={13} />
                     </div>
                 ))}
             </div>
