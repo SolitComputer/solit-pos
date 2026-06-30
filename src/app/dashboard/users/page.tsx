@@ -786,7 +786,7 @@ export default function UsersPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
 
           {/* ── Page Header ── */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
@@ -936,18 +936,18 @@ export default function UsersPage() {
                 style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
                 {/* List header bar */}
-                <div className="px-5 py-3.5 flex items-center justify-between"
+                <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between flex-wrap gap-2"
                   style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
                   <div className="flex items-center gap-2.5">
                     <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
                     <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
                       {filtered.length === totalInTab
-                        ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "K aryawan"}`
+                        ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
                         : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
                     </p>
                   </div>
                   {isAdmin && (
-                    <div className="flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
+                    <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
                       <span className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
                       </span>
@@ -962,7 +962,7 @@ export default function UsersPage() {
                 {loading ? (
                   <div>
                     {Array(6).fill(0).map((_, i) => (
-                      <div key={i} className="px-5 py-4 flex items-center gap-3.5 animate-pulse"
+                      <div key={i} className="px-4 sm:px-5 py-4 flex items-center gap-3.5 animate-pulse"
                         style={{ borderBottom: "1px solid #f8f8fc" }}>
                         <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
                         <div className="flex-1 space-y-2">
@@ -994,12 +994,13 @@ export default function UsersPage() {
                       const avatarColor = getAvatarColor(user.role);
                       const badgeStyle = ROLE_BADGE_STYLE[user.role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
                       const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
+                      const canChat = currentUserInfo && user.id !== currentUserInfo.id;
 
                       return (
                         <div key={user.id}
-                          className="px-5 py-3.5 hover:bg-slate-50/70 transition-colors group"
+                          className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/70 transition-colors group"
                           style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
-                          <div className="flex items-center gap-3.5">
+                          <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
                             {/* Avatar */}
                             <div className="relative flex-shrink-0">
@@ -1057,9 +1058,9 @@ export default function UsersPage() {
                               )}
                             </div>
 
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {currentUserInfo && user.id !== currentUserInfo.id && (
+                            {/* Action buttons — desktop/tablet inline */}
+                            <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                              {canChat && (
                                 <ActionBtn
                                   onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
                                   title={`Chat dengan ${user.name}`}
@@ -1096,6 +1097,46 @@ export default function UsersPage() {
                             </div>
 
                           </div>
+
+                          {/* Action buttons — mobile row (di bawah nama, biar tidak sempit) */}
+                          {(canChat || isAdmin) && (
+                            <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px]">
+                              {canChat && (
+                                <ActionBtn
+                                  onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
+                                  title={`Chat dengan ${user.name}`}
+                                  bg="#eff6ff" color="#3b82f6">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && (
+                                <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && user.face_embedding && (
+                                <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
+                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && (
+                                <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

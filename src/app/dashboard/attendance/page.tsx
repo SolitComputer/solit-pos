@@ -5558,4 +5558,3 @@ export default function AttendanceDashboardPage() {
         </DashboardLayout>
     );
 }
-
