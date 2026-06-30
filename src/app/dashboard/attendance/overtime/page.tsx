@@ -85,6 +85,14 @@ function formatTime(iso: string | null | undefined): string {
 function toWIBDateKey(iso: string) { return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10); }
 function initials(name: string) { return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
 function pad2(n: number) { return String(n).padStart(2, "0"); }
+function addDaysToDateStr(dateStr: string, days: number): string {
+  // ✅ FIX: parse manual tanpa Date object biar gak kena masalah timezone.
+  // Pakai UTC explicit supaya .toISOString() konsisten dengan input.
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 function calcDuration(start: string | null, end: string | null): string {
   if (!start || !end) return "—";
   const ms = new Date(end).getTime() - new Date(start).getTime();
@@ -831,11 +839,24 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     [allUsers, allowedRoles, isFullAdmin]
   );
 
+  // ✅ FIX: kalau endTime <= startTime, anggap overnight, tambah 24 jam
+  const isOvernight = useMemo(() => {
+    if (!startTime || !endTime) return false;
+    return endTime <= startTime;
+  }, [startTime, endTime]);
+
+  const endDateResolved = useMemo(
+    () => isOvernight ? addDaysToDateStr(requestDate, 1) : requestDate,
+    [isOvernight, requestDate]
+  );
+
   const previewHours = useMemo(() => {
     if (!startTime || !endTime) return null;
-    const d = (new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime()) / 3600000;
+    let diffMs = new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime();
+    if (isOvernight) diffMs += 24 * 3600000; // ✅ tambah 1 hari kalau lewat tengah malam
+    const d = diffMs / 3600000;
     return d > 0 ? Math.floor(d) : null;
-  }, [startTime, endTime]);
+  }, [startTime, endTime, isOvernight]);
 
   const holidayIsLate = useMemo(
     () => isHolidayOvertime && detectLateFromTime(startTime),
@@ -844,8 +865,8 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
 
   const submit = async () => {
     if (!targetUserId || !requestDate || !startTime || !endTime || !reasonType || !workDescription.trim()) { setError("Semua field wajib diisi"); return; }
-    const s = new Date(`1970-01-01T${startTime}:00`).getTime(), e = new Date(`1970-01-01T${endTime}:00`).getTime();
-    if (e <= s) { setError("Jam selesai harus lebih besar dari jam mulai"); return; }
+    // ✅ FIX: cuma tolak kalau jam mulai & selesai SAMA PERSIS (durasi 0), bukan karena beda hari
+    if (startTime === endTime) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan"); return; }
     setSubmitting(true); setError("");
     try {
@@ -860,6 +881,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           request_date: requestDate,
           actual_start_time: startTime,
           actual_end_time: endTime,
+          actual_end_date: endDateResolved, // ✅ FIX: kirim tanggal selesai yang sudah dihitung (beda hari kalau overnight)
           work_description: workDescription.trim(),
           reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
           proof_photo_url: photoUrl,
@@ -938,6 +960,15 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
+        {isOvernight && (
+          <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+            <span className="text-sm">🌙</span>
+            <span className="text-xs text-blue-700">
+              Lembur melewati tengah malam — akan tercatat selesai pada{" "}
+              <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
+            </span>
+          </div>
+        )}
         <div><label className={lbl}>Alasan Lembur *</label><ReasonGrid value={reasonType} onChange={v => { setReasonType(v); if (v !== "Lainnya") setReasonCustom(""); }} /></div>
         {reasonType === "Lainnya" && <div><label className={lbl}>Jelaskan Alasan *</label><input type="text" value={reasonCustom} onChange={e => setReasonCustom(e.target.value)} placeholder="Alasan spesifik..." className={inp} autoFocus /></div>}
         <div>
@@ -981,25 +1012,39 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   const isLainnya = reasonType === "Lainnya";
 
+  // ✅ FIX: deteksi overnight (jam selesai <= jam mulai → lembur lewat tengah malam)
+  const isOvernight = useMemo(() => {
+    if (!startTime || !endTime) return false;
+    return endTime <= startTime;
+  }, [startTime, endTime]);
+
+  const endDateResolved = useMemo(
+    () => isOvernight ? addDaysToDateStr(requestDate, 1) : requestDate,
+    [isOvernight, requestDate]
+  );
+
   const prevDur = useMemo(() => {
     if (!startTime || !endTime) return null;
-    const d = (new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime()) / 3600000;
+    let diffMs = new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime();
+    if (isOvernight) diffMs += 24 * 3600000;
+    const d = diffMs / 3600000;
     return d > 0 ? Math.floor(d) : null;
-  }, [startTime, endTime]);
+  }, [startTime, endTime, isOvernight]);
 
   const fmt = (t: string) => t.length === 5 ? `${t}:00` : t;
 
   const save = async () => {
     if (!requestDate || !startTime || !endTime || !reasonType) { setError("Semua field wajib diisi"); return; }
     if (isLainnya && !reasonCustom.trim()) { setError("Jelaskan alasan lembur"); return; }
-    const s = new Date(`1970-01-01T${startTime}:00`).getTime(), e = new Date(`1970-01-01T${endTime}:00`).getTime();
-    if (e <= s) { setError("Jam selesai harus lebih besar"); return; }
+    // ✅ FIX: hanya tolak kalau jam mulai & selesai SAMA PERSIS, bukan karena beda hari (overnight)
+    if (startTime === endTime) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     setSaving(true); setError("");
     try {
       let proofUrl: string | null | undefined = undefined;
       if (photoFile) { const fd = new FormData(); fd.append("file", photoFile); const ur = await fetch("/api/attendance/overtime/upload", { method: "POST", body: fd }); if (!ur.ok) throw new Error((await ur.json()).message || "Upload foto gagal"); proofUrl = (await ur.json()).url; }
       else if (photoPreview === null && o.proof_photo_url) proofUrl = null;
-      const isoS = `${requestDate}T${fmt(startTime)}+07:00`, isoE = `${requestDate}T${fmt(endTime)}+07:00`;
+      // ✅ FIX: isoE pakai endDateResolved (tanggal+1 kalau overnight), bukan requestDate yang sama
+      const isoS = `${requestDate}T${fmt(startTime)}+07:00`, isoE = `${endDateResolved}T${fmt(endTime)}+07:00`;
       const payload: Record<string, any> = { id: o.id, action: "UPDATE", request_date: requestDate, scheduled_start: isoS, scheduled_end: isoE, actual_start: isoS, actual_end: isoE, reason: isLainnya ? reasonCustom.trim() : reasonType, work_description: workDesc.trim(), status };
       if (proofUrl !== undefined) payload.proof_photo_url = proofUrl;
       const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -1030,6 +1075,15 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
             <div className="mt-2 inline-flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-lg px-3 py-1.5">
               <span className="text-xs">⏱️</span>
               <span className="text-[10px] text-violet-700 font-medium">{prevDur} jam</span>
+            </div>
+          )}
+          {isOvernight && (
+            <div className="mt-2 flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+              <span className="text-sm">🌙</span>
+              <span className="text-xs text-blue-700">
+                Lewat tengah malam — selesai dicatat{" "}
+                <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
+              </span>
             </div>
           )}
         </div>
