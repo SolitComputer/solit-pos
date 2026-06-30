@@ -159,6 +159,12 @@ export async function POST(request: Request) {
       } catch (leaveErr: any) {
         console.error("[attendance/manual POST] leave sync error:", leaveErr);
       }
+    } else {
+      try {
+        await cleanupLeaveOnStatusChange(user_id, attendance_date);
+      } catch (cleanupErr: any) {
+        console.error("[attendance/manual POST] leave cleanup error:", cleanupErr);
+      }
     }
 
     return NextResponse.json({ success: true, data });
@@ -208,6 +214,35 @@ async function handleLeaveSync(userId: string, leaveDate: string, notes: string 
       user_id: userId, year: leaveYear, month: leaveMonth,
       quota: 1, used: 1, carried_over: 0,
     });
+  }
+}
+
+async function cleanupLeaveOnStatusChange(userId: string, leaveDate: string) {
+  const { data: leaveReq } = await supabase
+    .from("user_leave_requests")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("leave_date", leaveDate)
+    .maybeSingle();
+
+  if (!leaveReq) return;
+
+  await supabase.from("user_leave_requests").delete().eq("id", leaveReq.id);
+
+  const [yearStr, monthStr] = leaveDate.split("-");
+  const { data: balance } = await supabase
+    .from("user_leave_balance")
+    .select("id, used")
+    .eq("user_id", userId)
+    .eq("year", parseInt(yearStr))
+    .eq("month", parseInt(monthStr))
+    .maybeSingle();
+
+  if (balance && balance.used > 0) {
+    await supabase
+      .from("user_leave_balance")
+      .update({ used: balance.used - 1, updated_at: new Date().toISOString() })
+      .eq("id", balance.id);
   }
 }
 

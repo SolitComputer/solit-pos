@@ -2926,7 +2926,14 @@ export default function AttendanceDashboardPage() {
         Object.entries(monthlyOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, monthlyOffNoteByName[name]?.[dk] || "Libur Bulanan"); });
         Object.entries(dayOffByName).forEach(([name, dows]) => { if (dows.has(dow)) add(name, "Libur Mingguan"); });
         Object.entries(dateOffByName).forEach(([name, dates]) => { if (dates.has(dk)) add(name, "Libur / Tukar"); });
-        leaveData.forEach(ld => { if (ld?.requests?.some(r => r.leave_date === dk)) add(ld?.user?.name, "Cuti"); });
+        leaveData.forEach(ld => {
+            const uid = ld?.user?.id;
+            if (!uid || !ld?.requests?.some(r => r.leave_date === dk)) return;
+            // ✅ Absen manual non-LEAVE menimpa status cuti basi (Cuti → Izin/Sakit/dll)
+            const mr = manualMap[`${uid}_${dk}`];
+            if (mr && mr.status !== "LEAVE") return;
+            add(ld?.user?.name, "Cuti");
+        });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
     };
@@ -3072,6 +3079,7 @@ export default function AttendanceDashboardPage() {
             );
             Object.entries(manualByName[name] ?? {}).forEach(([date, mr]) => {
                 if (mr.status === "LEAVE") userLeaveSet.add(date);
+                else userLeaveSet.delete(date);
             });
 
             let present = 0, late = 0, score = 0, leave = 0;   // ✅ + leave
@@ -3198,8 +3206,9 @@ export default function AttendanceDashboardPage() {
             const manualRec = manualMap[`${u.id}_${selectedDate}`];
             if (manualRec && (manualRec.status === "PRESENT" || manualRec.status === "LATE")) return;
 
-            const hasLeave = leaveData.find(ld => ld?.user?.id === u.id)
-                ?.requests?.some(r => r.leave_date === selectedDate);
+            const hasLeave = (!manualRec || manualRec.status === "LEAVE") &&
+                leaveData.find(ld => ld?.user?.id === u.id)
+                    ?.requests?.some(r => r.leave_date === selectedDate);
             if (hasLeave) return;
 
             const reason = manualRec?.status as "ABSENT" | "SICK" | "PERMIT" | undefined;
