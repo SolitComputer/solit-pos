@@ -133,6 +133,7 @@ export async function POST(request: Request) {
             month: monthInt,
             salary_type,
             base_salary,
+            salary_income,
             allowance_wife: allowance_wife || 0,
             allowance_child: allowance_child || 0,
             allowance_transport: 0,

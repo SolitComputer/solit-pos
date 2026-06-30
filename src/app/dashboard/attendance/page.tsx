@@ -1799,6 +1799,7 @@ type SalarySlip = {
     month: number;
     salary_type: "FIXED" | "PERCENTAGE";
     base_salary: number;
+    salary_income?: number;
     allowance_wife: number;
     allowance_child: number;
     allowance_transport: number;
@@ -1938,7 +1939,12 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide mb-1">Penghasilan</p>
                     <p className="text-xs font-black text-emerald-700 font-mono">{formatRupiah(slip.total_income)}</p>
                     <div className="mt-1.5 space-y-0.5">
-                        <p className="text-[9px] text-gray-500">Pokok: {formatRupiah(slip.base_salary)}</p>
+                        <p className="text-[9px] text-gray-500">
+                            Pokok: {formatRupiah(slip.salary_income ?? slip.base_salary)}
+                            {slip.salary_type === "PERCENTAGE" && typeof slip.salary_income === "number" && slip.salary_income !== slip.base_salary && (
+                                <span className="text-gray-300"> (nominal {formatRupiah(slip.base_salary)})</span>
+                            )}
+                        </p>
                         {slip.overtime > 0 && <p className="text-[9px] text-orange-600">Lembur: +{formatRupiah(slip.overtime)}</p>}
                         {(slip.allowance_wife > 0 || slip.allowance_child > 0) && (
                             <p className="text-[9px] text-gray-500">Tunjangan: +{formatRupiah(slip.allowance_wife + slip.allowance_child)}</p>
@@ -2765,16 +2771,23 @@ export default function AttendanceDashboardPage() {
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
-            fetchAllowances()
+            fetchAllowances(),
+            fetchLeaveData(year, month), // ✅ FIX: sama seperti di atas
         ];
-        if (isAdminRole(currentUser?.role)) {
-            tasks.push(fetchLeaveData(year, month));
-        }
         Promise.all(tasks).finally(() => setLoading(false));
-        if (canViewSalary(currentUser?.role)) {
-            fetchSalarySlips(year, month);
-        }
-    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser?.role]);
+    }, [
+        selectedMonth,
+        fetchAttendance,
+        fetchDayOffs,
+        fetchAllDateOffs,
+        fetchAllDateWorks,
+        fetchMonthlyOffs,
+        fetchManualRecords,
+        fetchAllUsers,
+        fetchSalaries,
+        fetchAllowances,
+        fetchLeaveData,
+    ]);
 
     useEffect(() => {
         if (canViewSalary(currentUser?.role)) {
@@ -2823,25 +2836,13 @@ export default function AttendanceDashboardPage() {
             fetchAllUsers(),
             fetchSalaries(),
             fetchAllowances(),
+            fetchLeaveData(year, month), // ✅ FIX: jangan gate ke admin doang, biar perhitungan cuti sama-sama akurat di akun biasa
         ];
-        if (isAdminRole(currentUser?.role)) {
-            tasks.push(fetchLeaveData(year, month));
-        }
         Promise.all(tasks).finally(() => setLoading(false));
-    }, [
-        selectedMonth,
-        currentUser?.role,
-        fetchAttendance,
-        fetchDayOffs,
-        fetchAllDateOffs,
-        fetchAllDateWorks,
-        fetchMonthlyOffs,
-        fetchManualRecords,
-        fetchAllUsers,
-        fetchSalaries,
-        fetchAllowances,
-        fetchLeaveData,
-    ]);
+        if (canViewSalary(currentUser?.role)) {
+            fetchSalarySlips(year, month);
+        }
+    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser?.role]);
 
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
@@ -5002,6 +5003,9 @@ export default function AttendanceDashboardPage() {
                     {(() => {
                         const mySalary = salaries.find(s => s.user_id === currentUser?.id);
                         const myStat = userSummary.find(u => u.userId === currentUser?.id);
+                        const myCalc = mySalary && myStat
+                            ? computeMonthlySalary(mySalary, allowanceMap[currentUser?.id ?? ""], overtimeTotal[currentUser?.id ?? ""] || 0, myStat)
+                            : null;
 
                         return (
                             <div className="space-y-4">
@@ -5039,8 +5043,13 @@ export default function AttendanceDashboardPage() {
                                                     <div className="bg-gray-50 rounded-2xl p-4">
                                                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Gaji Pokok</p>
                                                         <p className="text-lg font-black text-gray-800 font-mono">
-                                                            {formatRupiah(mySalary.base_salary)}
+                                                            {formatRupiah(myCalc ? myCalc.salaryIncome : mySalary.base_salary)}
                                                         </p>
+                                                        {mySalary.salary_type === "PERCENTAGE" && myStat && (
+                                                            <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                                                                📊 {formatPct(myStat.pct)}% kehadiran
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -5091,21 +5100,15 @@ export default function AttendanceDashboardPage() {
                                                 )}
 
                                                 {/* Rincian & gaji bersih — sama dengan halaman admin */}
-                                                {myStat && (() => {
-                                                    const c = computeMonthlySalary(
-                                                        mySalary,
-                                                        allowanceMap[currentUser?.id ?? ""],
-                                                        overtimeTotal[currentUser?.id ?? ""] || 0,
-                                                        myStat
-                                                    );
-                                                    const pokok = c.salaryIncome;
-                                                    const tWife = c.allowanceWife;
-                                                    const tChild = c.allowanceChild;
-                                                    const dLoan = c.deductionLoan;
-                                                    const dPension = c.deductionPension;
-                                                    const myOt = c.overtime;
-                                                    const gross = c.grossIncome;
-                                                    const net = c.netSalary;
+                                                {myStat && myCalc && (() => {
+                                                    const pokok = myCalc.salaryIncome;
+                                                    const tWife = myCalc.allowanceWife;
+                                                    const tChild = myCalc.allowanceChild;
+                                                    const dLoan = myCalc.deductionLoan;
+                                                    const dPension = myCalc.deductionPension;
+                                                    const myOt = myCalc.overtime;
+                                                    const gross = myCalc.grossIncome;
+                                                    const net = myCalc.netSalary;
                                                     return (
                                                         <>
                                                             <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl p-4 space-y-2">

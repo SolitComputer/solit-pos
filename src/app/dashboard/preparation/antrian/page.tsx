@@ -7,6 +7,7 @@ import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
+import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 
 export default function PreparationAntrianPage() {
   const [orders, setOrders] = useState<PrepOrder[]>([]);
@@ -27,6 +28,16 @@ export default function PreparationAntrianPage() {
   const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
 
   useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
+
+  const menungguOrders = useMemo(
+    () => orders.filter((o) => o.status === "MENUNGGU"),
+    [orders]
+  );
+  const { unackedCount: alarmCount, unackedIds: alarmIds, acknowledge } = usePrepAlarm(
+    menungguOrders,
+    ALARM_KEYS.MENUNGGU,
+    soundOn
+  );
 
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
@@ -79,6 +90,7 @@ export default function PreparationAntrianPage() {
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   const handleReceive = async (id: string) => {
+    acknowledge(id);
     setReceivingId(id);
     try {
       const res = await fetch(`/api/preparation/${id}/receive`, { method: "POST" });
@@ -146,6 +158,15 @@ export default function PreparationAntrianPage() {
               <button onClick={() => setToast(null)} className="text-gray-300 hover:text-gray-500 flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
+            </div>
+          </div>
+        )}
+
+        {alarmCount > 0 && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] animate-in slide-in-from-top-2 duration-300">
+            <div className="bg-red-600 text-white px-5 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <p className="text-sm font-black">🔔 {alarmCount} penyiapan menunggu diterima!</p>
             </div>
           </div>
         )}
@@ -232,8 +253,15 @@ export default function PreparationAntrianPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-              {filtered.map(o => (
-                <OrderCard key={o.id} o={o} canReceive={canDone} receivingId={receivingId} onReceive={handleReceive} isNew={newIds.has(o.id)} />
+              {filtered.map((o) => (
+                <OrderCard
+                  key={o.id}
+                  o={o}
+                  canReceive={canDone}
+                  receivingId={receivingId}
+                  onReceive={handleReceive}
+                  isNew={newIds.has(o.id) || alarmIds.has(o.id)} 
+                />
               ))}
             </div>
           )}

@@ -11,7 +11,7 @@ export default function Layout({
   return (
     <ChatProvider>
       <main>
-        {children}u
+        {children}
       </main>
       <NotificationBanner />
       {/* Floating chat button pojok kanan bawah */}
