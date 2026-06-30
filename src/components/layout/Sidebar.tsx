@@ -790,12 +790,14 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 
   useEffect(() => {
+    if (loading) return;          
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
-    if (saved) el.scrollTop = parseInt(saved, 10);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (saved) {
+      requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });  // ← tunggu paint
+    }
+  }, [loading, scrollKey]);
 
   const handleNavScroll = useCallback(() => {
     const el = navRef.current;
@@ -894,7 +896,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
                           !pathname.startsWith("/dashboard/preparation/done") &&
                           !pathname.startsWith("/dashboard/preparation/history") &&
                           !pathname.startsWith("/dashboard/preparation/pengantaran") &&
-                          !pathname.startsWith("/dashboard/preparation/sedang-diantar") && 
+                          !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
                           !pathname.startsWith("/dashboard/preparation/siap-kirim"));
                     }
                     if (item.href === "/dashboard/laptops") {
