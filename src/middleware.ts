@@ -269,5 +269,6 @@ export const config = {
     "/api/seller-followups/:path*",
     "/dashboard/preparation/:path*",  
     "/api/preparation/:path*",
+    "/api/missions/:path*",   
   ],
 };
