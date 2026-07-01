@@ -447,6 +447,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
     SERVICE_MENU,
+    // ✅ Tambah ini
+    {
+      label: "Transaksi",
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
+    },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
   ACCOUNTING: [
@@ -648,6 +653,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
+    },
+    // ✅ Tambah ini
+    {
+      label: "Transaksi",
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
