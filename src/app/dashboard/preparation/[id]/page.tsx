@@ -339,6 +339,64 @@ function DoneModal({ order, onClose, onDone }: {
     );
 }
 
+// ── CancelModal: konfirmasi + alasan pembatalan ──────────────────────────────
+function CancelModal({ order, onClose, onCancelled }: {
+    order: PrepOrder; onClose: () => void; onCancelled: () => void;
+}) {
+    const [reason, setReason] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/preparation/${order.id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: reason.trim() || null }),
+            });
+            const result = await res.json();
+            if (!result.success) { setError(result.message || "Gagal membatalkan"); return; }
+            onCancelled();
+            onClose();
+        } catch { setError("Terjadi kesalahan koneksi"); } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-red-600 px-5 py-4">
+                    <p className="font-bold text-white text-sm">🗑️ Batalkan Penyiapan</p>
+                    <p className="text-xs text-red-100 mt-0.5">
+                        Pesanan {order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.
+                    </p>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Alasan (opsional)</label>
+                        <textarea
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            rows={3}
+                            placeholder="Contoh: Customer batal order, salah input, dll."
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 focus:bg-white transition resize-none"
+                        />
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Jangan Batalkan</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50">
+                        {saving ? "Membatalkan..." : "Ya, Batalkan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PreparationDetailPage() {
     const params = useParams();
     const id = params.id as string;
@@ -366,6 +424,8 @@ export default function PreparationDetailPage() {
     const canVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE);
     const canTargetVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE_TARGET);
     const canCancel = hasAnyRole(userRoles, PERMISSIONS.CANCEL_PREPARATION);
+
+    const [showCancel, setShowCancel] = useState(false);
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json())
@@ -531,17 +591,20 @@ export default function PreparationDetailPage() {
     };
 
     const handleCancel = async () => {
-        if (!order) return;
+        if (!order || actionLoading) return;
 
-        const ok = await confirm({
-            title: "Batalkan Penyiapan Ini?",
-            message: `Pesanan ${order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.`,
-            variant: "danger",
-            confirmText: "Ya, Batalkan",
-            requireText: "BATAL",
-            icon: "🗑️"
-        });
-
+        let ok = false;
+        try {
+            ok = await confirm({
+                title: "Batalkan Penyiapan Ini?",
+                message: `Pesanan ${order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.`,
+                variant: "danger",
+                confirmText: "Ya, Batalkan",
+            });
+        } catch (err) {
+            console.error("[cancel confirm]", err);
+            ok = window.confirm(`Batalkan pesanan ${order.order_number}? Tindakan ini permanen.`);
+        }
         if (!ok) return;
 
         setActionLoading(true);
@@ -553,9 +616,10 @@ export default function PreparationDetailPage() {
             });
             const result = await res.json();
             if (result.success) await fetchOrder();
-            else alert(result.message);
-        } catch {
-            alert("Gagal membatalkan");
+            else alert(result.message || "Gagal membatalkan");
+        } catch (err) {
+            console.error("[cancel]", err);
+            alert("Gagal membatalkan pesanan");
         } finally {
             setActionLoading(false);
         }
@@ -679,10 +743,9 @@ export default function PreparationDetailPage() {
                                 )}
                             </div>
 
-                            {/* (item 4) Tombol Batalkan — Admin / Programmer / Kepala Sales */}
                             {canShowCancel && (
-                                <button onClick={handleCancel} disabled={actionLoading}
-                                    className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 transition disabled:opacity-50">
+                                <button onClick={() => setShowCancel(true)}
+                                    className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 transition">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                     Batalkan
                                 </button>
@@ -1029,6 +1092,7 @@ export default function PreparationDetailPage() {
                     onConfirm={async p => { await handleStartTrip(p); setShowStart(false); }}
                 />
             )}
+            {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
         </DashboardLayout>
     );
 }

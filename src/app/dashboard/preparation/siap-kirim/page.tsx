@@ -34,6 +34,13 @@ export default function PreparationSiapKirimPage() {
         soundOn
     );
 
+    const didInitAckRef = useRef(false);
+    useEffect(() => {
+        if (didInitAckRef.current || isLoading) return;
+        orders.forEach((o) => ackOrder(o.id));
+        didInitAckRef.current = true;
+    }, [isLoading, orders, ackOrder]);
+
     useEffect(() => {
         const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
         window.addEventListener("pointerdown", unlock);
@@ -203,10 +210,10 @@ export default function PreparationSiapKirimPage() {
                                 <Link
                                     key={o.id}
                                     href={`/dashboard/preparation/${o.id}`}
-                                    onClick={() => ackOrder(o.id)} 
+                                    onClick={() => ackOrder(o.id)}
                                     className={`block bg-white rounded-2xl border shadow-sm p-4 transition hover:shadow-md hover:border-gray-200 ${newIds.has(o.id) || alarmIds.has(o.id)
-                                            ? "border-orange-400 ring-2 ring-orange-200"
-                                            : "border-gray-100"
+                                        ? "border-orange-400 ring-2 ring-orange-200"
+                                        : "border-gray-100"
                                         }`}
                                 >
                                     <div className="flex items-start justify-between gap-3 mb-2">

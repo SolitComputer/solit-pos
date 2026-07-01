@@ -5,6 +5,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
+import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 interface MyDelivery {
@@ -189,6 +190,16 @@ export default function MyDeliveryPage() {
     return { perlu, jalan, selesai, all: orders.length, aktif: perlu + jalan };
   }, [orders]);
 
+  const perluSetuju = useMemo(
+    () => orders.filter((o) => o.status === "MENUNGGU_PENGANTAR"),
+    [orders]
+  );
+  const { unackedIds: alarmIds, acknowledge: ackApproval } = usePrepAlarm(
+    perluSetuju,
+    ALARM_KEYS.APPROVAL,
+    soundOn
+  );
+
   const filtered = useMemo(() => {
     let list = [...orders];
     if (filter === "AKTIF") list = list.filter((o) => getPhase(o) !== "SELESAI");
@@ -326,7 +337,11 @@ export default function MyDeliveryPage() {
             </div>
           ) : (
             <div className="space-y-2.5">
-              {filtered.map((o) => <DeliveryCard key={o.id} o={o} isNew={newIds.has(o.id)} />)}
+              {filtered.map((o) => (
+                <div key={o.id} onClick={() => ackApproval(o.id)}>
+                  <DeliveryCard o={o} isNew={newIds.has(o.id) || alarmIds.has(o.id)} />
+                </div>
+              ))}
             </div>
           )}
         </div>

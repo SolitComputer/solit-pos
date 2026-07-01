@@ -39,6 +39,13 @@ export default function PreparationAntrianPage() {
     soundOn
   );
 
+  const didInitAckRef = useRef(false);
+  useEffect(() => {
+    if (didInitAckRef.current || isLoading) return;
+    menungguOrders.forEach((o) => acknowledge(o.id));
+    didInitAckRef.current = true;
+  }, [isLoading, menungguOrders, acknowledge]);
+
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
     if (soundOnRef.current) playNotifSound();
@@ -260,7 +267,7 @@ export default function PreparationAntrianPage() {
                   canReceive={canDone}
                   receivingId={receivingId}
                   onReceive={handleReceive}
-                  isNew={newIds.has(o.id) || alarmIds.has(o.id)} 
+                  isNew={newIds.has(o.id) || alarmIds.has(o.id)}
                 />
               ))}
             </div>

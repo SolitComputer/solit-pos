@@ -3,7 +3,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // ← tambah useRouter
+import { usePrepNotify } from "@/hooks/usePrepNotify";
+import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
 import { mergeMenuGroups } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
@@ -447,7 +450,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS,
     PENGANTARAN_TRANSAKSI,
-    PREPARATION_PENGANTARAN_MENU, 
+    PREPARATION_PENGANTARAN_MENU,
   ],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
   KEPALA_SOTECH: [
@@ -964,6 +967,7 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -1010,13 +1014,59 @@ export default function Sidebar() {
     ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
 
-  // ✅ Delivery badge (dari origin/develop)
+  const prep = usePrepNotify(userRoles);
+
+  useEffect(() => {
+    const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
+    window.addEventListener("pointerdown", unlock);
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, []);
+
+  const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
+  const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
+
+  usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
+  usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
+
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
+    "/dashboard/preparation/antrian": prep.menungguUnacked.length,
+    "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
   };
 
   void mounted;
+
+  {/* ── Banner alarm global (klik = buka + matikan bunyi) ── */ }
+  {
+    !onAntrian && prep.menungguUnacked.length > 0 && (
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
+        <button
+          onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }}
+          className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+        >
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          <span className="text-sm font-black">🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
+        </button>
+      </div>
+    )
+  }
+  {
+    !onSiapKirim && prep.siapKirimUnacked.length > 0 && (
+      <div
+        className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
+        style={{ top: (!onAntrian && prep.menungguUnacked.length > 0) ? 64 : 12 }}
+      >
+        <button
+          onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }}
+          className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+        >
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          <span className="text-sm font-black">📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
