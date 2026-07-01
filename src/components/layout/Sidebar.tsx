@@ -682,6 +682,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
+
 };
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
