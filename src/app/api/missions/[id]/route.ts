@@ -71,12 +71,19 @@ async function patchHandler(req: NextRequest, ctx: any, user: AuthUser) {
       if (!isAssignee) return forbidden();
       if (!["PENDING", "IN_PROGRESS", "REJECTED"].includes(mission.status))
         return badReq("Misi tidak bisa disubmit dari status saat ini");
+
+      const { data: items } = await supabaseAdmin
+        .from("mission_items").select("is_done").eq("mission_id", id);
+      if (items && items.length > 0 && items.some(it => !it.is_done)) {
+        return badReq("Selesaikan semua sub-tugas dulu sebelum submit");
+      }
+
       if (!body.proof_photo_url) return badReq("Bukti foto wajib diupload");
       updates.status = "SUBMITTED";
       updates.proof_photo_url = body.proof_photo_url;
       updates.proof_note = body.proof_note?.trim() || null;
       updates.submitted_at = new Date().toISOString();
-      updates.rejection_reason = null; // reset kalau ini resubmit setelah ditolak
+      updates.rejection_reason = null;
       break;
     }
     case "approve": {
