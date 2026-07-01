@@ -541,10 +541,6 @@ function LoginInner() {
   );
 }
 
-// ── Export default dengan Suspense wrapper ────────────────────────────────────
-// ✅ WAJIB: useSearchParams() di App Router harus dibungkus Suspense
-// Tanpa ini Next.js akan throw error saat build:
-// "useSearchParams() should be wrapped in a suspense boundary"
 export default function Page() {
   return (
     <Suspense fallback={
