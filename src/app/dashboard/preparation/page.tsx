@@ -9,111 +9,141 @@ import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 
 // ── BarcodeScanModal ──────────────────────────────────────────────────────────
+// ── BarcodeScanModal (native + fallback ZXing) ────────────────────────────────
 function BarcodeScanModal({
   onScan, onClose,
 }: { onScan: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
   const [detected, setDetected] = useState<string | null>(null);
-  const doneRef = useRef(false);
+  const [engine, setEngine] = useState<"native" | "zxing" | "">("");
+
+  // simpan callback terbaru di ref → effect cukup jalan sekali (kamera gak restart tiap render)
+  const onScanRef = useRef(onScan);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onScanRef.current = onScan; onCloseRef.current = onClose; });
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let animId = 0;
+    let zxingControls: { stop: () => void } | null = null;
+    let done = false;
+
+    const finish = (value: string) => {
+      if (done) return;
+      done = true;
+      const clean = value.trim();
+      setDetected(clean);
+      setTimeout(() => { onScanRef.current(clean); onCloseRef.current(); }, 500);
+    };
+
+    // Engine 1: BarcodeDetector native (Chrome/Edge/Android)
+    const startNative = async () => {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+      const detector = new (window as any).BarcodeDetector({
+        formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix", "upc_a"],
+      });
+      setEngine("native");
+      const loop = async () => {
+        if (done || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes.length > 0) return finish(codes[0].rawValue);
+        } catch { /* frame belum siap */ }
+        animId = requestAnimationFrame(loop);
+      };
+      animId = requestAnimationFrame(loop);
+    };
+
+    const startZxing = async () => {
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
+      const reader = new BrowserMultiFormatReader();
+      setEngine("zxing");
+      zxingControls = await reader.decodeFromVideoDevice(
+        undefined,
+        videoRef.current!,
+        (result) => { if (result) finish(result.getText()); }
+      );
+    };
+
+    const hasNative = async () => {
+      if (!("BarcodeDetector" in window)) return false;
+      try {
+        const fmts = await (window as any).BarcodeDetector.getSupportedFormats?.();
+        return !fmts || fmts.length > 0;
+      } catch { return true; }
+    };
 
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-
-        if (!("BarcodeDetector" in window)) {
-          setError("Browser ini belum mendukung scan otomatis. Gunakan Chrome 88+ / Edge.\nMasih bisa ketik SN manual.");
-          return;
+        if (await hasNative()) await startNative();
+        else await startZxing();
+      } catch (e1: any) {
+        try { await startZxing(); } // native gagal → coba ZXing dulu sebelum nyerah
+        catch (e2: any) {
+          const name = e2?.name || e1?.name;
+          if (name === "NotAllowedError")
+            setError("Izin kamera ditolak. Aktifkan izin kamera lalu refresh halaman.");
+          else if (name === "NotFoundError")
+            setError("Kamera tidak ditemukan. Ketik SN manual saja ya.");
+          else
+            setError("Gagal memulai scanner di browser ini. Kamu masih bisa ketik SN manual.");
         }
-
-        const detector = new (window as any).BarcodeDetector({
-          formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix"],
-        });
-
-        const scan = async () => {
-          if (doneRef.current || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0 && !doneRef.current) {
-              doneRef.current = true;
-              const value = (codes[0].rawValue as string).trim();
-              setDetected(value);
-              setTimeout(() => { onScan(value); onClose(); }, 700);
-              return;
-            }
-          } catch { }
-          if (!doneRef.current) animId = requestAnimationFrame(scan);
-        };
-        animId = requestAnimationFrame(scan);
-      } catch {
-        setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diberikan.");
       }
     })();
 
     return () => {
-      doneRef.current = true;
+      done = true;
       cancelAnimationFrame(animId);
+      try { zxingControls?.stop(); } catch { }
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onScan, onClose]);
+  }, []); // jalan sekali saat modal dibuka
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80">
       <div className="relative bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl">
         <div className="bg-gray-900 px-4 py-3.5 flex items-center justify-between">
           <div>
-            <p className="text-white font-bold text-sm">📷 Scan Barcode Serial Number</p>
-            <p className="text-gray-400 text-[11px]">Arahkan kamera ke barcode SN laptop</p>
+            <p className="text-white font-bold">📷 Scan Barcode</p>
+            <p className="text-gray-400 text-xs">
+              Arahkan ke barcode Serial Number{engine === "zxing" && " · mode kompatibel"}
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-300 hover:text-white p-1">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <button onClick={onClose} className="text-white p-1">✕</button>
         </div>
 
-        <div className="bg-black relative" style={{ aspectRatio: "4/3" }}>
+        <div className="relative bg-black" style={{ aspectRatio: "4/3" }}>
           <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-          {/* Viewfinder overlay */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="relative w-3/4 h-2/5">
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-emerald-400 rounded-tl" />
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-emerald-400 rounded-tr" />
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-emerald-400 rounded-bl" />
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-emerald-400 rounded-br" />
-              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-emerald-400 opacity-60 animate-pulse" />
+            <div className="w-72 h-40 border-2 border-emerald-400 rounded-xl relative">
+              <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400" />
+              <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400" />
+              <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400" />
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400" />
             </div>
           </div>
           {detected && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="bg-emerald-500 text-white px-6 py-3 rounded-2xl text-center shadow-xl">
-                <p className="text-sm font-black">✅ Terbaca!</p>
-                <p className="font-mono text-xs mt-1">{detected}</p>
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-5xl mb-2">✅</div>
+                <p className="text-emerald-400 font-bold">Terbaca!</p>
+                <p className="font-mono text-white mt-1">{detected}</p>
               </div>
             </div>
           )}
         </div>
 
-        {error ? (
-          <div className="px-4 py-3 bg-red-50 border-t border-red-100">
-            <p className="text-xs text-red-700 whitespace-pre-line">{error}</p>
+        {error && (
+          <div className="p-4 bg-red-50 border-t border-red-100">
+            <p className="text-red-700 text-sm whitespace-pre-line">{error}</p>
           </div>
-        ) : (
-          !detected && (
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-center">
-              <p className="text-xs text-gray-500">Deteksi otomatis — langsung terbaca tanpa perlu tap</p>
-            </div>
-          )
         )}
-        <div className="px-4 py-3 border-t border-gray-100">
-          <button onClick={onClose} className="w-full h-9 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition">
-            Tutup
+
+        <div className="p-4 border-t">
+          <button onClick={onClose} className="w-full h-11 bg-gray-100 rounded-xl text-sm font-medium">
+            Tutup Kamera
           </button>
         </div>
       </div>
@@ -172,7 +202,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_name: customerName.trim(), customer_phone: customerPhone.trim() || null,
-          delivery_address: deliveryAddress.trim() || null, notes: notes.trim() || null, items,
+          delivery_address: deliveryAddress.trim() || null, notes: notes.trim() || null,
+          items,
         }),
       });
       const result = await res.json();
@@ -323,6 +354,9 @@ export default function PreparationPage() {
   const canCreate = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_PREPARATION) : false;
   const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const notifiedDoneRef = useRef<Set<string>>(new Set());
+
   useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
 
   const showToast = useCallback((title: string, sub: string) => {
@@ -339,7 +373,10 @@ export default function PreparationPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+    fetch("/api/auth/me").then(r => r.json()).then(r => {
+      setUserRole(r.user?.role ?? null);
+      setUserId(r.user?.id ?? null);
+    }).catch(() => { setUserRole(null); setUserId(null); });
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -366,11 +403,22 @@ export default function PreparationPage() {
         }
         fetchOrders();
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "preparation_orders" }, (payload) => {
+        const row: any = payload.new;
+        // notif ke pembuat format saat penyedia selesai cek (→ SIAP_KIRIM)
+        if (
+          row?.status === "SIAP_KIRIM" &&
+          userId && row.created_by === userId &&
+          !notifiedDoneRef.current.has(row.id)
+        ) {
+          notifiedDoneRef.current.add(row.id);
+          showToast("✅ Barang siap dikirim!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+        }
+        fetchOrders();
+      }).on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userRole, canDone, showToast, fetchOrders]);
+  }, [userRole, userId, canDone, showToast, fetchOrders]);
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

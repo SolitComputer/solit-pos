@@ -57,8 +57,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const now = new Date().toISOString();
-    // DIAMBIL_CUSTOMER → langsung SELESAI. PENGANTARAN/KURIR → DIKIRIM
-    const nextStatus = delivery_method === "DIAMBIL_CUSTOMER" ? "SELESAI" : "DIKIRIM";
+
+    const nextStatus =
+      delivery_method === "DIAMBIL_CUSTOMER" ? "SELESAI"
+        : delivery_method === "PENGANTARAN" ? "MENUNGGU_PENGANTAR"
+          : "DIKIRIM";
 
     const payload: Record<string, any> = {
       status: nextStatus,
@@ -75,6 +78,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       payload.dest_lng = dest_lng ?? null;
       payload.delivery_user_id = delivery_user_id ?? null;
       payload.delivery_user_name = delivery_user_name ?? null;
+      payload.delivery_accepted_at = null;
+      payload.delivery_declined_at = null;
+      payload.delivery_decline_reason = null;
     }
 
     if (delivery_method === "KURIR") {

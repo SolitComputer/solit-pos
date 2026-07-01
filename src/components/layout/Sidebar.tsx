@@ -233,10 +233,15 @@ const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   ],
 };
 
+const ITEM_ANTRIAN_MASUK: MenuItem = {
+  name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
+};
+
 const PREPARATION_SALES_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
     { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    ITEM_ANTRIAN_MASUK, // ← req 6
   ],
 };
 const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
@@ -251,6 +256,7 @@ const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
 const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
+    ITEM_ANTRIAN_MASUK, // ← req 6: pengantaran bisa lihat antrian masuk
     { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.pendingOrders },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
@@ -441,11 +447,17 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS,
     PENGANTARAN_TRANSAKSI,
-    PREPARATION_PENGANTARAN_MENU, // ← UPDATED (now includes Antrian Penyiapan)
+    PREPARATION_PENGANTARAN_MENU, 
   ],
   KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_SOTECH: [
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+  ],
+  ONPOINT: [
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+  ],
   TEKNISI: [
     {
       label: "Overview",
@@ -582,6 +594,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
+    PREPARATION_SALES_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
   PENYEDIA_BARANG: [
     {
@@ -790,7 +804,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 
   useEffect(() => {
-    if (loading) return;          
+    if (loading) return;
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);

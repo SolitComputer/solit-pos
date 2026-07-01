@@ -98,10 +98,15 @@ const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "
 
 // ─── Preparation Roles ────────────────────────────────────────────────────────
 
-/** Sales yang bisa CREATE format penyiapan */
+/** PKL (anak magang) — dipakai di grup preparation (item 5) */
+const PKL_PREP_ROLES: UserRole[] = [
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+];
+
+/** (item 5) Role yang bisa BUAT format penyiapan */
 const PREPARATION_SALES_ROLES: UserRole[] = [
-  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
-  "KEPALA_ONPOINT", "ONPOINT",
+  "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "SOTECH", "KEPALA_SOTECH", "ONPOINT",
 ];
 
 /** Penyedia barang yang cek & tandai done */
@@ -109,32 +114,41 @@ const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
 ];
 
-/** Siapa yang buat format penyiapan (Sales + Admin) */
-export const PREPARATION_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
+/** (item 5) Buat + dispatch format (creator + PKL + Admin) */
+export const PREPARATION_CREATE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
+];
 
-/** Siapa yang bisa terima & done-in penyiapan (Penyedia + Admin) */
+/** Terima & done penyiapan (Penyedia + Admin) */
 export const PREPARATION_DONE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_PENYEDIA_ROLES];
 
-/**
- * Siapa yang bisa DISPATCH (pilih metode pengiriman) setelah penyedia done.
- * Dari origin/develop — Sales/Kepala Sales, BUKAN penyedia barang.
- */
-export const PREPARATION_DISPATCH_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
+/** (item 1 & 7) Dispatch pilih metode kirim — PENGANTARAN TIDAK termasuk */
+export const PREPARATION_DISPATCH_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
+];
 
-/** Role yang boleh handle delivery tracking */
+/** (item 4) BATALKAN pesanan — HANYA Admin, Programmer, Kepala Sales */
+export const PREPARATION_CANCEL_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES"];
+
+/** Role yang handle delivery tracking */
 export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
   ...FULL_ACCESS, "PENGANTARAN", ...PREPARATION_PENYEDIA_ROLES,
 ];
 
-/** Semua yang bisa lihat penyiapan */
-export const PREPARATION_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS,
-  ...PREPARATION_SALES_ROLES,
-  ...PREPARATION_PENYEDIA_ROLES,
+/** (item 6) Role yang bisa LIHAT antrian masuk (sales dkk view-only) */
+export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...PREPARATION_DONE_ROLES, // penyedia + admin (bisa receive)
+  "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH", "ONPOINT",
   "PENGANTARAN",
-];
+]));
 
-/** Role yang MENJADI pengantar (bukan yang assign) */
+/** Semua yang bisa lihat penyiapan */
+export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PREPARATION_PENYEDIA_ROLES, ...PKL_PREP_ROLES,
+  "KEPALA_SALES", "KEPALA_ONPOINT", "PENGANTARAN",
+]));
+
+/** Role yang MENJADI pengantar */
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
 
 // ─── Voice / HT Roles ────────────────────────────────────────────────────────
@@ -203,7 +217,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
 
   "/payment": [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",   // ← "PENGANTARAN" dihapus
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
   ],
 
@@ -225,11 +239,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
+
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
@@ -242,17 +257,18 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/api/units/reserve": [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",   // ← "PENGANTARAN" dihapus
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
+
   "/api/units/hold": [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  ],
+  ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",   // ← "PENGANTARAN" dihapus
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+],
   "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES"],
   "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
@@ -295,7 +311,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── Preparation routes (dari origin/develop) ───────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
   // Antrian & Done = khusus Penyedia Barang + Admin
-  "/dashboard/preparation/antrian": [...PREPARATION_DONE_ROLES],
+  "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
   // Siap Kirim = Sales lihat dan dispatch (BARU dari origin/develop)
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
@@ -325,7 +341,7 @@ export const PERMISSIONS = {
   ] as UserRole[],
 
   CREATE_TRANSACTION: [
-    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",   // ← "PENGANTARAN" dihapus
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -340,7 +356,7 @@ export const PERMISSIONS = {
 
   RESERVE_UNIT: [
     ...FULL_ACCESS,
-    "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+    "KEPALA_SALES", "CREW_SALES", "SOTECH",                   // ← "PENGANTARAN" dihapus
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -404,6 +420,7 @@ export const PERMISSIONS = {
   /** Sales pilih metode pengiriman setelah penyedia done (dari origin/develop) */
   DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
+  CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
 
   // ── Voice HT ────────────────────────────────────────────────────────────────
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
