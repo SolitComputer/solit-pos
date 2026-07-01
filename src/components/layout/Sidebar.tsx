@@ -183,15 +183,36 @@ const Icons = {
       <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
     </svg>
   ),
+  mission: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };
 
-// ── Shared items ──────────────────────────────────────────────────────────────
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
 const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard/pkl-reports", icon: Icons.pklReport };
 const ITEM_ACCESSORIES: MenuItem = { name: "Data Aksesori", href: "/dashboard/accessories", icon: Icons.accessories };
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
+const ITEM_MISI: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.mission };
+
+function injectMissionMenu(groups: MenuGroup[]): MenuGroup[] {
+  const HREF = "/dashboard/missions";
+  if (groups.some(g => g.items.some(i => i.href === HREF))) return groups;
+  const clone = groups.map(g => ({ label: g.label, items: [...g.items] }));
+  const overview = clone.find(g => g.label === "Overview");
+  if (overview) {
+    const dashIdx = overview.items.findIndex(i => i.href === "/dashboard");
+    overview.items.splice(dashIdx >= 0 ? dashIdx + 1 : 0, 0, ITEM_MISI);
+  } else {
+    clone.unshift({ label: "Overview", items: [ITEM_MISI] });
+  }
+  return clone;
+}
 
 // ── Preparation Menu Groups (dari origin/develop) ─────────────────────────────
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
@@ -958,9 +979,10 @@ export default function Sidebar() {
         ? [user.role]
         : [];
 
-  const groups: MenuGroup[] = userRoles.length > 0
+  const baseGroups: MenuGroup[] = userRoles.length > 0
     ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
+  const groups: MenuGroup[] = injectMissionMenu(baseGroups);
 
   // ✅ Delivery badge (dari origin/develop)
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);

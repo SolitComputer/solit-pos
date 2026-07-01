@@ -310,6 +310,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
+
+  "/dashboard/missions": [...ALL_ROLES],
+  "/api/missions": [...ALL_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
