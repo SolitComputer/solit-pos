@@ -82,7 +82,7 @@ const ACCESS_TREE: DNode = {
     rnode("ACCOUNTING", [
       rnode("KEPALA_PENGELOLA_BARANG", [rnode("PENGELOLA_BARANG")]),
     ]),
-    { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer (Ikmal)", emoji: "💻", color: "#4f46e5", children: [] },
+    { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", emoji: "💻", color: "#4f46e5", children: [] },
     rnode("KEPALA_SOTECH", [rnode("SOTECH")]),
     rnode("KEPALA_ONPOINT", [rnode("ONPOINT")]),
   ],
