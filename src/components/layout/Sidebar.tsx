@@ -1,9 +1,16 @@
 "use client";
 // src/components/layout/Sidebar.tsx
+// ── MERGE NOTES ──────────────────────────────────────────────────────────────
+// Gabungan dua versi Sidebar:
+//  • Versi A (teman)  : basic + useDeliveryBadge
+//  • Versi B (Ikmal)  : + usePrepNotify / usePrepAlarm / unlockAudio / banner alarm
+// Strategi: UNION. Semua fitur & menu per-role dipertahankan (tidak ada yang hilang).
+// Fix: banner alarm versi B tadinya ditulis sebagai block-statement di body fungsi
+//      (jadi TIDAK pernah ter-render). Di sini banner dipindah ke dalam return JSX.
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { usePathname, useRouter } from "next/navigation"; // ← tambah useRouter
+import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
@@ -227,26 +234,28 @@ const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
   href: "/dashboard/preparation/pengantaran",
   icon: Icons.deliveryRoute,
 };
+const ITEM_ANTRIAN_MASUK: MenuItem = {
+  name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
+};
+
+// ── Preparation groups (UNION dari kedua versi; dedupe by href otomatis di mergeMenuGroups) ──
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
-    { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
+    { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    ITEM_ANTRIAN_MASUK,
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    // Penyedia TIDAK lihat Siap Kirim (itu urusan Sales)
   ],
-};
-
-const ITEM_ANTRIAN_MASUK: MenuItem = {
-  name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
 };
 
 const PREPARATION_SALES_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
     { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
-    ITEM_ANTRIAN_MASUK, // ← req 6
+    ITEM_ANTRIAN_MASUK,
   ],
 };
+
 const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
@@ -259,7 +268,7 @@ const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
 const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
-    ITEM_ANTRIAN_MASUK, // ← req 6: pengantaran bisa lihat antrian masuk
+    ITEM_ANTRIAN_MASUK, // pengantaran bisa lihat antrian masuk
     { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.pendingOrders },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
@@ -393,7 +402,36 @@ const PKL_MENU: MenuGroup[] = [
   },
 ];
 
-// ── Role → Menu mapping ───────────────────────────────────────────────────────
+// ── PKL Sales menu (punya akses preparation) — dipertahankan dari versi Ikmal ──
+const PKL_SALES_MENU: MenuGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+      ITEM_ABSENSI, ITEM_PKL_REPORT,
+    ],
+  },
+  {
+    label: "Inventaris",
+    items: [
+      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+    ],
+  },
+  {
+    label: "Transaksi",
+    items: [
+      { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+      { name: "Scanner", href: "/scan", icon: Icons.scanner },
+    ],
+  },
+  PREPARATION_SALES_MENU,          // Dashboard Penyiapan + Antrian Masuk (create)
+  PREPARATION_PENYEDIA_MENU,       // Antrian & Selesai (done)
+  PREPARATION_SALES_DELIVERY_MENU, // Siap Dikirim / Sedang Diantar / Riwayat (dispatch)
+];
+
+// ── Role → Menu mapping (UNION per-role — tidak ada menu yang hilang) ──────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
   PROGRAMMER: [
@@ -430,6 +468,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
     PREPARATION_SALES_DELIVERY_MENU,
   ],
   CREW_SALES: [
@@ -437,6 +476,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
     PREPARATION_SALES_DELIVERY_MENU,
   ],
   SOTECH: [
@@ -452,14 +492,26 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PENGANTARAN_TRANSAKSI,
     PREPARATION_PENGANTARAN_MENU,
   ],
-  KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  KEPALA_SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+  KEPALA_ONPOINT: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
   ],
   ONPOINT: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,          // union (dari versi teman)
+    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
+  ],
+  KEPALA_SOTECH: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,          // union (dari versi teman)
+    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
+    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
   ],
   TEKNISI: [
     {
@@ -597,8 +649,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
-    PREPARATION_SALES_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    PREPARATION_SALES_MENU,          // union (dari versi teman)
+    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
+    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
   ],
   PENYEDIA_BARANG: [
     {
@@ -661,7 +714,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
-  PKL_SALES: PKL_MENU,
+  PKL_SALES: PKL_SALES_MENU,          // union (menu spesial dari versi Ikmal)
   PKL_PENYEDIA_BARANG: PKL_MENU,
   PKL_SOTECH: PKL_MENU,
   PKL_ONPOINT: PKL_MENU,
@@ -749,7 +802,7 @@ function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-// ── Multi-role: tampilkan semua role sebagai badge bertumpuk (dari HEAD) ───────
+// ── Multi-role: tampilkan semua role sebagai badge bertumpuk ──────────────────
 function RoleBadges({ user }: { user: any }) {
   const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
   if (roles.length === 0) return null;
@@ -770,7 +823,7 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-// ── NavItem dengan badge support (dari origin/develop) ────────────────────────
+// ── NavItem dengan badge support ──────────────────────────────────────────────
 function NavItem({ item, isActive, onClick, badge }: {
   item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number;
 }) {
@@ -866,7 +919,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
-              {/* Multi-role badges dari HEAD */}
+              {/* Multi-role badges */}
               <RoleBadges user={user} />
             </div>
           </div>
@@ -962,12 +1015,12 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -1002,7 +1055,7 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  // ✅ Multi-role: ambil semua roles, merge menu (dari HEAD)
+  // ✅ Multi-role: ambil semua roles, merge menu
   const userRoles: string[] =
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
@@ -1014,6 +1067,7 @@ export default function Sidebar() {
     ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
 
+  // ✅ Prep notify + alarm (dari versi Ikmal)
   const prep = usePrepNotify(userRoles);
 
   useEffect(() => {
@@ -1028,6 +1082,7 @@ export default function Sidebar() {
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
 
+  // ✅ Delivery badge (dari versi teman) + badge antrian/siap-kirim (dari versi Ikmal)
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
@@ -1037,39 +1092,35 @@ export default function Sidebar() {
 
   void mounted;
 
-  {/* ── Banner alarm global (klik = buka + matikan bunyi) ── */ }
-  {
-    !onAntrian && prep.menungguUnacked.length > 0 && (
-      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
-        <button
-          onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }}
-          className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-        >
-          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          <span className="text-sm font-black">🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
-        </button>
-      </div>
-    )
-  }
-  {
-    !onSiapKirim && prep.siapKirimUnacked.length > 0 && (
-      <div
-        className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
-        style={{ top: (!onAntrian && prep.menungguUnacked.length > 0) ? 64 : 12 }}
-      >
-        <button
-          onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }}
-          className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-        >
-          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-          <span className="text-sm font-black">📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
-        </button>
-      </div>
-    )
-  }
-
   return (
     <>
+      {/* ── Banner alarm global (klik = buka + matikan bunyi) ── */}
+      {!onAntrian && prep.menungguUnacked.length > 0 && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
+          <button
+            onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }}
+            className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+          >
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span className="text-sm font-black">🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
+          </button>
+        </div>
+      )}
+      {!onSiapKirim && prep.siapKirimUnacked.length > 0 && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
+          style={{ top: (!onAntrian && prep.menungguUnacked.length > 0) ? 64 : 12 }}
+        >
+          <button
+            onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }}
+            className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+          >
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span className="text-sm font-black">📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
+          </button>
+        </div>
+      )}
+
       {/* Mobile toggle button */}
       <button
         onClick={() => setOpen(true)}
