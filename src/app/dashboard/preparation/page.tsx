@@ -335,14 +335,57 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   );
 }
 
+interface LeaderRow { name: string; total: number; }
+interface StatusCounts {
+  menunggu: number; diproses: number; siap_kirim: number; menunggu_pengantar: number;
+  dikirim: number; selesai: number; dibatalkan: number; total: number; unit_menunggu: number;
+}
+interface DashboardStats {
+  range?: { from: string | null; to: string | null; label: string };
+  status_counts: StatusCounts;
+  formats: LeaderRow[]; prepared: LeaderRow[]; delivered: LeaderRow[];
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const ymd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const localMidnightISO = (s: string) => new Date(`${s}T00:00:00`).toISOString();
+const nextDayISO = (s: string) => {
+  const d = new Date(`${s}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+};
+const fmtRange = (s: string) =>
+  new Date(`${s}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+
 export default function PreparationPage() {
+  // ── View & data ──
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+
   const [orders, setOrders] = useState<PrepOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [isLoading, setIsLoading] = useState(true);
+
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // ── Periode / kalender ──
+  const now0 = new Date();
+  const [fromDate, setFromDate] = useState(() => ymd(new Date(now0.getFullYear(), now0.getMonth(), 1)));
+  const [toDate, setToDate] = useState(() => ymd(now0));
+  const [allTime, setAllTime] = useState(false);
+  const [activePreset, setActivePreset] = useState<string>("month");
+
+  // ── Leaderboard / stats ──
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const [showCreate, setShowCreate] = useState(false);
   const [receivingId, setReceivingId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ title: string; sub: string } | null>(null);
   const [soundOn, setSoundOn] = useState(true);
@@ -351,12 +394,10 @@ export default function PreparationPage() {
 
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const knownIdsRef = useRef<Set<string>>(new Set());
+  const notifiedDoneRef = useRef<Set<string>>(new Set());
 
   const canCreate = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_PREPARATION) : false;
   const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
-
-  const [userId, setUserId] = useState<string | null>(null);
-  const notifiedDoneRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
 
@@ -380,16 +421,57 @@ export default function PreparationPage() {
     }).catch(() => { setUserRole(null); setUserId(null); });
   }, []);
 
-  const fetchOrders = useCallback(async () => {
+  // debounce search (biar nggak spam server tiap ketik)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // filter berubah → balik ke halaman 1
+  useEffect(() => { setPage(1); }, [statusFilter, debouncedSearch, fromDate, toDate, allTime]);
+
+  const periodParams = useCallback((qs: URLSearchParams) => {
+    if (!allTime) {
+      qs.set("from", localMidnightISO(fromDate));
+      qs.set("to", nextDayISO(toDate));
+    }
+    return qs;
+  }, [allTime, fromDate, toDate]);
+
+  const fetchList = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/preparation");
+      const qs = periodParams(new URLSearchParams());
+      qs.set("page", String(page));
+      qs.set("limit", String(PAGE_SIZE));
+      if (statusFilter !== "ALL") qs.set("status", statusFilter);
+      if (debouncedSearch.trim()) qs.set("search", debouncedSearch.trim());
+      const res = await fetch(`/api/preparation?${qs.toString()}`);
       const result = await res.json();
       const data: PrepOrder[] = result.data || [];
       setOrders(data);
+      setTotal(result.total ?? data.length);
       data.forEach(o => knownIdsRef.current.add(o.id));
-    } catch { setOrders([]); } finally { setIsLoading(false); }
-  }, []);
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+    } catch { setOrders([]); setTotal(0); } finally { setIsLoading(false); }
+  }, [periodParams, page, statusFilter, debouncedSearch]);
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const qs = allTime ? new URLSearchParams({ scope: "all" }) : periodParams(new URLSearchParams());
+      const res = await fetch(`/api/preparation/leaderboard?${qs.toString()}`);
+      const r = await res.json();
+      if (r.success) setStats(r);
+    } catch { /* keep last */ } finally { setStatsLoading(false); }
+  }, [allTime, periodParams]);
+
+  useEffect(() => { fetchList(); }, [fetchList]);
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // ref biar realtime nggak resubscribe tiap fetcher berubah
+  const fetchListRef = useRef(fetchList);
+  const fetchStatsRef = useRef(fetchStats);
+  useEffect(() => { fetchListRef.current = fetchList; fetchStatsRef.current = fetchStats; });
 
   useEffect(() => {
     if (!userRole) return;
@@ -402,27 +484,29 @@ export default function PreparationPage() {
         }
         if (row.id && !knownIdsRef.current.has(row.id)) {
           setNewIds(prev => new Set(prev).add(row.id));
-          setTimeout(() => setNewIds(prev => { const next = new Set(prev); next.delete(row.id); return next; }), 10000);
+          setTimeout(() => setNewIds(prev => { const n = new Set(prev); n.delete(row.id); return n; }), 10000);
         }
-        fetchOrders();
+        fetchListRef.current(); fetchStatsRef.current();
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "preparation_orders" }, (payload) => {
         const row: any = payload.new;
-        // notif ke pembuat format saat penyedia selesai cek (→ SIAP_KIRIM)
         if (
           row?.status === "SIAP_KIRIM" &&
-          userId && row.created_by === userId &&  
-          !isPrepSilent(userRole) &&              
+          userId && row.created_by === userId &&
+          !isPrepSilent(userRole) &&
           !notifiedDoneRef.current.has(row.id)
         ) {
           notifiedDoneRef.current.add(row.id);
           showToast("✅ Barang siap dikirim!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
         }
-        fetchOrders();
-      }).on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
+        fetchListRef.current(); fetchStatsRef.current();
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => {
+        fetchListRef.current(); fetchStatsRef.current();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userRole, userId, showToast, fetchOrders]);
+  }, [userRole, userId, showToast]);
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
@@ -436,47 +520,51 @@ export default function PreparationPage() {
     } catch { alert("Terjadi kesalahan"); } finally { setReceivingId(null); }
   };
 
-  const filtered = useMemo(() => {
-    let list = [...orders];
-    if (statusFilter !== "ALL") list = list.filter(o => o.status === statusFilter);
-    if (search.trim()) {
-      const t = search.toLowerCase();
-      list = list.filter(o =>
-        o.order_number.toLowerCase().includes(t) ||
-        o.customer_name.toLowerCase().includes(t) ||
-        (o.customer_phone || "").toLowerCase().includes(t) ||
-        o.preparation_items.some(it => it.serial_number.toLowerCase().includes(t))
-      );
-    }
-    return list;
-  }, [orders, statusFilter, search]);
+  // ── Preset kalender ──
+  const applyPreset = (key: string) => {
+    const now = new Date();
+    if (key === "today") { const t = ymd(now); setFromDate(t); setToDate(t); setAllTime(false); }
+    else if (key === "7d") { setFromDate(ymd(new Date(Date.now() - 6 * 86400000))); setToDate(ymd(now)); setAllTime(false); }
+    else if (key === "month") { setFromDate(ymd(new Date(now.getFullYear(), now.getMonth(), 1))); setToDate(ymd(now)); setAllTime(false); }
+    else if (key === "lastMonth") {
+      const f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const t = new Date(now.getFullYear(), now.getMonth(), 0);
+      setFromDate(ymd(f)); setToDate(ymd(t)); setAllTime(false);
+    } else if (key === "all") { setAllTime(true); }
+    setActivePreset(key);
+  };
 
-  const counts = useMemo(() => ({
-    ALL: orders.length,
-    MENUNGGU: orders.filter(o => o.status === "MENUNGGU").length,
-    DIPROSES: orders.filter(o => o.status === "DIPROSES").length,
-    DIKIRIM: orders.filter(o => o.status === "DIKIRIM").length,
-    SELESAI: orders.filter(o => o.status === "SELESAI").length,
-  }), [orders]);
+  const applyMonth = (m: string) => {
+    if (!/^\d{4}-\d{2}$/.test(m)) return;
+    const [y, mo] = m.split("-").map(Number);
+    const now = new Date();
+    const last = new Date(y, mo, 0);
+    setFromDate(ymd(new Date(y, mo - 1, 1)));
+    setToDate(ymd(last > now ? now : last));
+    setAllTime(false);
+    setActivePreset("custom");
+  };
 
-  const totalUnitMenunggu = useMemo(
-    () => orders.filter(o => o.status === "MENUNGGU").reduce((s, o) => s + o.preparation_items.length, 0),
-    [orders]
-  );
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const sc = stats?.status_counts;
+  const rangeLabel = allTime ? "Semua Waktu" : `${fmtRange(fromDate)} — ${fmtRange(toDate)}`;
+  const monthValue = fromDate.slice(0, 7);
 
-  const TABS = [
-    { value: "ALL", label: "Semua" },
-    { value: "MENUNGGU", label: "Menunggu" },
-    { value: "DIPROSES", label: "Diproses" },
-    { value: "DIKIRIM", label: "Dikirim" },
-    { value: "SELESAI", label: "Selesai" },
+  const inputCls = "h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition disabled:opacity-50 disabled:cursor-not-allowed";
+
+  const PRESETS = [
+    { key: "today", label: "Hari Ini" },
+    { key: "7d", label: "7 Hari" },
+    { key: "month", label: "Bulan Ini" },
+    { key: "lastMonth", label: "Bulan Lalu" },
+    { key: "all", label: "Semua" },
   ];
 
   const STAT_CARDS = [
-    { label: "Menunggu", value: counts.MENUNGGU, color: "amber", icon: "⏳" },
-    { label: "Diproses", value: counts.DIPROSES, color: "blue", icon: "🔧" },
-    { label: "Dikirim", value: counts.DIKIRIM, color: "violet", icon: "🚚" },
-    { label: "Selesai", value: counts.SELESAI, color: "emerald", icon: "✅" },
+    { key: "MENUNGGU", label: "Menunggu", value: sc?.menunggu ?? 0, color: "amber", icon: "⏳" },
+    { key: "DIPROSES", label: "Diproses", value: sc?.diproses ?? 0, color: "blue", icon: "🔧" },
+    { key: "DIKIRIM", label: "Dikirim", value: sc?.dikirim ?? 0, color: "violet", icon: "🚚" },
+    { key: "SELESAI", label: "Selesai", value: sc?.selesai ?? 0, color: "emerald", icon: "✅" },
   ];
   const statColor: Record<string, string> = {
     amber: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
@@ -484,6 +572,22 @@ export default function PreparationPage() {
     violet: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700",
     emerald: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
   };
+
+  const boardGroups = [
+    { key: "formats", title: "Paling Banyak Buat Format", sub: "Sales input penyiapan", icon: "📝", rows: stats?.formats ?? [] },
+    { key: "prepared", title: "Paling Banyak Menyiapkan", sub: "Penyedia cek → siap kirim", icon: "📦", rows: stats?.prepared ?? [] },
+    { key: "delivered", title: "Paling Banyak Mengantar", sub: "Pengantar selesai antar", icon: "🛵", rows: stats?.delivered ?? [] },
+  ];
+  const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
+
+  const TABS = [
+    { value: "ALL", label: "Semua" },
+    { value: "MENUNGGU", label: "Menunggu" },
+    { value: "DIPROSES", label: "Diproses" },
+    { value: "SIAP_KIRIM", label: "Siap Kirim" },
+    { value: "DIKIRIM", label: "Dikirim" },
+    { value: "SELESAI", label: "Selesai" },
+  ];
 
   return (
     <DashboardLayout>
@@ -506,6 +610,7 @@ export default function PreparationPage() {
         )}
 
         <div className="max-w-5xl mx-auto space-y-5">
+          {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
@@ -516,12 +621,8 @@ export default function PreparationPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">
-                    Dashboard Penyiapan  {/* was "Penyiapan Barang" */}
-                  </h1>
-                  <p className="text-xs text-gray-400 mt-0.5 font-medium">
-                    Format SN dari sales → disiapkan penyedia barang
-                  </p>                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Dashboard Penyiapan</h1>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />LIVE
                   </span>
                 </div>
@@ -548,76 +649,172 @@ export default function PreparationPage() {
             </div>
           </div>
 
+          {/* View toggle */}
+          <div className="inline-flex bg-white border border-gray-200 rounded-xl p-1 gap-1">
+            {[
+              { v: "list", label: "📋 Daftar" },
+              { v: "board", label: "🏆 Papan Peringkat" },
+            ].map(t => (
+              <button key={t.v} onClick={() => setViewMode(t.v as "list" | "board")}
+                className={`px-4 h-9 rounded-lg text-sm font-bold transition ${viewMode === t.v ? "bg-[#1a1a2e] text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Periode / kalender */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {PRESETS.map(p => (
+                <button key={p.key} onClick={() => applyPreset(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${activePreset === p.key ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  {p.label}
+                </button>
+              ))}
+              <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg">
+                📅 {rangeLabel}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Dari</label>
+                <input type="date" value={fromDate} max={toDate} disabled={allTime}
+                  onChange={e => { setAllTime(false); setActivePreset("custom"); setFromDate(e.target.value); }} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sampai</label>
+                <input type="date" value={toDate} min={fromDate} max={ymd(new Date())} disabled={allTime}
+                  onChange={e => { setAllTime(false); setActivePreset("custom"); setToDate(e.target.value); }} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Pilih Bulan</label>
+                <input type="month" value={monthValue} max={ymd(new Date()).slice(0, 7)} disabled={allTime}
+                  onChange={e => applyMonth(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stat cards (berbasis periode terpilih) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {STAT_CARDS.map(s => (
-              <button key={s.label} onClick={() => setStatusFilter(s.label === "Menunggu" ? "MENUNGGU" : s.label === "Diproses" ? "DIPROSES" : s.label === "Dikirim" ? "DIKIRIM" : "SELESAI")}
+              <button key={s.key} onClick={() => { setViewMode("list"); setStatusFilter(s.key); }}
                 className={`bg-gradient-to-br ${statColor[s.color]} border rounded-2xl p-3 text-left transition hover:scale-[1.02] active:scale-95`}>
                 <div className="flex items-center justify-between">
                   <span className="text-lg">{s.icon}</span>
-                  <span className="text-2xl font-black tabular-nums">{s.value}</span>
+                  <span className="text-2xl font-black tabular-nums">{statsLoading ? "…" : s.value}</span>
                 </div>
                 <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
               </button>
             ))}
           </div>
 
-          {canDone && counts.MENUNGGU > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-              <span className="text-2xl">📥</span>
-              <div>
-                <p className="text-sm font-bold text-amber-800">{counts.MENUNGGU} penyiapan menunggu diproses</p>
-                <p className="text-xs text-amber-600">Total {totalUnitMenunggu} unit perlu disiapkan</p>
+          {/* ── BOARD ── */}
+          {viewMode === "board" ? (
+            <>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                <span className="text-2xl">🏆</span>
+                <div>
+                  <p className="text-sm font-bold text-indigo-800">Papan Peringkat · {rangeLabel}</p>
+                  <p className="text-xs text-indigo-600">Default bulan berjalan (reset otomatis tiap bulan). Ganti periode/pilih bulan untuk lihat bulan sebelumnya.</p>
+                </div>
               </div>
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3 sticky top-2 z-20">
-            <div className="flex flex-wrap gap-1.5">
-              {TABS.map(t => (
-                <button key={t.value} onClick={() => setStatusFilter(t.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${statusFilter === t.value ? "bg-[#1a1a2e] text-white" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>
-                  {t.label}
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${statusFilter === t.value ? "bg-white/20" : "bg-gray-100 text-gray-500"}`}>
-                    {counts[t.value as keyof typeof counts]}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nomor, customer, WA, SN..."
-                className="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
-            </div>
-            {(search || statusFilter !== "ALL") && (
-              <p className="text-[11px] text-gray-400 px-1">
-                Menampilkan <span className="font-bold text-gray-600">{filtered.length}</span> dari {orders.length} penyiapan
-              </p>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2.5">{[1, 2, 3].map(i => <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
-          ) : filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-              <div className="text-4xl mb-3 opacity-40">📦</div>
-              <p className="text-gray-500 text-sm font-medium">
-                {search || statusFilter !== "ALL" ? "Tidak ada penyiapan yang cocok" : "Belum ada penyiapan barang"}
-              </p>
-              {(search || statusFilter !== "ALL") && (
-                <button onClick={() => { setSearch(""); setStatusFilter("ALL"); }} className="mt-3 text-xs text-blue-600 hover:underline">Reset filter</button>
-              )}
-            </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                {boardGroups.map(g => (
+                  <div key={g.key} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <span className="text-xl">{g.icon}</span>
+                      <div>
+                        <h3 className="text-sm font-black text-gray-800 leading-tight">{g.title}</h3>
+                        <p className="text-[11px] text-gray-400">{g.sub}</p>
+                      </div>
+                    </div>
+                    {statsLoading ? (
+                      <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                    ) : g.rows.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-gray-400">Belum ada data di periode ini</div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {g.rows.slice(0, 10).map((r, i) => (
+                          <div key={r.name + i}
+                            className={`flex items-center gap-3 rounded-xl px-3 py-2 border ${i === 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"}`}>
+                            <span className={`w-7 text-center text-sm font-black ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
+                            <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
+                            <span className="text-sm font-black text-gray-900 tabular-nums">{r.total}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-              {filtered.map(o => (
-                <OrderCard key={o.id} o={o} canReceive={canDone} receivingId={receivingId} onReceive={handleReceive} isNew={newIds.has(o.id)} />
-              ))}
-            </div>
+            /* ── LIST ── */
+            <>
+              {canDone && (sc?.menunggu ?? 0) > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-2xl">📥</span>
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">{sc?.menunggu} penyiapan menunggu diproses</p>
+                    <p className="text-xs text-amber-600">Total {sc?.unit_menunggu ?? 0} unit perlu disiapkan</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3 sticky top-2 z-20">
+                <div className="flex flex-wrap gap-1.5">
+                  {TABS.map(t => (
+                    <button key={t.value} onClick={() => setStatusFilter(t.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${statusFilter === t.value ? "bg-[#1a1a2e] text-white" : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nomor, customer, WA, SN..."
+                    className="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-2.5">{[1, 2, 3].map(i => <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
+              ) : orders.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
+                  <div className="text-4xl mb-3 opacity-40">📦</div>
+                  <p className="text-gray-500 text-sm font-medium">
+                    {debouncedSearch || statusFilter !== "ALL" || !allTime ? "Tidak ada penyiapan yang cocok di periode/filter ini" : "Belum ada penyiapan barang"}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+                    {orders.map(o => (
+                      <OrderCard key={o.id} o={o} canReceive={canDone} receivingId={receivingId} onReceive={handleReceive} isNew={newIds.has(o.id)} />
+                    ))}
+                  </div>
+
+                  {total > PAGE_SIZE && (
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <p className="text-xs text-gray-400">
+                        Halaman <span className="font-bold text-gray-600">{page}</span> dari {totalPages} · {total} total
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button disabled={page <= 1 || isLoading} onClick={() => setPage(p => Math.max(1, p - 1))}
+                          className="h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition">← Sebelumnya</button>
+                        <button disabled={page >= totalPages || isLoading} onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                          className="h-9 px-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition">Berikutnya →</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
       </main>
 
-      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={fetchOrders} />}
+      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={() => { fetchList(); fetchStats(); }} />}
     </DashboardLayout>
   );
 }
