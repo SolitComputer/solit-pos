@@ -1,24 +1,3 @@
-// src/lib/permissions.ts
-// ── MERGE NOTES ──────────────────────────────────────────────────────────────
-// Gabungan dua versi permissions:
-//   • Versi A (teman/develop) : PKL_PREP_ROLES, PREPARATION_CANCEL_ROLES,
-//     PREPARATION_ANTRIAN_VIEW_ROLES, + sengaja HAPUS "PENGANTARAN" dari
-//     payment/reserve/hold/create-transaction.
-//   • Versi B (Ikmal/HEAD)    : PREPARATION_PENYEDIA_EXTRA_ROLES, PKL_SALES di
-//     banyak route.
-//
-// Strategi: UNION (semua role & konstanta dipertahankan). Untuk titik yang
-// SALING KONFLIK (satu sisi menghapus role, sisi lain menahannya) — default di
-// sini mengikuti "jangan ada yang kehapus" (role tetap ADA) dan ditandai:
-//     ⚠️ MERGE-CONFLICT: <role> ...
-//
-// KEPUTUSAN FINAL (per request Ikmal):
-//   • PENGANTARAN (kurir) TIDAK boleh bayar / buat transaksi / reserve / hold.
-//     Sudah dihapus dari: /payment, /api/transaction/create, /api/units/reserve,
-//     /api/units/hold, CREATE_TRANSACTION, RESERVE_UNIT. (mengikuti versi teman)
-//   • Konflik lain yang masih ada tanda ⚠️ (mis. DONE_PREPARATION extra roles)
-//     belum diputuskan — hapus baris ber-⚠️ bila setuju versi teman.
-
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -51,7 +30,7 @@ export type UserRole =
   | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
-// ─── Default Redirect ─────────────────────────────────────────────────────────
+
 export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   ADMIN: "/dashboard",
   PROGRAMMER: "/dashboard",
