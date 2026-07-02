@@ -5,6 +5,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
+import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 interface MyDelivery {
@@ -15,23 +16,28 @@ interface MyDelivery {
   return_started_at: string | null; returned_at: string | null;
   delivery_distance_m: number | null; delivery_duration_s: number | null;
   created_at: string; updated_at: string;
-  preparation_items: PrepItem[];
+  preparation_items: PrepItem[]; scheduled_delivery_date: string | null;
 }
 
-type Phase = "PERLU_ANTAR" | "SEDANG_ANTAR" | "PULANG" | "SELESAI";
+type Phase = "MENUNGGU_SETUJU" | "PERLU_ANTAR" | "SEDANG_ANTAR" | "PULANG" | "SELESAI";
 
 function getPhase(o: MyDelivery): Phase {
+  if (o.status === "MENUNGGU_PENGANTAR") return "MENUNGGU_SETUJU";
   if (o.status === "DIKIRIM") return o.delivery_started_at ? "SEDANG_ANTAR" : "PERLU_ANTAR";
   if (o.status === "SELESAI" && o.return_started_at && !o.returned_at) return "PULANG";
   return "SELESAI";
 }
 
 const PHASE_META: Record<Phase, { label: string; badge: string; dot: string; cta: string; pulse?: boolean }> = {
+  MENUNGGU_SETUJU: { label: "Perlu Disetujui", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500", cta: "✅ Setujui Tugas", pulse: true },
   PERLU_ANTAR: { label: "Perlu Diantar", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", cta: "🎯 Mulai Antar", pulse: true },
   SEDANG_ANTAR: { label: "Sedang Diantar", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", cta: "📍 Lanjutkan Antar", pulse: true },
   PULANG: { label: "Perjalanan Pulang", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", cta: "🏠 Lihat Perjalanan", pulse: true },
   SELESAI: { label: "Selesai", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", cta: "Lihat Detail" },
 };
+
+const fmtSched = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" });
 
 function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
   const phase = getPhase(o);
@@ -66,6 +72,13 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
         <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-2 flex items-start gap-2">
           <span className="text-sm flex-shrink-0">📍</span>
           <p className="text-xs text-gray-600 leading-snug">{o.delivery_address}</p>
+        </div>
+      )}
+
+      {o.scheduled_delivery_date && (
+        <div className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1 mb-2">
+          <span className="text-xs">📅</span>
+          <span className="text-[11px] font-bold text-indigo-700">Antar: {fmtSched(o.scheduled_delivery_date)}</span>
         </div>
       )}
 
@@ -177,6 +190,16 @@ export default function MyDeliveryPage() {
     return { perlu, jalan, selesai, all: orders.length, aktif: perlu + jalan };
   }, [orders]);
 
+  const perluSetuju = useMemo(
+    () => orders.filter((o) => o.status === "MENUNGGU_PENGANTAR"),
+    [orders]
+  );
+  const { unackedIds: alarmIds, acknowledge: ackApproval } = usePrepAlarm(
+    perluSetuju,
+    ALARM_KEYS.APPROVAL,
+    soundOn
+  );
+
   const filtered = useMemo(() => {
     let list = [...orders];
     if (filter === "AKTIF") list = list.filter((o) => getPhase(o) !== "SELESAI");
@@ -191,7 +214,7 @@ export default function MyDeliveryPage() {
         (o.preparation_items ?? []).some((it) => it.serial_number.toLowerCase().includes(t))
       );
     }
-    const rank: Record<Phase, number> = { PERLU_ANTAR: 0, SEDANG_ANTAR: 1, PULANG: 2, SELESAI: 3 };
+    const rank: Record<Phase, number> = { MENUNGGU_SETUJU: 0, PERLU_ANTAR: 1, SEDANG_ANTAR: 2, PULANG: 3, SELESAI: 4 };
     return list.sort((a, b) => {
       const ra = rank[getPhase(a)], rb = rank[getPhase(b)];
       if (ra !== rb) return ra - rb;
@@ -314,7 +337,11 @@ export default function MyDeliveryPage() {
             </div>
           ) : (
             <div className="space-y-2.5">
-              {filtered.map((o) => <DeliveryCard key={o.id} o={o} isNew={newIds.has(o.id)} />)}
+              {filtered.map((o) => (
+                <div key={o.id} onClick={() => ackApproval(o.id)}>
+                  <DeliveryCard o={o} isNew={newIds.has(o.id) || alarmIds.has(o.id)} />
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -4,6 +4,13 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { PREPARATION_VIEW_ROLES, PREPARATION_CREATE_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
+// helper: "besok" dalam WIB (Vercel jalan di UTC)
+function tomorrowWIB(): string {
+  const nowWIB = new Date(Date.now() + 7 * 3600_000);
+  nowWIB.setUTCDate(nowWIB.getUTCDate() + 1);
+  return nowWIB.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
 // Nomor order: PREP-YYYYMMDD-XXXX
 async function generateOrderNumber(): Promise<string> {
   const now = new Date();
@@ -54,7 +61,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { customer_name, customer_phone, notes, items, delivery_address } = body;
+    const { customer_name, customer_phone, notes, items, delivery_address, scheduled_delivery_date } = body;
 
     if (!customer_name || !String(customer_name).trim()) {
       return NextResponse.json({ success: false, message: "Nama customer wajib diisi" }, { status: 400 });
@@ -76,6 +83,19 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: "Serial number tidak boleh kosong" }, { status: 400 });
     }
 
+    // validasi jadwal antar — minimal besok (req 8)
+    let schedDate: string | null = null;
+    if (scheduled_delivery_date) {
+      const minDate = tomorrowWIB();
+      if (scheduled_delivery_date < minDate) {
+        return NextResponse.json(
+          { success: false, message: "Jadwal antar paling cepat besok" },
+          { status: 400 }
+        );
+      }
+      schedDate = scheduled_delivery_date;
+    }
+
     const order_number = await generateOrderNumber();
 
     const { data: order, error: orderError } = await supabase
@@ -85,6 +105,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         customer_name: String(customer_name).trim(),
         customer_phone: customer_phone ?? null,
         delivery_address: delivery_address ?? null,
+        scheduled_delivery_date: schedDate,   // ← baru
         notes: notes ?? null,
         status: "MENUNGGU",
         created_by: user.id,
@@ -101,7 +122,6 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .insert(cleanItems.map((it) => ({ preparation_id: order.id, ...it })));
 
     if (itemsError) {
-      // rollback header kalau item gagal (hindari order "yatim")
       await supabase.from("preparation_orders").delete().eq("id", order.id);
       throw itemsError;
     }

@@ -1,24 +1,33 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { isFullAccess, isDivisionHead, getSubordinateRoles, isSubordinate, DIVISION_MAP  } from "@/lib/permissions";
+import { isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
-
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ── Multi-role helper ─────────────────────────────────────────────────────────
+// Ambil semua role user (dukung akun multi-role; fallback ke single role).
+function rolesOf(user: any): string[] {
+  return Array.isArray(user?.roles) && user.roles.length > 0
+    ? user.roles
+    : user?.role ? [user.role] : [];
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
+    const userRoles = rolesOf(user);
+
     const { searchParams } = new URL(request.url);
-    const year  = searchParams.get("year");
+    const year = searchParams.get("year");
     const month = searchParams.get("month");
 
-    // ← Gunakan select tanpa FK join dulu (lebih aman, hindari FK name salah)
+    // Gunakan select tanpa FK join dulu (lebih aman, hindari FK name salah)
     let query = supabase
       .from("user_date_off")
       .select("id, user_id, off_date, note, notes, swap_group_id, created_at")
@@ -28,25 +37,27 @@ export async function GET(request: Request) {
     if (year && month) {
       const y = parseInt(year);
       const m = parseInt(month);
-      const firstDay   = `${y}-${String(m).padStart(2, "0")}-01`;
-      const lastDay    = new Date(y, m, 0);
+      const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m, 0);
       const lastDayStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
       query = query.gte("off_date", firstDay).lte("off_date", lastDayStr);
     }
 
-    // Scope by role
-    if (isFullAccess(user.role)) {
+    // Scope by role (multi-role aware)
+    if (isFullAccessMulti(userRoles)) {
       // lihat semua, tidak perlu filter
-    } else if (isDivisionHead(user.role)) {
-      const subordinateRoles = DIVISION_MAP[user.role] ?? [];
-      const { data: subUsers } = await supabase
-        .from("users")
-        .select("id")
-        .in("role", subordinateRoles as string[]);
-      const subIds = (subUsers ?? []).map((u: any) => u.id);
-      query = query.in("user_id", [user.id, ...subIds]);
     } else {
-      query = query.eq("user_id", user.id);
+      const subordinateRoles = getEffectiveSubordinates(userRoles); // union semua role
+      if (subordinateRoles.length > 0) {
+        const { data: subUsers } = await supabase
+          .from("users")
+          .select("id")
+          .in("role", subordinateRoles as string[]);
+        const subIds = (subUsers ?? []).map((u: any) => u.id);
+        query = query.in("user_id", [user.id, ...subIds]);
+      } else {
+        query = query.eq("user_id", user.id);
+      }
     }
 
     const { data, error } = await query;
@@ -68,8 +79,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    // Hanya full access atau kepala divisi yang bisa set libur untuk orang lain
-    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    const userRoles = rolesOf(user);
+
+    // Hanya full access atau kepala divisi (satu/lebih) yang bisa set libur untuk orang lain
+    const canManage = isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
     if (!canManage) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
@@ -85,8 +98,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Format tanggal: YYYY-MM-DD" }, { status: 400 });
     }
 
-    // Kepala divisi: validasi target user adalah bawahannya
-    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+    // Kepala divisi (bukan full access): validasi target user adalah salah satu bawahannya
+    if (!isFullAccessMulti(userRoles)) {
       const { data: targetUser, error: targetErr } = await supabase
         .from("users")
         .select("id, role")
@@ -97,7 +110,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
       }
 
-      if (!isSubordinate(user.role, targetUser.role)) {
+      if (!(getEffectiveSubordinates(userRoles) as string[]).includes(targetUser.role)) {
         return NextResponse.json(
           { success: false, message: "User bukan anggota divisi kamu" },
           { status: 403 }
@@ -107,9 +120,10 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("user_date_off")
-      .upsert({ user_id, off_date, note: notes || null,
-        created_by: user.id,
-      }, { onConflict: "user_id,off_date" })
+      .upsert(
+        { user_id, off_date, note: notes || null, created_by: user.id },
+        { onConflict: "user_id,off_date" }
+      )
       .select()
       .single();
 
@@ -127,7 +141,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const canManage = isFullAccess(user.role) || isDivisionHead(user.role);
+    const userRoles = rolesOf(user);
+
+    const canManage = isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
     if (!canManage) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
@@ -140,15 +156,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, message: "user_id dan off_date wajib" }, { status: 400 });
     }
 
-    // Kepala divisi: validasi target user adalah bawahannya
-    if (isDivisionHead(user.role) && !isFullAccess(user.role)) {
+    // Kepala divisi (bukan full access): validasi target user adalah salah satu bawahannya
+    if (!isFullAccessMulti(userRoles)) {
       const { data: targetUser } = await supabase
         .from("users")
         .select("id, role")
         .eq("id", user_id)
         .single();
 
-      if (!targetUser || !isSubordinate(user.role, targetUser.role)) {
+      if (!targetUser || !(getEffectiveSubordinates(userRoles) as string[]).includes(targetUser.role)) {
         return NextResponse.json(
           { success: false, message: "User bukan anggota divisi kamu" },
           { status: 403 }

@@ -4,6 +4,11 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { PREPARATION_DELIVERY_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
+function todayWIB(): string {
+  const nowWIB = new Date(Date.now() + 7 * 3600_000);
+  return nowWIB.toISOString().slice(0, 10);
+}
+
 interface Props { params: Promise<{ id: string }>; }
 
 // action: START | COMPLETE | RETURN_START | RETURN_COMPLETE
@@ -18,8 +23,14 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const now = new Date().toISOString();
 
-    // ── MULAI ANTAR ── (pengantar pilih tujuan + rute di sini)
     if (action === "START") {
+      if (order.scheduled_delivery_date && order.scheduled_delivery_date > todayWIB()) {
+        return NextResponse.json({
+          success: false,
+          message: `Belum waktunya. Dijadwalkan diantar ${order.scheduled_delivery_date}.`,
+        }, { status: 400 });
+      }
+
       if (order.status !== "DIKIRIM")
         return NextResponse.json({ success: false, message: `Status bukan pengiriman (${order.status})` }, { status: 400 });
       if (order.delivery_method !== "PENGANTARAN")

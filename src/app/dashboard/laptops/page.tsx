@@ -226,10 +226,10 @@ function DeleteConfirmModal({
                             onChange={e => setInputName(e.target.value)}
                             placeholder="Ketik nama laptop di atas..."
                             className={`w-full h-11 border rounded-xl px-3.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200 ${inputName.length > 0
-                                    ? isMatch
-                                        ? "border-green-400 focus:ring-green-200 bg-green-50/30"
-                                        : "border-red-300 focus:ring-red-200"
-                                    : "border-gray-200 focus:ring-gray-200"
+                                ? isMatch
+                                    ? "border-green-400 focus:ring-green-200 bg-green-50/30"
+                                    : "border-red-300 focus:ring-red-200"
+                                : "border-gray-200 focus:ring-gray-200"
                                 }`}
                             autoFocus
                         />
@@ -298,12 +298,16 @@ export default function Page() {
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
     const canExport = hasAnyRole(userRoles, [
-        "ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
         "MARKETING", "KEPALA_MARKETING",
     ] as UserRole[]);
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
-    const canViewTotalStok = hasAnyRole(userRoles, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG"] as UserRole[]);
-    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    const canViewTotalStok = hasAnyRole(userRoles, [
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+    ] as UserRole[]);
+     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);

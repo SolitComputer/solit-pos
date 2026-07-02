@@ -13,7 +13,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         .select("*", { count: "exact", head: true })
         .eq("delivery_user_id", user.id)
         .eq("delivery_method", "PENGANTARAN")
-        .eq("status", "DIKIRIM");
+        .in("status", ["MENUNGGU_PENGANTAR", "DIKIRIM"])
       if (error) throw error;
       return NextResponse.json({ success: true, count: count ?? 0 });
     }
@@ -23,7 +23,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       .select("*, preparation_items(*)")
       .eq("delivery_user_id", user.id)
       .eq("delivery_method", "PENGANTARAN")
-      .in("status", ["DIKIRIM", "SELESAI"])
+      .in("status", ["MENUNGGU_PENGANTAR", "DIKIRIM"])
       .order("updated_at", { ascending: false })
       .limit(60);
     if (error) throw error;

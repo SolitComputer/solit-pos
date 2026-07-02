@@ -13,6 +13,8 @@
     "@ducanh2912/next-pwa": "^10.2.9",
     "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.105.4",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "axios": "^1.16.0",
     "bcryptjs": "^3.0.3",
     "browser-image-compression": "^2.0.2",

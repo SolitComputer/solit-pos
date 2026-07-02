@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 import { HTCallProvider } from "@/contexts/HTCallContext";
+import ConfirmDialog from "../ui/ConfirmDialog";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -50,7 +51,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="w-9" />
           </div>
 
-          {/* Tidak perlu pb extra karena chat sekarang floating, tidak ada bar bawah */}
           <main className="flex-1">
             <div className="p-4 lg:p-5 max-w-[1280px]">
               {children}
@@ -58,6 +58,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
       </div>
+
+      <ConfirmDialog />   {/* ← mount sekali, dipakai semua confirm() di dashboard */}
     </HTCallProvider>
   );
 }

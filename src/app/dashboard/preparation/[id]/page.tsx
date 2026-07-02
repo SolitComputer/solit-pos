@@ -7,12 +7,13 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import DeliveryMap, { type TrackPoint } from "@/components/preparation/DeliveryMap";
 import StartTripModal, { type StartTripPayload } from "@/components/preparation/StartTripModal";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { computeSpeedKmh } from "@/lib/geo";
 import { useDeliveryTracker, type TrackerPoint } from "@/hooks/useDeliveryTracker";
 import TrackingStatusBadge from "@/components/preparation/TrackingStatusBadge";
 import DeliveryVoiceHT from "@/components/preparation/DeliveryVoiceHT";
 import { supabase } from "@/services/supabase";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
@@ -32,11 +33,29 @@ interface PrepOrder {
     courier_service: string | null; courier_tracking_number: string | null; courier_note: string | null;
     transaction_invoice: string | null;
     tracking_status: string | null; tracking_reason: string | null; tracking_last_ping: string | null;
-    created_at: string; preparation_items: PrepItem[];
+    // ── persetujuan pengantar (item 1) ──
+    delivery_accepted_at: string | null; delivery_declined_at: string | null; delivery_decline_reason: string | null;
+    // ── batalkan pesanan (item 4) ──
+    cancelled_at: string | null; cancelled_by_name: string | null; cancel_reason: string | null;
+    created_at: string; preparation_items: PrepItem[]; scheduled_delivery_date: string | null;
 }
 
 const fmtFull = (iso: string) =>
     new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+const fmtDate = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+
+const todayLocal = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const addDaysLocal = (n: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 function fmtElapsed(ms: number): string {
     if (ms < 0) ms = 0;
@@ -46,7 +65,6 @@ function fmtElapsed(ms: number): string {
     return h > 0 ? `${pad(h)}:${pad(m)}:${pad(ss)}` : `${pad(m)}:${pad(ss)}`;
 }
 
-// Tambah setelah fmtElapsed()
 function isMapUrl(str: string | null): boolean {
     if (!str) return false;
     return /^https?:\/\//i.test(str.trim());
@@ -71,11 +89,12 @@ function AddressDisplay({ address, className }: { address: string; className?: s
     return <span className={className}>{address}</span>;
 }
 
-// Status includes new SIAP_KIRIM
+// Status includes SIAP_KIRIM + MENUNGGU_PENGANTAR (persetujuan pengantar)
 const STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
     MENUNGGU: { label: "Menunggu", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
     DIPROSES: { label: "Diproses", badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
     SIAP_KIRIM: { label: "Siap Kirim", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+    MENUNGGU_PENGANTAR: { label: "Menunggu Pengantar", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-400" },
     DIKIRIM: { label: "Dikirim", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500" },
     SELESAI: { label: "Selesai", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
     DIBATALKAN: { label: "Batal", badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400" },
@@ -96,6 +115,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
     const [driversLoading, setDriversLoading] = useState(false);
     const [driverId, setDriverId] = useState("");
     const [driverName, setDriverName] = useState("");
+    const [schedule, setSchedule] = useState<"TODAY" | "TOMORROW">("TODAY");
 
     useEffect(() => {
         if (method !== "PENGANTARAN" || drivers.length > 0) return;
@@ -122,6 +142,10 @@ function DispatchModal({ order, onClose, onDispatched }: {
                     delivery_address: address.trim() || null,
                     delivery_user_id: method === "PENGANTARAN" ? driverId : null,
                     delivery_user_name: method === "PENGANTARAN" ? driverName : null,
+                    scheduled_delivery_date:
+                        method === "PENGANTARAN"
+                            ? (schedule === "TODAY" ? todayLocal() : addDaysLocal(1))
+                            : null,   // ← baru
                     courier_service: courierService.trim() || null,
                     courier_tracking_number: trackingNumber.trim() || null,
                     courier_note: courierNote.trim() || null,
@@ -138,7 +162,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
 
     const OPTIONS = [
         { value: "DIAMBIL_CUSTOMER", icon: "🧍", title: "Langsung Diambil Customer", desc: "Customer ambil ke toko, langsung selesai" },
-        { value: "PENGANTARAN", icon: "🛵", title: "Diantar Role Pengantaran", desc: "Pengantar yang dipilih akan dapat notifikasi tugas baru" },
+        { value: "PENGANTARAN", icon: "🛵", title: "Diantar Role Pengantaran", desc: "Pengantar dapat notif tugas & harus menyetujui dulu" },
         { value: "KURIR", icon: "📦", title: "Diantar Kurir", desc: "Jasa kurir pihak ketiga (JNE, J&T, dll)" },
     ] as const;
 
@@ -190,7 +214,6 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     </div>
                                 )}
                             </div>
-                            {/* Dalam bagian input Alamat Tujuan di DispatchModal */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Alamat Tujuan *</label>
                                 <input
@@ -203,8 +226,25 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     💡 Bisa isi alamat biasa atau paste link Google Maps / Waze
                                 </p>
                             </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">Jadwal Antar *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button type="button" onClick={() => setSchedule("TODAY")}
+                                        className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TODAY" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                                        🚀 Antar Hari Ini
+                                    </button>
+                                    <button type="button" onClick={() => setSchedule("TOMORROW")}
+                                        className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TOMORROW" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                                        📅 Antar Besok
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-violet-500 mt-1">
+                                    {schedule === "TODAY"
+                                        ? "Pengantar bisa langsung mulai antar hari ini."
+                                        : `Pengantar baru bisa mulai antar besok (${addDaysLocal(1)}).`}
+                                </p>
+                            </div>
 
-                            {/* Jika sudah ada URL, preview link */}
                             {isMapUrl(address) && (
                                 <a
                                     href={address}
@@ -215,7 +255,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     🗺️ Preview Maps →
                                 </a>
                             )}
-                            <p className="text-[11px] text-violet-600">📲 Pengantar yang dipilih akan menerima notifikasi dan dapat mulai tracking.</p>
+                            <p className="text-[11px] text-violet-600">📲 Pengantar yang dipilih akan menerima notifikasi dan harus menyetujui tugas sebelum mulai antar.</p>
                         </div>
                     )}
 
@@ -299,9 +339,68 @@ function DoneModal({ order, onClose, onDone }: {
     );
 }
 
+// ── CancelModal: konfirmasi + alasan pembatalan ──────────────────────────────
+function CancelModal({ order, onClose, onCancelled }: {
+    order: PrepOrder; onClose: () => void; onCancelled: () => void;
+}) {
+    const [reason, setReason] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/preparation/${order.id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: reason.trim() || null }),
+            });
+            const result = await res.json();
+            if (!result.success) { setError(result.message || "Gagal membatalkan"); return; }
+            onCancelled();
+            onClose();
+        } catch { setError("Terjadi kesalahan koneksi"); } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-red-600 px-5 py-4">
+                    <p className="font-bold text-white text-sm">🗑️ Batalkan Penyiapan</p>
+                    <p className="text-xs text-red-100 mt-0.5">
+                        Pesanan {order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.
+                    </p>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Alasan (opsional)</label>
+                        <textarea
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            rows={3}
+                            placeholder="Contoh: Customer batal order, salah input, dll."
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 focus:bg-white transition resize-none"
+                        />
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Jangan Batalkan</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50">
+                        {saving ? "Membatalkan..." : "Ya, Batalkan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PreparationDetailPage() {
     const params = useParams();
     const id = params.id as string;
+    const confirm = useConfirm();
 
     const [order, setOrder] = useState<PrepOrder | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -317,22 +416,27 @@ export default function PreparationDetailPage() {
     const [points, setPoints] = useState<TrackPoint[]>([]);
     const isAssignedRef = useRef(false);
     const phaseRef = useRef<"GO" | "RETURN">("GO");
+    const [userRoles, setUserRoles] = useState<string[]>([]);
 
-    // Permissions
-    const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
-    const canDispatch = userRole ? hasPermission(userRole, PERMISSIONS.DISPATCH_PREPARATION) : false;
-    const canDeliver = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_PREPARATION) : false;
-    const canVoice = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_VOICE) : false;
-    const canTargetVoice = userRole ? hasPermission(userRole, PERMISSIONS.DELIVERY_VOICE_TARGET) : false;
+    const canDone = hasAnyRole(userRoles, PERMISSIONS.DONE_PREPARATION);
+    const canDispatch = hasAnyRole(userRoles, PERMISSIONS.DISPATCH_PREPARATION);
+    const canDeliver = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_PREPARATION);
+    const canVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE);
+    const canTargetVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE_TARGET);
+    const canCancel = hasAnyRole(userRoles, PERMISSIONS.CANCEL_PREPARATION);
+
+    const [showCancel, setShowCancel] = useState(false);
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json())
             .then(r => {
-                setUserRole(r.user?.role ?? null);
+                const roles: string[] = r.user?.roles ?? (r.user?.role ? [r.user.role] : []);
+                setUserRoles(roles);
+                setUserRole((r.user?.role ?? roles[0] ?? null) as UserRole | null);
                 setUserId(r.user?.id ?? null);
                 setUserName(r.user?.name ?? "User");
             })
-            .catch(() => { setUserRole(null); setUserId(null); });
+            .catch(() => { setUserRoles([]); setUserRole(null); setUserId(null); });
     }, []);
 
     const fetchOrder = useCallback(async () => {
@@ -448,7 +552,86 @@ export default function PreparationDetailPage() {
         await fetchOrder(); // begitu delivery_started_at keisi, tracker otomatis mulai
     };
 
+    // ── (item 2) 2-step verifikasi: pengantar SETUJU tugas ──
+    const handleAccept = async () => {
+        const ok = await confirm({
+            title: "Setujui tugas antar ini?",
+            message: "Setelah setuju, kamu bertugas mengantar pesanan ini dan tracking GPS akan aktif.",
+            variant: "success", confirmText: "✅ Ya, Setuju",
+        });
+        if (!ok) return;
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/preparation/${id}/accept`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "ACCEPT" }),
+            });
+            const result = await res.json();
+            if (result.success) { await fetchOrder(); } else alert(result.message);
+        } catch { alert("Gagal"); } finally { setActionLoading(false); }
+    };
+
+    // ── (item 2) 2-step verifikasi: pengantar TOLAK tugas (pengaman anti-nyangkut) ──
+    const handleDecline = async () => {
+        const ok = await confirm({
+            title: "Tolak tugas antar ini?",
+            message: "Tugas dikembalikan ke sales untuk ditugaskan ke pengantar lain.",
+            variant: "danger", confirmText: "Ya, Tolak",
+        });
+        if (!ok) return;
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/preparation/${id}/accept`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "DECLINE" }),
+            });
+            const result = await res.json();
+            if (result.success) { await fetchOrder(); } else alert(result.message);
+        } catch { alert("Gagal"); } finally { setActionLoading(false); }
+    };
+
+    const handleCancel = async () => {
+        if (!order || actionLoading) return;
+
+        let ok = false;
+        try {
+            ok = await confirm({
+                title: "Batalkan Penyiapan Ini?",
+                message: `Pesanan ${order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.`,
+                variant: "danger",
+                confirmText: "Ya, Batalkan",
+            });
+        } catch (err) {
+            console.error("[cancel confirm]", err);
+            ok = window.confirm(`Batalkan pesanan ${order.order_number}? Tindakan ini permanen.`);
+        }
+        if (!ok) return;
+
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/preparation/${id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: null }),
+            });
+            const result = await res.json();
+            if (result.success) await fetchOrder();
+            else alert(result.message || "Gagal membatalkan");
+        } catch (err) {
+            console.error("[cancel]", err);
+            alert("Gagal membatalkan pesanan");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const completeDelivery = async () => {
+        const ok = await confirm({
+            title: "Barang sudah sampai ke customer?",
+            message: "Pastikan barang benar-benar sudah diterima customer sebelum menandai selesai.",
+            variant: "success", confirmText: "Ya, Sudah Sampai",
+        });
+        if (!ok) return;
         setActionLoading(true);
         try {
             const res = await fetch(`/api/preparation/${id}/delivery`, {
@@ -461,6 +644,12 @@ export default function PreparationDetailPage() {
     };
 
     const doReturnAction = async (action: "RETURN_START" | "RETURN_COMPLETE") => {
+        const ok = await confirm(
+            action === "RETURN_START"
+                ? { title: "Mulai perjalanan pulang?", message: "Tracking pulang akan diaktifkan.", variant: "warning", confirmText: "Ya, Mulai Pulang" }
+                : { title: "Sudah sampai di toko?", message: "Perjalanan pulang akan ditandai selesai.", variant: "success", confirmText: "Ya, Sudah Sampai" }
+        );
+        if (!ok) return;
         setActionLoading(true);
         try {
             const res = await fetch(`/api/preparation/${id}/delivery`, {
@@ -506,10 +695,15 @@ export default function PreparationDetailPage() {
     const speedKmh = computeSpeedKmh(points);
     const isDeliveringGo = order.status === "DIKIRIM" && order.delivery_method === "PENGANTARAN";
     const isReturning = order.status === "SELESAI" && !!order.return_started_at && !order.returned_at;
+    const scheduledReady =
+        !order.scheduled_delivery_date || order.scheduled_delivery_date <= todayLocal();
     const startMs = isReturning
         ? (order.return_started_at ? new Date(order.return_started_at).getTime() : nowTs)
         : (order.delivery_started_at ? new Date(order.delivery_started_at).getTime() : nowTs);
     const elapsedMs = nowTs - startMs;
+
+    // (item 4) tombol batal hanya muncul jika role berwenang & status masih bisa dibatalkan
+    const canShowCancel = canCancel && order.status !== "SELESAI" && order.status !== "DIBATALKAN";
 
     return (
         <DashboardLayout>
@@ -533,12 +727,29 @@ export default function PreparationDetailPage() {
                                 <h1 className="text-lg font-black text-gray-900">{order.customer_name}</h1>
                                 {order.customer_phone && <p className="text-sm text-gray-500">📱 {order.customer_phone}</p>}
                                 {order.delivery_address && (
-                                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-3">
+                                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-3 mt-2">
                                         <p className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">Tujuan</p>
                                         <AddressDisplay address={order.delivery_address} className="text-xs text-gray-700" />
                                     </div>
                                 )}
+                                {order.scheduled_delivery_date && order.status !== "SELESAI" && order.status !== "DIBATALKAN" && (
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 mt-2 inline-flex items-center gap-2">
+                                        <span>📅</span>
+                                        <div>
+                                            <p className="text-[10px] text-indigo-400 font-semibold uppercase">Jadwal Antar</p>
+                                            <p className="text-xs font-bold text-indigo-700">{fmtDate(order.scheduled_delivery_date)}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+
+                            {canShowCancel && (
+                                <button onClick={() => setShowCancel(true)}
+                                    className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 transition">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Batalkan
+                                </button>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -593,11 +804,62 @@ export default function PreparationDetailPage() {
                                     </p>
                                 </div>
                             </div>
+                            {order.delivery_declined_at && order.delivery_decline_reason && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3 text-xs text-red-700">
+                                    Pengantar sebelumnya menolak: {order.delivery_decline_reason}
+                                </div>
+                            )}
                             {canDispatch && (
                                 <button onClick={() => setShowDispatch(true)}
                                     className="w-full h-11 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition">
                                     📮 Pilih Metode Pengiriman
                                 </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── MENUNGGU PERSETUJUAN PENGANTAR (item 1) ── */}
+                    {order.status === "MENUNGGU_PENGANTAR" && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
+                            <div className="flex items-center gap-3 mb-3">
+                                <span className="text-2xl">🛵</span>
+                                <div>
+                                    <p className="text-sm font-bold text-yellow-800">
+                                        {isAssignedDriver ? "Kamu ditugaskan mengantar pesanan ini" : "Menunggu pengantar menyetujui tugas"}
+                                    </p>
+                                    <p className="text-xs text-yellow-600 mt-0.5">
+                                        {isAssignedDriver
+                                            ? "Setujui dulu untuk mulai antar & mengaktifkan tracking."
+                                            : `Menunggu ${order.delivery_user_name || "pengantar"} klik setuju.`}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {order.delivery_user_name && (
+                                <div className="bg-white border border-yellow-200 rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5">
+                                    <span className="w-9 h-9 rounded-full bg-yellow-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                        {order.delivery_user_name.charAt(0).toUpperCase()}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] text-yellow-600 font-semibold uppercase">Ditugaskan ke</p>
+                                        <p className="text-sm font-bold text-yellow-900 truncate">{order.delivery_user_name}</p>
+                                    </div>
+                                    {isAssignedDriver && <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex-shrink-0">Anda</span>}
+                                </div>
+                            )}
+
+                            {isAssignedDriver && (
+                                <div className="flex gap-2">
+                                    {/* Tombol Tolak (sekunder) — pengaman anti-nyangkut. Hapus blok ini kalau mau strict cuma Setuju */}
+                                    <button onClick={handleDecline} disabled={actionLoading}
+                                        className="h-11 px-4 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition disabled:opacity-50">
+                                        Tolak
+                                    </button>
+                                    <button onClick={handleAccept} disabled={actionLoading}
+                                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                        {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}
@@ -662,7 +924,7 @@ export default function PreparationDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Status detail buat pengantar (poin #2 & #3) */}
+                            {/* Status detail buat pengantar */}
                             {isAssignedDriver && tracker.status !== "ACTIVE" && (
                                 <div className={`mb-3 rounded-xl px-3 py-2.5 text-xs border ${tracker.status === "NO_PERMISSION" ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
                                     <p className="font-bold">{tracker.statusLabel}</p>
@@ -714,7 +976,15 @@ export default function PreparationDetailPage() {
                             {isAssignedDriver && (
                                 <div className="mt-3 space-y-2">
                                     {isDeliveringGo && !order.delivery_started_at && (
-                                        <button onClick={() => setShowStart(true)} className="w-full h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
+                                        <button
+                                            onClick={() => {
+                                                if (!scheduledReady) {
+                                                    alert(`Belum waktunya. Barang ini dijadwalkan diantar ${fmtDate(order.scheduled_delivery_date!)}.`);
+                                                    return;
+                                                }
+                                                setShowStart(true);
+                                            }}
+                                            className="w-full h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
                                             🎯 Atur Tujuan & Mulai Antar
                                         </button>
                                     )}
@@ -791,6 +1061,25 @@ export default function PreparationDetailPage() {
                             </div>
                         </div>
                     )}
+
+                    {/* ── DIBATALKAN (item 4) ── */}
+                    {order.status === "DIBATALKAN" && (
+                        <div className="bg-gray-100 border border-gray-200 rounded-2xl p-5 text-center">
+                            <div className="text-3xl mb-2">🚫</div>
+                            <p className="text-sm font-bold text-gray-700">Pesanan ini dibatalkan</p>
+                            {order.cancelled_by_name && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Dibatalkan oleh {order.cancelled_by_name}
+                                    {order.cancelled_at && ` · ${fmtFull(order.cancelled_at)}`}
+                                </p>
+                            )}
+                            {order.cancel_reason && (
+                                <p className="text-xs text-gray-600 mt-2 bg-white border border-gray-200 rounded-xl px-3 py-2 inline-block">
+                                    Alasan: {order.cancel_reason}
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -803,6 +1092,7 @@ export default function PreparationDetailPage() {
                     onConfirm={async p => { await handleStartTrip(p); setShowStart(false); }}
                 />
             )}
+            {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
         </DashboardLayout>
     );
 }

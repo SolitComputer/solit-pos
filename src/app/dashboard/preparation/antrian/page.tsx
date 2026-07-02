@@ -7,7 +7,7 @@ import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
-import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { usePrepAlarm, ALARM_KEYS, isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 
 export default function PreparationAntrianPage() {
   const [orders, setOrders] = useState<PrepOrder[]>([]);
@@ -33,11 +33,21 @@ export default function PreparationAntrianPage() {
     () => orders.filter((o) => o.status === "MENUNGGU"),
     [orders]
   );
+
+  const canHearIncoming = isPrepProvider(userRole) && !isPrepSilent(userRole);
+
   const { unackedCount: alarmCount, unackedIds: alarmIds, acknowledge } = usePrepAlarm(
     menungguOrders,
     ALARM_KEYS.MENUNGGU,
-    soundOn
+    soundOn && canHearIncoming   
   );
+
+  const didInitAckRef = useRef(false);
+  useEffect(() => {
+    if (didInitAckRef.current || isLoading) return;
+    menungguOrders.forEach((o) => acknowledge(o.id));
+    didInitAckRef.current = true;
+  }, [isLoading, menungguOrders, acknowledge]);
 
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
@@ -260,7 +270,7 @@ export default function PreparationAntrianPage() {
                   canReceive={canDone}
                   receivingId={receivingId}
                   onReceive={handleReceive}
-                  isNew={newIds.has(o.id) || alarmIds.has(o.id)} 
+                  isNew={newIds.has(o.id) || alarmIds.has(o.id)}
                 />
               ))}
             </div>
