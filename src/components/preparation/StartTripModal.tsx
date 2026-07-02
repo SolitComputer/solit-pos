@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   searchPlaces, getRoute, fmtDistance, fmtDuration,
+  parseLatLngFromText, reverseGeocode,
+  isShortMapLink, resolveShortMapLink,
   STORE_ORIGIN, type GeoPlace, type RouteResult,
 } from "@/lib/geo";
 
@@ -18,35 +20,23 @@ interface Props {
 }
 
 export default function StartTripModal({ defaultAddress, onClose, onConfirm }: Props) {
-  const [query, setQuery] = useState(defaultAddress ?? "");
+  // Input SELALU kosong saat modal dibuka — pengantar isi/paste manual.
+  // defaultAddress hanya dipakai sebagai referensi (lihat blok "Alamat dari sales").
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeoPlace[]>([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<GeoPlace | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routing, setRouting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const onSearch = (q: string) => {
-    setQuery(q); setSelected(null); setRoute(null);
-    if (debRef.current) clearTimeout(debRef.current);
-    if (q.trim().length < 3) { setResults([]); return; }
-    debRef.current = setTimeout(async () => {
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-      setSearching(true);
-      const data = await searchPlaces(q, abortRef.current.signal);
-      setResults(data); setSearching(false);
-    }, 450);
-  };
-
-  const pick = async (p: GeoPlace) => {
-    setSelected(p); setQuery(p.label); setResults([]);
-    setRouting(true);
-    // origin: pakai GPS pengantar kalau bisa, kalau gagal pakai titik toko
-    const origin = await new Promise<{ lat: number; lng: number }>((resolve) => {
+  // origin: GPS pengantar kalau bisa, fallback titik toko
+  const getOrigin = () =>
+    new Promise<{ lat: number; lng: number }>((resolve) => {
       if (!navigator.geolocation) return resolve(STORE_ORIGIN);
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -54,13 +44,84 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
         { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
       );
     });
+
+  // Hanya update teks. TIDAK memproses apa pun otomatis —
+  // semua (link/koordinat/alamat) diproses lewat tombol "Deteksi Tujuan".
+  const onSearch = (q: string) => {
+    setQuery(q);
+    setSelected(null);
+    setRoute(null);
+    setError("");
+    setResults([]);
+    if (debRef.current) clearTimeout(debRef.current);
+  };
+
+  // Pilih tujuan dari koordinat (hasil parse / resolve link Maps)
+  const pickCoord = async (c: { lat: number; lng: number }) => {
+    setError("");
+    const fallback = `Titik dari link Maps (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)})`;
+    setSelected({ lat: c.lat, lng: c.lng, label: fallback });
+    setQuery(fallback);
+    setRouting(true);
+
+    // perkaya label via reverse geocode (tidak nge-block rute)
+    reverseGeocode(c.lat, c.lng).then((r) => {
+      if (r?.label) {
+        const nice = `${r.label} · dari link Maps`;
+        setSelected((prev) => (prev ? { ...prev, label: nice } : prev));
+        setQuery(nice);
+      }
+    });
+
+    const origin = await getOrigin();
+    const r = await getRoute(origin, c);
+    setRoute(r); setRouting(false);
+  };
+
+  // Pilih tujuan dari daftar rekomendasi alamat
+  const pick = async (p: GeoPlace) => {
+    setSelected(p); setQuery(p.label); setResults([]);
+    setRouting(true);
+    const origin = await getOrigin();
     const r = await getRoute(origin, { lat: p.lat, lng: p.lng });
     setRoute(r); setRouting(false);
   };
 
+  // Manual: proses isi input saat tombol diklik (link pendek / koordinat / alamat)
+  const detectDestination = async () => {
+    const q = query.trim();
+    setError("");
+    if (!q) { setError("Isi alamat / link tujuan dulu"); return; }
+
+    // 1) Link PENDEK Google Maps → resolve di server (butuh loading)
+    if (isShortMapLink(q)) {
+      setDetecting(true);
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      const coord = await resolveShortMapLink(q, abortRef.current.signal);
+      setDetecting(false);
+      if (coord) await pickCoord(coord);
+      else setError("Link tidak bisa dibaca. Buka link → salin URL panjang (ada @lat,lng), atau ketik alamat manual.");
+      return;
+    }
+
+    // 2) Link panjang / koordinat tertulis
+    const coord = parseLatLngFromText(q);
+    if (coord) { await pickCoord(coord); return; }
+
+    // 3) Alamat teks → cari rekomendasi (loading sebentar)
+    setDetecting(true);
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const data = await searchPlaces(q, abortRef.current.signal);
+    setDetecting(false);
+    setResults(data);
+    if (data.length === 0) setError("Alamat tidak ketemu. Coba kata kunci lain atau paste link Maps.");
+  };
+
   const confirm = async () => {
     setError("");
-    if (!selected) { setError("Pilih tujuan dulu dari daftar rekomendasi"); return; }
+    if (!selected) { setError("Deteksi & pilih tujuan dulu"); return; }
     setSaving(true);
     try {
       await onConfirm({ dest: { lat: selected.lat, lng: selected.lng }, address: selected.label, route });
@@ -77,13 +138,14 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         <div className="bg-[#1a1a2e] px-5 py-4 flex-shrink-0">
           <p className="font-bold text-white text-sm">🛵 Atur Tujuan & Mulai Antar</p>
-          <p className="text-xs text-gray-300 mt-0.5">Cari alamat tujuan, sistem hitung estimasi rute</p>
+          <p className="text-xs text-gray-300 mt-0.5">Isi alamat / link Maps, lalu deteksi tujuan</p>
         </div>
 
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
           <div className="relative">
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Tujuan Pengantaran *</label>
-            <input value={query} onChange={(e) => onSearch(e.target.value)} placeholder="Ketik nama jalan / wilayah..." className={inputCls} />
+            <input value={query} onChange={(e) => onSearch(e.target.value)}
+              placeholder="Ketik alamat / wilayah, atau paste link Google Maps" className={inputCls} />
             {searching && <div className="absolute right-3 top-9 w-4 h-4 border-2 border-gray-200 border-t-[#1a1a2e] rounded-full animate-spin" />}
             {results.length > 0 && (
               <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden bg-white max-h-56 overflow-y-auto">
@@ -95,6 +157,34 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
                 ))}
               </div>
             )}
+            <p className="text-[10px] text-gray-400 mt-1">
+              💡 Paste link Google Maps atau ketik alamat, lalu klik &quot;Deteksi Tujuan&quot;.
+            </p>
+
+            {/* Referensi alamat dari sales — TIDAK mengisi input otomatis */}
+            {defaultAddress && (
+              <div className="mt-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">Alamat dari sales</p>
+                <p className="text-[11px] text-gray-600 break-all">{defaultAddress}</p>
+                <button type="button"
+                  onClick={() => onSearch(defaultAddress)}
+                  className="mt-1 text-[11px] text-blue-600 font-semibold hover:underline">
+                  Pakai alamat ini →
+                </button>
+              </div>
+            )}
+
+            {/* Tombol deteksi manual + loading */}
+            <button type="button" onClick={detectDestination}
+              disabled={detecting || routing || !query.trim()}
+              className="mt-2 w-full h-10 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+              {detecting || routing ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Mendeteksi lokasi...
+                </>
+              ) : "📍 Deteksi Tujuan"}
+            </button>
           </div>
 
           {selected && (
