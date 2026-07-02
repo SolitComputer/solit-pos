@@ -14,6 +14,9 @@ interface StopInfo { lat: number; lng: number; durS: number; key: string }
 
 declare global { interface Window { L?: any } }
 
+// MapTiler key (opsional). Kalau kosong → fallback CARTO/Esri (tetap jalan).
+const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+
 function computeStops(points: TrackPoint[]): StopInfo[] {
   const stops: StopInfo[] = [];
   let i = 0;
@@ -95,14 +98,28 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       const map = L.map(containerRef.current, { center: [start.lat, start.lng], zoom: 16, zoomControl: true, attributionControl: false });
       mapRef.current = map;
 
-      roadLayerRef.current = L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        { maxZoom: 20, detectRetina: true, subdomains: "abcd" }
-      ).addTo(map);
-      satLayerRef.current = L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        { maxZoom: 19 }
-      );
+      // ── Tile layers ──
+      // Kalau ada MapTiler key: streets-v2 (POI/nama toko lengkap) + hybrid (satelit BER-LABEL).
+      // Kalau kosong: fallback CARTO Voyager + Esri World Imagery (app tetap jalan).
+      roadLayerRef.current = MAPTILER_KEY
+        ? L.tileLayer(
+            `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+            { maxZoom: 20, detectRetina: true, crossOrigin: true }
+          ).addTo(map)
+        : L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+            { maxZoom: 20, detectRetina: true, subdomains: "abcd" }
+          ).addTo(map);
+
+      satLayerRef.current = MAPTILER_KEY
+        ? L.tileLayer(
+            `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+            { maxZoom: 20, detectRetina: true, crossOrigin: true }
+          )
+        : L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            { maxZoom: 19 }
+          );
 
       map.on("dragstart", () => { followRef.current = false; });
 
@@ -265,7 +282,9 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    // isolation:isolate → kunci stacking context peta.
+    // Tanpa ini, z-index overlay (tombol/HUD) "bocor" menimpa komponen halaman lain.
+    <div style={{ position: "relative", isolation: "isolate" }}>
       <div ref={containerRef} style={{ height, width: "100%", borderRadius: 16, overflow: "hidden", zIndex: 0 }} />
 
       {!ready && (
@@ -276,7 +295,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
 
       {/* HUD nama jalan + speed (sinkron) + sisa jarak */}
       {ready && (
-        <div style={{ position: "absolute", left: 10, right: 10, top: 10, zIndex: 500, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: 10, right: 10, top: 10, zIndex: 20, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ background: "rgba(26,26,46,.92)", color: "#fff", borderRadius: 12, padding: "7px 12px", display: "flex", alignItems: "center", gap: 12, fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.3)", maxWidth: "92%" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
               <span>🛣️</span>
@@ -294,7 +313,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
 
       {/* Banner LIVE berhenti */}
       {ready && liveStop && (
-        <div style={{ position: "absolute", left: 10, right: 10, bottom: 56, zIndex: 500, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", left: 10, right: 10, bottom: 56, zIndex: 20, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", borderRadius: 12, padding: "6px 12px", fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.2)", maxWidth: "92%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             ⏸️ Sedang berhenti — {liveStop.emoji} {liveStop.kind}
           </div>
@@ -302,11 +321,11 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       )}
 
       <button type="button" onClick={toggleType}
-        style={{ position: "absolute", left: 10, bottom: 10, zIndex: 500, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "7px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
+        style={{ position: "absolute", left: 10, bottom: 10, zIndex: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "7px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
         {mapType === "road" ? "🛰️ Satelit" : "🗺️ Peta"}
       </button>
       <button type="button" onClick={recenter}
-        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 500, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "8px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
+        style={{ position: "absolute", right: 10, bottom: 10, zIndex: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "8px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
         🎯 Ikuti motor
       </button>
     </div>

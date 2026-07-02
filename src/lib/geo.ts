@@ -37,17 +37,81 @@ export function bearingDeg(a: { lat: number; lng: number }, b: { lat: number; ln
     return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
+/**
+ * Ekstrak koordinat dari link Google Maps / teks koordinat.
+ * Dukung: @lat,lng (link panjang) · ?q= / &query= / &ll= / &destination= ·
+ *         !3d!4d (pin asli) · "lat, lng" polos.
+ * Return null kalau bukan koordinat valid (biar fallback ke pencarian teks biasa).
+ *
+ * CATATAN: link PENDEK (maps.app.goo.gl / goo.gl/maps) tidak bisa di-parse di sini,
+ * karena koordinat baru muncul setelah redirect (butuh resolve di server / CORS).
+ */
+export function parseLatLngFromText(input: string): { lat: number; lng: number } | null {
+  const s = input.trim();
+  const valid = (lat: number, lng: number) =>
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+      ? { lat, lng } : null;
+
+  // 1) @lat,lng → link panjang google.com/maps (kasus utama)
+  const at = s.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/);
+  if (at) return valid(parseFloat(at[1]), parseFloat(at[2]));
+
+  // 2) ?q= / &query= / &ll= / &destination=
+  const q = s.match(/[?&](?:q|query|ll|destination)=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/);
+  if (q) return valid(parseFloat(q[1]), parseFloat(q[2]));
+
+  // 3) !3dLAT!4dLNG → titik pin sebenarnya (lebih presisi dari @ kalau ada)
+  const d = s.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+  if (d) return valid(parseFloat(d[1]), parseFloat(d[2]));
+
+  // 4) "lat, lng" ditempel langsung
+  const plain = s.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  if (plain) return valid(parseFloat(plain[1]), parseFloat(plain[2]));
+
+  return null;
+}
+
+/** true kalau ini link PENDEK Google Maps (butuh resolve server, tak ada koordinat di teks). */
+export function isShortMapLink(input: string): boolean {
+  return /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps)\//i.test(input.trim());
+}
+
+/** Resolve link pendek → {lat,lng} via API route server (follow redirect). */
+export async function resolveShortMapLink(
+  url: string, signal?: AbortSignal
+): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const res = await fetch(`/api/geo/resolve-maps?url=${encodeURIComponent(url.trim())}`, { signal });
+    const d = await res.json();
+    return d?.success ? { lat: d.lat, lng: d.lng } : null;
+  } catch { return null; }
+}
+
 export async function searchPlaces(q: string, signal?: AbortSignal): Promise<GeoPlace[]> {
     const query = q.trim();
     if (query.length < 3) return [];
     const url =
-        `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=6` +
+        `${NOMINATIM}/search?format=jsonv2&addressdetails=1&namedetails=1&limit=12` +
         `&countrycodes=id&viewbox=${VIEWBOX}&bounded=0&q=${encodeURIComponent(query)}`;
     try {
         const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
         if (!res.ok) return [];
         const data = (await res.json()) as any[];
-        return data.map((d) => ({ label: d.display_name, lat: parseFloat(d.lat), lng: parseFloat(d.lon), type: d.type }));
+        const seen = new Set<string>();
+        const out: GeoPlace[] = [];
+        for (const d of data) {
+            const lat = parseFloat(d.lat), lng = parseFloat(d.lon);
+            const key = `${lat.toFixed(4)},${lng.toFixed(4)}`; // buang titik nyaris identik
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const poi = d.namedetails?.name || d.name; // nama toko/POI kalau ada
+            out.push({
+                label: poi ? `${poi} — ${d.display_name}` : d.display_name,
+                lat, lng, type: d.type,
+            });
+        }
+        return out;
     } catch { return []; }
 }
 
@@ -132,7 +196,7 @@ export function computeSpeedKmh(points: { lat: number; lng: number; t?: number }
   const dt = (pts[pts.length - 1].t! - pts[0].t!) / 1000;
   if (dt <= 0) return null;
   const mps = dist / dt;
-  if (mps < 0.7) return 0;    
-  if (mps > 45) return null; 
+  if (mps < 0.7) return 0;
+  if (mps > 45) return null;
   return mps * 3.6;
 }
