@@ -153,11 +153,11 @@ export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
 
-/** Terima & DONE penyiapan (Penyedia inti + role tambahan + Admin) — UNION (superset) */
+/** Terima & DONE penyiapan — HANYA penyedia barang inti + admin */
 export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_PENYEDIA_ROLES,
-  ...PREPARATION_PENYEDIA_EXTRA_ROLES, // ⚠️ MERGE-CONFLICT: versi teman tidak include ini
+  
 ]));
 
 /** Dispatch pilih metode kirim (Sales + PKL + Admin) — PENGANTARAN tidak termasuk */
@@ -177,6 +177,7 @@ export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
 export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...PREPARATION_DONE_ROLES,
   "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH", "ONPOINT",
+  "KEPALA_ONPOINT", "KONTEN", "PKL_SALES", 
   "PENGANTARAN",
 ]));
 
