@@ -22,12 +22,11 @@ async function handler(req: NextRequest) {
   try {
     const WIB = 7 * 60 * 60 * 1000;
     const today = getTodayWIB();
-    
+
     const nowWIB = new Date(Date.now() + WIB);
     const monthStart = new Date(nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(), 1)
       .toISOString().split("T")[0];
 
-    // Daily sales (30 hari terakhir)
     const dayStart = new Date(nowWIB);
     dayStart.setUTCDate(dayStart.getUTCDate() - 29);
     const dayStartStr = dayStart.toISOString().split("T")[0];
@@ -56,38 +55,99 @@ async function handler(req: NextRequest) {
         .lte("pickup_date", today),
     ]);
 
-    // Sales person summary
-    const salesMap: Record<string, { total: number; revenue: number; profit: number }> = {};
+    // ── Step 1: Kumpulkan semua sales_id unik dari dailyTrx ─────────
+    const allSalesIds = new Set<string>();
+    for (const trx of dailyTrx ?? []) {
+      if (trx.sales_id) allSalesIds.add(trx.sales_id);
+    }
 
-    dailyTrx?.forEach((item) => {
-      const sales = item.sales_name || "Unknown";
-      if (!salesMap[sales]) salesMap[sales] = { total: 0, revenue: 0, profit: 0 };
-      salesMap[sales].total += 1;
-      salesMap[sales].revenue += getDealPrice(item);
-      salesMap[sales].profit += calcProfit(item);
-    });
+    // ── Step 2: Fetch nama canonical dari public.users ───────────────
+    // Pakai nama terbaru dari users table, bukan snapshot sales_name
+    const userNameMap = new Map<string, string>(); // sales_id → current name
+    if (allSalesIds.size > 0) {
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, name")
+        .in("id", Array.from(allSalesIds));
 
-    // Daily breakdown per sales
-    const dailyDetailMap: Record<string, Record<string, { total: number; revenue: number; profit: number }>> = {};
-
-    dailyTrx?.forEach((item) => {
-      const date = item.pickup_date as string;
-      const sales = item.sales_name || "Unknown";
-      
-      if (!dailyDetailMap[sales]) dailyDetailMap[sales] = {};
-      if (!dailyDetailMap[sales][date]) {
-        dailyDetailMap[sales][date] = { total: 0, revenue: 0, profit: 0 };
+      for (const u of users ?? []) {
+        if (u.id && u.name) userNameMap.set(u.id, u.name);
       }
-      
-      dailyDetailMap[sales][date].total += 1;
-      dailyDetailMap[sales][date].revenue += getDealPrice(item);
-      dailyDetailMap[sales][date].profit += calcProfit(item);
+    }
+
+    /**
+     * Resolve group key & display name per transaksi.
+     *
+     * Priority:
+     * 1. sales_id ada & user ditemukan  → groupKey = "uid:{id}", name = nama terbaru dari DB
+     * 2. sales_id ada tapi user deleted → groupKey = "uid:{id}", name = sales_name lama
+     * 3. Tidak ada sales_id (transaksi lama) → groupKey = "name:{sales_name}", name = sales_name
+     */
+    function resolveCanonical(item: any): { groupKey: string; displayName: string } {
+      const salesId = item.sales_id as string | null | undefined;
+      const rawName = (item.sales_name as string | null | undefined) || "Unknown";
+
+      if (salesId) {
+        const currentName = userNameMap.get(salesId);
+        return {
+          groupKey: `uid:${salesId}`,
+          // Selalu pakai nama terbaru dari DB kalau ada
+          displayName: currentName ?? rawName,
+        };
+      }
+
+      // Fallback: transaksi lama tanpa sales_id
+      return {
+        groupKey: `name:${rawName.toLowerCase().trim()}`,
+        displayName: rawName,
+      };
+    }
+
+    // ── Step 3: Build salesMap dengan dedup by groupKey ─────────────
+    const salesMap: Record<string, {
+      displayName: string;
+      total: number;
+      revenue: number;
+      profit: number;
+    }> = {};
+
+    dailyTrx?.forEach((item) => {
+      const { groupKey, displayName } = resolveCanonical(item);
+
+      if (!salesMap[groupKey]) {
+        salesMap[groupKey] = { displayName, total: 0, revenue: 0, profit: 0 };
+      }
+
+      salesMap[groupKey].total   += 1;
+      salesMap[groupKey].revenue += getDealPrice(item);
+      salesMap[groupKey].profit  += calcProfit(item);
     });
 
-    // Format sales performance
+    // ── Step 4: Daily breakdown dengan groupKey yang sama ───────────
+    const dailyDetailMap: Record<string, Record<string, {
+      total: number;
+      revenue: number;
+      profit: number;
+    }>> = {};
+
+    dailyTrx?.forEach((item) => {
+      const { groupKey } = resolveCanonical(item);
+      const date = item.pickup_date as string;
+
+      if (!dailyDetailMap[groupKey]) dailyDetailMap[groupKey] = {};
+      if (!dailyDetailMap[groupKey][date]) {
+        dailyDetailMap[groupKey][date] = { total: 0, revenue: 0, profit: 0 };
+      }
+
+      dailyDetailMap[groupKey][date].total   += 1;
+      dailyDetailMap[groupKey][date].revenue += getDealPrice(item);
+      dailyDetailMap[groupKey][date].profit  += calcProfit(item);
+    });
+
+    // ── Step 5: Format output ────────────────────────────────────────
     const salesPerformance = Object.entries(salesMap)
-      .map(([name, data]) => {
-        const dailyDetail = dailyDetailMap[name] || {};
+      .map(([groupKey, data]) => {
+        const dailyDetail = dailyDetailMap[groupKey] || {};
         const dailyBreakdown = Object.entries(dailyDetail)
           .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
           .map(([date, stats]) => {
@@ -101,8 +161,10 @@ async function handler(req: NextRequest) {
           });
 
         return {
-          name,
-          ...data,
+          name: data.displayName,
+          total: data.total,
+          revenue: data.revenue,
+          profit: data.profit,
           dailyBreakdown,
         };
       })
@@ -113,14 +175,14 @@ async function handler(req: NextRequest) {
       success: true,
       data: {
         today: {
-          count: todayTrx?.length || 0,
+          count:   todayTrx?.length || 0,
           revenue: todayTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          profit: todayTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0,
+          profit:  todayTrx?.reduce((acc, item) => acc + calcProfit(item), 0)   || 0,
         },
         monthly: {
-          count: monthTrx?.length || 0,
+          count:   monthTrx?.length || 0,
           revenue: monthTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          profit: monthTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0,
+          profit:  monthTrx?.reduce((acc, item) => acc + calcProfit(item), 0)   || 0,
         },
         salesPerformance,
       },

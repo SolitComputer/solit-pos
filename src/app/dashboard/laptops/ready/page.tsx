@@ -123,7 +123,6 @@ function StatCard({ label, value, icon, color, bg, bar }: {
 }) {
     return (
         <div className={`${bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-4 sm:p-5 relative overflow-hidden group hover:-translate-y-0.5`}>
-            {/* Bottom accent bar */}
             <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-50 group-hover:opacity-100 transition-opacity`} />
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -133,6 +132,36 @@ function StatCard({ label, value, icon, color, bg, bar }: {
                 <div className={`w-10 h-10 rounded-2xl ${bar} flex items-center justify-center text-lg flex-shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity`}>
                     {icon}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── TotalBar ─────────────────────────────────────────────────────────────────
+function TotalBar({ totals, count }: {
+    totals: { selling: number; purchase: number; margin: number };
+    count: number;
+}) {
+    const isPositive = totals.margin >= 0;
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex flex-wrap gap-4 sm:gap-0 sm:divide-x sm:divide-gray-100 animate-fadeUp">
+            <div className="flex-1 min-w-[140px] sm:pr-6">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
+                <p className="text-2xl font-black text-gray-900 tabular-nums">{count}</p>
+            </div>
+            <div className="flex-1 min-w-[160px] sm:px-6">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
+                <p className="text-xl font-black text-gray-800 tabular-nums">{fmt(totals.selling)}</p>
+            </div>
+            <div className="flex-1 min-w-[160px] sm:px-6">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Beli</p>
+                <p className="text-xl font-black text-gray-600 tabular-nums">{fmt(totals.purchase)}</p>
+            </div>
+            <div className="flex-1 min-w-[160px] sm:pl-6">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estimasi Margin</p>
+                <p className={`text-xl font-black tabular-nums ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
+                    {isPositive ? "+" : ""}{fmt(totals.margin)}
+                </p>
             </div>
         </div>
     );
@@ -214,6 +243,13 @@ export default function ReadyPage() {
         packing: units.filter(u => u.status === "PACKING").length,
     };
 
+    // ── Totals (ikut filter aktif) ────────────────────────────────────────────
+    const totals = useMemo(() => ({
+        selling: filtered.reduce((sum, u) => sum + (u.selling_price || 0), 0),
+        purchase: filtered.reduce((sum, u) => sum + (u.purchase_price || 0), 0),
+        margin: filtered.reduce((sum, u) => sum + ((u.selling_price || 0) - (u.purchase_price || 0)), 0),
+    }), [filtered]);
+
     // ── Export Excel ──────────────────────────────────────────────────────────
     const exportToExcel = () => {
         if (filtered.length === 0) return;
@@ -290,7 +326,6 @@ export default function ReadyPage() {
 
                     {/* ── Header ─────────────────────────────────────────── */}
                     <div className="flex flex-wrap items-center justify-between gap-3 animate-slideIn">
-                        {/* Judul */}
                         <div className="flex items-center gap-3">
                             <div className="w-1 h-8 rounded-full bg-gray-800 flex-shrink-0" />
                             <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
@@ -309,9 +344,7 @@ export default function ReadyPage() {
                             </div>
                         </div>
 
-                        {/* Button group */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Export Excel */}
                             <button
                                 onClick={exportToExcel}
                                 disabled={isExporting || filtered.length === 0}
@@ -336,7 +369,6 @@ export default function ReadyPage() {
                                 )}
                             </button>
 
-                            {/* Refresh */}
                             <button
                                 onClick={fetchUnits}
                                 className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 h-9 px-3.5 rounded-xl transition-all active:scale-[0.98] group"
@@ -362,7 +394,6 @@ export default function ReadyPage() {
 
                     {/* ── Filter ─────────────────────────────────────────── */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        {/* Status chips — scrollable */}
                         <div className="px-4 pt-4 pb-3 border-b border-gray-100">
                             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
                                 {[
@@ -390,7 +421,6 @@ export default function ReadyPage() {
                             </div>
                         </div>
 
-                        {/* Search + Grade + Reset */}
                         <div className="px-4 py-3 flex flex-wrap gap-2">
                             <div className="relative flex-1 min-w-[180px]">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -478,12 +508,10 @@ export default function ReadyPage() {
                                                     key={unit.id}
                                                     className={`data-row ${unit.status === "RESERVED" ? "bg-violet-50/20 hover:bg-violet-50/40" : unit.status === "HELD" ? "bg-orange-50/20 hover:bg-orange-50/40" : "hover:bg-gray-50/60"}`}
                                                 >
-                                                    {/* No */}
                                                     <td className="px-4 py-3.5 text-center w-10">
                                                         <span className="text-[11px] font-semibold text-gray-300 tabular-nums">{idx + 1}</span>
                                                     </td>
 
-                                                    {/* Laptop */}
                                                     <td className="px-4 py-3.5" style={{ maxWidth: 240 }}>
                                                         <p className="font-semibold text-gray-800 text-xs truncate" title={unit.laptop?.laptop_name}>
                                                             {unit.laptop?.laptop_name || "—"}
@@ -495,24 +523,20 @@ export default function ReadyPage() {
                                                         </div>
                                                     </td>
 
-                                                    {/* Serial Number */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{unit.serial_number}</code>
                                                     </td>
 
-                                                    {/* Grade */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
                                                             {unit.grade === "A" ? "🏆" : unit.grade === "B" ? "👍" : "⚠️"} Grade {unit.grade}
                                                         </span>
                                                     </td>
 
-                                                    {/* Harga Jual */}
                                                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                         <span className="font-bold text-gray-800 text-xs tabular-nums">{fmt(unit.selling_price)}</span>
                                                     </td>
 
-                                                    {/* Status */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         {st && (
                                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${st.badge}`}>
@@ -522,7 +546,6 @@ export default function ReadyPage() {
                                                         )}
                                                     </td>
 
-                                                    {/* Pemesan */}
                                                     <td className="px-4 py-3.5">
                                                         {isPending && unit.reserved_by ? (
                                                             <div>
@@ -536,7 +559,6 @@ export default function ReadyPage() {
                                                         )}
                                                     </td>
 
-                                                    {/* Aksi */}
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
                                                             {isAvailable && canCreateTx && (
@@ -590,18 +612,14 @@ export default function ReadyPage() {
                                     unit
                                     {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
                                 </p>
-                                <button
-                                    onClick={exportToExcel}
-                                    disabled={isExporting || filtered.length === 0}
-                                    className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Export Excel
-                                </button>
+                               
                             </div>
                         </div>
+                    )}
+
+                    {/* ── Total Nominal ───────────────────────────────────── */}
+                    {!isLoading && filtered.length > 0 && (
+                        <TotalBar totals={totals} count={filtered.length} />
                     )}
 
                 </div>
@@ -709,7 +727,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[94dvh] overflow-hidden animate-slideUp">
 
-                {/* Header */}
                 <div className={`px-5 py-4 flex-shrink-0 ${isDP ? "bg-gray-800" : "bg-gray-700"} text-white`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -725,7 +742,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                     </div>
                 </div>
 
-                {/* Unit info */}
                 <div className="px-5 pt-4 pb-0 flex-shrink-0">
                     <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center gap-3">
                         <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -741,7 +757,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                     </div>
                 </div>
 
-                {/* Form */}
                 <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
@@ -815,7 +830,6 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                     </div>
                 </form>
 
-                {/* Footer */}
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-white">
                     <button type="button" onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
                     <button type="button" onClick={() => handleSubmit()} disabled={loading}
@@ -893,7 +907,6 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
-                {/* Header */}
                 <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -911,7 +924,6 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     </div>
                 </div>
 
-                {/* Body */}
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
@@ -929,7 +941,6 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                         ))}
                     </div>
 
-                    {/* Upload bukti */}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Bukti Pembayaran <span className="text-gray-400 font-normal">(opsional)</span></label>
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProofUpload} className="hidden" />
@@ -959,7 +970,6 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
                     <button

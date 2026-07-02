@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AccessoryUnit {
@@ -736,6 +737,7 @@ export default function AccessoriesPage() {
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("");
     const [fetching, setFetching] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Accessory CRUD
     const [accModalOpen, setAccModalOpen] = useState(false);
@@ -835,6 +837,125 @@ export default function AccessoriesPage() {
         } finally { setDeletingAcc(false); }
     };
 
+    // ── Export Excel ──
+    // Halaman ini pakai server-side pagination (items cuma 20 baris halaman aktif),
+    // jadi fetch ulang SEMUA data sesuai filter aktif dulu sebelum bikin file.
+    const exportToExcel = async () => {
+        setIsExporting(true);
+        try {
+            const params = new URLSearchParams({
+                page: "1",
+                limit: String(total > 0 ? total : 9999),
+                ...(search && { search }),
+                ...(filterCategory && { category: filterCategory }),
+            });
+            const res = await fetch(`/api/accessories?${params}`);
+            const json = await res.json();
+            const all: Accessory[] = json.success ? json.data : items;
+
+            if (all.length === 0) {
+                toast.error("Tidak ada data untuk di-export");
+                return;
+            }
+
+            const statusLabel: Record<string, string> = {
+                TERSEDIA: "Tersedia", TERJUAL: "Terjual", RESERVED: "Reserved",
+            };
+
+            // ── Sheet 1: Master Aksesori ──
+            const masterRows = all.map((a, idx) => {
+                const units = a.accessory_units ?? [];
+                const terjual = units.filter(u => u.status === "TERJUAL").length;
+                return {
+                    "No": idx + 1,
+                    "Nama Aksesori": a.name,
+                    "Kategori": a.category,
+                    "Merk": a.brand ?? "—",
+                    "Spesifikasi": a.spec ?? "—",
+                    "Harga Jual Default": a.sell_price || 0,
+                    "Stok Tersedia": a.stock_tersedia,
+                    "Total Unit": a.stock_total,
+                    "Terjual": terjual,
+                    "Keterangan": a.notes ?? "—",
+                    "Tanggal Input": a.created_at
+                        ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+                        : "—",
+                };
+            });
+
+            // ── Sheet 2: Detail Unit / SN (lengkap dengan margin) ──
+            const unitRows: Record<string, string | number>[] = [];
+            let no = 1;
+            let totalModal = 0, totalJual = 0, totalMargin = 0;
+            all.forEach(a => {
+                (a.accessory_units ?? []).forEach(u => {
+                    const margin = (u.selling_price || 0) - (u.buy_price || 0);
+                    const marginPct = u.buy_price > 0 ? Math.round((margin / u.buy_price) * 100) : 0;
+                    totalModal += u.buy_price || 0;
+                    totalJual += u.selling_price || 0;
+                    totalMargin += margin;
+                    unitRows.push({
+                        "No": no++,
+                        "Nama Aksesori": a.name,
+                        "Kategori": a.category,
+                        "Serial Number": u.serial_number,
+                        "Kondisi": u.condition,
+                        "Status": statusLabel[u.status] ?? u.status,
+                        "Harga Modal": u.buy_price || 0,
+                        "Harga Jual": u.selling_price || 0,
+                        "Margin": margin,
+                        "Margin %": `${marginPct}%`,
+                        "Catatan": u.notes ?? "—",
+                        "Tanggal Input": u.created_at
+                            ? new Date(u.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+                            : "—",
+                    });
+                });
+            });
+
+            // Baris TOTAL di bawah sheet unit
+            if (unitRows.length > 0) {
+                unitRows.push({
+                    "No": "", "Nama Aksesori": "TOTAL", "Kategori": "", "Serial Number": "",
+                    "Kondisi": "", "Status": "",
+                    "Harga Modal": totalModal,
+                    "Harga Jual": totalJual,
+                    "Margin": totalMargin,
+                    "Margin %": "", "Catatan": "", "Tanggal Input": "",
+                });
+            }
+
+            // ── Build workbook ──
+            const wb = XLSX.utils.book_new();
+
+            const wsMaster = XLSX.utils.json_to_sheet(masterRows);
+            wsMaster["!cols"] = [
+                { wch: 5 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
+                { wch: 18 }, { wch: 13 }, { wch: 11 }, { wch: 10 }, { wch: 26 }, { wch: 16 },
+            ];
+            XLSX.utils.book_append_sheet(wb, wsMaster, "Aksesori");
+
+            if (unitRows.length > 0) {
+                const wsUnit = XLSX.utils.json_to_sheet(unitRows);
+                wsUnit["!cols"] = [
+                    { wch: 5 }, { wch: 30 }, { wch: 14 }, { wch: 20 }, { wch: 10 },
+                    { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 22 }, { wch: 16 },
+                ];
+                XLSX.utils.book_append_sheet(wb, wsUnit, "Detail Unit");
+            }
+
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+            XLSX.writeFile(wb, `Aksesori_${dateStr}.xlsx`);
+            toast.success(`Export berhasil — ${all.length} jenis, ${no - 1} unit`);
+        } catch (err) {
+            console.error("Export Excel gagal:", err);
+            toast.error("Gagal export Excel. Coba lagi.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const totalPages = Math.ceil(total / LIMIT);
     const hasFilter = !!(search || filterCategory);
 
@@ -886,15 +1007,43 @@ export default function AccessoriesPage() {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
-                                className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Tambah Aksesori
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {/* Export Excel */}
+                                <button
+                                    onClick={exportToExcel}
+                                    disabled={isExporting || fetching || items.length === 0}
+                                    title={items.length === 0 ? "Tidak ada data untuk di-export" : "Export semua data ke Excel"}
+                                    className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-xl active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {isExporting ? (
+                                        <>
+                                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Mengexport...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            <span className="hidden sm:inline">Export Excel</span>
+                                            <span className="sm:hidden">Excel</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Tambah Aksesori */}
+                                <button
+                                    onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
+                                    className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Tambah Aksesori
+                                </button>
+                            </div>
                         </div>
 
                         {/* STAT CARDS */}
