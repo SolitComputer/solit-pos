@@ -31,10 +31,10 @@ type Scope = "ACTIVE" | "ARCHIVED";
 const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : "—";
 
 const daysDiff = (nextISO: string) =>
@@ -87,6 +87,13 @@ const CheckIcon = () => (
   </svg>
 );
 
+// Icon untuk tombol Tandai FU (phone/call icon)
+const PhoneIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012.18 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.15a16 16 0 006.02 6.02l1.51-1.52a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+  </svg>
+);
+
 const Spinner = () => (
   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block flex-shrink-0" />
 );
@@ -102,9 +109,8 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   const isPedagang = type === "PEDAGANG";
   return (
     <div
-      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${
-        isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
-      }`}
+      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+        }`}
     >
       {initials || "?"}
     </div>
@@ -163,8 +169,27 @@ function InfoCell({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-// ── WaLink Button (extracted to avoid <a tag being stripped by renderer) ──────
-function WaFollowupButton({
+// ── Tombol Chat WA — hanya buka WhatsApp, TIDAK record ke API ────────────────
+// Dipakai di scope ACTIVE maupun ARCHIVED oleh semua role yang bisa canView
+function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boolean }) {
+  return (
+    <a
+      href={waLink(f)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Buka WhatsApp"
+      className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-bold" : "w-9"
+        }`}
+    >
+      <WaIcon />
+      {fullWidth && <span>Chat WA</span>}
+    </a>
+  );
+}
+
+// ── Tombol Tandai Follow-up — hanya record ke API, TIDAK buka WA ─────────────
+// Hanya muncul saat canFollowup === true dan f.is_due === true
+function TandaiFuButton({
   f,
   processing,
   onFollowup,
@@ -173,37 +198,19 @@ function WaFollowupButton({
   processing: boolean;
   onFollowup: (id: string) => void;
 }) {
-  const href = waLink(f);
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
       onClick={() => onFollowup(f.id)}
-      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${
-        processing
-          ? "bg-emerald-400 opacity-70 pointer-events-none"
-          : "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
-      }`}
+      disabled={processing}
+      title="Tandai sudah follow-up (catat ke sistem)"
+      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
+          ? "bg-blue-400 opacity-70 cursor-not-allowed"
+          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+        }`}
     >
-      {processing ? <Spinner /> : <WaIcon />}
-      Chat WA &amp; Follow-up
-    </a>
-  );
-}
-
-function WaChatButton({ f }: { f: Followup }) {
-  const href = waLink(f);
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Chat WhatsApp"
-      className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-150 flex-shrink-0"
-    >
-      <WaIcon />
-    </a>
+      {processing ? <Spinner /> : <PhoneIcon />}
+      Tandai FU
+    </button>
   );
 }
 
@@ -234,9 +241,8 @@ function FollowupCard({
 
   return (
     <div
-      className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${
-        isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
-      }`}
+      className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
+        }`}
     >
       {isDue && (
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />
@@ -262,11 +268,10 @@ function FollowupCard({
         </div>
         <div className="mt-2.5 flex items-center gap-1.5">
           <span
-            className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-              isPedagang
+            className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${isPedagang
                 ? "bg-amber-50 text-amber-700 border-amber-200"
                 : "bg-blue-50 text-blue-700 border-blue-200"
-            }`}
+              }`}
           >
             {isPedagang ? "🏷️ Pedagang" : "🙋 User"}
           </span>
@@ -304,22 +309,35 @@ function FollowupCard({
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
           {scope === "ACTIVE" ? (
             <>
-              {/* Tombol Follow-up: hanya Closing (CREW_SALES) & Admin */}
+              {/*
+               * Tombol WA: selalu muncul untuk semua role yang punya akses view.
+               * Hanya buka WhatsApp, tidak mencatat FU ke sistem.
+               */}
+              <WaChatButton f={f} />
+
+              {/*
+               * Tombol Tandai FU: hanya canFollowup (CREW_SALES & Admin).
+               * Saat is_due → tombol biru aktif "Tandai FU".
+               * Saat belum due → tombol disabled abu-abu info status.
+               */}
               {canFollowup ? (
                 f.is_due ? (
-                  <WaFollowupButton f={f} processing={processing} onFollowup={onFollowup} />
+                  <TandaiFuButton f={f} processing={processing} onFollowup={onFollowup} />
                 ) : (
                   <button
                     disabled
                     title={`Sudah FU. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
-                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed"
+                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
                   >
                     <CheckIcon />
                     Sudah FU · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
                   </button>
                 )
               ) : (
-                /* Role lain: info-only, tidak bisa FU */
+                /*
+                 * Role lain (non-canFollowup): hanya info status, tidak bisa Tandai FU.
+                 * Tombol WA di atas tetap tersedia.
+                 */
                 <div className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-semibold border border-gray-100 cursor-default select-none">
                   {f.is_due ? (
                     <span>⏰ Perlu Follow-up</span>
@@ -345,9 +363,12 @@ function FollowupCard({
               )}
             </>
           ) : (
-            /* Scope ARCHIVED */
+            /* ── Scope ARCHIVED ─────────────────────────────
+             * Tombol WA (fullWidth jika tidak ada Aktifkan Lagi)
+             * + Aktifkan Lagi (hanya canManage)
+             */
             <>
-              <WaChatButton f={f} />
+              <WaChatButton f={f} fullWidth={!canManage} />
               {canManage && (
                 <button
                   onClick={() => onReactivate(f.id)}
@@ -375,43 +396,39 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-          { emoji: "🗂️", label: "Total Arsip", value: total, danger: false },
-          { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-        ]
+        { emoji: "🗂️", label: "Total Arsip", value: total, danger: false },
+        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
+      ]
       : [
-          { emoji: "👥", label: "Customer", value: total, danger: false },
-          { emoji: "🔴", label: "Perlu Follow-up", value: totalDue, danger: totalDue > 0 },
-          { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-        ];
+        { emoji: "👥", label: "Customer", value: total, danger: false },
+        { emoji: "🔴", label: "Perlu Follow-up", value: totalDue, danger: totalDue > 0 },
+        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
+      ];
 
   return (
     <div className={`grid gap-2 ${scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3"}`}>
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${
-            c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
-          }`}
+          className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+            }`}
         >
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${
-              c.danger ? "bg-red-100" : "bg-gray-100"
-            }`}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${c.danger ? "bg-red-100" : "bg-gray-100"
+              }`}
           >
             {c.emoji}
           </div>
           <div className="min-w-0">
             <p
-              className={`text-[9px] font-bold uppercase tracking-widest leading-none mb-1 truncate ${
-                c.danger ? "text-red-400" : "text-gray-400"
-              }`}
+              className={`text-[9px] font-bold uppercase tracking-widest leading-none mb-1 truncate ${c.danger ? "text-red-400" : "text-gray-400"
+                }`}
             >
               {c.label}
             </p>
             <p
-              className={`text-lg font-black leading-none ${
-                c.danger ? "text-red-600" : "text-gray-900"
-              }`}
+              className={`text-lg font-black leading-none ${c.danger ? "text-red-600" : "text-gray-900"
+                }`}
             >
               {c.value}
             </p>
@@ -605,11 +622,10 @@ export default function ManagementSellerPage() {
               <button
                 key={s}
                 onClick={() => setScope(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                  scope === s
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
-                }`}
+                  }`}
               >
                 {s === "ACTIVE" ? "Aktif" : "Arsip"}
               </button>
@@ -633,17 +649,15 @@ export default function ManagementSellerPage() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${
-                  isActive
+                className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
                     ? "bg-gray-900 border-gray-900 shadow-md"
                     : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-                      isActive ? "bg-white/10" : "bg-gray-100"
-                    }`}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${isActive ? "bg-white/10" : "bg-gray-100"
+                      }`}
                   >
                     {t.icon}
                   </div>
@@ -718,8 +732,8 @@ export default function ManagementSellerPage() {
               {search.trim()
                 ? "Tidak ada hasil pencarian"
                 : scope === "ARCHIVED"
-                ? "Belum ada yang diarsipkan"
-                : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
+                  ? "Belum ada yang diarsipkan"
+                  : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
             </p>
             {search.trim() && (
               <button
