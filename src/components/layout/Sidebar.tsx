@@ -7,6 +7,7 @@
 // Strategi: UNION. Semua fitur & menu per-role dipertahankan (tidak ada yang hilang).
 // Fix: banner alarm versi B tadinya ditulis sebagai block-statement di body fungsi
 //      (jadi TIDAK pernah ter-render). Di sini banner dipindah ke dalam return JSX.
+// v2: Tambah ITEM_MISSIONS ke semua role kecuali PKL (semua varian).
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -193,6 +194,13 @@ const Icons = {
       <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
     </svg>
   ),
+  // ── Missions icon ──────────────────────────────────────────────────────────
+  missions: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -237,6 +245,12 @@ const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
 const ITEM_ANTRIAN_MASUK: MenuItem = {
   name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
 };
+// ── Missions item (semua role kecuali PKL) ────────────────────────────────────
+const ITEM_MISSIONS: MenuItem = {
+  name: "Misi Pekerjaan",
+  href: "/dashboard/missions",
+  icon: Icons.missions,
+};
 
 // ── Preparation groups (UNION dari kedua versi; dedupe by href otomatis di mergeMenuGroups) ──
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
@@ -268,7 +282,7 @@ const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
 const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
-    ITEM_ANTRIAN_MASUK, // pengantaran bisa lihat antrian masuk
+    ITEM_ANTRIAN_MASUK,
     { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.pendingOrders },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
@@ -294,11 +308,13 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
 };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
+// ITEM_MISSIONS disertakan di sini agar semua role yang pakai ADMIN_OVERVIEW dapat menu Misi
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+    ITEM_MISSIONS,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -338,11 +354,15 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
+// ITEM_MISSIONS disertakan di sini agar semua role yang pakai SALES_OVERVIEW() dapat menu Misi
+// Role yang pakai function ini: KEPALA_SALES, CREW_SALES, SOTECH, PENGANTARAN,
+// KEPALA_ONPOINT, ONPOINT, KEPALA_SOTECH, KEPALA_MARKETING, ACCOUNTING
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
     ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+    ITEM_MISSIONS,
     ...extra,
   ],
 });
@@ -376,7 +396,7 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   ],
 };
 
-// ── PKL shared menu ───────────────────────────────────────────────────────────
+// ── PKL shared menu — SENGAJA tidak ada ITEM_MISSIONS ────────────────────────
 const PKL_MENU: MenuGroup[] = [
   {
     label: "Overview",
@@ -402,7 +422,7 @@ const PKL_MENU: MenuGroup[] = [
   },
 ];
 
-// ── PKL Sales menu (punya akses preparation) — dipertahankan dari versi Ikmal ──
+// ── PKL Sales menu — SENGAJA tidak ada ITEM_MISSIONS ─────────────────────────
 const PKL_SALES_MENU: MenuGroup[] = [
   {
     label: "Overview",
@@ -426,11 +446,12 @@ const PKL_SALES_MENU: MenuGroup[] = [
       { name: "Scanner", href: "/scan", icon: Icons.scanner },
     ],
   },
-  PREPARATION_SALES_MENU,          // Dashboard Penyiapan + Antrian Masuk (create)
-  PREPARATION_PENYEDIA_MENU,       // Antrian & Selesai (done)
-  PREPARATION_SALES_DELIVERY_MENU, // Siap Dikirim / Sedang Diantar / Riwayat (dispatch)
+  PREPARATION_SALES_MENU,
+  PREPARATION_PENYEDIA_MENU,
+  PREPARATION_SALES_DELIVERY_MENU,
 ];
 
+// ── PKL Penyedia menu — SENGAJA tidak ada ITEM_MISSIONS ──────────────────────
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
   {
     label: "Overview",
@@ -457,15 +478,21 @@ const PKL_PENYEDIA_MENU: MenuGroup[] = [
   },
 ];
 
-// ── Role → Menu mapping (UNION per-role — tidak ada menu yang hilang) ──────────
+// ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
+  // ── ADMIN & setara ──────────────────────────────────────────────────────────
+  ADMIN: [
+    ADMIN_OVERVIEW, // sudah include ITEM_MISSIONS
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+  ],
+
   PROGRAMMER: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+        ITEM_MISSIONS, // ✅
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -475,12 +502,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
+
   ASISTEN_CEO: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+        ITEM_MISSIONS, // ✅
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -489,62 +518,59 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
+
+  // ── SALES ──────────────────────────────────────────────────────────────────
+  // SALES_OVERVIEW() sudah include ITEM_MISSIONS
   KEPALA_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
   CREW_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
   SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
   PENGANTARAN: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    PENGANTARAN_TRANSAKSI,
+    SALES_INVENTARIS, PENGANTARAN_TRANSAKSI,
     PREPARATION_PENGANTARAN_MENU,
   ],
+
   KEPALA_ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_PENYEDIA_MENU,
   ],
+
   ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,          // union (dari versi teman)
-    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
   KEPALA_SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,          // union (dari versi teman)
-    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
-    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
+    SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
+  // ── TEKNISI ────────────────────────────────────────────────────────────────
   TEKNISI: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -562,12 +588,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
+
   KEPALA_TEKNISI: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -583,8 +611,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
+
+  // ── ACCOUNTING ─────────────────────────────────────────────────────────────
   ACCOUNTING: [
-    SALES_OVERVIEW([
+    SALES_OVERVIEW([ // sudah include ITEM_MISSIONS
       { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ITEM_USERS,
     ]),
@@ -605,6 +635,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
+
+  // ── PENGELOLA BARANG ───────────────────────────────────────────────────────
   PENGELOLA_BARANG: [
     {
       label: "Overview",
@@ -613,6 +645,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -626,10 +659,32 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
+
+  KEPALA_PENGELOLA_BARANG: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_MISSIONS, // ✅
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+      ],
+    },
+    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
+  ],
+
+  // ── MARKETING ──────────────────────────────────────────────────────────────
   MARKETING: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS],
+      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS], // ✅
     },
     {
       label: "Inventaris",
@@ -639,26 +694,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       ],
     },
   ],
-  KEBERSIHAN: [
-    {
-      label: "Overview",
-      items: [
-        ITEM_ABSENSI, ITEM_LEMBUR,
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_USERS,
-      ],
-    },
-    {
-      label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
-    },
-  ],
+
   KEPALA_MARKETING: [
-    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_OVERVIEW([ITEM_USERS]), // sudah include ITEM_MISSIONS
     {
       label: "Inventaris",
       items: [
@@ -675,16 +713,38 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
-    PREPARATION_SALES_MENU,          // union (dari versi teman)
-    PREPARATION_PENYEDIA_MENU,       // union (dari versi Ikmal)
-    PREPARATION_SALES_DELIVERY_MENU, // union (dari versi teman)
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
+
+  // ── KEBERSIHAN ─────────────────────────────────────────────────────────────
+  KEBERSIHAN: [
+    {
+      label: "Overview",
+      items: [
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+        ITEM_USERS,
+        ITEM_MISSIONS, // ✅
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+  ],
+
+  // ── PENYEDIA BARANG ────────────────────────────────────────────────────────
   PENYEDIA_BARANG: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -700,12 +760,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
+
   KEPALA_PENYEDIA_BARANG: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -721,10 +783,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
+
+  // ── KONTEN ─────────────────────────────────────────────────────────────────
   KONTEN: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS],
+      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS], // ✅
     },
     {
       label: "Inventaris",
@@ -738,20 +802,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
   ],
-  PKL: PKL_MENU,
-  PKL_MARKETING: PKL_MENU,
-  PKL_SALES: PKL_SALES_MENU,        
-  PKL_PENYEDIA_BARANG: PKL_PENYEDIA_MENU, 
-  PKL_SOTECH: PKL_MENU,
-  PKL_ONPOINT: PKL_MENU,
-  PKL_TEKNISI: PKL_MENU,
-  PKL_KONTEN: PKL_MENU,
+
+  // ── CUSTOMER SERVICE ───────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_MISSIONS, // ✅
       ],
     },
     {
@@ -770,24 +829,16 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     SERVICE_MENU,
   ],
-  KEPALA_PENGELOLA_BARANG: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
-      ],
-    },
-    {
-      label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
-      ],
-    },
-    { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
-  ],
+
+  // ── PKL — TIDAK ada ITEM_MISSIONS ─────────────────────────────────────────
+  PKL: PKL_MENU,
+  PKL_MARKETING: PKL_MENU,
+  PKL_SALES: PKL_SALES_MENU,
+  PKL_PENYEDIA_BARANG: PKL_PENYEDIA_MENU,
+  PKL_SOTECH: PKL_MENU,
+  PKL_ONPOINT: PKL_MENU,
+  PKL_TEKNISI: PKL_MENU,
+  PKL_KONTEN: PKL_MENU,
 };
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -891,7 +942,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
     if (saved) {
-      requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });  // ← tunggu paint
+      requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });
     }
   }, [loading, scrollKey]);
 
@@ -945,7 +996,6 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
-              {/* Multi-role badges */}
               <RoleBadges user={user} />
             </div>
           </div>
@@ -1093,7 +1143,7 @@ export default function Sidebar() {
     ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
     : [];
 
-  // ✅ Prep notify + alarm (dari versi Ikmal)
+  // ✅ Prep notify + alarm
   const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
@@ -1108,7 +1158,7 @@ export default function Sidebar() {
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
 
-  // ✅ Delivery badge (dari versi teman) + badge antrian/siap-kirim (dari versi Ikmal)
+  // ✅ Delivery badge + badge antrian/siap-kirim
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
@@ -1120,7 +1170,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ── Banner alarm global (klik = buka + matikan bunyi) ── */}
+      {/* ── Banner alarm global ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
           <button
