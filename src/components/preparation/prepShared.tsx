@@ -6,12 +6,12 @@ export interface PrepItem { id: string; serial_number: string; laptop_name: stri
 export interface PrepOrder {
   id: string; order_number: string; customer_name: string; customer_phone: string | null;
   status: string; delivery_method: string | null;
+  created_by: string | null;                
   created_by_name: string | null; created_by_role?: string | null;
   received_by_name: string | null; done_by_name: string | null;
   delivery_address: string | null; created_at: string;
   preparation_items: PrepItem[];
 }
-
 export const STATUS_META: Record<string, { label: string; badge: string; dot: string }> = {
   MENUNGGU: { label: "Menunggu", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
   DIPROSES: { label: "Diproses", badge: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },

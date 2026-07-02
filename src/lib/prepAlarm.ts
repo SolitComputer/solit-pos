@@ -74,3 +74,29 @@ export function usePrepAlarm(
 
   return { unackedCount: unacked.length, unackedIds, acknowledge };
 }
+
+export const PREP_PROVIDER_ROLES = [
+  "PENYEDIA_BARANG",
+  "KEPALA_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG",
+] as const;
+
+export const PREP_SILENT_ROLES = ["ADMIN"] as const;
+
+function collectRoles(role?: string | null, roles?: string[] | null): string[] {
+  const list = roles ? [...roles] : [];
+  if (role) list.push(role);
+  return list;
+}
+
+/** true kalau user termasuk penyedia barang (dengar semua alarm format masuk). */
+export function isPrepProvider(role?: string | null, roles?: string[] | null): boolean {
+  const list = collectRoles(role, roles);
+  return list.some((r) => (PREP_PROVIDER_ROLES as readonly string[]).includes(r));
+}
+
+/** true kalau user tidak boleh bunyi alarm sama sekali (mis. admin). */
+export function isPrepSilent(role?: string | null, roles?: string[] | null): boolean {
+  const list = collectRoles(role, roles);
+  return list.some((r) => (PREP_SILENT_ROLES as readonly string[]).includes(r));
+}

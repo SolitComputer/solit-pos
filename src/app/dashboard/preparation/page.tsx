@@ -7,6 +7,7 @@ import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
+import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 
 // ── BarcodeScanModal ──────────────────────────────────────────────────────────
 // ── BarcodeScanModal (native + fallback ZXing) ────────────────────────────────
@@ -396,7 +397,9 @@ export default function PreparationPage() {
       .channel("preparation-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, (payload) => {
         const row: any = payload.new;
-        if (canDone) showToast("📦 Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+        if (isPrepProvider(userRole) && !isPrepSilent(userRole)) {
+          showToast("📦 Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+        }
         if (row.id && !knownIdsRef.current.has(row.id)) {
           setNewIds(prev => new Set(prev).add(row.id));
           setTimeout(() => setNewIds(prev => { const next = new Set(prev); next.delete(row.id); return next; }), 10000);
@@ -408,7 +411,8 @@ export default function PreparationPage() {
         // notif ke pembuat format saat penyedia selesai cek (→ SIAP_KIRIM)
         if (
           row?.status === "SIAP_KIRIM" &&
-          userId && row.created_by === userId &&
+          userId && row.created_by === userId &&  
+          !isPrepSilent(userRole) &&              
           !notifiedDoneRef.current.has(row.id)
         ) {
           notifiedDoneRef.current.add(row.id);
@@ -418,7 +422,7 @@ export default function PreparationPage() {
       }).on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userRole, userId, canDone, showToast, fetchOrders]);
+  }, [userRole, userId, showToast, fetchOrders]);
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

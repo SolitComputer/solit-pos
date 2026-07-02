@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
-import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 
 export default function PreparationSiapKirimPage() {
     const [orders, setOrders] = useState<PrepOrder[]>([]);
@@ -18,6 +18,21 @@ export default function PreparationSiapKirimPage() {
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [newIds, setNewIds] = useState<Set<string>>(new Set());
     const knownIdsRef = useRef<Set<string>>(new Set());
+    const [userId, setUserId] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch("/api/auth/me").then(r => r.json())
+            .then(r => { setUserId(r.user?.id ?? null); setUserRole(r.user?.role ?? null); })
+            .catch(() => { setUserId(null); setUserRole(null); });
+    }, []);
+
+    const silent = isPrepSilent(userRole);
+
+    const myOrders = useMemo(
+        () => (userId ? orders.filter(o => o.created_by === userId) : []),
+        [orders, userId]
+    );
 
     useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
 
@@ -29,9 +44,9 @@ export default function PreparationSiapKirimPage() {
     }, []);
 
     const { unackedCount: alarmCount, unackedIds: alarmIds, acknowledge: ackOrder } = usePrepAlarm(
-        orders,
+        myOrders,
         ALARM_KEYS.SIAP_KIRIM,
-        soundOn
+        soundOn && !silent
     );
 
     const didInitAckRef = useRef(false);
@@ -65,7 +80,12 @@ export default function PreparationSiapKirimPage() {
             .channel("prep-siap-kirim-realtime")
             .on("postgres_changes", { event: "UPDATE", schema: "public", table: "preparation_orders" }, payload => {
                 const row: any = payload.new;
-                if (row.status === "SIAP_KIRIM" && !knownIdsRef.current.has(row.id)) {
+                if (
+                    row.status === "SIAP_KIRIM" &&
+                    userId && row.created_by === userId &&
+                    !silent &&
+                    !knownIdsRef.current.has(row.id)
+                ) {
                     showToast("📦 Barang siap dikirim!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
                     setNewIds(prev => { const n = new Set(prev); n.add(row.id); return n; });
                     setTimeout(() => setNewIds(prev => { const n = new Set(prev); n.delete(row.id); return n; }), 12000);
@@ -76,7 +96,7 @@ export default function PreparationSiapKirimPage() {
             .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [showToast, fetchOrders]);
+    }, [showToast, fetchOrders, userId, silent]);
 
     useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
