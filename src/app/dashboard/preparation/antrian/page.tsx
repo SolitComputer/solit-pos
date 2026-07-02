@@ -78,13 +78,15 @@ export default function PreparationAntrianPage() {
   }, []);
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!userRole) return;
     const channel = supabase
       .channel("prep-antrian-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, (payload) => {
         const row: any = payload.new;
-        showToast("📦 Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+        if (canHearIncoming) {   // ← admin / non-penyedia yang buka halaman ini tidak ikut bunyi
+          showToast("📦 Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+        }
         if (row.id && !knownIdsRef.current.has(row.id)) {
           setNewIds(prev => new Set(prev).add(row.id));
           setTimeout(() => setNewIds(prev => { const n = new Set(prev); n.delete(row.id); return n; }), 10000);
@@ -95,7 +97,7 @@ export default function PreparationAntrianPage() {
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userRole, showToast, fetchOrders]);
+  }, [userRole, showToast, fetchOrders, canHearIncoming]);
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 

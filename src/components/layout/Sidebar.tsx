@@ -1094,7 +1094,7 @@ export default function Sidebar() {
     : [];
 
   // ✅ Prep notify + alarm (dari versi Ikmal)
-  const prep = usePrepNotify(userRoles);
+  const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
     const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
