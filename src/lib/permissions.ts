@@ -131,7 +131,6 @@ const PREPARATION_SALES_ROLES: UserRole[] = [
 ];
 
 /** Penyedia barang yang cek & tandai done */
-/** Penyedia barang yang cek & tandai done */
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
   "PKL_PENYEDIA_BARANG", // ← PKL penyedia = sama seperti penyedia barang (receive/check/done)
@@ -194,16 +193,17 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
 /** Role yang MENJADI pengantar (bukan yang assign) */
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
 
+// ─── Voice / HT Roles ────────────────────────────────────────────────────────
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-  "PKL_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG", // parity dengan penyedia barang
 ];
 
 export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-  "PKL_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG", // parity dengan penyedia barang
 ];
 
 // ─── Service Roles ────────────────────────────────────────────────────────────
@@ -438,8 +438,8 @@ export const PERMISSIONS = {
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
   ] as UserRole[],
-  CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
-  EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG"] as UserRole[],
+  CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+  EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
 
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
@@ -494,12 +494,13 @@ export function hasPermission(
 
 // ─── Division management ──────────────────────────────────────────────────────
 export const DIVISION_MAP: Record<string, UserRole[]> = {
-  KEPALA_TEKNISI: ["TEKNISI", "PKL_TEKNISI"],
+  KEPALA_TEKNISI: ["TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE", "PENGELOLA_BARANG"],
   KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES"],
   KEPALA_MARKETING: ["KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
   KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
+  KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE"],
   ADMIN: ["PENGELOLA_BARANG"],
 };
 
@@ -561,6 +562,7 @@ export function getDivisionLabel(headRole: string): string {
     KEPALA_ONPOINT: "Divisi Onpoint",
     KEPALA_PENYEDIA_BARANG: "Divisi Penyedia Barang",
     KEPALA_SOTECH: "Divisi Sotech",
+    KEPALA_PENGELOLA_BARANG: "Divisi Pengelola Barang",
     ADMIN: "Pengelola Barang",
   };
   return labels[headRole] ?? headRole.replace(/_/g, " ");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, isDivisionHead, isFullAccess } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-import { DIVISION_MAP } from "@/lib/permissions";
+import { isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,18 +10,30 @@ const supabase = createClient(
 
 const MAX_OFF_PER_MONTH = 6;
 
-function canManageUser(actorRole: string, targetRole: string): boolean {
-  if (isFullAccess(actorRole)) return true;
-  if (!isDivisionHead(actorRole)) return false;
-  const subordinates = DIVISION_MAP[actorRole] ?? [];
-  return (subordinates as string[]).includes(targetRole);
+// ── Multi-role helpers ────────────────────────────────────────────────────────
+// Ambil semua role user. Dukung akun multi-role (roles[]) & fallback single (role).
+function rolesOf(user: any): string[] {
+  return Array.isArray(user?.roles) && user.roles.length > 0
+    ? user.roles
+    : user?.role ? [user.role] : [];
 }
 
-// ── GET — tidak berubah ──────────────────────────────────────────────────────
+// Boleh kelola libur target jika full-access ATAU target termasuk gabungan
+// bawahan dari SEMUA role user (union). Ini yang bikin akun
+// [KEPALA_PENGELOLA_BARANG, KEPALA_TEKNISI] bisa atur pengelola barang,
+// teknisi, customer service, dan pkl teknisi sekaligus.
+function canManageUser(userRoles: string[], targetRole: string): boolean {
+  if (isFullAccessMulti(userRoles)) return true;
+  return (getEffectiveSubordinates(userRoles) as string[]).includes(targetRole);
+}
+
+// ── GET ────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
+
+    const userRoles = rolesOf(user);
 
     const { searchParams } = new URL(request.url);
     const year = Number(searchParams.get("year") ?? new Date().getFullYear());
@@ -32,7 +44,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, message: "Bulan tidak valid" }, { status: 400 });
     }
 
-    if (isFullAccess(user.role)) {
+    // Full access → lihat semua
+    if (isFullAccessMulti(userRoles)) {
       let q = supabase
         .from("user_monthly_off")
         .select(`
@@ -50,10 +63,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: data ?? [] });
     }
 
-    if (isDivisionHead(user.role)) {
-      const subordinateRoles = DIVISION_MAP[user.role] ?? [];
-      if (subordinateRoles.length === 0) return NextResponse.json({ success: true, data: [] });
-
+    // Kepala divisi (bisa lebih dari satu) → lihat gabungan bawahan
+    const subordinateRoles = getEffectiveSubordinates(userRoles);
+    if (subordinateRoles.length > 0) {
       const { data: subordinateUsers } = await supabase
         .from("users")
         .select("id, name, role")
@@ -65,7 +77,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
       }
 
-      let q = supabase
+      const q = supabase
         .from("user_monthly_off")
         .select(`
           id, user_id, off_date, year, month, notes, set_by, created_at,
@@ -81,6 +93,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: data ?? [] });
     }
 
+    // Selain itu → hanya lihat milik sendiri
     const { data, error } = await supabase
       .from("user_monthly_off")
       .select("id, user_id, off_date, year, month, notes, created_at")
@@ -103,6 +116,7 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
+    const userRoles = rolesOf(user);
     const body = await request.json();
 
     // ── MODE SWAP ─────────────────────────────────────────────────────────────
@@ -135,7 +149,7 @@ export async function POST(request: Request) {
       if (!targetUser) {
         return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
       }
-      if (!canManageUser(user.role, targetUser.role)) {
+      if (!canManageUser(userRoles, targetUser.role)) {
         return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
       }
 
@@ -241,7 +255,6 @@ export async function POST(request: Request) {
     }
 
     // ── MODE NORMAL ───────────────────────────────────────────────────────────
-    // ↑ BAGIAN INI YANG HILANG — ini penyebab 500 untuk klik libur biasa
     const { user_id, off_date, notes } = body;
 
     if (!user_id || !off_date) {
@@ -269,7 +282,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
     }
 
-    if (!canManageUser(user.role, targetUser.role)) {
+    if (!canManageUser(userRoles, targetUser.role)) {
       return NextResponse.json(
         { success: false, message: "Kamu tidak punya akses untuk mengatur libur karyawan ini" },
         { status: 403 }
@@ -345,6 +358,8 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
+    const userRoles = rolesOf(user);
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const weekly_date = searchParams.get("weekly_date");
@@ -357,7 +372,7 @@ export async function DELETE(request: Request) {
       const { data: targetUser } = await supabase
         .from("users").select("id, role").eq("id", userId).maybeSingle();
       if (!targetUser) return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
-      if (!canManageUser(user.role, targetUser.role)) {
+      if (!canManageUser(userRoles, targetUser.role)) {
         return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
       }
 
@@ -405,7 +420,7 @@ export async function DELETE(request: Request) {
     }
 
     const targetRole = (record as any).users?.role ?? "";
-    if (!canManageUser(user.role, targetRole)) {
+    if (!canManageUser(userRoles, targetRole)) {
       return NextResponse.json(
         { success: false, message: "Kamu tidak punya akses untuk menghapus libur karyawan ini" },
         { status: 403 }

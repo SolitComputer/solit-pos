@@ -6,7 +6,7 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
 import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
-import { canManageAttendance, DIVISION_MAP } from "@/lib/permissions";
+import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function isPKLRole(role?: string): boolean {
@@ -3425,7 +3425,11 @@ export default function AttendanceDashboardPage() {
     }, [selectedMonth, refreshAll]);
 
     const isAdmin = isAdminRole(currentUser?.role);
-    const canManage = canManageAttendance(currentUser?.role);
+    const userRoles: string[] =
+        Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
+            ? currentUser.roles
+            : currentUser?.role ? [currentUser.role] : [];
+    const canManage = isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = canViewSalary(currentUser?.role);
 
     if (!selectedMonth) return (
@@ -5423,12 +5427,9 @@ export default function AttendanceDashboardPage() {
             {showMonthlyOffModal && canManage && (
                 <MonthlyOffModal
                     users={
-                        isAdmin
+                        (isAdmin || isFullAccessMulti(userRoles))
                             ? allUsers
-                            : allUsers.filter(u => {
-                                const subs = DIVISION_MAP[currentUser?.role as string] ?? [];
-                                return (subs as string[]).includes(u.role);
-                            })
+                            : allUsers.filter(u => (getEffectiveSubordinates(userRoles) as string[]).includes(u.role))
                     }
                     calYear={calYear}
                     calMonth={calMonth}
@@ -5559,11 +5560,11 @@ export default function AttendanceDashboardPage() {
                 />
             )}
             <style jsx global>{`
-        @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes scaleIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
-        .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16,1,0.3,1); }
-        .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16,1,0.3,1); }
-      `}</style>
+            @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+            @keyframes scaleIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
+            .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16,1,0.3,1); }
+            .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16,1,0.3,1); }
+        `}</style>
         </DashboardLayout>
     );
 }

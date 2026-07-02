@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import * as XLSX from "xlsx";
 import { Trash2 } from "lucide-react";
 
@@ -611,9 +611,12 @@ export default function UnitsPage() {
     const [filterPriceMax, setFilterPriceMax] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
-    const [userRole, setUserRole] = useState<UserRole | null>(null);
-    const canManageUnits = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_UNITS) : false;
-    const canSeePriceInfo = userRole ? hasPermission(userRole, ["ADMIN", "PENGELOLA_BARANG", "ACCOUNTING"] as UserRole[]) : false;
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
+    const canSeePriceInfo = hasAnyRole(userRoles, [
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
+    ] as UserRole[]);
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -626,8 +629,14 @@ export default function UnitsPage() {
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
-            .then(r => setUserRole(r.user?.role ?? null))
-            .catch(() => setUserRole(null));
+            .then(r => {
+                const roles: string[] =
+                    Array.isArray(r.user?.roles) && r.user.roles.length > 0
+                        ? r.user.roles
+                        : r.user?.role ? [r.user.role] : [];
+                setUserRoles(roles as UserRole[]);
+            })
+            .catch(() => setUserRoles([]));
     }, []);
 
     const fmtDate = (iso: string) => {
@@ -730,9 +739,9 @@ export default function UnitsPage() {
     };
 
     const counts = {
-        total: activeUnits.length,   
+        total: activeUnits.length,
         siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
-        sold: units.filter(u => u.status === "SOLD").length,  
+        sold: units.filter(u => u.status === "SOLD").length,
         service: activeUnits.filter(u => u.status === "SERVICE").length,
         belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
         gradeA: activeUnits.filter(u => u.grade === "A").length,
