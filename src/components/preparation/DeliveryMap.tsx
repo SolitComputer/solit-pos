@@ -95,7 +95,13 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     ensureLeaflet().then((L) => {
       if (cancelled || !containerRef.current || mapRef.current) return;
       const start = points[0] || destination || { lat: -6.4025, lng: 106.7942 };
-      const map = L.map(containerRef.current, { center: [start.lat, start.lng], zoom: 16, zoomControl: true, attributionControl: false });
+      const map = L.map(containerRef.current, {
+        center: [start.lat, start.lng],
+        zoom: 17,
+        maxZoom: 22,
+        zoomControl: true,
+        attributionControl: false,
+      });
       mapRef.current = map;
 
       // ── Tile layers ──
@@ -103,23 +109,23 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       // Kalau kosong: fallback CARTO Voyager + Esri World Imagery (app tetap jalan).
       roadLayerRef.current = MAPTILER_KEY
         ? L.tileLayer(
-            `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
-            { maxZoom: 20, detectRetina: true, crossOrigin: true }
-          ).addTo(map)
+          `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+          { maxZoom: 22, detectRetina: true, crossOrigin: true }   // ← 20 → 22
+        ).addTo(map)
         : L.tileLayer(
-            "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-            { maxZoom: 20, detectRetina: true, subdomains: "abcd" }
-          ).addTo(map);
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          { maxZoom: 20, detectRetina: true, subdomains: "abcd" }
+        ).addTo(map);
 
       satLayerRef.current = MAPTILER_KEY
         ? L.tileLayer(
-            `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
-            { maxZoom: 20, detectRetina: true, crossOrigin: true }
-          )
+          `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+          { maxZoom: 20, detectRetina: true, crossOrigin: true }
+        )
         : L.tileLayer(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            { maxZoom: 19 }
-          );
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          { maxZoom: 19 }
+        );
 
       map.on("dragstart", () => { followRef.current = false; });
 
@@ -196,8 +202,8 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       motoRef.current.setLatLng([target.lat, target.lng]);
       const pts: [number, number][] = points.map((p) => [p.lat, p.lng]);
       if (destination) pts.push([destination.lat, destination.lng]);
-      if (pts.length >= 2) mapRef.current.fitBounds(pts, { padding: [60, 60], maxZoom: 17 });
-      else mapRef.current.setView([target.lat, target.lng], 16);
+      if (pts.length >= 2) mapRef.current.fitBounds(pts, { padding: [60, 60], maxZoom: 18 });  // ← 17 → 18
+      else mapRef.current.setView([target.lat, target.lng], 17);                               // ← 16 → 17                              // ← 16 → 17
       return;
     }
 
