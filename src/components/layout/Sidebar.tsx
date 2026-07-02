@@ -227,11 +227,12 @@ const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
+    { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders }, // ← tambah
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    // Penyedia TIDAK lihat Siap Kirim (itu urusan Sales)
   ],
 };
+
 
 const PREPARATION_SALES_MENU: MenuGroup = {
   label: "Penyiapan Barang",
@@ -260,7 +261,7 @@ const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
   items: [
-    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+    { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
   ],
@@ -384,6 +385,35 @@ const PKL_MENU: MenuGroup[] = [
   },
 ];
 
+// ── PKL Sales menu (punya akses preparation) ───────────────────────────────
+const PKL_SALES_MENU: MenuGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+      ITEM_ABSENSI, ITEM_PKL_REPORT,
+    ],
+  },
+  {
+    label: "Inventaris",
+    items: [
+      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+    ],
+  },
+  {
+    label: "Transaksi",
+    items: [
+      { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
+      { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
+      { name: "Scanner", href: "/scan", icon: Icons.scanner },
+    ],
+  },
+  PREPARATION_SALES_MENU,       // Dashboard Penyiapan (create)
+  PREPARATION_PENYEDIA_MENU,    // Antrian & Selesai (done)
+  PREPARATION_SALES_DELIVERY_MENU, // Siap Dikirim / Sedang Diantar / Riwayat (dispatch)
+];
+
 // ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
@@ -421,6 +451,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,      // ← tambah
     PREPARATION_SALES_DELIVERY_MENU,
   ],
   CREW_SALES: [
@@ -428,6 +459,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,      // ← tambah
     PREPARATION_SALES_DELIVERY_MENU,
   ],
   SOTECH: [
@@ -443,9 +475,19 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PENGANTARAN_TRANSAKSI,
     PREPARATION_PENGANTARAN_MENU, // ← UPDATED (now includes Antrian Penyiapan)
   ],
-  KEPALA_ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_ONPOINT: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_PENYEDIA_MENU,      // ← tambah
+  ],
   ONPOINT: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
-  KEPALA_SOTECH: [SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI],
+  KEPALA_SOTECH: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_PENYEDIA_MENU,      // ← tambah
+  ],
   TEKNISI: [
     {
       label: "Overview",
@@ -582,6 +624,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
+    PREPARATION_PENYEDIA_MENU,      // ← tambah
   ],
   PENYEDIA_BARANG: [
     {
@@ -644,7 +687,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
-  PKL_SALES: PKL_MENU,
+  PKL_SALES: PKL_SALES_MENU,
   PKL_PENYEDIA_BARANG: PKL_MENU,
   PKL_SOTECH: PKL_MENU,
   PKL_ONPOINT: PKL_MENU,
@@ -790,7 +833,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 
   useEffect(() => {
-    if (loading) return;          
+    if (loading) return;
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);

@@ -1,3 +1,13 @@
+// src/lib/permissions.ts
+// Gabungan HEAD (punya Ikmal) + origin/develop (punya teman):
+// 1. Tambah DISPATCH_PREPARATION permission (sales pilih metode kirim)
+// 2. Tambah route /dashboard/preparation/siap-kirim
+// 3. PREPARATION_DELIVERY_PERSON_ROLES tetap hanya PENGANTARAN
+// 4. Multi-Role Helpers (mergeMenuGroups, getEffectivePermissions, dll) dari HEAD
+// 5. Tambah PREPARATION_PENYEDIA_EXTRA_ROLES — role Sales/Marketing/Konten/PKL-Sales
+//    diberi akses PENUH fitur penyedia barang (receive/check/done/view).
+//    Dedupe pakai `new Set(...)` karena sebagian role sudah ada di grup Sales.
+
 export type UserRole =
   | "ADMIN"
   | "KEPALA_SALES"
@@ -85,7 +95,11 @@ const SALES_ACCESS: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
 ];
 
-const TRANSACTION_VIEW: UserRole[] = ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "TEKNISI"];
+const TRANSACTION_VIEW: UserRole[] = [
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "TEKNISI", "KEPALA_TEKNISI",        // ← tambah
+  "KEPALA_PENGELOLA_BARANG",           // ← tambah
+];
 
 const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING"];
 
@@ -95,6 +109,7 @@ const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "
 const PREPARATION_SALES_ROLES: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
   "KEPALA_ONPOINT", "ONPOINT",
+  "PKL_SALES",  // ← tambah
 ];
 
 /** Penyedia barang yang cek & tandai done */
@@ -102,11 +117,36 @@ const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
 ];
 
+/**
+ * Role tambahan (DI LUAR penyedia barang inti) yang atas permintaan bisnis
+ * diberi akses PENUH ke fitur penyedia barang:
+ *   - terima antrian (receive)
+ *   - cek unit (check)
+ *   - tandai siap kirim (done)
+ *   - lihat semua penyiapan
+ * Catatan: ini TIDAK memberi akses CREATE atau DISPATCH — dua itu tetap milik Sales.
+ */
+const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
+  "KEPALA_SALES",
+  "CREW_SALES",
+  "KEPALA_MARKETING",
+  "KEPALA_SOTECH",
+  "KEPALA_ONPOINT",
+  "KONTEN",
+  "PKL_SALES",  // ✅ sudah ada
+];
+
 /** Siapa yang buat format penyiapan (Sales + Admin) */
 export const PREPARATION_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_SALES_ROLES];
 
-/** Siapa yang bisa terima & done-in penyiapan (Penyedia + Admin) */
-export const PREPARATION_DONE_ROLES: UserRole[] = [...FULL_ACCESS, ...PREPARATION_PENYEDIA_ROLES];
+/** Siapa yang bisa terima & done-in penyiapan (Penyedia inti + role tambahan + Admin) */
+export const PREPARATION_DONE_ROLES: UserRole[] = [
+  ...new Set<UserRole>([
+    ...FULL_ACCESS,
+    ...PREPARATION_PENYEDIA_ROLES,
+    ...PREPARATION_PENYEDIA_EXTRA_ROLES,
+  ]),
+];
 
 /**
  * Siapa yang bisa DISPATCH (pilih metode pengiriman) setelah penyedia done.
@@ -121,12 +161,14 @@ export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
 
 /** Semua yang bisa lihat penyiapan */
 export const PREPARATION_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS,
-  ...PREPARATION_SALES_ROLES,
-  ...PREPARATION_PENYEDIA_ROLES,
-  "PENGANTARAN",
+  ...new Set<UserRole>([
+    ...FULL_ACCESS,
+    ...PREPARATION_SALES_ROLES,
+    ...PREPARATION_PENYEDIA_ROLES,
+    ...PREPARATION_PENYEDIA_EXTRA_ROLES,
+    "PENGANTARAN",
+  ]),
 ];
-
 /** Role yang MENJADI pengantar (bukan yang assign) */
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
 
@@ -161,7 +203,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE", "PKL_SALES",
   ],
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
@@ -176,13 +218,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
-    "PENGANTARAN", "KEPALA_MARKETING",
+    "PENGANTARAN", "KEPALA_MARKETING", "PKL_SALES",
   ],
   "/dashboard/transactions": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     ...TRANSACTION_VIEW,
+    "PKL_SALES",  // ← tambah
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
@@ -198,6 +241,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "PKL_SALES",  // ← tambah
   ],
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
@@ -220,7 +264,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/transaction/create": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",  // ✅ sudah ada
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/transaction": [
@@ -228,24 +272,26 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES",  // ← tambah
   ],
   "/api/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
+    "PKL_SALES",  // ← tambah
   ],
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/api/units/reserve": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",  // ✅ sudah ada
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/units/hold": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",  // ✅ sudah ada
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES"],
@@ -301,6 +347,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
+
+  "/dashboard/missions": [...ALL_ROLES],
+  "/api/missions": [...ALL_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
@@ -314,6 +363,7 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
     ...TRANSACTION_VIEW,
+    "PKL_SALES",  // ← tambah
   ] as UserRole[],
 
   CREATE_TRANSACTION: [
@@ -326,6 +376,7 @@ export const PERMISSIONS = {
   EDIT_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES",  // ← tambah
   ] as UserRole[],
 
   RESTORE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],
@@ -364,6 +415,7 @@ export const PERMISSIONS = {
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
     "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
+    "PKL_SALES",  // ← tambah
   ] as UserRole[],
   EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
