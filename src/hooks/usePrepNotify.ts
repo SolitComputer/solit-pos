@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/services/supabase";
 import { hasAnyRole, PREPARATION_DONE_ROLES, PREPARATION_DISPATCH_ROLES } from "@/lib/permissions";
-import { ALARM_KEYS } from "@/lib/prepAlarm";
+import { ALARM_KEYS, isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 
 function readAck(key: string): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -20,9 +20,16 @@ function writeAck(key: string, ids: Set<string>) {
   } catch { }
 }
 
-export function usePrepNotify(userRoles: string[]) {
+export function usePrepNotify(userRoles: string[], userId?: string | null) {
+  // return values lama tetap dipertahankan (dipakai konsumer lain kalau ada)
   const isPenyedia = hasAnyRole(userRoles, PREPARATION_DONE_ROLES);
   const isDispatcher = hasAnyRole(userRoles, PREPARATION_DISPATCH_ROLES);
+
+  // ── Gating khusus ALARM (lebih ketat) ──────────────────────────────────────
+  const silent = isPrepSilent(null, userRoles);                 // ADMIN → mute total
+  const canHearMenunggu = !silent && isPrepProvider(null, userRoles); // hanya role penyedia barang
+  const canHearSiapKirim = !silent && isDispatcher && !!userId;  // sales, tapi difilter pembuat format
+
   const rolesKey = userRoles.join(",");
 
   const [menungguIds, setMenungguIds] = useState<string[]>([]);
@@ -32,28 +39,35 @@ export function usePrepNotify(userRoles: string[]) {
 
   const fetchData = useCallback(async () => {
     try {
-      if (isPenyedia) {
+      // MENUNGGU (format baru) → hanya penyedia barang yang bunyi
+      if (canHearMenunggu) {
         const r = await (await fetch("/api/preparation?status=MENUNGGU", { cache: "no-store" })).json();
         setMenungguIds((r.data ?? []).map((o: any) => o.id));
       } else setMenungguIds([]);
 
-      if (isDispatcher) {
+      // SIAP_KIRIM (penyedia done) → HANYA order yang dibuat user ini (sales pembuat format)
+      if (canHearSiapKirim) {
         const r = await (await fetch("/api/preparation?status=SIAP_KIRIM", { cache: "no-store" })).json();
-        setSiapKirimIds((r.data ?? []).map((o: any) => o.id));
+        setSiapKirimIds(
+          (r.data ?? [])
+            .filter((o: any) => o.created_by === userId)  // ← kunci: cuma pembuat format
+            .map((o: any) => o.id)
+        );
       } else setSiapKirimIds([]);
     } catch { /* ignore */ }
-  }, [isPenyedia, isDispatcher]);
+  }, [canHearMenunggu, canHearSiapKirim, userId]);
 
   useEffect(() => { if (rolesKey) fetchData(); }, [rolesKey, fetchData]);
 
   useEffect(() => {
-    if (!rolesKey) return;
+    // admin / role yang tak berhak dengar → tidak usah subscribe sama sekali
+    if (!rolesKey || silent || (!canHearMenunggu && !canHearSiapKirim)) return;
     const ch = supabase
       .channel("prep-notify-global")
       .on("postgres_changes", { event: "*", schema: "public", table: "preparation_orders" }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [rolesKey, fetchData]);
+  }, [rolesKey, silent, canHearMenunggu, canHearSiapKirim, fetchData]);
 
   // sinkron ack (same-tab event + cross-tab storage + balik fokus)
   useEffect(() => {
