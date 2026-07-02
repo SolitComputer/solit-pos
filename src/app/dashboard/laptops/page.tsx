@@ -293,8 +293,6 @@ export default function Page() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
     // ✅ Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
-    // sehingga user dengan kombinasi role apapun (mis. KEPALA_TEKNISI + KEPALA_PENGELOLA_BARANG)
-    // akan dapat akses kalau SALAH SATU dari role-nya punya izin.
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
     const canExport = hasAnyRole(userRoles, [
@@ -307,7 +305,7 @@ export default function Page() {
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
     ] as UserRole[]);
-     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -319,7 +317,7 @@ export default function Page() {
 
     useEffect(() => { fetchLaptops(); }, []);
 
-    // ✅ Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal kalau belum ada array
+    // ✅ Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
@@ -377,7 +375,7 @@ export default function Page() {
         if (filterStatus === "SIAP_JUAL") {
             list = list.filter(x => (x.siap_jual ?? 0) > 0);
         } else if (filterStatus === "BELUM_SIAP") {
-            list = list.filter(x => (x.siap_jual ?? 0) === 0);
+            list = list.filter(x => (x.stok_minus ?? 0) > 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
         if (filterProcessor !== "ALL") {
@@ -526,41 +524,72 @@ export default function Page() {
     };
 
     // ─── Export Excel ─────────────────────────────────────────────────────────
+    // ✅ Export disesuaikan dengan filterStatus yang aktif:
+    //    - ALL     → tampilkan semua kolom (Stock Total, Siap Jual, Minus, Terjual)
+    //    - SIAP_JUAL  → hanya kolom "Siap Jual", data hanya unit SIAP_JUAL
+    //    - BELUM_SIAP → hanya kolom "Minus", data hanya unit SERVICE/BELUM_SIAP
     const exportToExcel = async () => {
         const wb = new ExcelJS.Workbook();
         wb.creator = "Solit Inventory";
         wb.created = new Date();
-        const ws = wb.addWorksheet("Data Laptop", {
+
+        // Tentukan konteks berdasarkan filter status aktif
+        const isSiapJualOnly = filterStatus === "SIAP_JUAL";
+        const isMinusOnly = filterStatus === "BELUM_SIAP";
+        const isAllMode = !isSiapJualOnly && !isMinusOnly;
+
+        // Sheet name & file suffix mengikuti filter
+        const sheetLabel = isSiapJualOnly
+            ? "Laptop Siap Jual"
+            : isMinusOnly
+            ? "Laptop Minus"
+            : "Data Laptop";
+
+        const fileSuffix = isSiapJualOnly
+            ? "_siap_jual"
+            : isMinusOnly
+            ? "_minus"
+            : "";
+
+        const ws = wb.addWorksheet(sheetLabel, {
             views: [{ state: "frozen", ySplit: 1 }],
             pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
         });
 
         const COLOR = {
-            headerBg: "FF4B5563",
-            headerFg: "FFFFFFFF",
-            rowEven: "FFF8FAFC",
-            rowOdd: "FFFFFFFF",
-            borderColor: "FFE2E8F0",
-            subTextFg: "FF64748B",
-            // Status colors
-            siapBg: "FFD1FAE5", // green-100
-            siapFg: "FF065F46", // green-900
-            minusBg: "FFFEE2E2", // red-100
-            minusFg: "FF7F1D1D", // red-900
-            terjualBg: "FFDBEAFE", // blue-100
-            terjualFg: "FF1E3A8A", // blue-900
+            headerBg:   "FF4B5563",
+            headerFg:   "FFFFFFFF",
+            rowEven:    "FFF8FAFC",
+            rowOdd:     "FFFFFFFF",
+            borderColor:"FFE2E8F0",
+            subTextFg:  "FF64748B",
+            siapBg:     "FFD1FAE5", // green-100
+            siapFg:     "FF065F46", // green-900
+            minusBg:    "FFFEE2E2", // red-100
+            minusFg:    "FF7F1D1D", // red-900
+            terjualBg:  "FFDBEAFE", // blue-100
+            terjualFg:  "FF1E3A8A", // blue-900
         };
 
+        // ✅ Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
         ws.columns = [
-            { header: "No", key: "no", width: 6 },
+            { header: "No",      key: "no",      width: 6  },
             { header: "Product", key: "product", width: 35 },
-            { header: "CPU", key: "cpu", width: 28 },
-            { header: "RAM", key: "ram", width: 14 },
+            { header: "CPU",     key: "cpu",     width: 28 },
+            { header: "RAM",     key: "ram",     width: 14 },
             { header: "HDD/SSD", key: "storage", width: 16 },
-            { header: "Stock Total", key: "stock", width: 13 },
-            { header: "Siap Jual", key: "siap_jual", width: 12 },
-            { header: "Minus", key: "minus", width: 10 },
-            { header: "Terjual", key: "terjual", width: 10 },
+            // Kolom stok utama — labelnya berubah sesuai konteks filter
+            {
+                header: isSiapJualOnly ? "Siap Jual" : isMinusOnly ? "Minus" : "Stock Total",
+                key: "stock",
+                width: 13,
+            },
+            // Kolom detail stok hanya muncul di mode ALL
+            ...(isAllMode ? [
+                { header: "Siap Jual", key: "siap_jual", width: 12 },
+                { header: "Minus",     key: "minus",     width: 10 },
+                { header: "Terjual",   key: "terjual",   width: 10 },
+            ] : []),
             { header: "Price Store", key: "price_store", width: 18 },
         ];
 
@@ -571,84 +600,125 @@ export default function Page() {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
             cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
             cell.border = {
-                top: { style: "thin", color: { argb: COLOR.borderColor } },
-                left: { style: "thin", color: { argb: COLOR.borderColor } },
+                top:    { style: "thin",   color: { argb: COLOR.borderColor } },
+                left:   { style: "thin",   color: { argb: COLOR.borderColor } },
                 bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-                right: { style: "thin", color: { argb: COLOR.borderColor } },
+                right:  { style: "thin",   color: { argb: COLOR.borderColor } },
             };
             cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
-        // Data rows
+        // ✅ Data rows — nilai kolom stok dihitung ulang sesuai filterStatus
         filteredLaptops.forEach((item, idx) => {
             const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
-            const siapJual = (item.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
-            const minus = item.stok_minus ?? 0;
-            const terjual = item.terjual ?? 0;
+            const units = item.laptop_units || [];
 
-            const row = ws.addRow({
-                no: idx + 1,
-                product: item.laptop_name || "",
-                cpu: item.cpu || "",
-                ram: item.ram || "",
-                storage: item.storage || "",
-                stock: item.stok_tersedia ?? 0,
-                siap_jual: siapJual,
-                minus: minus,
-                terjual: terjual,
+            // Hitung per-jenis unit dari raw laptop_units (bukan dari field cached)
+            const siapJualCount = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
+            const minusCount    = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+            const terjualCount  = units.filter((u: LaptopUnit) => u.status === "SOLD").length;
+            const tersediaCount = units.filter((u: LaptopUnit) => u.status !== "SOLD").length;
+
+            // ✅ Nilai kolom "stock" disesuaikan dengan konteks filter
+            const stockValue = isSiapJualOnly
+                ? siapJualCount
+                : isMinusOnly
+                ? minusCount
+                : tersediaCount;
+
+            // Bangun row data — kolom detail hanya di mode ALL
+            const rowData: Record<string, string | number> = {
+                no:          idx + 1,
+                product:     item.laptop_name   || "",
+                cpu:         item.cpu           || "",
+                ram:         item.ram           || "",
+                storage:     item.storage       || "",
+                stock:       stockValue,
                 price_store: item.selling_price || 0,
-            });
+            };
 
+            if (isAllMode) {
+                rowData.siap_jual = siapJualCount;
+                rowData.minus     = minusCount;
+                rowData.terjual   = terjualCount;
+            }
+
+            const row = ws.addRow(rowData);
             row.height = 22;
 
             row.eachCell((cell, colNum) => {
                 const key = ws.getColumn(colNum).key as string;
 
-                // Base styling
+                // ── Base styling ──────────────────────────────────────────────
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
                 cell.border = {
-                    top: { style: "hair", color: { argb: COLOR.borderColor } },
-                    left: { style: "hair", color: { argb: COLOR.borderColor } },
+                    top:    { style: "hair", color: { argb: COLOR.borderColor } },
+                    left:   { style: "hair", color: { argb: COLOR.borderColor } },
                     bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-                    right: { style: "hair", color: { argb: COLOR.borderColor } },
+                    right:  { style: "hair", color: { argb: COLOR.borderColor } },
                 };
-                cell.font = { size: 10, name: "Arial" };
+                cell.font      = { size: 10, name: "Arial" };
                 cell.alignment = { vertical: "middle" };
 
-                // Per-column overrides
+                // ── Per-column overrides ──────────────────────────────────────
                 if (key === "no") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                } else if (key === "product") {
-                    cell.font = { size: 10, name: "Arial", bold: true };
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                } else if (["cpu", "ram", "storage", "stock"].includes(key)) {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                } else if (key === "price_store") {
-                    cell.numFmt = '"Rp "#,##0';
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                }
+                    cell.font      = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
 
-                // Status cells — colored background when value > 0
-                else if (key === "siap_jual") {
+                } else if (key === "product") {
+                    cell.font      = { size: 10, name: "Arial", bold: true };
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (siapJual > 0) {
+
+                } else if (["cpu", "ram", "storage"].includes(key)) {
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+
+                } else if (key === "price_store") {
+                    cell.numFmt    = '"Rp "#,##0';
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+
+                } else if (key === "stock") {
+                    // ✅ Warna kolom "stock" mengikuti konteks filter
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                    if (isSiapJualOnly) {
+                        if (stockValue > 0) {
+                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } };
+                            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } };
+                        } else {
+                            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+                        }
+                    } else if (isMinusOnly) {
+                        if (stockValue > 0) {
+                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.minusBg } };
+                            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.minusFg } };
+                        } else {
+                            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+                        }
+                    } else {
+                        // ALL mode — kolom Stock Total, tidak diberi warna khusus
+                        cell.font = { size: 10, name: "Arial" };
+                    }
+
+                } else if (key === "siap_jual") {
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                    if (siapJualCount > 0) {
                         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } };
                         cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } };
                     } else {
                         cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
                     }
+
                 } else if (key === "minus") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (minus > 0) {
+                    if (minusCount > 0) {
                         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.minusBg } };
                         cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.minusFg } };
                     } else {
                         cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
                     }
+
                 } else if (key === "terjual") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (terjual > 0) {
+                    if (terjualCount > 0) {
                         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.terjualBg } };
                         cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.terjualFg } };
                     } else {
@@ -658,20 +728,23 @@ export default function Page() {
             });
         });
 
+        // Download
         const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `data_laptop_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const blob   = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const link      = document.createElement("a");
+        link.href       = URL.createObjectURL(blob);
+        link.download   = `data_laptop${fileSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
+    const totalSisa     = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
-    const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
-    const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
+    const totalMinus    = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
+    const totalTerjual  = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
     return (
         <>
@@ -795,9 +868,6 @@ export default function Page() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                <FilterSelect value={filterProcessor} onChange={e => setFilterProcessor(e.target.value)}>
-                                    {uniqueProcessors.map(p => <option key={p} value={p}>{p === "ALL" ? "Semua Processor" : p}</option>)}
-                                </FilterSelect>
                                 <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
                                     {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
                                 </FilterSelect>
