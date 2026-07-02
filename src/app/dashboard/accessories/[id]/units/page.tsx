@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AccessoryUnit {
@@ -174,6 +175,450 @@ function SkeletonUnits() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// BULK ADD MODAL — Adaptasi dari laptop units untuk aksesori
+// ═══════════════════════════════════════════════════════════════════════════
+function BulkAddModal({
+    accessoryId,
+    defaultSellingPrice,
+    onClose,
+    onSuccess,
+}: {
+    accessoryId: string;
+    defaultSellingPrice: number;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [tab, setTab] = useState<"range" | "manual" | "excel">("range");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const [condition, setCondition] = useState<"BARU" | "BEKAS">("BARU");
+    const [status, setStatus] = useState<"TERSEDIA" | "RESERVED">("TERSEDIA");
+    const [buyPrice, setBuyPrice] = useState("");
+    const [sellPrice, setSellPrice] = useState(fmtInput(defaultSellingPrice || 0));
+    const [notes, setNotes] = useState("");
+
+    // Range
+    const [snFrom, setSnFrom] = useState("");
+    const [snTo, setSnTo] = useState("");
+
+    // Manual
+    const [manualText, setManualText] = useState("");
+
+    // Excel
+    const [excelRows, setExcelRows] = useState<any[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    function generateRange(from: string, to: string): string[] {
+        const f = from.trim();
+        const t = to.trim();
+        if (!f || !t) return [];
+        const fNum = parseInt(f, 10);
+        const tNum = parseInt(t, 10);
+        if (!isNaN(fNum) && !isNaN(tNum) && fNum <= tNum) {
+            const padLen = Math.max(f.length, t.length);
+            const result: string[] = [];
+            for (let i = fNum; i <= tNum; i++) {
+                result.push(String(i).padStart(padLen, "0"));
+            }
+            return result;
+        }
+        return f === t ? [f] : [f, t];
+    }
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setError("");
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const wb = XLSX.read(ev.target?.result, { type: "binary" });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const raw = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });
+                const snKeys = ["serial_number", "sn", "Serial Number", "SN", "No SN", "no_sn"];
+                const buyKeys = ["buy_price", "harga_modal", "Harga Modal", "modal", "buy"];
+                const sellKeys = ["selling_price", "harga_jual", "Harga Jual", "jual", "sell"];
+                const condKeys = ["condition", "kondisi", "Kondisi"];
+                const noteKeys = ["notes", "note", "catatan", "Catatan"];
+                const findKey = (row: any, keys: string[]) => keys.find(k => k in row) ?? null;
+                const parsed = raw.map((row: any) => {
+                    const snKey = findKey(row, snKeys);
+                    const buyKey = findKey(row, buyKeys);
+                    const sellKey = findKey(row, sellKeys);
+                    const condKey = findKey(row, condKeys);
+                    const noteKey = findKey(row, noteKeys);
+                    const rawCond = condKey ? String(row[condKey]).toUpperCase().trim() : condition;
+                    const normalizedCond = rawCond === "BEKAS" ? "BEKAS" : "BARU";
+                    return {
+                        serial_number: snKey ? String(row[snKey]).trim().toUpperCase() : "",
+                        buy_price: buyKey ? Number(row[buyKey]) : 0,
+                        selling_price: sellKey ? Number(row[sellKey]) : parseRupiah(sellPrice) || 0,
+                        condition: normalizedCond,
+                        notes: noteKey ? String(row[noteKey]) : "",
+                    };
+                }).filter((r: any) => r.serial_number);
+                if (parsed.length === 0) {
+                    setError("Tidak ada data SN valid di file. Pastikan ada kolom 'serial_number' atau 'SN'.");
+                    return;
+                }
+                setExcelRows(parsed);
+            } catch {
+                setError("Gagal membaca file Excel. Pastikan format file benar.");
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    function buildUnits() {
+        const defaults = {
+            condition,
+            status,
+            buy_price: parseRupiah(buyPrice) || 0,
+            selling_price: parseRupiah(sellPrice) || 0,
+            notes: notes || "",
+        };
+        if (tab === "range") {
+            const sns = generateRange(snFrom, snTo);
+            return sns.map(sn => ({ serial_number: sn, ...defaults }));
+        }
+        if (tab === "manual") {
+            const sns = manualText.split(/[\n,；,、]/).map(s => s.trim().toUpperCase()).filter(Boolean);
+            return sns.map(sn => ({ serial_number: sn, ...defaults }));
+        }
+        if (tab === "excel") {
+            return excelRows.map(r => ({
+                serial_number: r.serial_number,
+                condition: r.condition || defaults.condition,
+                status: defaults.status,
+                buy_price: r.buy_price || defaults.buy_price,
+                selling_price: r.selling_price || defaults.selling_price,
+                notes: r.notes || "",
+            }));
+        }
+        return [];
+    }
+
+    const units = buildUnits();
+    const unitCount = units.length;
+    const canSubmit = unitCount > 0 && !loading;
+
+    const handleSubmit = async () => {
+        if (!canSubmit) return;
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/accessory-units/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accessory_id: accessoryId, units }),
+            });
+            const result = await res.json();
+            if (!result.success) {
+                setError(result.message || "Gagal menambahkan units");
+                return;
+            }
+            toast.success(`${result.count} unit berhasil ditambahkan`);
+            onSuccess();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const downloadTemplate = () => {
+        const ws = XLSX.utils.aoa_to_sheet([
+            ["serial_number", "condition", "buy_price", "selling_price", "notes"],
+            ["SN-HDD-001", "BARU", 150000, 250000, "mulus"],
+            ["SN-HDD-002", "BEKAS", 100000, 200000, "bekas pakai"],
+        ]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Units");
+        XLSX.writeFile(wb, "template_bulk_accessory_units.xlsx");
+    };
+
+    const TABS = [
+        { id: "range", label: "Range SN", icon: "🔢" },
+        { id: "manual", label: "Manual", icon: "✏️" },
+        { id: "excel", label: "Import Excel", icon: "📊" },
+    ] as const;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88vh] sm:mx-4 overflow-hidden">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h2 className="font-bold text-gray-800 text-base">Tambah Banyak Unit</h2>
+                        <p className="text-xs text-gray-400 mt-0.5">Pilih cara input serial number</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Tab selector */}
+                <div className="flex px-5 pt-4 gap-2 flex-shrink-0">
+                    {TABS.map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => { setTab(t.id); setError(""); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition border ${tab === t.id
+                                ? "bg-gray-800 text-white border-gray-800"
+                                : "bg-white text-gray-500 border-gray-200 active:bg-gray-50"
+                                }`}
+                        >
+                            <span>{t.icon}</span>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Body */}
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
+
+                    {tab === "range" && (
+                        <div className="space-y-3">
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                                <p className="text-xs text-blue-700">
+                                    Masukkan SN awal dan SN akhir. Sistem akan otomatis generate semua SN di antaranya.
+                                    Contoh: dari <code className="font-mono bg-blue-100 px-1 rounded">001</code> ke <code className="font-mono bg-blue-100 px-1 rounded">005</code> → 5 unit.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">SN Awal</label>
+                                    <input type="text" placeholder="001" value={snFrom} onChange={e => setSnFrom(e.target.value)}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">SN Akhir</label>
+                                    <input type="text" placeholder="005" value={snTo} onChange={e => setSnTo(e.target.value)}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition" />
+                                </div>
+                            </div>
+                            {snFrom && snTo && (
+                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <p className="text-xs text-gray-500 mb-1">Total: <span className="font-bold text-gray-800">{generateRange(snFrom, snTo).length} unit</span></p>
+                                    <p className="text-xs text-gray-400 font-mono">
+                                        {generateRange(snFrom, snTo).slice(0, 5).join(", ")}
+                                        {generateRange(snFrom, snTo).length > 5 && ` ... +${generateRange(snFrom, snTo).length - 5} lagi`}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {tab === "manual" && (
+                        <div className="space-y-3">
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                                <p className="text-xs text-blue-700">Ketik atau paste serial number, satu per baris (atau pisahkan dengan koma).</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Daftar Serial Number</label>
+                                <textarea
+                                    placeholder={"SN-HDD-001\nSN-HDD-002\nSN-HDD-003\natau: SN-HDD-001, SN-HDD-002"}
+                                    value={manualText} onChange={e => setManualText(e.target.value)} rows={6}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition resize-none" />
+                            </div>
+                            {manualText.trim() && (
+                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <p className="text-xs text-gray-500">Total: <span className="font-bold text-gray-800">
+                                        {manualText.split(/[\n,；,、]/).map(s => s.trim()).filter(Boolean).length} unit
+                                    </span></p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {tab === "excel" && (
+                        <div className="space-y-3">
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                                <p className="text-xs text-blue-700 mb-2">
+                                    Upload file Excel (.xlsx/.xls). Kolom yang dikenali: <code className="bg-blue-100 px-1 rounded font-mono">serial_number</code>, <code className="bg-blue-100 px-1 rounded font-mono">condition</code>, <code className="bg-blue-100 px-1 rounded font-mono">buy_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">selling_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">notes</code>.
+                                </p>
+                                <button onClick={downloadTemplate} className="text-xs text-blue-600 font-semibold underline underline-offset-2">⬇ Download Template Excel</button>
+                            </div>
+                            <div onClick={() => fileInputRef.current?.click()}
+                                className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50 transition">
+                                <div className="text-3xl mb-2">📊</div>
+                                <p className="text-sm font-medium text-gray-600">Klik untuk pilih file</p>
+                                <p className="text-xs text-gray-400 mt-1">.xlsx atau .xls</p>
+                                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+                            </div>
+                            {excelRows.length > 0 && (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                                    <p className="text-xs font-semibold text-emerald-700 mb-2">✅ {excelRows.length} baris berhasil dibaca</p>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-[10px]">
+                                            <thead>
+                                                <tr className="text-gray-500">
+                                                    <th className="text-left pb-1">SN</th>
+                                                    <th className="text-left pb-1">Kondisi</th>
+                                                    <th className="text-right pb-1">Harga Jual</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {excelRows.slice(0, 5).map((r: any, i: number) => (
+                                                    <tr key={i} className="border-t border-emerald-100">
+                                                        <td className="py-0.5 font-mono text-gray-700">{r.serial_number}</td>
+                                                        <td className="py-0.5 text-gray-600">{r.condition}</td>
+                                                        <td className="py-0.5 text-right text-gray-600">
+                                                            {r.selling_price ? `Rp${Number(r.selling_price).toLocaleString("id-ID")}` : "—"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {excelRows.length > 5 && (
+                                                    <tr><td colSpan={3} className="text-center pt-1 text-gray-400">... +{excelRows.length - 5} baris lagi</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Default values section (for range & manual tabs) */}
+                    {tab !== "excel" && (
+                        <div className="border-t border-gray-100 pt-4 space-y-3">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nilai Default Semua Unit</p>
+
+                            {/* Kondisi: BARU / BEKAS */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Kondisi</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(["BARU", "BEKAS"] as const).map(c => (
+                                        <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => setCondition(c)}
+                                            className={`h-9 rounded-lg text-xs font-bold border transition ${condition === c
+                                                ? c === "BARU"
+                                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                                    : "bg-amber-500 text-white border-amber-500"
+                                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            {c === "BARU" ? "✨ Baru" : "🔄 Bekas"}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Status: TERSEDIA / RESERVED */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {(["TERSEDIA", "RESERVED"] as const).map(s => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => setStatus(s)}
+                                            className={`h-9 rounded-lg text-xs font-semibold border transition ${status === s
+                                                ? s === "TERSEDIA"
+                                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                                    : "bg-amber-500 text-white border-amber-500"
+                                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            {s === "TERSEDIA" ? "✅ Tersedia" : "🔒 Reserved"}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Harga */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Modal</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">Rp</span>
+                                        <input
+                                            inputMode="numeric"
+                                            placeholder="0"
+                                            value={buyPrice}
+                                            onChange={e => {
+                                                const raw = e.target.value.replace(/\D/g, "");
+                                                setBuyPrice(raw ? new Intl.NumberFormat("id-ID").format(parseInt(raw, 10)) : "");
+                                            }}
+                                            className="w-full h-9 border border-gray-200 rounded-lg pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition tabular-nums"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">Rp</span>
+                                        <input
+                                            inputMode="numeric"
+                                            placeholder="0"
+                                            value={sellPrice}
+                                            onChange={e => {
+                                                const raw = e.target.value.replace(/\D/g, "");
+                                                setSellPrice(raw ? new Intl.NumberFormat("id-ID").format(parseInt(raw, 10)) : "");
+                                            }}
+                                            className="w-full h-9 border border-gray-200 rounded-lg pl-8 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition tabular-nums"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Catatan */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Kondisi khusus, dll"
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={handleSubmit} disabled={!canSubmit}
+                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold active:bg-gray-900 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-gray-800/20">
+                        {loading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                        ) : (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>Tambah {unitCount > 0 ? `${unitCount} Unit` : "Unit"}</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
 export default function AccessoryUnitsPage() {
@@ -203,6 +648,7 @@ export default function AccessoryUnitsPage() {
     // Bulk
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [showBulkModal, setShowBulkModal] = useState(false);
 
     // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -410,15 +856,27 @@ export default function AccessoryUnitsPage() {
                                     .filter(Boolean).join(" · ") || "Detail aksesori"}
                             </p>
                         </div>
-                        <button
-                            onClick={openCreate}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-800 rounded-lg text-sm font-medium text-white hover:bg-gray-900 transition shadow-sm"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Tambah Unit
-                        </button>
+                        {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={openCreate}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-800 rounded-lg text-sm font-medium text-white hover:bg-gray-900 transition shadow-sm"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Tambah Unit
+                            </button>
+                            <button
+                                onClick={() => setShowBulkModal(true)}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white hover:bg-gray-700 transition shadow-sm"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Tambah Banyak
+                            </button>
+                        </div>
                     </div>
 
                     {/* Stats Cards */}
@@ -832,6 +1290,16 @@ export default function AccessoryUnitsPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ── Bulk Add Modal ── */}
+            {showBulkModal && (
+                <BulkAddModal
+                    accessoryId={accessoryId}
+                    defaultSellingPrice={accessory?.sell_price ?? 0}
+                    onClose={() => setShowBulkModal(false)}
+                    onSuccess={fetchData}
+                />
             )}
 
             {confirmModal && (
