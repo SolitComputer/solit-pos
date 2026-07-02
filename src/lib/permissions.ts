@@ -131,8 +131,10 @@ const PREPARATION_SALES_ROLES: UserRole[] = [
 ];
 
 /** Penyedia barang yang cek & tandai done */
+/** Penyedia barang yang cek & tandai done */
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG", // ← PKL penyedia = sama seperti penyedia barang (receive/check/done)
 ];
 
 /**
@@ -192,15 +194,16 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
 /** Role yang MENJADI pengantar (bukan yang assign) */
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
 
-// ─── Voice / HT Roles ────────────────────────────────────────────────────────
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG",
 ];
 
 export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+  "PKL_PENYEDIA_BARANG",
 ];
 
 // ─── Service Roles ────────────────────────────────────────────────────────────

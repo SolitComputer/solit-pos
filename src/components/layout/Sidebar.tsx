@@ -431,6 +431,32 @@ const PKL_SALES_MENU: MenuGroup[] = [
   PREPARATION_SALES_DELIVERY_MENU, // Siap Dikirim / Sedang Diantar / Riwayat (dispatch)
 ];
 
+const PKL_PENYEDIA_MENU: MenuGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+      ITEM_ABSENSI, ITEM_PKL_REPORT,
+    ],
+  },
+  {
+    label: "Inventaris",
+    items: [
+      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+    ],
+  },
+  PREPARATION_PENYEDIA_MENU,
+  {
+    label: "Transaksi",
+    items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
+  },
+  {
+    label: "Tools",
+    items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }],
+  },
+];
+
 // ── Role → Menu mapping (UNION per-role — tidak ada menu yang hilang) ──────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ADMIN: [ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
@@ -714,8 +740,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
-  PKL_SALES: PKL_SALES_MENU,          // union (menu spesial dari versi Ikmal)
-  PKL_PENYEDIA_BARANG: PKL_MENU,
+  PKL_SALES: PKL_SALES_MENU,        
+  PKL_PENYEDIA_BARANG: PKL_PENYEDIA_MENU, 
   PKL_SOTECH: PKL_MENU,
   PKL_ONPOINT: PKL_MENU,
   PKL_TEKNISI: PKL_MENU,
