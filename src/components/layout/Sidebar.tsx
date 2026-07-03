@@ -16,8 +16,9 @@ import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
+
 
 const CACHE_KEY = "solit_sidebar_user";
 
@@ -907,6 +908,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 const MISSION_HREFS = new Set(MISSIONS_MENU.items.map((i) => i.href));
 
+// ── Step 1: Bersihkan MISSIONS_MENU items dari semua group,
+//           lalu append MISSIONS_MENU khusus untuk non-PKL role.
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   ROLE_MENUS[role] = ROLE_MENUS[role]
     .map((g) => ({ ...g, items: g.items.filter((it) => !MISSION_HREFS.has(it.href)) }))
@@ -916,6 +919,36 @@ const MISSION_HREFS = new Set(MISSIONS_MENU.items.map((i) => i.href));
     ROLE_MENUS[role] = [...ROLE_MENUS[role], MISSIONS_MENU];
   }
 });
+
+// ── Step 2: PKL variant inherit menu penuh dari parent role.
+//           Dilakukan SETELAH cleanup di atas, supaya MISSIONS_MENU
+//           udah ke-append di parent → otomatis ikut ter-share ke PKL variant.
+//
+//           Mapping sesuai permintaan Ikmal:
+//             PKL_MARKETING → MARKETING
+//             PKL_SALES     → CREW_SALES
+//             PKL_SOTECH    → SOTECH
+//             PKL_ONPOINT   → ONPOINT
+//             PKL_KONTEN    → KONTEN
+//             PKL_TEKNISI   → TEKNISI
+//
+//           PKL polos & PKL_PENYEDIA_BARANG TIDAK diubah (tetap pakai
+//           PKL_MENU / PKL_PENYEDIA_MENU) karena tidak diminta.
+const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
+  PKL_MARKETING: "MARKETING",
+  PKL_SALES: "CREW_SALES",
+  PKL_SOTECH: "SOTECH",
+  PKL_ONPOINT: "ONPOINT",
+  PKL_KONTEN: "KONTEN",
+  PKL_TEKNISI: "TEKNISI",
+};
+
+(Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(
+  ([pklRole, parentRole]) => {
+    // Clone array biar mutasi selanjutnya (kalau ada) nggak nyebrang antar role.
+    ROLE_MENUS[pklRole] = [...ROLE_MENUS[parentRole]];
+  }
+);
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -1315,8 +1348,10 @@ export default function Sidebar() {
       ? user.roles
       : user?.role ? [user.role] : [];
 
-  const groups: MenuGroup[] = userRoles.length > 0
-    ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles))
+  const effectiveRoles = expandRolesWithParents(userRoles); // ✅ tambahan
+
+  const groups: MenuGroup[] = effectiveRoles.length > 0
+    ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
     : [];
 
   const groupsSig = groups.map(g => g.label).join("|");

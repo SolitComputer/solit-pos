@@ -7,6 +7,10 @@ import {
   ROLE_DEFAULT_REDIRECT,
   UserRole,
 } from "@/lib/auth";
+import {
+  expandRolesWithParents,
+  getEffectivePrimaryRole,
+} from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
@@ -113,10 +117,11 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         const userRoles: string[] = user.roles ?? [user.role];
-        const primaryRole = (userRoles[0] ?? user.role) as UserRole;
+        // ✅ PKL variant pakai redirect parent role-nya
+        const effectivePrimary = getEffectivePrimaryRole(userRoles);
         return NextResponse.redirect(
           new URL(
-            ROLE_DEFAULT_REDIRECT[primaryRole] ?? "/dashboard",
+            ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard",
             request.url
           )
         );
@@ -160,7 +165,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const userRoles: string[] = user.roles ?? [user.role];
-  const primaryRole = (userRoles[0] ?? user.role) as UserRole;
+  // ✅ Expand: PKL_SALES → ["PKL_SALES", "CREW_SALES"], dst.
+  const effectiveRoles = expandRolesWithParents(userRoles);
+  const effectivePrimary = getEffectivePrimaryRole(userRoles);
 
   const isPageRoute = !pathname.startsWith("/api/");
 
@@ -227,8 +234,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── PKL block: hanya block jika SEMUA roles adalah PKL ────────────────────
-  const allPKL = userRoles.every(
+  // ── PKL block: hanya block jika SEMUA effective roles adalah PKL polos ────
+  // ✅ Pakai effectiveRoles:
+  //   - PKL_SALES → effectiveRoles = ["PKL_SALES", "CREW_SALES"] → NOT allPKL → LOLOS
+  //   - PKL polos → effectiveRoles = ["PKL"] → allPKL → BLOCKED
+  const allPKL = effectiveRoles.every(
     (r: string) => r === "PKL" || r.startsWith("PKL_")
   );
   if (allPKL && PKL_BLOCKED_ROUTES.some((r) => pathname.startsWith(r))) {
@@ -236,19 +246,20 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Route permission check ────────────────────────────────────────────────
+  // ✅ Pakai effectiveRoles: PKL_MARKETING akan lolos di route yang allow MARKETING
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
 
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
-    const hasAccess = userRoles.some((r: string) =>
+    const hasAccess = effectiveRoles.some((r: string) =>
       (allowed as string[]).includes(r)
     );
     if (!hasAccess) {
       return NextResponse.redirect(
         new URL(
-          ROLE_DEFAULT_REDIRECT[primaryRole] ?? "/dashboard",
+          ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard",
           request.url
         )
       );
@@ -256,6 +267,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Inject user headers untuk API routes ──────────────────────────────────
+  // NOTE: header pakai roles ASLI (bukan effective) supaya API tahu role sebenarnya.
+  // Permission check di API dilakukan di withAuth() yang juga expand parent.
   const response = NextResponse.next();
   response.headers.set("x-user-id", user.id);
   response.headers.set("x-user-role", user.role);

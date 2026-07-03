@@ -1,6 +1,7 @@
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { expandRolesWithParents } from "@/lib/permissions";
 
 export type { UserRole } from "@/lib/permissions";
 export {
@@ -148,7 +149,7 @@ export function buildTokenPayload(user: {
     id: user.id,
     name: user.name,
     role: rolesArray[0],   // primary role (backward compat untuk middleware lama)
-    roles: rolesArray,       // semua roles (NEW)
+    roles: rolesArray,     // semua roles (NEW)
     shift: user.shift ?? "PAGI",
   };
 }
@@ -369,10 +370,15 @@ export function withAuth(
       return res;
     }
 
-    // ✅ Multi-role: cek apakah SALAH SATU role user ada di allowedRoles
+    // ✅ Multi-role + PKL inheritance:
+    //   - userRoles asli:      ["PKL_MARKETING"]
+    //   - effectiveRoles:      ["PKL_MARKETING", "MARKETING"]
+    //   Jadi PKL_MARKETING otomatis lolos di route yang allow MARKETING,
+    //   tanpa perlu nambahin PKL_MARKETING manual di tiap withAuth().
     if (allowedRoles) {
       const userRoles = user.roles ?? [user.role];
-      const hasAccess = userRoles.some(r =>
+      const effectiveRoles = expandRolesWithParents(userRoles);
+      const hasAccess = effectiveRoles.some(r =>
         (allowedRoles as string[]).includes(r)
       );
       if (!hasAccess) {
