@@ -136,7 +136,7 @@ export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>
 export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_PENYEDIA_ROLES,
-  
+
 ]));
 
 /** Dispatch pilih metode kirim (Sales + PKL + Admin) — PENGANTARAN tidak termasuk */
@@ -157,7 +157,7 @@ export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
 export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...PREPARATION_DONE_ROLES,
   "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH", "ONPOINT",
-  "KEPALA_ONPOINT", "KONTEN", "PKL_SALES", 
+  "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
   "PENGANTARAN",
 ]));
 
@@ -494,6 +494,48 @@ export const PKL_ROLES: UserRole[] = [
 ];
 
 export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
+
+// ─── PKL → Parent Role Mapping ────────────────────────────────────────────────
+/**
+ * PKL inherit akses dari role induknya. Contoh:
+ *   PKL_SALES  → akses = CREW_SALES
+ *   PKL_TEKNISI → akses = TEKNISI
+ * PKL polos (tanpa suffix) tetap standalone — tidak inherit apapun.
+ */
+export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
+  PKL_SALES: "CREW_SALES",
+  PKL_MARKETING: "MARKETING",
+  PKL_PENYEDIA_BARANG: "PENYEDIA_BARANG",
+  PKL_SOTECH: "SOTECH",
+  PKL_ONPOINT: "ONPOINT",
+  PKL_TEKNISI: "TEKNISI",
+  PKL_KONTEN: "KONTEN",
+};
+
+/** Ambil parent role dari PKL variant. Return null kalau bukan PKL bervariant. */
+export function getPKLParentRole(role: string): UserRole | null {
+  return (PKL_PARENT_ROLE[role as UserRole] ?? null) as UserRole | null;
+}
+
+/**
+ * Expand userRoles dengan parent role dari tiap PKL variant.
+ * Contoh: ["PKL_SALES"] → ["PKL_SALES", "CREW_SALES"]
+ * Dipakai untuk permission check biar PKL otomatis inherit akses induknya.
+ */
+export function expandRolesWithParents(userRoles: string[]): string[] {
+  const set = new Set<string>(userRoles);
+  for (const r of userRoles) {
+    const parent = PKL_PARENT_ROLE[r as UserRole];
+    if (parent) set.add(parent);
+  }
+  return Array.from(set);
+}
+
+/** Effective primary role — kalau PKL variant, pakai parent-nya. */
+export function getEffectivePrimaryRole(userRoles: string[]): UserRole {
+  const primary = (userRoles[0] as UserRole) ?? "CREW_SALES";
+  return (PKL_PARENT_ROLE[primary] ?? primary) as UserRole;
+}
 
 export function isPKLRole(role?: string): boolean {
   if (!role) return false;
