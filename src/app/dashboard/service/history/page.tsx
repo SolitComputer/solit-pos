@@ -62,6 +62,43 @@ const IconXSmall = () => (
     <line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
   </svg>
 );
+const IconX = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+const IconLaptop = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <line x1="2" y1="20" x2="22" y2="20" />
+  </svg>
+);
+const IconUser = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+  </svg>
+);
+const IconClock = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const IconPhone = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+  </svg>
+);
+const IconMapPin = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
+  </svg>
+);
+const IconDollar = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="1" x2="12" y2="23" />
+    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+  </svg>
+);
 
 // ── Skeleton Row ───────────────────────────────────────────────────────────────
 function SkeletonRow() {
@@ -76,12 +113,343 @@ function SkeletonRow() {
   );
 }
 
+// ── Detail Modal ───────────────────────────────────────────────────────────────
+function HistoryDetailModal({
+  order,
+  onClose,
+}: {
+  order: ServiceOrder | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!order) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [order, onClose]);
+
+  if (!order) return null;
+
+  const isFromGagal = order.status === "SUDAH_DIAMBIL" && !!order.alasan_tidak_jadi;
+  const isTidakJadi = order.status === "TIDAK_JADI";
+  const isBad = isTidakJadi || isFromGagal;
+
+  // Inisial avatar dari nama pelanggan
+  const initials = order.nama
+    .split(" ")
+    .slice(0, 2)
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-end">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[3px]"
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <div className="relative h-full w-full max-w-[420px] bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+
+        {/* ── HERO HEADER ─────────────────────────────────────────────────── */}
+        <div className={`relative px-5 pt-5 pb-6 shrink-0 overflow-hidden ${
+          isBad
+            ? "bg-gradient-to-br from-rose-50 via-rose-50/60 to-white"
+            : "bg-gradient-to-br from-[#1a1a2e]/[0.03] via-blue-50/40 to-white"
+        }`}>
+          {/* Dekoratif circle blur di pojok */}
+          <div className={`absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20 blur-2xl pointer-events-none ${
+            isBad ? "bg-rose-400" : "bg-blue-400"
+          }`} />
+
+          {/* Top bar: close button */}
+          <div className="flex items-center justify-between mb-4">
+            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${
+              isBad
+                ? "bg-rose-100 text-rose-500"
+                : "bg-[#1a1a2e]/8 text-[#1a1a2e]/50"
+            }`}>
+              Riwayat Servis
+            </span>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg bg-white/80 hover:bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition shadow-sm"
+              aria-label="Tutup"
+            >
+              <IconX />
+            </button>
+          </div>
+
+          {/* Avatar + nama */}
+          <div className="flex items-center gap-3.5">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 font-black text-[15px] shadow-sm ${
+              isBad
+                ? "bg-rose-500 text-white"
+                : "bg-[#1a1a2e] text-white"
+            }`}>
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[16px] font-black text-[#1a1a2e] leading-tight truncate">
+                {order.nama}
+              </h2>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="flex items-center gap-1 text-[11px] text-gray-400 font-medium">
+                  <IconPhone />
+                  {order.no_hp}
+                </span>
+                {order.alamat && (
+                  <>
+                    <span className="text-gray-200">·</span>
+                    <span className="flex items-center gap-1 text-[11px] text-gray-400 font-medium truncate max-w-[140px]">
+                      <IconMapPin />
+                      {order.alamat}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Status pills */}
+          <div className="flex items-center gap-2 mt-4 flex-wrap">
+            <ServiceStatusBadge status={order.status} />
+            {isFromGagal && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-600 text-[10px] font-black">
+                <IconXSmall />
+                Gagal Diperbaiki
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── BODY (scrollable) ───────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* ── LAPTOP CARD ── */}
+          <div className="mx-4 mt-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-500">
+                  <IconLaptop />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Laptop</span>
+              </div>
+              <p className="text-[14px] font-black text-[#1a1a2e] leading-tight">{order.type_laptop}</p>
+              {(order.cpu || order.ram || order.storage) && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[order.cpu, order.ram, order.storage].filter(Boolean).map((spec, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-md bg-white border border-blue-100 text-[11px] text-blue-700 font-semibold">
+                      {spec}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {order.kelengkapan && (
+                <p className="text-[11px] text-gray-400 mt-2 pt-2 border-t border-blue-100">
+                  <span className="font-bold text-blue-400">Kelengkapan: </span>{order.kelengkapan}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ── KELUHAN + ANALISA ── */}
+          <div className="mx-4 mt-3 space-y-2">
+            <div className="rounded-2xl border border-violet-100 bg-violet-50/30 p-4">
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center text-violet-500 shrink-0">
+                  <IconDoc />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">Keluhan</span>
+              </div>
+              <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">
+                {order.keluhan}
+              </p>
+            </div>
+
+            {order.hasil_analisa && (
+              <div className="rounded-2xl border border-violet-100 bg-white p-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center text-violet-500 shrink-0">
+                    <IconDoc />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">Hasil Analisa</span>
+                </div>
+                <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">
+                  {order.hasil_analisa}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── TIMELINE ── */}
+          <div className="mx-4 mt-3">
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-500">
+                  <IconClock />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Timeline</span>
+              </div>
+
+              {/* Visual timeline */}
+              <div className="space-y-0">
+                {[
+                  { dot: "bg-blue-400",    label: "Masuk",        value: formatDate(order.tanggal_masuk) },
+                  { dot: "bg-violet-400",  label: "Selesai",      value: formatDate(order.tanggal_selesai) },
+                  { dot: "bg-emerald-400", label: "Diambil",      value: formatDate(order.tanggal_diambil) },
+                ].map((item, i, arr) => (
+                  <div key={i} className="flex gap-3">
+                    {/* Dot + line */}
+                    <div className="flex flex-col items-center">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${item.value === "—" ? "bg-gray-200" : item.dot}`} />
+                      {i < arr.length - 1 && (
+                        <div className="w-px flex-1 bg-gray-100 my-0.5" style={{ minHeight: 16 }} />
+                      )}
+                    </div>
+                    {/* Content */}
+                    <div className="pb-3 min-w-0 flex-1 flex items-start justify-between gap-2">
+                      <span className="text-[11px] text-gray-400 font-medium mt-0.5 shrink-0">{item.label}</span>
+                      <span className="text-[11px] text-gray-600 font-semibold text-right">{item.value}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Durasi chip */}
+                <div className="flex items-center gap-2 pt-1 mt-1 border-t border-amber-100">
+                  <span className="text-[11px] text-gray-400 font-medium">Durasi servis</span>
+                  <span className="ml-auto font-mono text-[11px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg">
+                    {getDuration(order.tanggal_masuk, order.tanggal_selesai)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── PAYMENT ── */}
+          <div className="mx-4 mt-3">
+            {fmtRupiah(order.payment_amount) ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-500 p-4 text-white">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">
+                    <IconDollar />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-100">Payment</span>
+                </div>
+                <p className="text-[24px] font-black leading-none tracking-tight">
+                  {fmtRupiah(order.payment_amount)}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-black">
+                    {order.payment_method || "CASH"}
+                  </span>
+                  {order.payment_note && (
+                    <span className="text-[11px] text-emerald-100 italic truncate">{order.payment_note}</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                    <IconDollar />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">Payment</span>
+                </div>
+                <p className="text-[13px] text-gray-400 font-medium">
+                  {isFromGagal ? "Gratis / Tanpa biaya" : "—"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── TIM ── */}
+          <div className="mx-4 mt-3">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                  <IconUser />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">Tim</span>
+              </div>
+              <div className="space-y-2.5">
+                <TeamRow label="Dibuat oleh"    name={order.created_by_user?.name}    color="blue" />
+                <TeamRow label="Dikerjakan oleh" name={order.dikerjakan_by_user?.name} color="violet" />
+                <TeamRow label="Diambil oleh"   name={order.diambil_by_user?.name}    color="emerald" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── ALASAN GAGAL / TIDAK JADI ── */}
+          {order.alasan_tidak_jadi && (
+            <div className="mx-4 mt-3">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-rose-100 flex items-center justify-center text-rose-500">
+                    <IconXSmall />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">
+                    {isFromGagal ? "Alasan Gagal Diperbaiki" : "Alasan Tidak Jadi"}
+                  </span>
+                </div>
+                <p className="text-[13px] text-rose-700 leading-relaxed whitespace-pre-line font-medium">
+                  {order.alasan_tidak_jadi}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom padding */}
+          <div className="h-5" />
+        </div>
+
+        {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+        <div className="px-4 py-3 border-t border-gray-100 bg-white shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-[#1a1a2e] hover:bg-[#2a2a4e] text-[13px] font-bold text-white transition"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal sub-components ───────────────────────────────────────────────────────
+function TeamRow({ label, name, color }: { label: string; name?: string; color: "blue" | "violet" | "emerald" }) {
+  const colorMap = {
+    blue:    "bg-blue-100 text-blue-600",
+    violet:  "bg-violet-100 text-violet-600",
+    emerald: "bg-emerald-100 text-emerald-600",
+  };
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-gray-400 font-medium shrink-0">{label}</span>
+      {name ? (
+        <div className="flex items-center gap-2">
+          <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${colorMap[color]}`}>
+            <span className="text-[9px] font-black uppercase">{name.charAt(0)}</span>
+          </div>
+          <span className="text-[12px] text-gray-700 font-semibold">{name}</span>
+        </div>
+      ) : (
+        <span className="text-[11px] text-gray-300">—</span>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function HistoryPage() {
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<ServiceStatus | "ALL">("ALL");
+  const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -151,7 +519,6 @@ export default function HistoryPage() {
 
         {/* ── Filter Bar ────────────────────────────────────────────────────── */}
         <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center gap-3">
-          {/* Search */}
           <div className="relative flex-1 max-w-sm">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
               <IconSearch />
@@ -163,8 +530,6 @@ export default function HistoryPage() {
               className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-100 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e]/30 focus:bg-white transition placeholder:text-gray-300"
             />
           </div>
-
-          {/* Status Filter Pills */}
           <div className="flex items-center gap-1.5">
             {(["ALL", ...HISTORY_STATUSES] as const).map(s => (
               <button
@@ -187,7 +552,6 @@ export default function HistoryPage() {
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
           {!loading && orders.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              {/* Sudah Diambil */}
               <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-white px-5 py-4 text-emerald-800">
                 <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl bg-emerald-500" />
                 <div className="flex items-center justify-between">
@@ -202,8 +566,6 @@ export default function HistoryPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Tidak Jadi */}
               <div className="relative overflow-hidden rounded-2xl border border-red-100 bg-white px-5 py-4 text-red-800">
                 <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl bg-red-400" />
                 <div className="flex items-center justify-between">
@@ -240,7 +602,6 @@ export default function HistoryPage() {
               </table>
             </div>
           ) : filtered.length === 0 ? (
-            /* ── Empty State ── */
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
                 <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5 text-gray-300">
@@ -263,8 +624,17 @@ export default function HistoryPage() {
               </div>
             </div>
           ) : (
-            /* ── Main Table ── */
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {/* Hint bar */}
+              <div className="px-5 py-2 border-b border-gray-50 bg-gray-50/60 flex items-center gap-2">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-300 shrink-0">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  Klik baris untuk melihat detail lengkap
+                </p>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -291,8 +661,11 @@ export default function HistoryPage() {
                         : "hover:bg-blue-50/30";
 
                       return (
-                        <tr key={o.id} className={`transition-colors duration-100 ${rowBg}`}>
-
+                        <tr
+                          key={o.id}
+                          onClick={() => setSelectedOrder(o)}
+                          className={`transition-colors duration-100 cursor-pointer ${rowBg}`}
+                        >
                           {/* # */}
                           <td className="pl-5 pr-4 py-3.5">
                             <span className="text-[11px] font-mono font-bold text-gray-300">
@@ -317,9 +690,16 @@ export default function HistoryPage() {
                             </p>
                           </td>
 
-                          {/* Keluhan */}
+                          {/* Keluhan — tetap truncate, detail di modal */}
                           <td className="px-4 py-3.5 max-w-[160px]">
-                            <p className="text-[12px] text-gray-500 leading-relaxed line-clamp-2">{o.keluhan}</p>
+                            <p className="text-[12px] text-gray-500 leading-relaxed line-clamp-2">
+                              {o.keluhan}
+                            </p>
+                            {o.keluhan.length > 70 && (
+                              <p className="text-[10px] text-gray-300 mt-0.5 font-medium">
+                                klik untuk lihat semua
+                              </p>
+                            )}
                           </td>
 
                           {/* Jam Masuk */}
@@ -427,6 +807,12 @@ export default function HistoryPage() {
           )}
         </div>
       </div>
+
+      {/* ── Detail Modal ── */}
+      <HistoryDetailModal
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
     </DashboardLayout>
   );
 }
@@ -436,9 +822,9 @@ function UserCell({ name, color }: { name?: string; color: "blue" | "violet" | "
   if (!name) return <span className="text-[11px] text-gray-300 font-medium">—</span>;
 
   const colorMap: Record<string, string> = {
-    blue:   "bg-blue-100 text-blue-600",
-    violet: "bg-violet-100 text-violet-600",
-    emerald:"bg-emerald-100 text-emerald-600",
+    blue:    "bg-blue-100 text-blue-600",
+    violet:  "bg-violet-100 text-violet-600",
+    emerald: "bg-emerald-100 text-emerald-600",
   };
 
   return (

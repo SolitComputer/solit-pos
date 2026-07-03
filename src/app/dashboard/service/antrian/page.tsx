@@ -103,7 +103,7 @@ function useAntrianRealtime() {
       if (fallbackRef.current) clearInterval(fallbackRef.current);
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
-  }, []); // eslint-disable-line
+  }, []);
 
   const refresh = () => { setLoading(true); fetchREST(); };
   return { orders, loading, connected, refresh };
@@ -111,72 +111,99 @@ function useAntrianRealtime() {
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const IconRefresh = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
   </svg>
 );
+
 const IconPlus = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
+
 const IconClipboard = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
     <rect x="9" y="3" width="6" height="4" rx="1" />
     <line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="13" y2="16" />
   </svg>
 );
+
 const IconWrench = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
   </svg>
 );
+
 const IconQueue = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
     <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
   </svg>
 );
+
 const IconPart = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" /><path d="M19.07 4.93l-1.41 1.41M5.34 18.66l-1.41 1.41M19.07 19.07l-1.41-1.41M5.34 5.34L3.93 3.93" />
     <path d="M12 2v2m0 16v2M2 12h2m16 0h2" />
   </svg>
 );
 
+const IconCheck = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+const IconX = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({
-  icon, label, count, colorClass, accentBar,
+  icon, label, count, color, bgColor, borderColor, accentColor
 }: {
-  icon: React.ReactNode; label: string; count: number; colorClass: string; accentBar: string;
+  icon: React.ReactNode; 
+  label: string; 
+  count: number; 
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  accentColor: string;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl border px-5 py-4 bg-white ${colorClass}`}>
-      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-2xl ${accentBar}`} />
+    <div className={`relative overflow-hidden rounded-xl border ${borderColor} px-5 py-4 bg-white transition-all hover:shadow-md`}>
+      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-xl ${accentColor}`} />
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-3xl font-black tracking-tight leading-none">{count}</p>
-          <p className="text-xs font-semibold mt-1.5 opacity-70">{label}</p>
+          <p className={`text-3xl font-bold tracking-tight ${color}`}>{count}</p>
+          <p className="text-xs font-semibold mt-1 text-gray-500">{label}</p>
         </div>
-        <div className="opacity-20">{icon}</div>
+        <div className={`p-2 rounded-lg ${bgColor}`}>
+          <div className={color}>{icon}</div>
+        </div>
       </div>
     </div>
   );
 }
 
 // ── Action Button ─────────────────────────────────────────────────────────────
-function ActionBtn({ label, color, onClick }: { label: string; color: string; onClick: () => void }) {
-  const map: Record<string, string> = {
-    blue: "bg-blue-50 text-blue-700 hover:bg-blue-100 ring-blue-200",
-    green: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-emerald-200",
-    orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 ring-orange-200",
-    rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 ring-rose-200",
+function ActionBtn({ label, color, onClick }: { label: string; color: "blue" | "green" | "orange" | "rose" | "purple"; onClick: () => void }) {
+  const variants = {
+    blue: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200",
+    green: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200",
+    orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200",
+    rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200",
+    purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200",
   };
+  
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ring-1 ${map[color] || map.blue}`}
+      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${variants[color]} hover:scale-105 active:scale-95`}
     >
       {label}
     </button>
@@ -187,8 +214,8 @@ function ActionBtn({ label, color, onClick }: { label: string; color: string; on
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[48, 96, 80, 160, 72, 56, 64, 64, 100].map((w, i) => (
-        <td key={i} className="px-4 py-3.5">
+      {[40, 80, 70, 140, 60, 50, 60, 60, 90].map((w, i) => (
+        <td key={i} className="px-4 py-4">
           <div className="h-3 rounded-full bg-gray-100 animate-pulse" style={{ width: w }} />
         </td>
       ))}
@@ -205,47 +232,46 @@ export default function AntrianPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  // ✅ AFTER — ganti 2 baris ini
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []);
   const canCreate = userRoles.some(r => (SERVICE_CREATE_ROLES as string[]).includes(r));
   const canAction = userRoles.some(r => (SERVICE_TEKNISI_ROLES as string[]).includes(r));
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const openDialog = (order: ServiceOrder, action: DialogState["action"]) => {
     const configs: Record<string, Omit<DialogState, "open" | "orderId" | "action">> = {
       mulai: {
         title: "Mulai Pengerjaan",
-        description: `Tandai "${order.nama} — ${order.type_laptop}" sebagai sedang dikerjakan?`,
+        description: `Anda akan memulai pengerjaan untuk "${order.nama} — ${order.type_laptop}". Pastikan semua persiapan sudah lengkap.`,
         confirmLabel: "Ya, Mulai Kerjakan",
         confirmClass: "bg-blue-600 hover:bg-blue-700",
       },
       sparepart: {
         title: "Menunggu Sparepart",
-        description: "Tulis keterangan sparepart yang dibutuhkan.",
+        description: "Tulis keterangan sparepart yang dibutuhkan untuk melanjutkan pengerjaan.",
         confirmLabel: "Tandai Menunggu Sparepart",
         confirmClass: "bg-orange-600 hover:bg-orange-700",
         requireReason: true,
         reasonLabel: "Keterangan Sparepart",
-        reasonPlaceholder: "cth: butuh baterai 14.8V...",
+        reasonPlaceholder: "Contoh: Butuh baterai 14.8V 4400mAh untuk Acer Aspire",
       },
       done: {
         title: "Tandai Selesai",
-        description: `Tandai "${order.nama} — ${order.type_laptop}" sebagai SELESAI? Payment akan dikonfirmasi saat pelanggan mengambil laptop.`,
+        description: `Konfirmasi penyelesaian untuk "${order.nama} — ${order.type_laptop}". Payment akan dikonfirmasi saat pelanggan mengambil laptop.`,
         confirmLabel: "Ya, Tandai Selesai",
         confirmClass: "bg-emerald-600 hover:bg-emerald-700",
       },
       gagal_diperbaiki: {
         title: "Tandai Gagal Diperbaiki",
-        description: `Tandai "${order.nama} — ${order.type_laptop}" sebagai GAGAL diperbaiki? Tulis alasannya.`,
+        description: `Konfirmasi kegagalan perbaikan untuk "${order.nama} — ${order.type_laptop}". Berikan alasan yang jelas.`,
         confirmLabel: "Tandai Gagal Diperbaiki",
         confirmClass: "bg-rose-600 hover:bg-rose-700",
         requireReason: true,
         reasonLabel: "Alasan Gagal",
-        reasonPlaceholder: "cth: komponen sudah tidak tersedia...",
+        reasonPlaceholder: "Contoh: Komponen motherboard sudah tidak tersedia di pasaran",
       },
     };
     if (!action || !configs[action]) return;
@@ -263,8 +289,8 @@ export default function AntrianPage() {
     setDialog(DIALOG_CLOSED);
     showToast(
       dialog.action === "done"
-        ? "Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
-        : "Status berhasil diperbarui!"
+        ? "✅ Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
+        : "✅ Status berhasil diperbarui!"
     );
     refresh();
   };
@@ -279,48 +305,46 @@ export default function AntrianPage() {
 
   return (
     <DashboardLayout>
-      <div className="min-h-screen bg-[#F7F7F8]">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
 
-        {/* ── Top Header Bar ──────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-20">
-          <div className="flex items-center justify-between">
-            {/* Left: title + live dot */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center shrink-0">
+        {/* ── Top Header ──────────────────────────────────────────────────────── */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/60 px-6 py-5 sticky top-0 z-20">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#ffffff] to-[#ffffff] flex items-center justify-center shadow-lg shadow-[#1a1a2e]/20">
                 <IconWrench />
               </div>
               <div>
-                <h1 className="text-base font-black text-[#1a1a2e] leading-tight tracking-tight">
+                <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">
                   Antrian Servis
                 </h1>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5">
                   {connected ? (
-                    <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
-                      <span className="relative flex h-1.5 w-1.5">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-full">
+                      <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                       </span>
-                      Live
-                    </span>
+                      <span className="text-[10px] font-semibold text-emerald-700">Live</span>
+                    </div>
                   ) : (
-                    <span className="flex items-center gap-1 text-[11px] text-gray-400 font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
-                      Polling
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded-full">
+                      <span className="w-2 h-2 rounded-full bg-gray-300" />
+                      <span className="text-[10px] font-semibold text-gray-400">Polling</span>
+                    </div>
                   )}
-                  <span className="text-gray-200 text-xs">·</span>
-                  <span className="text-[11px] text-gray-400 font-medium">
+                  <span className="text-gray-300">·</span>
+                  <span className="text-xs font-medium text-gray-400">
                     {orders.length} order aktif
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Right: actions */}
             <div className="flex items-center gap-2">
               <button
                 onClick={refresh}
-                className="w-9 h-9 rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-200 hover:bg-gray-50 transition flex items-center justify-center"
+                className="p-2.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all"
                 title="Refresh"
               >
                 <IconRefresh />
@@ -328,7 +352,7 @@ export default function AntrianPage() {
               {canCreate && (
                 <button
                   onClick={() => setFormOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1a1a2e] text-white text-xs font-bold rounded-xl hover:bg-[#2d2d4a] transition shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-[#1a1a2e]/30 transition-all hover:scale-[1.02] active:scale-95"
                 >
                   <IconPlus />
                   Buat Formulir
@@ -338,66 +362,74 @@ export default function AntrianPage() {
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
 
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard
               icon={<IconQueue />}
               label="Antrian"
               count={grouped.ANTRIAN.length}
-              colorClass="border-yellow-100 text-yellow-800"
-              accentBar="bg-yellow-400"
+              color="text-yellow-600"
+              bgColor="bg-yellow-50"
+              borderColor="border-yellow-100"
+              accentColor="bg-yellow-400"
             />
             <StatCard
               icon={<IconWrench />}
               label="Sedang Dikerjakan"
               count={grouped.SEDANG_DIKERJAKAN.length}
-              colorClass="border-blue-100 text-blue-800"
-              accentBar="bg-blue-500"
+              color="text-blue-600"
+              bgColor="bg-blue-50"
+              borderColor="border-blue-100"
+              accentColor="bg-blue-500"
             />
             <StatCard
               icon={<IconPart />}
               label="Tunggu Sparepart"
               count={grouped.MENUNGGU_SPAREPART.length}
-              colorClass="border-orange-100 text-orange-800"
-              accentBar="bg-orange-400"
+              color="text-orange-600"
+              bgColor="bg-orange-50"
+              borderColor="border-orange-100"
+              accentColor="bg-orange-400"
             />
           </div>
 
-          {/* ── Table Area ──────────────────────────────────────────────────── */}
+          {/* ── Table ────────────────────────────────────────────────────────── */}
           {loading ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/60">
-                    {COLUMNS.map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[1, 2, 3, 4].map(i => <SkeletonRow key={i} />)}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/80">
+                      {COLUMNS.map(h => (
+                        <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap first:pl-5">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : orders.length === 0 ? (
             /* ── Empty State ── */
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm">
               <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-                <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5 text-gray-300">
+                <div className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center mb-6 text-gray-300">
                   <IconClipboard />
                 </div>
-                <p className="text-sm font-black text-[#1a1a2e]">Antrian kosong</p>
-                <p className="text-xs text-gray-400 mt-1.5 max-w-xs leading-relaxed">
+                <h3 className="text-lg font-bold text-[#1a1a2e]">Antrian Kosong</h3>
+                <p className="text-sm text-gray-400 mt-2 max-w-md leading-relaxed">
                   Semua order sudah selesai, atau belum ada order servis yang masuk hari ini.
                 </p>
                 {canCreate && (
                   <button
                     onClick={() => setFormOpen(true)}
-                    className="mt-6 flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a2e] text-white text-xs font-bold rounded-xl hover:bg-[#2d2d4a] transition shadow-sm"
+                    className="mt-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-[#1a1a2e]/30 transition-all hover:scale-[1.02] active:scale-95"
                   >
                     <IconPlus />
                     Buat Formulir Baru
@@ -407,15 +439,15 @@ export default function AntrianPage() {
             </div>
           ) : (
             /* ── Main Table ── */
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/60">
-                      {COLUMNS.map(h => (
+                    <tr className="border-b border-gray-100 bg-gradient-to-r from-gray-50/80 to-white">
+                      {COLUMNS.map((h, i) => (
                         <th
                           key={h}
-                          className="px-4 py-3.5 text-left text-[10px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap first:pl-5"
+                          className={`px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap ${i === 0 ? 'pl-5' : ''}`}
                         >
                           {h}
                         </th>
@@ -426,72 +458,63 @@ export default function AntrianPage() {
                     {orders.map((o, idx) => (
                       <tr
                         key={o.id}
-                        className="hover:bg-blue-50/30 transition-colors duration-100 cursor-pointer group"
+                        className="hover:bg-blue-50/30 transition-colors duration-150 cursor-pointer group"
                         onClick={() => setDetailId(o.id)}
                       >
-                        {/* # */}
-                        <td className="pl-5 pr-4 py-3.5">
-                          <span className="text-[11px] font-mono font-bold text-gray-300 group-hover:text-gray-400 transition">
+                        <td className="pl-5 pr-4 py-4">
+                          <span className="text-xs font-mono font-bold text-gray-300 group-hover:text-gray-500 transition">
                             {String(idx + 1).padStart(2, "0")}
                           </span>
                         </td>
 
-                        {/* Pelanggan */}
-                        <td className="px-4 py-3.5">
-                          <p className="font-bold text-[#1a1a2e] text-[13px] leading-tight">{o.nama}</p>
-                          <p className="text-[11px] text-gray-400 mt-0.5 font-medium">{o.no_hp}</p>
+                        <td className="px-4 py-4">
+                          <p className="font-semibold text-[#1a1a2e] text-sm leading-tight">{o.nama}</p>
+                          <p className="text-xs text-gray-400 mt-0.5 font-medium">{o.no_hp}</p>
                         </td>
 
-                        {/* Laptop */}
-                        <td className="px-4 py-3.5 min-w-[140px]">
-                          <p className="font-semibold text-gray-700 text-[13px] leading-tight">{o.type_laptop}</p>
-                          <p className="text-[11px] text-gray-400 mt-0.5">
+                        <td className="px-4 py-4 min-w-[150px]">
+                          <p className="font-semibold text-gray-700 text-sm leading-tight">{o.type_laptop}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
                             {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
                           </p>
                         </td>
 
-                        {/* Keluhan */}
-                        <td className="px-4 py-3.5 max-w-[200px]">
-                          <p className="text-[12px] text-gray-500 leading-relaxed line-clamp-2">{o.keluhan}</p>
+                        <td className="px-4 py-4 max-w-[200px]">
+                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{o.keluhan}</p>
                         </td>
 
-                        {/* Masuk */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className="text-[11px] text-gray-400 font-medium">{formatDate(o.tanggal_masuk)}</span>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="text-xs text-gray-400 font-medium">{formatDate(o.tanggal_masuk)}</span>
                         </td>
 
-                        {/* Durasi */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${getDurationColor(o.tanggal_masuk)}`}>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${getDurationColor(o.tanggal_masuk)}`}>
                             {getDuration(o.tanggal_masuk)}
                           </span>
                         </td>
 
-                        {/* Teknisi */}
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-4">
                           {o.dikerjakan_by_user?.name ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
-                                <span className="text-[9px] font-black text-violet-600 uppercase">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shrink-0">
+                                <span className="text-[9px] font-bold text-purple-700 uppercase">
                                   {o.dikerjakan_by_user.name.charAt(0)}
                                 </span>
                               </div>
-                              <span className="text-[12px] text-gray-600 font-medium">{o.dikerjakan_by_user.name}</span>
+                              <span className="text-xs text-gray-600 font-medium">{o.dikerjakan_by_user.name}</span>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-gray-300 font-medium">—</span>
+                            <span className="text-xs text-gray-300 font-medium">—</span>
                           )}
                         </td>
 
-                        {/* Status */}
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-4">
                           <ServiceStatusBadge status={o.status} />
                         </td>
 
-                        {/* Aksi */}
-                        <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                           {canAction && (
-                            <div className="flex items-center gap-1 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {o.status === "ANTRIAN" && (
                                 <>
                                   <ActionBtn label="Mulai" color="blue" onClick={() => openDialog(o, "mulai")} />
@@ -501,13 +524,13 @@ export default function AntrianPage() {
                               {o.status === "SEDANG_DIKERJAKAN" && (
                                 <>
                                   <ActionBtn label="Sparepart" color="orange" onClick={() => openDialog(o, "sparepart")} />
-                                  <ActionBtn label="Done" color="green" onClick={() => openDialog(o, "done")} />
+                                  <ActionBtn label="Selesai" color="green" onClick={() => openDialog(o, "done")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                 </>
                               )}
                               {o.status === "MENUNGGU_SPAREPART" && (
                                 <>
-                                  <ActionBtn label="Lanjut" color="blue" onClick={() => openDialog(o, "mulai")} />
+                                  <ActionBtn label="Lanjut" color="purple" onClick={() => openDialog(o, "mulai")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                 </>
                               )}
@@ -520,13 +543,12 @@ export default function AntrianPage() {
                 </table>
               </div>
 
-              {/* Footer */}
-              <div className="px-5 py-2.5 border-t border-gray-50 flex items-center justify-between">
-                <p className="text-[11px] text-gray-300 font-medium">
-                  Klik baris untuk melihat detail lengkap
+              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
+                <p className="text-xs text-gray-400 font-medium">
+                  💡 Klik baris untuk melihat detail lengkap
                 </p>
-                <p className="text-[11px] text-gray-300 font-medium">
-                  {orders.length} order
+                <p className="text-xs font-semibold text-gray-400">
+                  Total: <span className="text-[#1a1a2e]">{orders.length}</span> order
                 </p>
               </div>
             </div>
@@ -537,7 +559,7 @@ export default function AntrianPage() {
         <ServiceFormModal
           open={formOpen}
           onClose={() => setFormOpen(false)}
-          onSuccess={() => { showToast("Formulir berhasil dibuat!"); refresh(); }}
+          onSuccess={() => { showToast("✅ Formulir berhasil dibuat!"); refresh(); }}
         />
 
         <ServiceConfirmDialog
@@ -559,20 +581,12 @@ export default function AntrianPage() {
         {toast && (
           <div
             className={`
-              fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl
-              text-sm font-bold text-white transition-all
-              ${toast.type === "success" ? "bg-[#1a1a2e]" : "bg-rose-600"}
+              fixed bottom-8 right-8 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl
+              text-sm font-semibold text-white transition-all animate-in slide-in-from-right-5 duration-300
+              ${toast.type === "success" ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a]" : "bg-gradient-to-r from-rose-500 to-rose-600"}
             `}
           >
-            {toast.type === "success" ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
+            {toast.type === "success" ? <IconCheck /> : <IconX />}
             {toast.msg}
           </div>
         )}
