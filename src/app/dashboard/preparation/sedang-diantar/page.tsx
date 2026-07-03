@@ -7,6 +7,8 @@ import { supabase } from "@/services/supabase";
 import { deriveLiveStatus, type LiveOrder } from "@/lib/trackingStatus";
 import TrackingStatusBadge from "@/components/preparation/TrackingStatusBadge";
 import { useHTCall } from "@/contexts/HTCallContext";
+import { hasAnyRole, PERMISSIONS } from "@/lib/permissions";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null }
 interface ActiveOrder extends LiveOrder {
@@ -28,6 +30,19 @@ export default function PreparationSedangDiantarPage() {
         return m;
     }, [online]);
 
+    const confirm = useConfirm();
+    const [canForce, setCanForce] = useState(false);
+    const [forcingId, setForcingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch("/api/auth/me").then(r => r.json())
+            .then(r => {
+                const roles: string[] = r.user?.roles ?? (r.user?.role ? [r.user.role] : []);
+                setCanForce(hasAnyRole(roles, PERMISSIONS.FORCE_COMPLETE_PREPARATION));
+            })
+            .catch(() => setCanForce(false));
+    }, []);
+
     const callBusy = callState !== "idle";
 
     useEffect(() => { const iv = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(iv); }, []);
@@ -45,6 +60,26 @@ export default function PreparationSedangDiantarPage() {
         } catch { setOrders([]); } finally { setIsLoading(false); }
     }, []);
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+    // ✅ forceDone dipindah ke SINI — setelah fetchOrders dideklarasikan
+    const forceDone = useCallback(async (orderId: string, orderNumber: string) => {
+        const ok = await confirm({
+            title: "Selesaikan pengantaran ini?",
+            message: `Order ${orderNumber} akan ditandai SELESAI walau pengantar belum menekan tombol. Pastikan barang sudah sampai ke customer.`,
+            variant: "warning", confirmText: "Ya, Selesaikan",
+        });
+        if (!ok) return;
+        setForcingId(orderId);
+        try {
+            const res = await fetch(`/api/preparation/${orderId}/force-complete`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: null }),
+            });
+            const result = await res.json();
+            if (result.success) await fetchOrders();
+            else alert(result.message || "Gagal menyelesaikan");
+        } catch { alert("Gagal menyelesaikan"); } finally { setForcingId(null); }
+    }, [confirm, fetchOrders]);
 
     useEffect(() => {
         const ch = supabase
@@ -302,7 +337,7 @@ export default function PreparationSedangDiantarPage() {
                                                     type="button"
                                                     disabled={callBusy}
                                                     onClick={(e) => {
-                                                        e.preventDefault();  
+                                                        e.preventDefault();
                                                         e.stopPropagation();
                                                         callUser(driver, o.order_number);
                                                     }}
@@ -321,6 +356,16 @@ export default function PreparationSedangDiantarPage() {
                                                 </div>
                                             );
                                         })()}
+                                        {canForce && (
+                                            <button
+                                                type="button"
+                                                disabled={forcingId === o.id}
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); forceDone(o.id, o.order_number); }}
+                                                className="mt-2 w-full h-10 rounded-xl bg-[#1a1a2e] hover:bg-[#16213e] text-white text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-40"
+                                            >
+                                                {forcingId === o.id ? "Menyelesaikan..." : "✅ Tandai Selesai (Override)"}
+                                            </button>
+                                        )}
                                     </Link>
                                 );
                             })}

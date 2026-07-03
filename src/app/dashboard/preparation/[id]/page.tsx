@@ -424,6 +424,7 @@ export default function PreparationDetailPage() {
     const canVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE);
     const canTargetVoice = hasAnyRole(userRoles, PERMISSIONS.DELIVERY_VOICE_TARGET);
     const canCancel = hasAnyRole(userRoles, PERMISSIONS.CANCEL_PREPARATION);
+    const canForceComplete = hasAnyRole(userRoles, PERMISSIONS.FORCE_COMPLETE_PREPARATION);
 
     const [showCancel, setShowCancel] = useState(false);
 
@@ -641,6 +642,26 @@ export default function PreparationDetailPage() {
             const result = await res.json();
             if (result.success) { await fetchOrder(); } else alert(result.message); // tracker auto-stop saat status berubah
         } catch { alert("Gagal"); } finally { setActionLoading(false); }
+    };
+
+    const forceComplete = async () => {
+        if (!order || actionLoading) return;
+        const ok = await confirm({
+            title: "Selesaikan pengantaran secara paksa?",
+            message: "Status langsung jadi SELESAI walau pengantar belum menekan tombol. Pastikan barang benar-benar sudah diterima customer.",
+            variant: "warning", confirmText: "Ya, Selesaikan",
+        });
+        if (!ok) return;
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/preparation/${id}/force-complete`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: null }),
+            });
+            const result = await res.json();
+            if (result.success) await fetchOrder();
+            else alert(result.message || "Gagal menyelesaikan");
+        } catch { alert("Gagal menyelesaikan"); } finally { setActionLoading(false); }
     };
 
     const doReturnAction = async (action: "RETURN_START" | "RETURN_COMPLETE") => {
@@ -1078,6 +1099,19 @@ export default function PreparationDetailPage() {
                                     Alasan: {order.cancel_reason}
                                 </p>
                             )}
+                        </div>
+                    )}
+                    {canForceComplete && (order.status === "DIKIRIM" || order.status === "MENUNGGU_PENGANTAR") && (
+                        <div className="bg-[#1a1a2e] rounded-2xl p-4 flex items-center gap-3">
+                            <span className="text-xl">🛠️</span>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-white">Override Supervisor</p>
+                                <p className="text-[11px] text-gray-300 mt-0.5">Pengantar belum menyelesaikan perjalanan? Tandai selesai manual.</p>
+                            </div>
+                            <button onClick={forceComplete} disabled={actionLoading}
+                                className="h-9 px-4 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition disabled:opacity-50 flex-shrink-0">
+                                {actionLoading ? "..." : "✅ Selesaikan"}
+                            </button>
                         </div>
                     )}
                 </div>

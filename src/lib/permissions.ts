@@ -146,6 +146,7 @@ export const PREPARATION_DISPATCH_ROLES: UserRole[] = Array.from(new Set<UserRol
 
 /** BATALKAN pesanan — HANYA Admin, Programmer, Kepala Sales (dari versi teman) */
 export const PREPARATION_CANCEL_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES"];
+export const PREPARATION_FORCE_COMPLETE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES"];
 
 /** Role yang handle delivery tracking */
 export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
@@ -461,6 +462,7 @@ export const PERMISSIONS = {
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
   /** Batalkan pesanan (dari versi teman) */
   CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
+  FORCE_COMPLETE_PREPARATION: [...PREPARATION_FORCE_COMPLETE_ROLES] as UserRole[],
 
   // ── Voice HT ────────────────────────────────────────────────────────────────
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
