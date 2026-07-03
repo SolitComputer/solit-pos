@@ -53,8 +53,7 @@ export default function PreparationSedangDiantarPage() {
             const result = await res.json();
             const data: ActiveOrder[] = result.data || [];
             const active = data.filter(o =>
-                (o.status === "DIKIRIM" && o.delivery_method === "PENGANTARAN") ||
-                (o.status === "SELESAI" && o.return_started_at && !o.returned_at)
+                o.status === "DIKIRIM" && o.delivery_method === "PENGANTARAN"
             );
             setOrders(active);
         } catch { setOrders([]); } finally { setIsLoading(false); }
@@ -136,8 +135,8 @@ export default function PreparationSedangDiantarPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link 
-                                href="/dashboard/preparation/siap-kirim" 
+                            <Link
+                                href="/dashboard/preparation/siap-kirim"
                                 className="hidden sm:inline-flex items-center gap-2 h-9 px-4 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm"
                             >
                                 Siap Dikirim
@@ -145,8 +144,8 @@ export default function PreparationSedangDiantarPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </Link>
-                            <Link 
-                                href="/dashboard/preparation/history" 
+                            <Link
+                                href="/dashboard/preparation/history"
                                 className="hidden sm:inline-flex items-center gap-2 h-9 px-4 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm"
                             >
                                 Riwayat
@@ -170,23 +169,20 @@ export default function PreparationSedangDiantarPage() {
                                 </span>
                             </div>
                         </div>
-                        <div className={`rounded-2xl p-4 border transition hover:shadow-md hover:scale-[1.02] active:scale-95 ${
-                            problemCount > 0 
-                                ? "bg-gradient-to-br from-red-50 to-red-100/50 border-red-200" 
-                                : "bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200"
-                        }`}>
+                        <div className={`rounded-2xl p-4 border transition hover:shadow-md hover:scale-[1.02] active:scale-95 ${problemCount > 0
+                            ? "bg-gradient-to-br from-red-50 to-red-100/50 border-red-200"
+                            : "bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200"
+                            }`}>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xl">{problemCount > 0 ? "⚠️" : "✅"}</span>
-                                    <span className={`text-xs font-bold uppercase tracking-wide ${
-                                        problemCount > 0 ? "text-red-600" : "text-emerald-600"
-                                    }`}>
+                                    <span className={`text-xs font-bold uppercase tracking-wide ${problemCount > 0 ? "text-red-600" : "text-emerald-600"
+                                        }`}>
                                         Bermasalah
                                     </span>
                                 </div>
-                                <span className={`text-3xl font-black tabular-nums ${
-                                    problemCount > 0 ? "text-red-700" : "text-emerald-700"
-                                }`}>
+                                <span className={`text-3xl font-black tabular-nums ${problemCount > 0 ? "text-red-700" : "text-emerald-700"
+                                    }`}>
                                     {isLoading ? "…" : problemCount}
                                 </span>
                             </div>
@@ -219,14 +215,14 @@ export default function PreparationSedangDiantarPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
-                            <input 
-                                value={search} 
-                                onChange={e => setSearch(e.target.value)} 
+                            <input
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
                                 placeholder="Cari customer, pengantar, alamat, no order..."
-                                className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 focus:bg-white transition" 
+                                className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 focus:bg-white transition"
                             />
                             {search && (
-                                <button 
+                                <button
                                     onClick={() => setSearch("")}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition"
                                 >
@@ -263,7 +259,7 @@ export default function PreparationSedangDiantarPage() {
                                 {search ? "Tidak ada yang cocok dengan pencarian" : "Tidak ada pengantaran yang sedang berjalan"}
                             </p>
                             {search && (
-                                <button 
+                                <button
                                     onClick={() => setSearch("")}
                                     className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-700 transition"
                                 >
@@ -280,14 +276,13 @@ export default function PreparationSedangDiantarPage() {
                                 const live = deriveLiveStatus(o, now);
                                 const isReturn = o.status === "SELESAI";
                                 return (
-                                    <Link 
-                                        key={o.id} 
+                                    <Link
+                                        key={o.id}
                                         href={`/dashboard/preparation/${o.id}`}
-                                        className={`group block bg-white rounded-2xl border shadow-sm p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
-                                            live.tone === "bad" 
-                                                ? "border-red-300 ring-2 ring-red-200 ring-offset-2" 
-                                                : "border-gray-100 hover:border-violet-200"
-                                        }`}
+                                        className={`group block bg-white rounded-2xl border shadow-sm p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${live.tone === "bad"
+                                            ? "border-red-300 ring-2 ring-red-200 ring-offset-2"
+                                            : "border-gray-100 hover:border-violet-200"
+                                            }`}
                                     >
                                         <div className="flex items-start justify-between gap-3 mb-3">
                                             <div className="min-w-0 flex-1">
@@ -295,9 +290,8 @@ export default function PreparationSedangDiantarPage() {
                                                     <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg">
                                                         {o.order_number}
                                                     </span>
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full text-white animate-pulse ${
-                                                        isReturn ? "bg-orange-500" : "bg-violet-500"
-                                                    }`}>
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full text-white animate-pulse ${isReturn ? "bg-orange-500" : "bg-violet-500"
+                                                        }`}>
                                                         {isReturn ? "PULANG" : "DIANTAR"}
                                                     </span>
                                                     {live.tone === "bad" && (
@@ -320,12 +314,11 @@ export default function PreparationSedangDiantarPage() {
                                                 <TrackingStatusBadge order={o} />
                                             </div>
                                         </div>
-                                        
-                                        <div className={`rounded-xl px-3 py-2 text-xs font-semibold border ${
-                                            live.tone === "bad" 
-                                                ? "bg-red-50 border-red-200 text-red-600" 
-                                                : "bg-gray-50 border-gray-100 text-gray-600"
-                                        }`}>
+
+                                        <div className={`rounded-xl px-3 py-2 text-xs font-semibold border ${live.tone === "bad"
+                                            ? "bg-red-50 border-red-200 text-red-600"
+                                            : "bg-gray-50 border-gray-100 text-gray-600"
+                                            }`}>
                                             {live.label}
                                         </div>
 
@@ -356,7 +349,7 @@ export default function PreparationSedangDiantarPage() {
                                                 </div>
                                             );
                                         })()}
-                                        {canForce && (
+                                        {canForce && o.status === "DIKIRIM" && (
                                             <button
                                                 type="button"
                                                 disabled={forcingId === o.id}
