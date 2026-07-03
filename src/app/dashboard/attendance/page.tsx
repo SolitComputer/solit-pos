@@ -4495,7 +4495,31 @@ export default function AttendanceDashboardPage() {
                                                 </span>
                                                 <span className="text-[8px] text-gray-400">Lemburan</span>
                                             </td>
-                                            <td colSpan={2} />
+                                            {/* Kasbon Total */}
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-red-600 text-xs block">
+                                                    -{formatRupiah(
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + (allowanceMap[u.userId]?.deduction_loan || 0), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Total Kasbon</span>
+                                            </td>
+
+                                            {/* Pensiun Total */}
+                                            <td className="px-3 py-4 text-center border-r-2 border-gray-200">
+                                                <span className="font-mono font-black text-red-600 text-xs block">
+                                                    -{formatRupiah(
+                                                        userSummary
+                                                            .filter(u => { const i = allUsers.find(au => au.id === u.userId); return i ? !isPKLRole(i.role) : true; })
+                                                            .reduce((sum, u) => sum + (allowanceMap[u.userId]?.deduction_pension || 0), 0)
+                                                    )}
+                                                </span>
+                                                <span className="text-[8px] text-gray-400">Total Pensiun</span>
+                                            </td>
+
+                                            {/* Total Potongan gabungan — pindah ke kolom Gross */}
                                             <td className="px-3 py-4 text-center border-r-2 border-gray-200">
                                                 <span className="font-mono font-black text-red-600 text-xs block">
                                                     -{formatRupiah(
