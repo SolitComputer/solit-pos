@@ -177,13 +177,13 @@ export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN"];
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-  "PKL_PENYEDIA_BARANG", // parity dengan penyedia barang
+  "PKL_PENYEDIA_BARANG",
 ];
 
 export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-  "PKL_PENYEDIA_BARANG", // parity dengan penyedia barang
+  "PKL_PENYEDIA_BARANG",
 ];
 
 // ─── Service Roles ────────────────────────────────────────────────────────────
@@ -356,6 +356,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // "/api/preparation/cancel": [...PREPARATION_CANCEL_ROLES],
 
   "/dashboard/missions": [...ALL_ROLES],
+  "/dashboard/missions/progress": [...ALL_ROLES],
+  "/dashboard/missions/history": [...ALL_ROLES],
   "/api/missions": [...ALL_ROLES],
 };
 

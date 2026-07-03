@@ -2,7 +2,7 @@ import { ChatProvider } from "@/contexts/ChatContext";
 import { ChatManagerWrapper } from "@/components/ui/ChatManagerWrapper";
 import { NotificationBanner } from "@/components/ui/NotificationBanner";
 import ChatBarBackground from "@/components/ui/ChatBarBackground";
-
+import MissionQuestTracker from "@/components/layout/MissionQuestTracker"; 
 export default function Layout({
   children,
 }: {
@@ -13,6 +13,7 @@ export default function Layout({
       <main>
         {children}
       </main>
+      <MissionQuestTracker />
       <NotificationBanner />
       {/* Floating chat button pojok kanan bawah */}
       <ChatBarBackground />
