@@ -197,8 +197,8 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
           "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
           "PKL_PENGANTARAN",
-          "PKL_CUSTOMER_SERVICE",     
-          "PKL_PENGELOLA_BARANG",     
+          "PKL_CUSTOMER_SERVICE",
+          "PKL_PENGELOLA_BARANG",
         ].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
@@ -384,7 +384,9 @@ function MultiRoleSelect({
       label: "Magang (PKL)", roles: [
         "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
         "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-        "PKL_PENGANTARAN"
+        "PKL_PENGANTARAN",
+        "PKL_CUSTOMER_SERVICE",
+        "PKL_PENGELOLA_BARANG",
       ]
     },
   ];
@@ -745,9 +747,7 @@ export default function UsersPage() {
 
   const tabRoles = useMemo(() => {
     return activeTab === "pkl"
-      ? ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-        "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-        "PKL_PENGANTARAN"]
+      ? ALL_ROLES.filter(r => isPKLRole(r))
       : ALL_ROLES.filter(r => !isPKLRole(r));
   }, [activeTab]);
 
