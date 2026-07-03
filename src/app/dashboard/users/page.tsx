@@ -30,6 +30,7 @@ const ALL_ROLES = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN",   // ← NEW
   "CUSTOMER_SERVICE",
 ];
 
@@ -45,7 +46,7 @@ const ROLE_LABEL: Record<string, string> = {
   PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
   PKL_ONPOINT: "PKL Onpoint", PKL_TEKNISI: "PKL Teknisi", PKL_KONTEN: "PKL Content Creator",
-  CUSTOMER_SERVICE: "Customer Service",
+  PKL_PENGANTARAN: "PKL Pengantaran", CUSTOMER_SERVICE: "Customer Service",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -58,7 +59,7 @@ const ROLE_ICON: Record<string, string> = {
   KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
   PKL: "🎓", PKL_MARKETING: "🎓", PKL_SALES: "🎓",
   PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
-  PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓",
+  PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
   CUSTOMER_SERVICE: "🎧",
 };
 
@@ -88,7 +89,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PKL: { bg: "#f8fafc", text: "#475569", border: "#cbd5e1" },
   PKL_MARKETING: PKL_BADGE, PKL_SALES: PKL_BADGE,
   PKL_PENYEDIA_BARANG: PKL_BADGE, PKL_SOTECH: PKL_BADGE,
-  PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE,
+  PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE, PKL_PENGANTARAN: PKL_BADGE,
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
   KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
 };
@@ -105,7 +106,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   KEPALA_SOTECH: "#4d7c0f",
   PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309",
   PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
-  PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309",
+  PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
   CUSTOMER_SERVICE: "#0369a1",
 };
 
@@ -118,6 +119,7 @@ const KEPALA_ROLES = new Set([
 const PKL_ROLE_SET = new Set([
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN",
 ]);
 function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 
@@ -185,9 +187,11 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
       </optgroup>
       <optgroup label="— Magang (PKL) —">
         {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-          "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"].map(r => (
-            <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-          ))}
+          "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+          "PKL_PENGANTARAN"
+        ].map(r => (
+          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
+        ))}
       </optgroup>
       <optgroup label="— Layanan —">
         <option value="CUSTOMER_SERVICE">🎧 Customer Service</option>
@@ -366,7 +370,13 @@ function MultiRoleSelect({
     { label: "Operasional", roles: ["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"] },
     { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
     { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
-    { label: "Magang (PKL)", roles: ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"] },
+    {
+      label: "Magang (PKL)", roles: [
+        "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+        "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+        "PKL_PENGANTARAN"
+      ]
+    },
   ];
 
   const toggle = (role: string) => {
@@ -725,7 +735,9 @@ export default function UsersPage() {
 
   const tabRoles = useMemo(() => {
     return activeTab === "pkl"
-      ? ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN"]
+      ? ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+        "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+        "PKL_PENGANTARAN"]  
       : ALL_ROLES.filter(r => !isPKLRole(r));
   }, [activeTab]);
 
