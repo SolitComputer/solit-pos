@@ -16,10 +16,48 @@ import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 
 const CACHE_KEY = "solit_sidebar_user";
+
+const RAIL_KEY = "solit_sidebar_rail";
+const WIDTH_KEY = "solit_sidebar_width";
+const GROUPS_KEY = "solit_sidebar_groups_open";
+const MIN_W = 208;
+const MAX_W = 360;
+const DEFAULT_W = 240;
+const RAIL_W = 74;
+
+// ── Single source untuk active-state (dipakai render + default-open kategori) ──
+function isItemActive(href: string, pathname: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/dashboard") return false;
+  if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
+  if (href === "/dashboard/preparation") {
+    return (
+      pathname === "/dashboard/preparation" ||
+      (pathname.startsWith("/dashboard/preparation/") &&
+        !pathname.startsWith("/dashboard/preparation/antrian") &&
+        !pathname.startsWith("/dashboard/preparation/done") &&
+        !pathname.startsWith("/dashboard/preparation/history") &&
+        !pathname.startsWith("/dashboard/preparation/pengantaran") &&
+        !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
+        !pathname.startsWith("/dashboard/preparation/siap-kirim"))
+    );
+  }
+  if (href === "/dashboard/laptops") {
+    return (
+      pathname === "/dashboard/laptops" ||
+      (pathname.startsWith("/dashboard/laptops/") &&
+        !pathname.startsWith("/dashboard/laptops/ready") &&
+        !pathname.startsWith("/dashboard/laptops/minus"))
+    );
+  }
+  if (href.startsWith("/dashboard/service/")) return pathname === href;
+  if (href === "/dashboard/missions") return pathname === "/dashboard/missions"; // fix turn lalu
+  return pathname.startsWith(href);
+}
 
 function getCachedUser() {
   if (typeof window === "undefined") return null;
@@ -201,6 +239,24 @@ const Icons = {
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
+  // ── Missions category icons ──────────────────────────────────────────────────
+  missionDashboard: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  missionProgress: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  missionHistory: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" />
+      <polyline points="12 8 12 12 15 14" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -245,11 +301,19 @@ const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
 const ITEM_ANTRIAN_MASUK: MenuItem = {
   name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
 };
-// ── Missions item (semua role kecuali PKL) ────────────────────────────────────
 const ITEM_MISSIONS: MenuItem = {
   name: "Misi Pekerjaan",
   href: "/dashboard/missions",
   icon: Icons.missions,
+};
+
+const MISSIONS_MENU: MenuGroup = {
+  label: "Misi Pekerjaan",
+  items: [
+    { name: "Dashboard Misi", href: "/dashboard/missions", icon: Icons.missionDashboard },
+    { name: "Progress Misi", href: "/dashboard/missions/progress", icon: Icons.missionProgress },
+    { name: "Riwayat Misi", href: "/dashboard/missions/history", icon: Icons.missionHistory },
+  ],
 };
 
 // ── Preparation groups (UNION dari kedua versi; dedupe by href otomatis di mergeMenuGroups) ──
@@ -841,6 +905,18 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_KONTEN: PKL_MENU,
 };
 
+const MISSION_HREFS = new Set(MISSIONS_MENU.items.map((i) => i.href));
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  ROLE_MENUS[role] = ROLE_MENUS[role]
+    .map((g) => ({ ...g, items: g.items.filter((it) => !MISSION_HREFS.has(it.href)) }))
+    .filter((g) => g.items.length > 0);
+
+  if (!isPKLRole(role)) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], MISSIONS_MENU];
+  }
+});
+
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
@@ -900,25 +976,45 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-// ── NavItem dengan badge support ──────────────────────────────────────────────
-function NavItem({ item, isActive, onClick, badge }: {
-  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number;
+function NavItem({ item, isActive, onClick, badge, rail }: {
+  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean;
 }) {
   return (
     <Link
       href={item.href}
       onClick={onClick}
-      className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${isActive
-        ? "bg-[#1a1a2e] text-white shadow-sm"
-        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+      title={rail ? item.name : undefined}
+      className={`group relative flex items-center rounded-xl text-sm font-medium outline-none
+        transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30
+        ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"}
+        ${isActive
+          ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
+          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
         }`}
     >
-      <span className={`flex-shrink-0 ${isActive ? "text-white/70" : "text-gray-400 group-hover:text-gray-600"}`}>
+      {!rail && (
+        <span
+          className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white
+            transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`}
+        />
+      )}
+
+      <span
+        className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
+          ${isActive ? (rail ? "text-white" : "text-white/80") : "text-gray-400 group-hover:text-gray-600"}`}
+      >
         {item.icon}
       </span>
-      <span className="flex-1 truncate">{item.name}</span>
+
+      {!rail && <span className="flex-1 truncate">{item.name}</span>}
+
       {badge && badge > 0 ? (
-        <span className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white"}`}>
+        <span
+          style={{ animation: "solitBadgePop 0.3s ease-out both" }}
+          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums
+            ${rail ? "absolute top-0.5 right-1" : "ml-auto"}
+            ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+        >
           {badge > 99 ? "99+" : badge}
         </span>
       ) : null}
@@ -926,13 +1022,16 @@ function NavItem({ item, isActive, onClick, badge }: {
   );
 }
 
-function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, badges }: {
+function SidebarContent({
+  user, loading, groups, pathname, onClose, onLogout, badges,
+  rail, onToggleRail, openMap, onToggleGroup,
+}: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
-  onClose?: () => void; onLogout: () => void;
-  badges?: Record<string, number>;
+  onClose?: () => void; onLogout: () => void; badges?: Record<string, number>;
+  rail?: boolean; onToggleRail?: () => void;
+  openMap: Record<string, boolean>; onToggleGroup: (label: string) => void;
 }) {
   const initials = user?.name ? getInitials(user.name) : "?";
-
   const navRef = useRef<HTMLElement>(null);
   const scrollKey = `sidebar_scroll_${onClose ? "m" : "d"}`;
 
@@ -941,9 +1040,7 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
-    if (saved) {
-      requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });
-    }
+    if (saved) requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });
   }, [loading, scrollKey]);
 
   const handleNavScroll = useCallback(() => {
@@ -953,10 +1050,9 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-
       {/* ── Logo + User ── */}
-      <div className="px-4 pt-5 pb-4 flex-shrink-0">
-        <div className="flex items-center justify-between mb-5">
+      <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
+        <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
               <img
@@ -966,8 +1062,22 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
                 onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
-            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
+            {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
           </div>
+
+          {/* Rail toggle (desktop only) */}
+          {onToggleRail && !rail && (
+            <button
+              onClick={onToggleRail}
+              className="hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+              title="Perkecil sidebar" aria-label="Perkecil sidebar"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" />
+              </svg>
+            </button>
+          )}
+
           {onClose && (
             <button
               onClick={onClose}
@@ -982,11 +1092,22 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
         </div>
 
         {loading || !user ? (
-          <div className="flex items-center gap-3">
+          <div className={`flex items-center gap-3 ${rail ? "justify-center" : ""}`}>
             <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
-            <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
-              <div className="h-2.5 w-14 bg-gray-100 rounded animate-pulse" />
+            {!rail && (
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+                <div className="h-2.5 w-14 bg-gray-100 rounded animate-pulse" />
+              </div>
+            )}
+          </div>
+        ) : rail ? (
+          <div className="flex justify-center">
+            <div
+              className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold"
+              title={user?.name || ""}
+            >
+              {initials}
             </div>
           </div>
         ) : (
@@ -1002,91 +1123,138 @@ function SidebarContent({ user, loading, groups, pathname, onClose, onLogout, ba
         )}
       </div>
 
-      <div className="mx-4 h-px bg-gray-100 flex-shrink-0" />
+      {/* Expand button saat rail */}
+      {rail && onToggleRail && (
+        <button
+          onClick={onToggleRail}
+          className="hidden lg:flex mx-auto mb-2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+          title="Perbesar sidebar" aria-label="Perbesar sidebar"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+            <polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" />
+          </svg>
+        </button>
+      )}
+
+      <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
       {/* ── Nav ── */}
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
-        className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-3"
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"}`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
       >
         {loading ? (
           <div className="space-y-1 pt-1">
             {[1, 2, 3, 4].map(i => (
-              <div
-                key={i}
-                className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
-                style={{ animationDelay: `${i * 40}ms` }}
-              />
+              <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1" style={{ animationDelay: `${i * 40}ms` }} />
             ))}
           </div>
-        ) : (
-          groups.map(group => (
-            <div key={group.label}>
-              <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.07em] px-3 mb-1">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map(item => {
-                  const isActive = (() => {
-                    if (pathname === item.href) return true;
-                    if (item.href === "/dashboard") return false;
-                    if (item.href === "/dashboard/attendance") {
-                      return pathname === "/dashboard/attendance";
-                    }
-                    if (item.href === "/dashboard/preparation") {
-                      return pathname === "/dashboard/preparation" ||
-                        (pathname.startsWith("/dashboard/preparation/") &&
-                          !pathname.startsWith("/dashboard/preparation/antrian") &&
-                          !pathname.startsWith("/dashboard/preparation/done") &&
-                          !pathname.startsWith("/dashboard/preparation/history") &&
-                          !pathname.startsWith("/dashboard/preparation/pengantaran") &&
-                          !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
-                          !pathname.startsWith("/dashboard/preparation/siap-kirim"));
-                    }
-                    if (item.href === "/dashboard/laptops") {
-                      return (
-                        pathname === "/dashboard/laptops" ||
-                        (pathname.startsWith("/dashboard/laptops/") &&
-                          !pathname.startsWith("/dashboard/laptops/ready") &&
-                          !pathname.startsWith("/dashboard/laptops/minus"))
-                      );
-                    }
-                    if (item.href.startsWith("/dashboard/service/")) {
-                      return pathname === item.href;
-                    }
-                    return pathname.startsWith(item.href);
-                  })();
-
-                  return (
-                    <NavItem
-                      key={item.href}
-                      item={item}
-                      isActive={isActive}
-                      onClick={onClose}
-                      badge={badges?.[item.href]}
-                    />
-                  );
-                })}
-              </div>
+        ) : rail ? (
+          // ── Mode rail: icon-only, flat, dengan divider antar grup ──
+          groups.map((group, gi) => (
+            <div key={group.label} className="space-y-0.5">
+              {group.items.map(item => (
+                <NavItem
+                  key={item.href}
+                  item={item}
+                  isActive={isItemActive(item.href, pathname)}
+                  onClick={onClose}
+                  badge={badges?.[item.href]}
+                  rail
+                />
+              ))}
+              {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
             </div>
           ))
+        ) : (
+          // ── Mode normal: accordion kategori ──
+          groups.map((group, gi) => {
+            const isOpen = openMap[group.label] ?? true;
+            const hasActive = group.items.some(it => isItemActive(it.href, pathname));
+            return (
+              <div
+                key={group.label}
+                style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}
+              >
+                <button
+                  onClick={() => onToggleGroup(group.label)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat"
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
+                    ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
+                    {group.label}
+                  </span>
+                  {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
+                  <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                    className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0"
+                    style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Accordion body — animasi height pakai grid-rows trick */}
+                <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
+                  <div className="overflow-hidden min-h-0">
+                    <div className="space-y-0.5">
+                      {group.items.map(item => (
+                        <NavItem
+                          key={item.href}
+                          item={item}
+                          isActive={isItemActive(item.href, pathname)}
+                          onClick={onClose}
+                          badge={badges?.[item.href]}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </nav>
 
       {/* ── Logout ── */}
-      <div className="p-3 pb-5 border-t border-gray-100 flex-shrink-0">
+      <div className={`pb-5 border-t border-gray-100 flex-shrink-0 ${rail ? "p-2" : "p-3"}`}>
         <button
           onClick={onLogout}
-          className="w-full group flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+          title={rail ? "Keluar" : undefined}
+          className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all
+            ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}
         >
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
-          <span>Keluar</span>
+          {!rail && <span>Keluar</span>}
         </button>
       </div>
     </div>
   );
+}
+
+function dedupeGroups(groups: MenuGroup[]): MenuGroup[] {
+  const byLabel = new Map<string, MenuGroup>();
+
+  for (const group of groups) {
+    const existing = byLabel.get(group.label);
+
+    if (!existing) {
+      byLabel.set(group.label, { label: group.label, items: [...group.items] });
+      continue;
+    }
+
+    const seen = new Set(existing.items.map((it) => it.href));
+    for (const item of group.items) {
+      if (!seen.has(item.href)) {
+        existing.items.push(item);
+        seen.add(item.href);
+      }
+    }
+  }
+
+  return Array.from(byLabel.values());
 }
 
 export default function Sidebar() {
@@ -1096,15 +1264,25 @@ export default function Sidebar() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
-  const [mounted, setMounted] = useState(false);
+
+  // ── Rail (minimize) + width (resize) ──
+  const [rail, setRail] = useState(false);
+  const [width, setWidth] = useState(DEFAULT_W);
+  const [dragging, setDragging] = useState(false);
+  const widthRef = useRef(DEFAULT_W);
+  useEffect(() => { widthRef.current = width; }, [width]);
+
+  // ── Accordion open state (shared mobile & desktop) ──
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setMounted(true);
     const cached = getCachedUser();
-    if (cached) {
-      setUser(cached);
-      setLoading(false);
-    }
+    if (cached) { setUser(cached); setLoading(false); }
+    try {
+      setRail(localStorage.getItem(RAIL_KEY) === "1");
+      const w = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
+      if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -1131,19 +1309,85 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  // ✅ Multi-role: ambil semua roles, merge menu
+  // Multi-role → merge menu
   const userRoles: string[] =
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
-      : user?.role
-        ? [user.role]
-        : [];
+      : user?.role ? [user.role] : [];
 
   const groups: MenuGroup[] = userRoles.length > 0
-    ? mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles)
+    ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, userRoles))
     : [];
 
-  // ✅ Prep notify + alarm
+  const groupsSig = groups.map(g => g.label).join("|");
+
+  // Init open state per role: default buka kategori yg berisi route aktif, sisanya tutup
+  useEffect(() => {
+    if (groups.length === 0) return;
+    let saved: Record<string, boolean> | null = null;
+    try { saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null"); } catch { }
+    setOpenMap(() => {
+      const next: Record<string, boolean> = {};
+      for (const g of groups) {
+        next[g.label] = saved && Object.prototype.hasOwnProperty.call(saved, g.label)
+          ? saved[g.label]
+          : g.items.some(it => isItemActive(it.href, pathname));
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupsSig]);
+
+  // Saat navigasi: pastikan kategori aktif kebuka (tanpa nutup yg lain)
+  useEffect(() => {
+    const active = groups.find(g => g.items.some(it => isItemActive(it.href, pathname)));
+    if (!active) return;
+    setOpenMap(prev => (prev[active.label] ? prev : { ...prev, [active.label]: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, groupsSig]);
+
+  const toggleGroup = useCallback((label: string) => {
+    setOpenMap(prev => {
+      const next = { ...prev, [label]: !(prev[label] ?? true) };
+      try { sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next)); } catch { }
+      return next;
+    });
+  }, []);
+
+  const toggleRail = useCallback(() => {
+    setRail(v => {
+      const n = !v;
+      try { localStorage.setItem(RAIL_KEY, n ? "1" : "0"); } catch { }
+      return n;
+    });
+  }, []);
+
+  // ── Resize drag (desktop) ──
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setDragging(true);
+    const startX = e.clientX;
+    const startW = widthRef.current;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(MAX_W, Math.max(MIN_W, startW + (ev.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      setDragging(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      try { localStorage.setItem(WIDTH_KEY, String(widthRef.current)); } catch { }
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+
+  // Prep notify + alarm
   const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
@@ -1158,7 +1402,6 @@ export default function Sidebar() {
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
 
-  // ✅ Delivery badge + badge antrian/siap-kirim
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
@@ -1166,10 +1409,29 @@ export default function Sidebar() {
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
   };
 
-  void mounted;
+  const sharedContentProps = {
+    user, loading, groups, pathname, onLogout: handleLogout, badges,
+    openMap, onToggleGroup: toggleGroup,
+  };
 
   return (
     <>
+      <style>{`
+        @keyframes solitNavIn {
+          from { opacity: 0; transform: translateX(-8px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes solitGroupIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes solitBadgePop {
+          0%   { transform: scale(0.6); opacity: 0; }
+          60%  { transform: scale(1.15); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+
       {/* ── Banner alarm global ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
@@ -1197,16 +1459,14 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Mobile toggle button */}
+      {/* Mobile toggle */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
         aria-label="Buka menu"
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
 
@@ -1217,22 +1477,30 @@ export default function Sidebar() {
         aria-hidden="true"
       />
 
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar (drawer — tanpa rail/resize) */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-56 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-250 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <SidebarContent
-          user={user} loading={loading} groups={groups} pathname={pathname}
-          onClose={() => setOpen(false)} onLogout={handleLogout} badges={badges}
-        />
+        <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-56 xl:w-60 bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
-        <SidebarContent
-          user={user} loading={loading} groups={groups} pathname={pathname}
-          onLogout={handleLogout} badges={badges}
-        />
+      {/* Desktop sidebar (rail + resizable) */}
+      <aside
+        style={{ width: rail ? RAIL_W : width, transition: dragging ? "none" : "width 0.2s ease-out" }}
+        className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
+      >
+        <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
+
+        {/* Handle resize */}
+        {!rail && (
+          <div
+            onMouseDown={startResize}
+            className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize group/resize"
+            title="Geser untuk ubah lebar"
+          >
+            <div className="mx-auto h-full w-px bg-transparent group-hover/resize:bg-[#1a1a2e]/30 transition-colors" />
+          </div>
+        )}
       </aside>
     </>
   );
