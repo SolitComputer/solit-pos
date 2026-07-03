@@ -17,10 +17,10 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       pickup_date, pickup_time, pickup_location,
     } = body;
 
-    if (!unit_id)        return NextResponse.json({ success: false, message: "unit_id wajib" }, { status: 400 });
-    if (!type)           return NextResponse.json({ success: false, message: "type wajib (RESERVED/HELD)" }, { status: 400 });
-    if (!customer_name)  return NextResponse.json({ success: false, message: "customer_name wajib" }, { status: 400 });
-    if (!deal_price)     return NextResponse.json({ success: false, message: "deal_price wajib" }, { status: 400 });
+    if (!unit_id) return NextResponse.json({ success: false, message: "unit_id wajib" }, { status: 400 });
+    if (!type) return NextResponse.json({ success: false, message: "type wajib (RESERVED/HELD)" }, { status: 400 });
+    if (!customer_name) return NextResponse.json({ success: false, message: "customer_name wajib" }, { status: 400 });
+    if (!deal_price) return NextResponse.json({ success: false, message: "deal_price wajib" }, { status: 400 });
     if (type === "RESERVED" && !dp_amount) {
       return NextResponse.json({ success: false, message: "dp_amount wajib untuk DP" }, { status: 400 });
     }
@@ -48,7 +48,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
 
     // ── 3. Hitung gross profit (untuk referensi, bukan final)  ─────────────
     const inventory_price = Number(unit.purchase_price) || 0;
-    const gross_profit    = Number(deal_price) - inventory_price;
+    const gross_profit = Number(deal_price) - inventory_price;
 
     // ── 4. Insert transaction dengan status RESERVED / HELD ───────────────
     const txStatus = type; // "RESERVED" atau "HELD"
@@ -115,7 +115,19 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .eq("id", unit_id);
 
     if (unitUpdateErr) {
-      console.error("[reserve] unit update error:", unitUpdateErr.message);
+      await supabaseAdmin
+        .from("transactions")
+        .delete()
+        .eq("invoice_number", invoice_number);
+
+      console.error("[reserve] unit update GAGAL — rollback tx:", unitUpdateErr.message);
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Gagal mengunci unit: ${unitUpdateErr.message}`,
+        },
+        { status: 500 }
+      );
     }
 
     // ── 6. Update qty laptop (RESERVED/HELD tidak dikurangi qty) ──────────
