@@ -87,84 +87,125 @@ function SummarySkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       {Array(5).fill(0).map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
-          <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
-          <div className="h-6 bg-gray-200 rounded w-28" />
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-gray-100 rounded-xl" />
+            <div className="h-3 bg-gray-100 rounded w-16" />
+          </div>
+          <div className="h-7 bg-gray-100 rounded w-24 mb-1" />
+          <div className="h-2 bg-gray-50 rounded w-12" />
         </div>
       ))}
     </div>
   );
 }
 
-function ChartSkeleton() {
+function StatCard({
+  label, value, sub, icon, rank,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ReactNode;
+  rank?: number;
+}) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
-      <div className="h-4 bg-gray-200 rounded w-32 mb-4" />
-      <div className="h-[200px] bg-gray-100 rounded-xl" />
-    </div>
-  );
-}
+    <div className="report-stat-card bg-white rounded-2xl border border-gray-100 p-5 relative overflow-hidden group hover:border-gray-200 transition-all duration-200">
+      {/* Subtle corner accent */}
+      <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-[40px] bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200" />
 
-function StatCard({ label, value, color, bg, border, bar, icon }: any) {
-  return (
-    <div className={`bg-white rounded-2xl border ${border} shadow-sm hover:shadow-md transition-all duration-300 p-4 relative overflow-hidden group`}>
-      <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{label}</p>
-          <p className={`text-base font-extrabold mt-1 tracking-tight ${color} group-hover:scale-105 transition-transform origin-left break-words`}>
-            {value}
-          </p>
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center text-base group-hover:bg-gray-100 transition-colors duration-200 border border-gray-100">
+            {icon}
+          </div>
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
         </div>
-        <div className={`p-2 rounded-xl ${bg} opacity-60 group-hover:opacity-100 transition-opacity flex-shrink-0`}>
-          {icon}
-        </div>
+        <p className="text-xl font-bold text-gray-800 tracking-tight leading-none">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
       </div>
+
+      {rank !== undefined && (
+        <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-300">
+          #{rank}
+        </div>
+      )}
     </div>
   );
 }
 
-function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
+function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
+  title: string;
+  icon: string;
+  items: RankItem[];
+  color: string;
+  revenueKey?: string;
+}) {
   if (!items || items.length === 0) return null;
 
+  const medals = ["🥇", "🥈", "🥉"];
+  const maxVal = items[0]?.[revenueKey as keyof RankItem] as number ?? 1;
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <div className={`w-6 h-6 rounded-lg ${color} flex items-center justify-center`}>
-          <span className="text-sm">{icon}</span>
-        </div>
-        <h2 className="font-bold text-gray-800 text-sm">{title}</h2>
-      </div>
-      <div className="space-y-3">
-        {items.slice(0, 8).map((item: any, i: number) => (
-          <div key={item.name} className="group">
-            <div className="flex items-center gap-2">
-              <div className="w-6 text-center flex-shrink-0">
-                {i === 0 && <span className="text-lg">🥇</span>}
-                {i === 1 && <span className="text-lg">🥈</span>}
-                {i === 2 && <span className="text-lg">🥉</span>}
-                {i > 2 && (
-                  <span className="text-xs font-semibold text-gray-400 bg-gray-100 w-5 h-5 rounded-full flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-700 truncate flex-1 font-medium group-hover:text-gray-900 transition">
-                {item.name}
-              </p>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs font-bold text-gray-800">{fmtShort(item[revenueKey])}</p>
-                <p className="text-[10px] text-gray-400">{item.count}x</p>
-              </div>
-            </div>
-            <div className="ml-7 mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gray-600 rounded-full transition-all duration-500 group-hover:opacity-80"
-                style={{ width: `${Math.round((item[revenueKey] / items[0][revenueKey]) * 100)}%` }}
-              />
-            </div>
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-all duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-xl ${color} flex items-center justify-center text-sm border border-gray-100`}>
+            {icon}
           </div>
-        ))}
+          <span className="font-bold text-gray-800 text-sm">{title}</span>
+        </div>
+        <span className="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+          Top {Math.min(items.length, 8)}
+        </span>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-2.5">
+        {items.slice(0, 8).map((item: any, i: number) => {
+          const pct = Math.round((item[revenueKey] / maxVal) * 100);
+          return (
+            <div key={item.name} className="group/item">
+              <div className="flex items-center gap-3 mb-1.5">
+                {/* Rank badge */}
+                <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
+                  {i < 3 ? (
+                    <span className="text-base leading-none">{medals[i]}</span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-gray-400 w-5 h-5 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100">
+                      {i + 1}
+                    </span>
+                  )}
+                </div>
+
+                {/* Name */}
+                <p className="text-xs text-gray-700 truncate flex-1 font-medium">
+                  {item.name}
+                </p>
+
+                {/* Stats */}
+                <div className="text-right flex-shrink-0 flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md border border-gray-100">
+                    {item.count}x
+                  </span>
+                  <span className="text-xs font-bold text-gray-800">{fmtShort(item[revenueKey])}</span>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="ml-9 h-1 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${pct}%`,
+                    background: i === 0 ? "#374151" : i === 1 ? "#6B7280" : "#9CA3AF",
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -172,16 +213,30 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: any) {
 
 function EmptyState() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center animate-fadeIn">
-      <div className="text-7xl mb-4 animate-bounce">📊</div>
-      <p className="text-gray-500 font-semibold text-base">Belum ada data</p>
-      <p className="text-gray-400 text-sm mt-2">Pilih periode dan klik tombol Tampilkan</p>
-      <div className="mt-4 flex justify-center">
-        <div className="w-16 h-1 bg-gray-300 rounded-full" />
+    <div className="bg-white rounded-2xl border border-gray-100 py-24 text-center">
+      <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-100">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+          <line x1="2" y1="20" x2="22" y2="20" />
+        </svg>
       </div>
+      <p className="text-gray-700 font-semibold text-sm">Belum ada data</p>
+      <p className="text-gray-400 text-xs mt-1">Pilih periode dan klik tombol Tampilkan</p>
     </div>
   );
 }
+
+const PRESETS = [
+  { id: "today", label: "Hari ini" },
+  { id: "yesterday", label: "Kemarin" },
+  { id: "this_week", label: "Minggu ini" },
+  { id: "this_month", label: "Bulan ini" },
+  { id: "last_month", label: "Bulan lalu" },
+  { id: "last_30", label: "30 hari" },
+  { id: "this_year", label: "Tahun ini" },
+];
 
 export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState(() => getPreset("this_month").from);
@@ -196,8 +251,6 @@ export default function ReportsPage() {
   const [topLaptop, setTopLaptop] = useState<RankItem[]>([]);
   const [topSource, setTopSource] = useState<RankItem[]>([]);
 
-  // ✅ FIX: Terima optional params supaya applyPreset bisa pass nilai baru
-  // langsung tanpa tunggu React commit state (stale closure problem)
   const fetchReport = async (from?: string, to?: string, group?: string) => {
     const f = from ?? dateFrom;
     const t = to ?? dateTo;
@@ -223,7 +276,6 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchReport(); }, []);
 
-  // ✅ FIX: Pass nilai baru langsung ke fetchReport, tidak tunggu setState settle
   const applyPreset = (preset: string) => {
     const { from, to } = getPreset(preset);
     setDateFrom(from);
@@ -248,14 +300,14 @@ export default function ReportsPage() {
       {
         label: "Omzet",
         data: trendRevenue,
-        borderColor: "#4B5563",
-        backgroundColor: "rgba(75,85,99,0.06)",
-        borderWidth: 2.5,
+        borderColor: "#374151",
+        backgroundColor: "rgba(55,65,81,0.05)",
+        borderWidth: 2,
         fill: true,
         tension: 0.4,
         pointRadius: trendLabels.length > 30 ? 0 : 4,
         pointHoverRadius: 6,
-        pointBackgroundColor: "#4B5563",
+        pointBackgroundColor: "#374151",
         pointBorderColor: "#fff",
         pointBorderWidth: 2,
       },
@@ -263,8 +315,8 @@ export default function ReportsPage() {
         label: "Profit",
         data: trendProfit,
         borderColor: "#9CA3AF",
-        backgroundColor: "rgba(156,163,175,0.06)",
-        borderWidth: 2,
+        backgroundColor: "rgba(156,163,175,0.04)",
+        borderWidth: 1.5,
         fill: true,
         tension: 0.4,
         pointRadius: trendLabels.length > 30 ? 0 : 3,
@@ -282,12 +334,12 @@ export default function ReportsPage() {
     datasets: [{
       label: "Transaksi",
       data: trendTrx,
-      backgroundColor: "#3B82F6",
-      borderRadius: 8,
+      backgroundColor: "rgba(55,65,81,0.75)",
+      borderRadius: 6,
       borderSkipped: false as const,
-      hoverBackgroundColor: "#2563EB",
-      barPercentage: 0.45,
-      categoryPercentage: 0.65,
+      hoverBackgroundColor: "#111827",
+      barPercentage: 0.5,
+      categoryPercentage: 0.7,
     }],
   };
 
@@ -297,19 +349,27 @@ export default function ReportsPage() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(0,0,0,0.8)",
-        titleColor: "#fff",
-        bodyColor: "#e5e7eb",
-        padding: 8,
-        cornerRadius: 8,
+        backgroundColor: "#111827",
+        titleColor: "#F9FAFB",
+        bodyColor: "#D1D5DB",
+        padding: 10,
+        cornerRadius: 10,
         callbacks: {
           label: (context: any) => `${context.dataset.label}: ${fmtShort(context.raw)}`,
         },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af", maxRotation: 45 } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, ticks: { font: { size: 10 }, color: "#9ca3af", callback: (v: any) => fmtShort(v) } },
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { font: { size: 10 }, color: "#9ca3af", maxRotation: 45 },
+      },
+      y: {
+        grid: { color: "rgba(0,0,0,.04)" },
+        border: { display: false },
+        ticks: { font: { size: 10 }, color: "#9ca3af", callback: (v: any) => fmtShort(v) },
+      },
     },
   } as const;
 
@@ -319,10 +379,10 @@ export default function ReportsPage() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(59, 130, 246, 0.95)",
-        titleColor: "#fff",
-        bodyColor: "#fff",
-        cornerRadius: 8,
+        backgroundColor: "#111827",
+        titleColor: "#F9FAFB",
+        bodyColor: "#D1D5DB",
+        cornerRadius: 10,
         padding: 10,
         callbacks: {
           label: (c: any) => `${c.raw} transaksi`,
@@ -332,144 +392,115 @@ export default function ReportsPage() {
     scales: {
       x: {
         grid: { display: false },
-        ticks: {
-          font: { size: 10 },
-          color: "#9CA3AF",
-          maxRotation: 0,
-        },
+        border: { display: false },
+        ticks: { font: { size: 10 }, color: "#9CA3AF", maxRotation: 0 },
       },
       y: {
-        grid: {
-          color: "rgba(156, 163, 175, 0.25)",
-          drawBorder: false,
-          lineWidth: 1.2,
-        },
-        ticks: {
-          font: { size: 10 },
-          color: "#9CA3AF",
-          stepSize: 1,
-        },
+        grid: { color: "rgba(156,163,175,0.15)" },
+        border: { display: false },
+        ticks: { font: { size: 10 }, color: "#9CA3AF", stepSize: 1 },
         beginAtZero: true,
       },
     },
   } as const;
 
-  const PRESETS = [
-    { id: "today", label: "Hari ini", icon: "📅" },
-    { id: "yesterday", label: "Kemarin", icon: "📆" },
-    { id: "this_week", label: "Minggu ini", icon: "📊" },
-    { id: "this_month", label: "Bulan ini", icon: "📈" },
-    { id: "last_month", label: "Bulan lalu", icon: "📉" },
-    { id: "last_30", label: "30 hari", icon: "🗓️" },
-    { id: "this_year", label: "Tahun ini", icon: "🎯" },
-  ];
+  const activePresetLabel = PRESETS.find(p => p.id === activePreset)?.label;
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
 
-        {/* Header */}
-        <div className="animate-fadeIn">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
-                <div className="w-7 h-7 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center shadow-md">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <line x1="18" y1="20" x2="18" y2="10" />
-                    <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="14" />
-                    <line x1="2" y1="20" x2="22" y2="20" />
-                  </svg>
-                </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
-                  Laporan Keuangan
-                </h1>
+        {/* ── PAGE HEADER ── */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                  <line x1="2" y1="20" x2="22" y2="20" />
+                </svg>
               </div>
-              <p className="text-sm text-gray-500 ml-10">Omzet, profit, dan analisis transaksi</p>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 leading-none">Laporan Keuangan</h1>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {activePresetLabel ? activePresetLabel : `${dateFrom} – ${dateTo}`}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => fetchReport()}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 bg-white shadow-sm group"
+          </div>
+
+          <button
+            onClick={() => fetchReport()}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all bg-white"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              <svg className={`w-4 h-4 transition-transform group-hover:rotate-180 ${isLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {isLoading ? "Memuat..." : "Refresh"}
-            </button>
-          </div>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isLoading ? "Memuat..." : "Refresh"}
+          </button>
         </div>
 
-        {/* Filter Panel */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-          <div className="p-5 space-y-4">
-            {/* Preset buttons */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <span>⚡</span> Periode Cepat
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {PRESETS.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => applyPreset(p.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${activePreset === p.id
-                      ? "bg-gray-700 text-white shadow-md transform scale-105"
-                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                      }`}
-                  >
-                    <span>{p.icon}</span>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Date range + group by + apply */}
-            <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-gray-100">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Dari Tanggal</label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setActivePreset(""); }}
-                  className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sampai Tanggal</label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setActivePreset(""); }}
-                  className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Kelompokkan Per</label>
-                <select
-                  value={groupBy}
-                  onChange={e => setGroupBy(e.target.value)}
-                  className="h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition-all duration-200 cursor-pointer"
-                >
-                  <option value="day">📅 Hari</option>
-                  <option value="week">📆 Minggu</option>
-                  <option value="month">🗓️ Bulan</option>
-                </select>
-              </div>
+        {/* ── FILTER PANEL ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          {/* Preset chips */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {PRESETS.map(p => (
               <button
-                onClick={() => fetchReport()}
-                disabled={isLoading}
-                className="h-10 px-6 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg transform hover:scale-105"
+                key={p.id}
+                onClick={() => applyPreset(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                  activePreset === p.id
+                    ? "bg-gray-800 text-white"
+                    : "bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 border border-gray-100"
+                }`}
               >
-                Tampilkan
+                {p.label}
               </button>
+            ))}
+          </div>
+
+          {/* Date range row */}
+          <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Dari</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => { setDateFrom(e.target.value); setActivePreset(""); }}
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sampai</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => { setDateTo(e.target.value); setActivePreset(""); }}
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Kelompok</label>
+              <select
+                value={groupBy}
+                onChange={e => setGroupBy(e.target.value)}
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all cursor-pointer"
+              >
+                <option value="day">Per Hari</option>
+                <option value="week">Per Minggu</option>
+                <option value="month">Per Bulan</option>
+              </select>
             </div>
           </div>
         </div>
-
-        {/* Summary Cards */}
+        {/* ── SUMMARY CARDS ── */}
         {isLoading ? (
           <SummarySkeleton />
         ) : summary ? (
@@ -477,120 +508,109 @@ export default function ReportsPage() {
             <StatCard
               label="Total Omzet"
               value={fmtRupiah(summary.totalRevenue)}
-              color="text-gray-700"
-              bg="bg-gray-50"
-              border="border-gray-100"
-              bar="bg-gray-600"
-              icon={<span className="text-lg">💰</span>}
+              sub="Periode terpilih"
+              icon={<span className="text-sm">💰</span>}
+              rank={1}
             />
             <StatCard
               label="Total Profit"
               value={fmtRupiah(summary.totalProfit)}
-              color="text-gray-700"
-              bg="bg-gray-50"
-              border="border-gray-100"
-              bar="bg-gray-600"
-              icon={<span className="text-lg">📈</span>}
+              sub={`Margin ${summary.profitMargin}%`}
+              icon={<span className="text-sm">📈</span>}
             />
             <StatCard
-              label="Total Transaksi"
+              label="Transaksi"
               value={`${summary.totalTrx} trx`}
-              color="text-gray-700"
-              bg="bg-gray-50"
-              border="border-gray-100"
-              bar="bg-gray-600"
-              icon={<span className="text-lg">🛒</span>}
+              sub="Total deal"
+              icon={<span className="text-sm">🛒</span>}
             />
             <StatCard
               label="Rata-rata Deal"
               value={fmtRupiah(summary.avgDeal)}
-              color="text-gray-700"
-              bg="bg-gray-50"
-              border="border-gray-100"
-              bar="bg-gray-600"
-              icon={<span className="text-lg">💵</span>}
+              sub="Per transaksi"
+              icon={<span className="text-sm">💵</span>}
             />
             <StatCard
               label="Margin Profit"
               value={`${summary.profitMargin}%`}
-              color="text-gray-700"
-              bg="bg-gray-50"
-              border="border-gray-100"
-              bar="bg-gray-600"
-              icon={<span className="text-lg">📊</span>}
+              sub="Profit / omzet"
+              icon={<span className="text-sm">📊</span>}
             />
           </div>
         ) : null}
 
-        {/* Charts Section */}
+        {/* ── CHARTS ── */}
         {trend.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Trend Omzet & Profit */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5 lg:col-span-2">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                  <span className="w-1 h-4 bg-gray-600 rounded-full" />
-                  Tren Omzet & Profit
-                </h2>
-                <div className="flex gap-3">
-                  <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    <span className="w-5 h-0.5 bg-gray-600 inline-block rounded-full" /> Omzet
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    <span className="w-5 h-0.5 bg-gray-400 inline-block rounded-full" /> Profit
-                  </span>
+            {/* Line chart */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 lg:col-span-2">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="font-bold text-gray-800 text-sm">Tren Omzet & Profit</h2>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {activePresetLabel ?? `${dateFrom} – ${dateTo}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-0.5 bg-gray-700 inline-block rounded-full" />
+                    <span className="text-[10px] text-gray-400 font-medium">Omzet</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 h-[1px] bg-gray-400 inline-block rounded-full" style={{ borderTop: "1.5px dashed #9CA3AF", background: "none", display: "inline-block" }} />
+                    <span className="text-[10px] text-gray-400 font-medium">Profit</span>
+                  </div>
                 </div>
               </div>
-              <div style={{ height: 250 }}>
+              <div style={{ height: 240 }}>
                 <Line data={lineData} options={chartOpts} />
               </div>
             </div>
 
-            {/* Bar Transaksi */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-                  <span className="w-1 h-4 bg-blue-500 rounded-full" />
-                  Jumlah Transaksi
-                </h2>
-                <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  Total: {trend.reduce((sum, t) => sum + t.trxCount, 0)} transaksi
+            {/* Bar chart */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="font-bold text-gray-800 text-sm">Jumlah Transaksi</h2>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Per periode</p>
+                </div>
+                <span className="text-[10px] font-bold text-gray-500 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-lg">
+                  {trend.reduce((sum, t) => sum + t.trxCount, 0)} total
                 </span>
               </div>
-              <div style={{ height: 250 }}>
+              <div style={{ height: 240 }}>
                 <Bar data={barData} options={barOpts} />
               </div>
             </div>
           </div>
         )}
 
-        {/* Top Lists */}
+        {/* ── RANKING LISTS ── */}
         {(topSales.length > 0 || topLaptop.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <RankList title="Top Sales" icon="🏆" items={topSales} color="bg-gray-100" revenueKey="revenue" />
-            <RankList title="Laptop Terlaris" icon="💻" items={topLaptop} color="bg-gray-100" revenueKey="revenue" />
-            <RankList title="Sumber Penjualan" icon="📱" items={topSource} color="bg-gray-100" revenueKey="revenue" />
+            <RankList title="Top Sales" icon="🏆" items={topSales} color="bg-gray-50" revenueKey="revenue" />
+            <RankList title="Laptop Terlaris" icon="💻" items={topLaptop} color="bg-gray-50" revenueKey="revenue" />
+            <RankList title="Sumber Penjualan" icon="📱" items={topSource} color="bg-gray-50" revenueKey="revenue" />
           </div>
         )}
 
-        {/* Empty state */}
+        {/* ── EMPTY STATE ── */}
         {!isLoading && !summary && <EmptyState />}
 
       </div>
 
       <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
+        .report-stat-card {
+          transition: box-shadow 0.15s ease, border-color 0.15s ease;
         }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
+        .report-stat-card:hover {
+          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
         }
-        .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
-        .animate-bounce { animation: bounce 1s ease-in-out infinite; }
-        .animate-spin { animation: spin 0.6s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin { animation: spin 0.7s linear infinite; }
       `}</style>
     </DashboardLayout>
   );
