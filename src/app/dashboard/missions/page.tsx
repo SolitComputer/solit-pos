@@ -104,6 +104,16 @@ function fmtDateShort(iso: string | null) {
   if (!iso) return "-";
   return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const ymdLocal = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const dateKeyOf = (iso: string | null) => (iso ? ymdLocal(new Date(iso)) : null);
+const fmtDayLabel = (key: string) =>
+  new Date(`${key}T00:00:00`).toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+
+const ID_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const ID_DOW = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+type DateBasis = "created" | "due";
 function timeAgo(iso: string | null) {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -271,7 +281,7 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
         {mission.due_date && (
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
             style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
-                           : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
+              : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
             ⏰ Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
           </span>
         )}
@@ -400,12 +410,151 @@ function MissionCard({ m, view, onOpen }: { m: Mission; view: Box; onOpen: () =>
         {m.due_date && (
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
             style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
-                           : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
+              : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
             ⏰ {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
           </span>
         )}
       </div>
     </button>
+  );
+}
+
+function MissionCalendar({
+  missions, basis, selectedDate, onSelectDate, onBasisChange,
+}: {
+  missions: Mission[];
+  basis: DateBasis;
+  selectedDate: string | null;
+  onSelectDate: (d: string | null) => void;
+  onBasisChange: (b: DateBasis) => void;
+}) {
+  const today = ymdLocal(new Date());
+  const [cursor, setCursor] = useState(() => {
+    const base = selectedDate ? new Date(`${selectedDate}T00:00:00`) : new Date();
+    return { y: base.getFullYear(), m: base.getMonth() };
+  });
+
+  // agregasi jumlah misi per tanggal (sesuai basis)
+  const countByDate = useMemo(() => {
+    const map = new Map<string, { total: number; overdue: number; done: number }>();
+    for (const m of missions) {
+      const iso = basis === "due" ? m.due_date : m.created_at;
+      const key = dateKeyOf(iso);
+      if (!key) continue;
+      const cur = map.get(key) ?? { total: 0, overdue: 0, done: 0 };
+      cur.total += 1;
+      if (m.status === "APPROVED") cur.done += 1;
+      else if (m.due_date && new Date(m.due_date).getTime() < Date.now()) cur.overdue += 1;
+      map.set(key, cur);
+    }
+    return map;
+  }, [missions, basis]);
+
+  const cells = useMemo(() => {
+    const startDow = new Date(cursor.y, cursor.m, 1).getDay(); // 0 = Minggu
+    const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
+    const arr: ({ key: string; day: number } | null)[] = [];
+    for (let i = 0; i < startDow; i++) arr.push(null);
+    for (let d = 1; d <= daysInMonth; d++) arr.push({ key: `${cursor.y}-${pad2(cursor.m + 1)}-${pad2(d)}`, day: d });
+    while (arr.length % 7 !== 0) arr.push(null);
+    return arr;
+  }, [cursor]);
+
+  const monthPrefix = `${cursor.y}-${pad2(cursor.m + 1)}`;
+  const monthTotal = useMemo(() => {
+    let c = 0;
+    for (const [k, v] of countByDate) if (k.startsWith(monthPrefix)) c += v.total;
+    return c;
+  }, [countByDate, monthPrefix]);
+
+  const prevMonth = () => setCursor(c => { const d = new Date(c.y, c.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const nextMonth = () => setCursor(c => { const d = new Date(c.y, c.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const goToday = () => { const n = new Date(); setCursor({ y: n.getFullYear(), m: n.getMonth() }); onSelectDate(today); };
+
+  const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition text-lg font-bold";
+
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+      {/* Header bulan */}
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+        <div className="flex items-center gap-1.5">
+          <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya">‹</button>
+          <div className="text-center min-w-[128px]">
+            <p className="text-sm font-black text-slate-800 leading-tight">{ID_MONTHS[cursor.m]} {cursor.y}</p>
+            <p className="text-[10px] text-slate-400">{monthTotal} misi</p>
+          </div>
+          <button onClick={nextMonth} className={navBtn} aria-label="Bulan berikutnya">›</button>
+        </div>
+        <button onClick={goToday}
+          className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition active:scale-95"
+          style={{ background: "linear-gradient(135deg,#0f0c29,#1a1545)", color: "#fff" }}>
+          Hari Ini
+        </button>
+      </div>
+
+      {/* Toggle basis + clear */}
+      <div className="px-3 pt-3 flex items-center gap-1.5">
+        {([{ k: "created", label: "🗓️ Dibuat" }, { k: "due", label: "⏰ Tenggat" }] as { k: DateBasis; label: string }[]).map(b => {
+          const active = basis === b.k;
+          return (
+            <button key={b.k} onClick={() => onBasisChange(b.k)}
+              className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition"
+              style={active ? { background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" }
+                : { background: "#f8fafc", color: "#94a3b8", border: "1px solid #eef2f7" }}>
+              {b.label}
+            </button>
+          );
+        })}
+        {selectedDate && (
+          <button onClick={() => onSelectDate(null)}
+            className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition"
+            style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
+            Semua Tanggal ✕
+          </button>
+        )}
+      </div>
+
+      {/* Grid tanggal */}
+      <div className="p-3">
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {ID_DOW.map(d => <div key={d} className="text-center text-[10px] font-bold text-slate-400 py-1">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((cell, i) => {
+            if (!cell) return <div key={`e${i}`} />;
+            const info = countByDate.get(cell.key);
+            const isToday = cell.key === today;
+            const isSelected = cell.key === selectedDate;
+            const hasOverdue = (info?.overdue ?? 0) > 0;
+
+            return (
+              <button key={cell.key} type="button"
+                onClick={() => onSelectDate(isSelected ? null : cell.key)}
+                className="relative min-h-[42px] rounded-xl flex flex-col items-center justify-center gap-0.5 transition active:scale-95"
+                style={
+                  isSelected
+                    ? { background: "linear-gradient(135deg,#0f0c29,#1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                    : isToday
+                      ? { background: "#f5f3ff", border: "1.5px solid #c4b5fd", color: "#5b21b6" }
+                      : { background: info ? "#fafbff" : "transparent", border: "1px solid #f1f5f9", color: "#475569" }
+                }>
+                <span className="text-sm font-bold leading-none">{cell.day}</span>
+                {info && (
+                  <span className="text-[9px] font-black leading-none px-1 py-px rounded-full"
+                    style={
+                      isSelected ? { background: "rgba(255,255,255,0.25)", color: "#fff" }
+                        : hasOverdue ? { background: "#fee2e2", color: "#dc2626" }
+                          : { background: "#ede9fe", color: "#7c3aed" }
+                    }>
+                    {info.total}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -507,7 +656,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                     onClick={() => setAssignedTo(prev => (prev === u.id ? "" : u.id))}
                     className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all active:scale-[0.99] border"
                     style={active ? { background: "#f5f3ff", borderColor: "#c4b5fd", boxShadow: "0 0 0 1.5px #ddd6fe" }
-                                  : { background: "#f8fafc", borderColor: "#eef2f7" }}>
+                      : { background: "#f8fafc", borderColor: "#eef2f7" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-black flex-shrink-0"
                       style={{ background: active ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "linear-gradient(135deg,#cbd5e1,#94a3b8)" }}>
                       {initials(u.name)}
@@ -742,7 +891,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
 
   const proofNote =
     mission.status === "PENDING" ? "Belum dikerjakan penerima" :
-    mission.status === "IN_PROGRESS" ? "Sedang dikerjakan — belum ada bukti" : "Belum ada bukti";
+      mission.status === "IN_PROGRESS" ? "Sedang dikerjakan — belum ada bukti" : "Belum ada bukti";
 
   return (
     <ModalShell onClose={onClose}>
@@ -896,6 +1045,8 @@ export default function MissionsPage() {
   const mineRoles = useMemo(() => new Set(roles), [roles]);
 
   const [box, setBox] = useState<Box>("received");
+  const [dateBasis, setDateBasis] = useState<DateBasis>("created");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showStructure, setShowStructure] = useState(false);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -922,9 +1073,11 @@ export default function MissionsPage() {
 
   useEffect(() => { if (user) fetchMissions(box); /* eslint-disable-next-line */ }, [box, user]);
 
+  useEffect(() => { setSelectedDate(null); }, [box]);
+
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
+      Notification.requestPermission().catch(() => { });
     }
   }, []);
 
@@ -948,7 +1101,7 @@ export default function MissionsPage() {
           const t = payload.new?.title ?? "Misi baru";
           showToast("🎯 Misi baru masuk untukmu!", "ok");
           notifyBrowser("🎯 Misi Baru", t);
-          try { navigator.vibrate?.(200); } catch {}
+          try { navigator.vibrate?.(200); } catch { }
           fetchMissions(box, true);
         })
       .on("postgres_changes",
@@ -966,7 +1119,7 @@ export default function MissionsPage() {
           if (st === "SUBMITTED") {
             showToast("📤 Ada misi menunggu ACC", "ok");
             notifyBrowser("📤 Misi Disubmit", `${t} menunggu persetujuan`);
-            try { navigator.vibrate?.(200); } catch {}
+            try { navigator.vibrate?.(200); } catch { }
           }
           fetchMissions(box, true);
         })
@@ -993,6 +1146,14 @@ export default function MissionsPage() {
     review: missions.filter(m => m.status === "SUBMITTED").length,
     done: missions.filter(m => m.status === "APPROVED").length,
   }), [missions]);
+
+  const filteredMissions = useMemo(() => {
+    if (!selectedDate) return missions;
+    return missions.filter(m => {
+      const iso = dateBasis === "due" ? m.due_date : m.created_at;
+      return dateKeyOf(iso) === selectedDate;
+    });
+  }, [missions, selectedDate, dateBasis]);
 
   if (!user) return <DashboardLayout><PageSkeleton /></DashboardLayout>;
 
@@ -1068,7 +1229,7 @@ export default function MissionsPage() {
                 <button key={t.key} onClick={t.onClick}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
                   style={t.active ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                                  : { background: "#f5f7ff", color: "#64748b" }}>
+                    : { background: "#f5f7ff", color: "#64748b" }}>
                   <span>{t.emoji}</span><span>{t.label}</span>
                 </button>
               ))}
@@ -1099,25 +1260,67 @@ export default function MissionsPage() {
                 <span>💡 <b>Finance</b> & <b>Masak</b> belum jadi role sistem — untuk sekarang tugas Finance dijalankan lewat akun Akses Penuh (Admin/Asisten CEO).</span>
               </div>
             </div>
-          ) : loading ? (
-            <div className="space-y-3">{Array(4).fill(0).map((_, i) => <CardSkeleton key={i} />)}</div>
-          ) : missions.length === 0 ? (
-            <div className="bg-white rounded-2xl text-center py-16" style={{ border: "1px solid #f0f0f8" }}>
-              <div className="text-4xl mb-3">🗒️</div>
-              <p className="text-sm font-bold text-slate-600">
-                {box === "received" ? "Belum ada misi untukmu" : "Belum ada misi yang kamu berikan"}
-              </p>
-              <p className="text-xs mt-1 text-slate-400">
-                {box === "received" ? "Tugas dari atasan akan muncul di sini" : "Klik \"Beri Misi\" untuk mulai menugaskan"}
-              </p>
-            </div>
           ) : (
-            <div className="space-y-3">
-              {missions.map(m => (
-                <MissionCard key={m.id} m={m} view={box}
-                  onOpen={() => setDetail({ m, mode: box === "assigned" ? "reviewer" : "assignee" })} />
-              ))}
-            </div>
+            <>
+              {/* Kalender filter */}
+              <MissionCalendar
+                missions={missions}
+                basis={dateBasis}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onBasisChange={setDateBasis}
+              />
+
+              {/* Banner tanggal terpilih */}
+              {selectedDate && (
+                <div className="flex items-center gap-3 rounded-2xl px-4 py-3"
+                  style={{ background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", border: "1px solid #ddd6fe" }}>
+                  <span className="text-xl">📌</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-violet-800">{fmtDayLabel(selectedDate)}</p>
+                    <p className="text-[11px] text-violet-500">
+                      {filteredMissions.length} misi · basis {dateBasis === "due" ? "tenggat" : "dibuat"}
+                    </p>
+                  </div>
+                  <button onClick={() => setSelectedDate(null)}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white text-violet-600 border border-violet-200 hover:bg-violet-50 transition flex-shrink-0">
+                    Reset
+                  </button>
+                </div>
+              )}
+
+              {loading ? (
+                <div className="space-y-3">{Array(4).fill(0).map((_, i) => <CardSkeleton key={i} />)}</div>
+              ) : filteredMissions.length === 0 ? (
+                <div className="bg-white rounded-2xl text-center py-16" style={{ border: "1px solid #f0f0f8" }}>
+                  <div className="text-4xl mb-3">🗒️</div>
+                  {selectedDate ? (
+                    <>
+                      <p className="text-sm font-bold text-slate-600">Tidak ada misi pada tanggal ini</p>
+                      <button onClick={() => setSelectedDate(null)} className="text-xs mt-2 font-bold text-violet-600 hover:underline">
+                        Lihat semua misi
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-slate-600">
+                        {box === "received" ? "Belum ada misi untukmu" : "Belum ada misi yang kamu berikan"}
+                      </p>
+                      <p className="text-xs mt-1 text-slate-400">
+                        {box === "received" ? "Tugas dari atasan akan muncul di sini" : "Klik \"Beri Misi\" untuk mulai menugaskan"}
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredMissions.map(m => (
+                    <MissionCard key={m.id} m={m} view={box}
+                      onOpen={() => setDetail({ m, mode: box === "assigned" ? "reviewer" : "assignee" })} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

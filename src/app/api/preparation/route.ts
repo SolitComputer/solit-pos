@@ -36,22 +36,63 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const url = new URL(req.url);
     const status = url.searchParams.get("status") ?? "ALL";
     const search = url.searchParams.get("search")?.trim() ?? "";
+    const from = url.searchParams.get("from");          
+    const to = url.searchParams.get("to");               
+    const pageParam = url.searchParams.get("page");
+    const limitParam = url.searchParams.get("limit");
+
+    const paginated = pageParam !== null || limitParam !== null;
+    const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam ?? "20", 10) || 20));
+
+    let snIds: string[] = [];
+    if (search) {
+      const { data: snRows } = await supabase
+        .from("preparation_items")
+        .select("preparation_id")
+        .ilike("serial_number", `%${search}%`)
+        .limit(500);
+      snIds = [...new Set((snRows ?? []).map((r: any) => r.preparation_id))];
+    }
 
     let query = supabase
       .from("preparation_orders")
-      .select(`*, preparation_items ( id, serial_number, laptop_name, is_checked, check_note )`)
+      .select(
+        `*, preparation_items ( id, serial_number, laptop_name, is_checked, check_note )`,
+        { count: "exact" }
+      )
       .order("created_at", { ascending: false });
 
     if (status !== "ALL") query = query.eq("status", status);
+    if (from) query = query.gte("created_at", from);
+    if (to) query = query.lt("created_at", to);
+
     if (search) {
-      query = query.or(
-        `order_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%`
-      );
+      const s = search.replace(/[%,()]/g, " ").trim();
+      const ors = [
+        `order_number.ilike.%${s}%`,
+        `customer_name.ilike.%${s}%`,
+        `customer_phone.ilike.%${s}%`,
+      ];
+      if (snIds.length > 0) ors.push(`id.in.(${snIds.join(",")})`);
+      query = query.or(ors.join(","));
     }
 
-    const { data, error } = await query;
+    if (paginated) {
+      const start = (page - 1) * limit;
+      query = query.range(start, start + limit - 1);
+    }
+
+    const { data, error, count } = await query;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
-    return NextResponse.json({ success: true, data: data ?? [] });
+
+    return NextResponse.json({
+      success: true,
+      data: data ?? [],
+      total: count ?? (data?.length ?? 0),
+      page: paginated ? page : 1,
+      limit: paginated ? limit : (data?.length ?? 0),
+    });
   } catch (err) {
     console.error("[GET /api/preparation]", err);
     return NextResponse.json({ success: false, message: "Gagal mengambil data" }, { status: 500 });
