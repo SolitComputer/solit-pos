@@ -73,6 +73,38 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ─── Date helpers ──────────────────────────────────────────────────────────────
+function getDateKey(iso: string): string {
+    return new Date(iso).toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+}
+
+function formatDateLabel(iso: string): string {
+    const msgDate = new Date(
+        new Date(iso).toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
+    );
+    const today = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
+    );
+
+    // Strip time — hanya bandingkan tanggal
+    const msgDay = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate());
+    const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const diffMs = todayDay.getTime() - msgDay.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Hari ini";
+    if (diffDays === 1) return "Kemarin";
+
+    // Lebih dari 2 hari → tampilkan tanggal lengkap
+    return msgDate.toLocaleDateString("id-ID", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: msgDate.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
+    });
+}
+
 // ─── UserAvatar ───────────────────────────────────────────────────────────────
 function UserAvatar({ name, role, size = 28 }: { name: string; role: string; size?: number }) {
     const color = getRoleColor(role);
@@ -155,6 +187,27 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
                 {size != null && <p className={`text-[9px] mt-0.5 ${isMine ? "text-white/50" : "text-gray-400"}`}>{formatFileSize(size)}</p>}
             </div>
         </a>
+    );
+}
+
+// ─── DateSeparator ─────────────────────────────────────────────────────────────
+function DateSeparator({ label }: { label: string }) {
+    return (
+        <div className="flex items-center gap-2 py-1 select-none">
+            <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.06)" }} />
+            <span
+                className="text-[9.5px] font-semibold px-2.5 py-0.5 rounded-full"
+                style={{
+                    background: "rgba(99,102,241,0.08)",
+                    color: "#6366f1",
+                    border: "1px solid rgba(99,102,241,0.12)",
+                    letterSpacing: "0.02em",
+                }}
+            >
+                {label}
+            </span>
+            <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.06)" }} />
+        </div>
     );
 }
 
@@ -513,11 +566,35 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                         <div className="text-3xl opacity-20">💬</div>
                         <p className="text-[11px] text-gray-400">Mulai percakapan!</p>
                     </div>
-                ) : messages.map(msg => (
-                    <MessageItem key={msg.id} msg={msg}
-                        isMine={msg.sender_id === currentUser.id}
-                        onEdit={editMessage} onDelete={deleteMessage} />
-                ))}
+                ) : (() => {
+                    const elements: React.ReactNode[] = [];
+                    let lastDateKey = "";
+
+                    messages.forEach((msg) => {
+                        const dateKey = getDateKey(msg.created_at);
+
+                        if (dateKey !== lastDateKey) {
+                            elements.push(
+                                <DateSeparator
+                                    key={`sep-${dateKey}`}
+                                    label={formatDateLabel(msg.created_at)}
+                                />
+                            );
+                            lastDateKey = dateKey;
+                        }
+
+                        elements.push(
+                            <MessageItem
+                                key={msg.id}
+                                msg={msg}
+                                isMine={msg.sender_id === currentUser.id}
+                                onEdit={editMessage}
+                                onDelete={deleteMessage}
+                            />
+                        );
+                    });
+                    return elements;
+                })()}
                 <div ref={bottomRef} />
             </div>
 
