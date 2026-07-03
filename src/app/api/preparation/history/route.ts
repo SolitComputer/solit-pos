@@ -39,20 +39,24 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
 
-    let query = admin
+   let query = admin
       .from("preparation_orders")
       .select(`id, order_number, customer_name, delivery_user_id, delivery_user_name,
                delivery_method, delivery_address, status,
                delivery_started_at, delivered_at, return_started_at, returned_at,
                delivery_distance_m, delivery_duration_s`)
       .eq("delivery_method", "PENGANTARAN")
-      .not("delivery_started_at", "is", null)
-      .order("delivery_started_at", { ascending: false })
+      // ⛔ dulu: .not("delivery_started_at", "is", null) — ini buang order force-complete
+      // ✅ sekarang: cukup yang sudah jalan ATAU sudah selesai (delivered_at keisi)
+      .or("delivery_started_at.not.is.null,delivered_at.not.is.null")
+      .order("delivered_at", { ascending: false, nullsFirst: false })
       .limit(300);
 
-    if (from) query = query.gte("delivery_started_at", from);
-    if (to) query = query.lte("delivery_started_at", to);
-
+    // Anchor rentang tanggal ke delivered_at (selalu terisi saat order kelar,
+    // termasuk hasil force-complete). Order yang masih BERLANGSUNG (delivered_at null)
+    // tetap ikut karena lolos .or() di atas & tak terpotong filter tanggal delivered_at.
+    if (from) query = query.or(`delivered_at.gte.${from},and(delivered_at.is.null,delivery_started_at.gte.${from})`);
+    if (to)   query = query.or(`delivered_at.lte.${to},and(delivered_at.is.null,delivery_started_at.lte.${to})`);
     const { data: ordersRaw, error } = await query;
     if (error) throw error;
     const orders = (ordersRaw ?? []) as OrderRow[];

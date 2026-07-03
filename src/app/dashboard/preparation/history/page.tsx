@@ -57,7 +57,13 @@ export default function PreparationHistoryPage() {
       if (toIso) qs.set("to", toIso);
       const res = await fetch(`/api/preparation/history?${qs.toString()}`);
       const r = await res.json();
-      setTrips(r.success ? r.trips : []);
+      const list: Trip[] = r.success ? r.trips : [];
+      list.sort((a, b) => {
+        const av = a.delivered_at ? new Date(a.delivered_at).getTime() : Infinity; // berlangsung = paling atas
+        const bv = b.delivered_at ? new Date(b.delivered_at).getTime() : Infinity;
+        return bv - av;
+      });
+      setTrips(list);
     } catch { setTrips([]); } finally { setIsLoading(false); }
   }, [from, to]);
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
