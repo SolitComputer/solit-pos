@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { LAPTOP_DELETE_ROLES } from "@/lib/permissions";
+
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -140,7 +142,4 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
 export const GET = withAuth(getHandler);
 export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
-export const DELETE = withAuth(deleteHandler, [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
-]);
+export const DELETE = withAuth(deleteHandler, LAPTOP_DELETE_ROLES);

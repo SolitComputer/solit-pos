@@ -30,7 +30,8 @@ const ALL_ROLES = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  "PKL_PENGANTARAN",   // ← NEW
+  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",      // ← NEW
+  "PKL_PENGELOLA_BARANG",
   "CUSTOMER_SERVICE",
 ];
 
@@ -46,7 +47,8 @@ const ROLE_LABEL: Record<string, string> = {
   PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
   PKL_ONPOINT: "PKL Onpoint", PKL_TEKNISI: "PKL Teknisi", PKL_KONTEN: "PKL Content Creator",
-  PKL_PENGANTARAN: "PKL Pengantaran", CUSTOMER_SERVICE: "Customer Service",
+  PKL_PENGANTARAN: "PKL Pengantaran", CUSTOMER_SERVICE: "Customer Service", PKL_CUSTOMER_SERVICE: "PKL Customer Service",     // ← NEW
+  PKL_PENGELOLA_BARANG: "PKL Pengelola Barang",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -60,7 +62,8 @@ const ROLE_ICON: Record<string, string> = {
   PKL: "🎓", PKL_MARKETING: "🎓", PKL_SALES: "🎓",
   PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
   PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
-  CUSTOMER_SERVICE: "🎧",
+  CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",     // ← NEW
+  PKL_PENGELOLA_BARANG: "🎓",
 };
 
 const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
@@ -92,6 +95,8 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE, PKL_PENGANTARAN: PKL_BADGE,
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
   KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  PKL_CUSTOMER_SERVICE: PKL_BADGE,     // ← NEW
+  PKL_PENGELOLA_BARANG: PKL_BADGE,
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -107,7 +112,8 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309",
   PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
   PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
-  CUSTOMER_SERVICE: "#0369a1",
+  CUSTOMER_SERVICE: "#0369a1", PKL_CUSTOMER_SERVICE: "#b45309",     // ← NEW
+  PKL_PENGELOLA_BARANG: "#b45309",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -120,6 +126,8 @@ const PKL_ROLE_SET = new Set([
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   "PKL_PENGANTARAN",
+  "PKL_CUSTOMER_SERVICE",
+  "PKL_PENGELOLA_BARANG",
 ]);
 function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 
@@ -188,7 +196,9 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
       <optgroup label="— Magang (PKL) —">
         {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
           "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-          "PKL_PENGANTARAN"
+          "PKL_PENGANTARAN",
+          "PKL_CUSTOMER_SERVICE",     
+          "PKL_PENGELOLA_BARANG",     
         ].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
@@ -737,7 +747,7 @@ export default function UsersPage() {
     return activeTab === "pkl"
       ? ["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
         "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-        "PKL_PENGANTARAN"]  
+        "PKL_PENGANTARAN"]
       : ALL_ROLES.filter(r => !isPKLRole(r));
   }, [activeTab]);
 

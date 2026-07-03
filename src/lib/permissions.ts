@@ -28,6 +28,8 @@ export type UserRole =
   | "PKL_TEKNISI"
   | "PKL_KONTEN"
   | "PKL_PENGANTARAN"
+  | "PKL_CUSTOMER_SERVICE"    
+  | "PKL_PENGELOLA_BARANG"    
   | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
@@ -44,6 +46,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   TEKNISI: "/dashboard/service/antrian",
   KEPALA_TEKNISI: "/dashboard/service/antrian",
   PENGANTARAN: "/dashboard/preparation/pengantaran",
+  PKL_CUSTOMER_SERVICE: "/dashboard/service/antrian",     
+  PKL_PENGELOLA_BARANG: "/dashboard/laptops",
   MARKETING: "/dashboard/laptops",
   KEBERSIHAN: "/dashboard",
   KEPALA_MARKETING: "/dashboard",
@@ -78,7 +82,8 @@ const ALL_ROLES: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  "PKL_PENGANTARAN",   
+  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",   
+  "PKL_PENGELOLA_BARANG",
   "CUSTOMER_SERVICE",
 ];
 
@@ -480,25 +485,55 @@ export function hasPermission(
   return (allowed as UserRole[]).includes(role);
 }
 
-// ─── Division management ──────────────────────────────────────────────────────
 export const DIVISION_MAP: Record<string, UserRole[]> = {
-  KEPALA_TEKNISI: ["TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE", "PENGELOLA_BARANG"],
-  KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],  // ← NEW
+  KEPALA_TEKNISI: [
+    "TEKNISI", "PKL_TEKNISI",
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",     // ← NEW
+    "PENGELOLA_BARANG",
+  ],
+  KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
   KEPALA_MARKETING: ["KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
   KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
-  KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "TEKNISI", "PKL_TEKNISI", "CUSTOMER_SERVICE"],
+  KEPALA_PENGELOLA_BARANG: [
+    "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",     // ← NEW
+    "TEKNISI", "PKL_TEKNISI",
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",     // ← NEW (dual, sesuai request)
+  ],
   ADMIN: ["PENGELOLA_BARANG"],
 };
-
 export const PKL_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  "PKL_PENGANTARAN",   // ← NEW
+  "PKL_PENGANTARAN",
+  "PKL_CUSTOMER_SERVICE",    
+  "PKL_PENGELOLA_BARANG",    
 ];
 
 export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
+
+export const LAPTOP_VIEW_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "ACCOUNTING", "PENGANTARAN",
+  "MARKETING", "KEPALA_MARKETING",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "KEPALA_ONPOINT", "ONPOINT",
+  "KEPALA_TEKNISI", "TEKNISI",
+  "PKL", "CUSTOMER_SERVICE",
+];
+
+export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
+  ...LAPTOP_VIEW_ROLES,  
+];
+
+export const LAPTOP_DELETE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_TEKNISI",
+];
 
 // ─── PKL → Parent Role Mapping ────────────────────────────────────────────────
 /**
@@ -515,7 +550,9 @@ export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
   PKL_ONPOINT: "ONPOINT",
   PKL_TEKNISI: "TEKNISI",
   PKL_KONTEN: "KONTEN",
-  PKL_PENGANTARAN: "PENGANTARAN",  
+  PKL_PENGANTARAN: "PENGANTARAN",
+  PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",   
+  PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",   
 };
 
 /** Ambil parent role dari PKL variant. Return null kalau bukan PKL bervariant. */
