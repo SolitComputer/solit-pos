@@ -88,4 +88,4 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
 
 export const GET = withAuth(getHandler, PERMISSIONS.VIEW_UNITS);
-export const POST = withAuth(postHandler, PERMISSIONS.CREATE_LAPTOP);
+export const POST = withAuth(postHandler, PERMISSIONS.CREATE_UNITS);
