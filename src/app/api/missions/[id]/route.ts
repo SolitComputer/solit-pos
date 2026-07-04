@@ -124,16 +124,46 @@ async function deleteHandler(_req: NextRequest, ctx: any, user: AuthUser) {
   const roles = user.roles ?? [user.role];
 
   const { data: mission, error: fetchErr } = await supabaseAdmin
-    .from("missions").select("assigned_by").eq("id", id).maybeSingle();
+    .from("missions")
+    .select("assigned_by, assigned_to, status, title")
+    .eq("id", id)
+    .maybeSingle();
+
   if (fetchErr) return NextResponse.json({ success: false, message: fetchErr.message }, { status: 500 });
   if (!mission) return NextResponse.json({ success: false, message: "Misi tidak ditemukan" }, { status: 404 });
 
+  // Hanya pemberi misi atau full access yang boleh hapus
   const canDelete = isMissionFullAccess(roles) || mission.assigned_by === user.id;
-  if (!canDelete) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!canDelete) {
+    return NextResponse.json(
+      { success: false, message: "Kamu tidak berwenang menghapus misi ini" },
+      { status: 403 }
+    );
+  }
+
+  // Guard: misi APPROVED = arsip, hanya full access yang boleh hapus
+  if (mission.status === "APPROVED" && !isMissionFullAccess(roles)) {
+    return NextResponse.json(
+      { success: false, message: "Misi yang sudah disetujui menjadi arsip dan tidak bisa dihapus. Hubungi admin." },
+      { status: 400 }
+    );
+  }
+
+  // Hapus mission_items dulu (jaga-jaga kalau CASCADE belum di-set di DB)
+  const { error: itemsErr } = await supabaseAdmin
+    .from("mission_items").delete().eq("mission_id", id);
+  if (itemsErr) {
+    console.error("[missions DELETE items]", itemsErr);
+    // Non-fatal — lanjut hapus mission, karena kalau CASCADE aktif error ini normal
+  }
 
   const { error } = await supabaseAdmin.from("missions").delete().eq("id", id);
-  if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  if (error) {
+    console.error("[missions DELETE]", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, message: "Misi berhasil dihapus" });
 }
 
 export const GET = withAuth(getHandler);

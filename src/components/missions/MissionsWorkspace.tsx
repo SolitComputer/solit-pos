@@ -1,5 +1,5 @@
 "use client";
-// src/app/dashboard/missions/page.tsx
+// src/components/missions/MissionsWorkspace.tsx
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -378,54 +378,99 @@ function ChecklistBlock({ mission, interactive, togglingId, onToggle }: {
     );
 }
 
-// ── Mission card (dengan tanggal jelas) ───────────────────────────────────────
-function MissionCard({ m, view, onOpen }: { m: Mission; view: Box; onOpen: () => void }) {
+// ── Mission card (dengan quick delete untuk pemberi) ──────────────────────────
+function MissionCard({
+    m, view, onOpen, onQuickDelete,
+}: {
+    m: Mission;
+    view: Box;
+    onOpen: () => void;
+    onQuickDelete?: (m: Mission) => void;
+}) {
     const otherName = view === "received" ? (m.assigner?.name ?? "—") : (m.assignee?.name ?? "—");
     const otherLabel = view === "received" ? "Dari" : "Untuk";
     const overdue = isOverdue(m);
     const { done, total, percent } = missionProgress(m.items);
+
+    // Quick delete hanya muncul di box "assigned" dan status masih awal (belum submit bukti)
+    const showQuickDelete =
+        view === "assigned" &&
+        !!onQuickDelete &&
+        (m.status === "PENDING" || m.status === "IN_PROGRESS" || m.status === "REJECTED");
+
     return (
-        <button onClick={onOpen} className="w-full text-left bg-white rounded-2xl p-4 transition-all hover:shadow-md active:scale-[0.995]"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div className="flex items-start justify-between gap-3 mb-2">
-                <p className="text-sm font-bold text-slate-800 line-clamp-2">{m.title}</p>
-                <StatusBadge status={m.status} />
-            </div>
-            {m.description && <p className="text-xs text-slate-500 line-clamp-2 mb-2.5">{m.description}</p>}
-
-            {total > 0 && (
-                <div className="mb-2.5">
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9.5px] font-bold tracking-wide" style={{ color: "#94a3b8" }}>CHECKLIST {done}/{total}</span>
-                        <span className="text-[9.5px] font-black" style={{ color: percent === 100 ? "#059669" : "#6366f1" }}>{percent}%</span>
-                    </div>
-                    <ProgressBar percent={percent} thin />
+        <div className="relative">
+            <button
+                onClick={onOpen}
+                className="w-full text-left bg-white rounded-2xl p-4 transition-all hover:shadow-md active:scale-[0.995]"
+                style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
+            >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className={`text-sm font-bold text-slate-800 line-clamp-2 ${showQuickDelete ? "pr-9" : ""}`}>{m.title}</p>
+                    <StatusBadge status={m.status} />
                 </div>
-            )}
+                {m.description && <p className="text-xs text-slate-500 line-clamp-2 mb-2.5">{m.description}</p>}
 
-            <div className="flex items-center gap-2 flex-wrap">
-                <PriorityBadge priority={m.priority} />
-                <span className="text-[10px] text-slate-400 font-medium">
-                    {otherLabel}: <span className="text-slate-600 font-semibold">{otherName}</span>
-                </span>
-            </div>
-
-            {/* ── Tanggal ── */}
-            <div className="flex items-center gap-2 flex-wrap mt-2.5 pt-2.5" style={{ borderTop: "1px dashed #eef2f7" }}>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                    🗓️ Dibuat {fmtDateShort(m.created_at)}
-                </span>
-                <span className="text-[9.5px] text-slate-400">{timeAgo(m.created_at)}</span>
-                {m.due_date && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
-                        style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
-                            : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                        ⏰ {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
-                    </span>
+                {total > 0 && (
+                    <div className="mb-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-[9.5px] font-bold tracking-wide" style={{ color: "#94a3b8" }}>CHECKLIST {done}/{total}</span>
+                            <span className="text-[9.5px] font-black" style={{ color: percent === 100 ? "#059669" : "#6366f1" }}>{percent}%</span>
+                        </div>
+                        <ProgressBar percent={percent} thin />
+                    </div>
                 )}
-            </div>
-        </button>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    <PriorityBadge priority={m.priority} />
+                    <span className="text-[10px] text-slate-400 font-medium">
+                        {otherLabel}: <span className="text-slate-600 font-semibold">{otherName}</span>
+                    </span>
+                </div>
+
+                {/* ── Tanggal ── */}
+                <div className="flex items-center gap-2 flex-wrap mt-2.5 pt-2.5" style={{ borderTop: "1px dashed #eef2f7" }}>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                        🗓️ Dibuat {fmtDateShort(m.created_at)}
+                    </span>
+                    <span className="text-[9.5px] text-slate-400">{timeAgo(m.created_at)}</span>
+                    {m.due_date && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
+                            style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
+                                : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
+                            ⏰ {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
+                        </span>
+                    )}
+                </div>
+            </button>
+
+            {/* Quick delete floating button */}
+            {showQuickDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onQuickDelete?.(m);
+                    }}
+                    title="Hapus misi ini"
+                    aria-label="Hapus misi"
+                    className="absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-10"
+                    style={{
+                        background: "#fff1f2",
+                        border: "1px solid #fecdd3",
+                        color: "#dc2626",
+                        boxShadow: "0 2px 6px rgba(220,38,38,0.15)",
+                    }}
+                >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
+                    </svg>
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -444,7 +489,6 @@ function MissionCalendar({
         return { y: base.getFullYear(), m: base.getMonth() };
     });
 
-    // agregasi jumlah misi per tanggal (sesuai basis)
     const countByDate = useMemo(() => {
         const map = new Map<string, { total: number; overdue: number; done: number }>();
         for (const m of missions) {
@@ -461,7 +505,7 @@ function MissionCalendar({
     }, [missions, basis]);
 
     const cells = useMemo(() => {
-        const startDow = new Date(cursor.y, cursor.m, 1).getDay(); // 0 = Minggu
+        const startDow = new Date(cursor.y, cursor.m, 1).getDay();
         const daysInMonth = new Date(cursor.y, cursor.m + 1, 0).getDate();
         const arr: ({ key: string; day: number } | null)[] = [];
         for (let i = 0; i < startDow; i++) arr.push(null);
@@ -485,7 +529,6 @@ function MissionCalendar({
 
     return (
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            {/* Header bulan */}
             <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
                 <div className="flex items-center gap-1.5">
                     <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya">‹</button>
@@ -502,7 +545,6 @@ function MissionCalendar({
                 </button>
             </div>
 
-            {/* Toggle basis + clear */}
             <div className="px-3 pt-3 flex items-center gap-1.5">
                 {([{ k: "created", label: "🗓️ Dibuat" }, { k: "due", label: "⏰ Tenggat" }] as { k: DateBasis; label: string }[]).map(b => {
                     const active = basis === b.k;
@@ -524,7 +566,6 @@ function MissionCalendar({
                 )}
             </div>
 
-            {/* Grid tanggal */}
             <div className="p-3">
                 <div className="grid grid-cols-7 gap-1 mb-1">
                     {ID_DOW.map(d => <div key={d} className="text-center text-[10px] font-bold text-slate-400 py-1">{d}</div>)}
@@ -752,6 +793,73 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
     );
 }
 
+// ── Confirm delete modal (quick delete dari card) ─────────────────────────────
+function ConfirmDeleteModal({
+    mission, deleting, onCancel, onConfirm,
+}: {
+    mission: Mission;
+    deleting: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+}) {
+    return (
+        <ModalShell onClose={() => !deleting && onCancel()}>
+            <ModalHeader
+                title="Hapus Misi?"
+                subtitle="Aksi ini tidak bisa dibatalkan"
+                onClose={() => !deleting && onCancel()}
+                gradient="linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)"
+            />
+            <div className="p-6 space-y-4">
+                <div className="rounded-2xl p-4" style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}>
+                    <p className="text-sm font-black text-rose-700 mb-1">{mission.title}</p>
+                    <p className="text-xs text-rose-500">
+                        Untuk: <span className="font-semibold">{mission.assignee?.name ?? "—"}</span>
+                    </p>
+                    {mission.description && (
+                        <p className="text-xs text-rose-400 mt-1.5 line-clamp-2 italic">
+                            &ldquo;{mission.description}&rdquo;
+                        </p>
+                    )}
+                </div>
+
+                <div className="rounded-xl p-3 text-xs"
+                    style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e" }}>
+                    ⚠️ Misi & semua sub-tugas akan dihapus permanen dari sistem.
+                    {mission.status === "IN_PROGRESS" && (
+                        <p className="mt-1 font-semibold">Catatan: misi ini sedang dikerjakan penerima.</p>
+                    )}
+                    {mission.status === "REJECTED" && (
+                        <p className="mt-1 font-semibold">Catatan: misi ini sebelumnya ditolak dan sedang direvisi.</p>
+                    )}
+                </div>
+            </div>
+
+            <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+                <button
+                    onClick={onCancel}
+                    disabled={deleting}
+                    className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-50"
+                    style={{ background: "#f1f5f9", color: "#64748b" }}
+                >
+                    Batal
+                </button>
+                <button
+                    onClick={onConfirm}
+                    disabled={deleting}
+                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
+                    style={{
+                        background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+                        boxShadow: "0 4px 14px rgba(220,38,38,0.3)",
+                    }}
+                >
+                    {deleting ? "Menghapus..." : "🗑️ Ya, Hapus"}
+                </button>
+            </div>
+        </ModalShell>
+    );
+}
+
 // ── Detail: PENERIMA (assignee) ───────────────────────────────────────────────
 function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, showToast }: {
     mission: Mission; onClose: () => void; onChanged: () => void;
@@ -893,7 +1001,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
             const res = await fetch(`/api/missions/${mission.id}`, { method: "DELETE" });
             const data = await res.json();
             if (!data.success) { showToast(data.message ?? "Gagal menghapus", "err"); return; }
-            showToast("Misi dihapus", "ok");
+            showToast("Misi dihapus 🗑️", "ok");
             onChanged();
         } catch { showToast("Terjadi kesalahan", "err"); }
         finally { setBusy(false); }
@@ -1063,6 +1171,11 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
     const [showCreate, setShowCreate] = useState(false);
     const [detail, setDetail] = useState<{ m: Mission; mode: Perspective } | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+
+    // ── Quick delete state ──
+    const [confirmDelete, setConfirmDelete] = useState<Mission | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const router = useRouter();
     const iAmAdmin = hasFullAccess(roles);
@@ -1081,6 +1194,28 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
     const patchLocalMission = (updated: Mission) => {
         setMissions(prev => prev.map(m => m.id === updated.id ? updated : m));
         setDetail(prev => (prev && prev.m.id === updated.id ? { ...prev, m: updated } : prev));
+    };
+
+    // ── Handler quick delete ──
+    const handleQuickDelete = async () => {
+        if (!confirmDelete) return;
+        setDeleting(true);
+        try {
+            const res = await fetch(`/api/missions/${confirmDelete.id}`, { method: "DELETE" });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message ?? "Gagal menghapus misi", "err");
+                return;
+            }
+            // Optimistic: remove dari list lokal langsung
+            setMissions(prev => prev.filter(m => m.id !== confirmDelete.id));
+            showToast("Misi berhasil dihapus 🗑️", "ok");
+            setConfirmDelete(null);
+        } catch {
+            showToast("Terjadi kesalahan saat menghapus", "err");
+        } finally {
+            setDeleting(false);
+        }
     };
 
     useEffect(() => { if (user) fetchMissions(box); /* eslint-disable-next-line */ }, [box, user]);
@@ -1123,6 +1258,15 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     if (st === "APPROVED") { showToast("🎉 Misi kamu disetujui!", "ok"); notifyBrowser("🎉 Misi Disetujui", t); }
                     else if (st === "REJECTED") { showToast("❌ Misi kamu ditolak", "err"); notifyBrowser("❌ Misi Ditolak", t); }
                     fetchMissions(box, true);
+                })
+            .on("postgres_changes",
+                { event: "DELETE", schema: "public", table: "missions", filter: `assigned_to=eq.${uid}` },
+                (payload: any) => {
+                    const deletedId = payload.old?.id;
+                    if (deletedId) {
+                        setMissions(prev => prev.filter(m => m.id !== deletedId));
+                        showToast("Salah satu misimu dihapus oleh pemberi", "err");
+                    }
                 })
             .on("postgres_changes",
                 { event: "UPDATE", schema: "public", table: "missions", filter: `assigned_by=eq.${uid}` },
@@ -1197,6 +1341,14 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     onClose={() => setDetail(null)}
                     onChanged={() => { setDetail(null); fetchMissions(box); }}
                     showToast={showToast}
+                />
+            )}
+            {confirmDelete && (
+                <ConfirmDeleteModal
+                    mission={confirmDelete}
+                    deleting={deleting}
+                    onCancel={() => setConfirmDelete(null)}
+                    onConfirm={handleQuickDelete}
                 />
             )}
 
@@ -1334,8 +1486,13 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                             ) : (
                                 <div className="space-y-3">
                                     {filteredMissions.map(m => (
-                                        <MissionCard key={m.id} m={m} view={box}
-                                            onOpen={() => setDetail({ m, mode: box === "assigned" ? "reviewer" : "assignee" })} />
+                                        <MissionCard
+                                            key={m.id}
+                                            m={m}
+                                            view={box}
+                                            onOpen={() => setDetail({ m, mode: box === "assigned" ? "reviewer" : "assignee" })}
+                                            onQuickDelete={box === "assigned" ? (mission) => setConfirmDelete(mission) : undefined}
+                                        />
                                     ))}
                                 </div>
                             )}
