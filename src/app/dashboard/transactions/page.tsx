@@ -1372,7 +1372,6 @@ export default function Page() {
       });
 
       const COL_DEFS = [
-        { header: "No. Invoice", key: "invoice", width: 24 },
         { header: "Tanggal", key: "tanggal", width: 14 },
         { header: "Status", key: "status", width: 14 },
         { header: "Jumlah Unit", key: "qty", width: 13 },
@@ -1385,7 +1384,7 @@ export default function Page() {
         { header: "Harga Jual", key: "jual", width: 22 },
         { header: "Nama Customer", key: "customer", width: 24 },
         { header: "No. HP", key: "hp", width: 18 },
-        { header: "Toko", key: "toko", width: 15 },         // ← ganti dari "Platform"
+        { header: "Toko", key: "toko", width: 15 },
         { header: "Serial Number", key: "sn", width: 30 },
         { header: "Catatan", key: "catatan", width: 32 },
       ];
@@ -1417,7 +1416,7 @@ export default function Page() {
         );
       }
 
-      const LEFT_KEYS = new Set(["invoice", "tanggal"]);
+      const LEFT_KEYS = new Set(["tanggal"]);
       const CURR_KEYS = new Set(["modal", "jual"]);
       const NUM_KEYS = new Set(["qty"]);
       const tableRows: (string | number)[][] = [];
@@ -1441,7 +1440,7 @@ export default function Page() {
               ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0))
               : 0;
             tableRows.push([
-              item.invoice_number ?? "", tanggal,
+              tanggal,
               STATUS_LABEL[item.status] ?? item.status ?? "",
               Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "",
               g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal,
@@ -1457,7 +1456,7 @@ export default function Page() {
             ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0))
             : 0;
           tableRows.push([
-            item.invoice_number ?? "", tanggal,
+            tanggal,
             STATUS_LABEL[item.status] ?? item.status ?? "",
             1, item.laptop_name ?? "", item.cpu ?? "",
             item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal,
@@ -1488,7 +1487,7 @@ export default function Page() {
         });
       }
 
-      
+
       const headerRow = ws.getRow(1);
       headerRow.height = 30;
       headerRow.eachCell((cell, colNum) => {
@@ -1539,7 +1538,8 @@ export default function Page() {
       URL.revokeObjectURL(link.href);
     } catch (err) {
       console.error("Export error:", err);
-      alert("Gagal export Excel. Silakan coba lagi.");
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Gagal export Excel: ${msg}`);
     } finally {
       setIsExporting(false);
     }
@@ -1836,4 +1836,4 @@ export default function Page() {
       </div>
     </DashboardLayout>
   );
-}
+} 
