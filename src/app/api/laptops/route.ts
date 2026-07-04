@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
+import { LAPTOP_VIEW_ROLES } from "@/lib/permissions";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
@@ -31,27 +32,4 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(handler, [
-  "ADMIN",
-  "PROGRAMMER",
-  "ASISTEN_CEO",
-  "PENGELOLA_BARANG",
-  "KEPALA_PENGELOLA_BARANG",
-  "KEPALA_SALES",
-  "CREW_SALES",
-  "SOTECH",
-  "KEPALA_SOTECH",
-  "ACCOUNTING",
-  "PENGANTARAN",
-  "MARKETING",
-  "KEPALA_MARKETING",
-  "PENYEDIA_BARANG",
-  "KEPALA_PENYEDIA_BARANG",
-  "KONTEN",
-  "KEPALA_ONPOINT",
-  "ONPOINT",
-  "KEPALA_TEKNISI",
-  "TEKNISI",
-  "PKL",
-  "CUSTOMER_SERVICE",
-]);
+export const GET = withAuth(handler, LAPTOP_VIEW_ROLES);

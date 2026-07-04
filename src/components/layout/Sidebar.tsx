@@ -904,6 +904,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_ONPOINT: PKL_MENU,
   PKL_TEKNISI: PKL_MENU,
   PKL_KONTEN: PKL_MENU,
+  PKL_PENGANTARAN: [...PKL_MENU],
+  PKL_CUSTOMER_SERVICE: [...PKL_MENU],
+  PKL_PENGELOLA_BARANG: [...PKL_MENU],
 };
 
 const MISSION_HREFS = new Set(MISSIONS_MENU.items.map((i) => i.href));
@@ -941,6 +944,9 @@ const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_ONPOINT: "ONPOINT",
   PKL_KONTEN: "KONTEN",
   PKL_TEKNISI: "TEKNISI",
+  PKL_PENGANTARAN: "PENGANTARAN",
+  PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",    
+  PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",    
 };
 
 (Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(
@@ -982,6 +988,9 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
   PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
   PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
+  PKL_PENGANTARAN: { label: "PKL Pengantaran", className: "bg-amber-50 text-amber-700" },
+  PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" }, 
+  PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" }, 
 };
 
 function getInitials(name: string): string {

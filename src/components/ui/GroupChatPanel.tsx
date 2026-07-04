@@ -6,6 +6,7 @@ import {
 } from "react";
 import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
+import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
 
 const supabase = getSupabaseClient();
 
@@ -15,7 +16,7 @@ interface ReplyPreview {
     sender_name: string;
     content: string;
     is_deleted: boolean;
-    attachment_type: "image" | "file" | null;
+    attachment_type: "image" | "file" | "voice" | null;
 }
 
 interface GroupMessage {
@@ -29,7 +30,7 @@ interface GroupMessage {
     edited_at: string | null;
     created_at: string;
     attachment_url: string | null;
-    attachment_type: "image" | "file" | null;
+    attachment_type: "image" | "file" | "voice" | null;
     attachment_name: string | null;
     attachment_size: number | null;
     reply_to?: ReplyPreview | null;
@@ -248,11 +249,14 @@ function ImageLightbox({ url, name, onClose }: { url: string; name: string | nul
     );
 }
 
-// ─── AttachmentDisplay ────────────────────────────────────────────────────────
 function AttachmentDisplay({ url, type, name, size, isMine }: {
-    url: string; type: "image" | "file"; name: string | null; size: number | null; isMine: boolean;
+    url: string; type: "image" | "file" | "voice"; name: string | null; size: number | null; isMine: boolean;
 }) {
     const [lightbox, setLightbox] = useState(false);
+
+    if (type === "voice") {
+        return <VoicePlayer url={url} isMine={isMine} />;
+    }
 
     if (type === "image") {
         return (
@@ -488,8 +492,9 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                         style={{ color: isMine ? "rgba(255,255,255,0.5)" : "#94a3b8" }}>
                                         {msg.reply_to.is_deleted ? "🚫 Pesan dihapus"
                                             : msg.reply_to.attachment_type === "image" ? "📷 Foto"
-                                                : msg.reply_to.attachment_type === "file" ? "📎 File"
-                                                    : msg.reply_to.content}
+                                                : msg.reply_to.attachment_type === "voice" ? "🎤 Pesan suara"
+                                                    : msg.reply_to.attachment_type === "file" ? "📎 File"
+                                                        : msg.reply_to.content}
                                     </p>
                                 </div>
                             )}
@@ -680,9 +685,10 @@ interface InputAreaProps {
     onCancelReply: () => void;
     onSend: (content: string) => Promise<void>;
     onSendAttachment: (file: File, caption: string) => Promise<void>;
+    onSendVoice: (blob: Blob) => Promise<void>;   // ← BARU
 }
 
-function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendAttachment }: InputAreaProps) {
+function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendAttachment, onSendVoice }: InputAreaProps) {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -838,8 +844,9 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                         <p className="text-[10px] font-black text-indigo-500 mb-0.5">{replyTo.sender_name}</p>
                         <p className="text-xs text-slate-500 truncate">
                             {replyTo.attachment_type === "image" ? "📷 Foto"
-                                : replyTo.attachment_type === "file" ? "📎 File"
-                                    : replyTo.content}
+                                : replyTo.attachment_type === "voice" ? "🎤 Pesan suara"
+                                    : replyTo.attachment_type === "file" ? "📎 File"
+                                        : replyTo.content}
                         </p>
                     </div>
                     <button onClick={onCancelReply}
@@ -888,7 +895,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
             )}
 
             {/* Input row */}
-            <div className="flex items-end gap-3 px-4 py-3.5">
+            <div className="flex items-end gap-3 px-4 py-3.5 relative">
                 <div className="flex-shrink-0 self-end mb-1">
                     <Avatar name={currentUser.name} role={currentUser.role} size={32} />
                 </div>
@@ -942,29 +949,24 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     )}
                 </div>
 
-                {/* Send */}
-                <button
-                    onClick={preview ? handleSendFile : handleSendText}
-                    disabled={!canSend}
-                    className="flex items-center justify-center flex-shrink-0 text-white transition-all self-end disabled:opacity-40 hover:scale-105 active:scale-95"
-                    style={{
-                        width: 44, height: 44,
-                        borderRadius: 14,
-                        background: canSend
-                            ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
-                            : "#e2e8f0",
-                        boxShadow: canSend ? "0 4px 16px rgba(79,70,229,0.4)" : "none",
-                    }}>
-                    {isLoading ? (
-                        <div className="animate-spin"
-                            style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
-                    ) : (
-                        <svg className="w-4 h-4" fill="none" stroke={canSend ? "white" : "#94a3b8"} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
-                    )}
-                </button>
+                {/* Ada teks/file → Send; kosong → mic VN */}
+                {input.trim() || preview ? (
+                    <button
+                        onClick={preview ? handleSendFile : handleSendText}
+                        disabled={!canSend}
+                        className="flex items-center justify-center flex-shrink-0 text-white transition-all self-end disabled:opacity-40 hover:scale-105 active:scale-95"
+                        style={{ width: 44, height: 44, borderRadius: 14, background: canSend ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" : "#e2e8f0", boxShadow: canSend ? "0 4px 16px rgba(79,70,229,0.4)" : "none" }}>
+                        {isLoading ? (
+                            <div className="animate-spin" style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
+                        ) : (
+                            <svg className="w-4 h-4" fill="none" stroke={canSend ? "white" : "#94a3b8"} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                        )}
+                    </button>
+                ) : (
+                    <div className="self-end mb-1.5 flex-shrink-0">
+                        <VoiceRecorder onSend={onSendVoice} disabled={isLoading} />
+                    </div>
+                )}
 
                 <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
             </div>
@@ -1506,6 +1508,68 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }
     }, [currentUser, replyTo]);
 
+    const sendVoiceNote = useCallback(async (blob: Blob) => {
+        const tempId = `temp-${Date.now()}`;
+        const mimeType = blob.type && blob.type.startsWith("audio/") ? blob.type : "audio/webm";
+        const ext = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+        const fileName = `voice_${Date.now()}.${ext}`;
+        const previewUrl = URL.createObjectURL(blob);
+
+        const optimistic: GroupMessage = {
+            id: tempId,
+            sender_id: currentUser.id,
+            sender_name: currentUser.name,
+            sender_role: currentUser.role,
+            content: "",
+            reply_to_id: replyTo?.id ?? null,
+            is_deleted: false,
+            edited_at: null,
+            created_at: new Date().toISOString(),
+            attachment_url: previewUrl,
+            attachment_type: "voice",
+            attachment_name: fileName,
+            attachment_size: blob.size,
+            reply_to: replyTo
+                ? { id: replyTo.id, sender_name: replyTo.sender_name, content: replyTo.content, is_deleted: replyTo.is_deleted, attachment_type: replyTo.attachment_type }
+                : null,
+        };
+        setMessages(prev => [...prev, optimistic]);
+        setReplyTo(null);
+
+        try {
+            const audioFile = new File([blob], fileName, { type: mimeType }); // MIME eksplisit — kunci
+            const fd = new FormData();
+            fd.append("file", audioFile);
+            const up = await fetch("/api/group-chat/upload", { method: "POST", body: fd });
+            const upData = await up.json();
+            if (!upData.success) { URL.revokeObjectURL(previewUrl); setMessages(prev => prev.filter(m => m.id !== tempId)); return; }
+
+            const res = await fetch("/api/group-chat", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: "",
+                    reply_to_id: optimistic.reply_to_id,
+                    attachment_url: upData.url,
+                    attachment_type: "voice",
+                    attachment_name: fileName,
+                    attachment_size: blob.size,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+                setTimeout(() => URL.revokeObjectURL(previewUrl), 500);
+            } else {
+                URL.revokeObjectURL(previewUrl);
+                setMessages(prev => prev.filter(m => m.id !== tempId));
+            }
+        } catch (err) {
+            console.error("[group sendVoiceNote]", err);
+            URL.revokeObjectURL(previewUrl);
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        }
+    }, [currentUser, replyTo]);
+
     const deleteMessage = useCallback(async (messageId: string) => {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
         try {
@@ -1935,6 +1999,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         onCancelReply={() => setReplyTo(null)}
                         onSend={send}
                         onSendAttachment={sendAttachment}
+                        onSendVoice={sendVoiceNote}  
                     />
                 </div>
 
