@@ -172,4 +172,5 @@ export const POST = withAuth(handler, [
   "PENGANTARAN",
   "PENYEDIA_BARANG",
   "KEPALA_PENYEDIA_BARANG",
+  "KEPALA_SOTECH"
 ]);

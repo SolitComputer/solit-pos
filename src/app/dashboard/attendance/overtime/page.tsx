@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; // ✅ ADD
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
@@ -28,12 +29,12 @@ const DIVISION_HEAD_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI
 const PAY_VIEW_ROLES = ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_PENYEDIA_BARANG", "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] as const;
 
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
-  KEPALA_SALES:            ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES", "PKL_SALES", "PKL"],
-  KEPALA_MARKETING:        ["MARKETING", "KONTEN", "KEPALA_MARKETING", "PKL_MARKETING", "PKL_KONTEN", "PKL"],
-  KEPALA_TEKNISI:          ["TEKNISI", "PENGELOLA_BARANG", "KEPALA_TEKNISI", "PKL_TEKNISI", "PKL"],
-  KEPALA_ONPOINT:          ["ONPOINT", "KEPALA_ONPOINT", "PKL_ONPOINT", "PKL"],
-  KEPALA_PENYEDIA_BARANG:  ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "PKL"],
-  KEPALA_SOTECH:           ["SOTECH", "KEPALA_SOTECH", "PKL_SOTECH", "PKL"],
+  KEPALA_SALES: ["CREW_SALES", "SOTECH", "PENGANTARAN", "KEPALA_SALES", "PKL_SALES", "PKL"],
+  KEPALA_MARKETING: ["MARKETING", "KONTEN", "KEPALA_MARKETING", "PKL_MARKETING", "PKL_KONTEN", "PKL"],
+  KEPALA_TEKNISI: ["TEKNISI", "PENGELOLA_BARANG", "KEPALA_TEKNISI", "PKL_TEKNISI", "PKL"],
+  KEPALA_ONPOINT: ["ONPOINT", "KEPALA_ONPOINT", "PKL_ONPOINT", "PKL"],
+  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PENGELOLA_BARANG", "KEPALA_PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG", "PKL"],
+  KEPALA_SOTECH: ["SOTECH", "KEPALA_SOTECH", "PKL_SOTECH", "PKL"],
   KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "TEKNISI", "KEPALA_PENGELOLA_BARANG", "PKL"],
 };
 
@@ -1466,7 +1467,20 @@ export default function OvertimePage() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedUserId = searchParams.get("user");
+
+  const setSelectedUserId = useCallback(
+    (uid: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (uid) params.set("user", uid);
+      else params.delete("user");
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    },
+    [router, searchParams]
+  );
   const [detailData, setDetailData] = useState<OvertimeRequest | null>(null);
   const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
   const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);

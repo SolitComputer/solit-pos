@@ -572,7 +572,7 @@ function MissionCalendar({
 function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
     const [users, setUsers] = useState<AssignableUser[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
-    const [assignedTo, setAssignedTo] = useState("");
+    const [assignedTo, setAssignedTo] = useState<string[]>([]);
     const [search, setSearch] = useState("");
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -598,26 +598,59 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
     }, []);
 
     const filtered = users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
-    const selectedUser = users.find(u => u.id === assignedTo) ?? null;
-
+    
     const save = async () => {
         setError("");
-        if (!assignedTo) { setError("Pilih penerima misi"); return; }
+        // ✅ FIX: validasi array
+        if (assignedTo.length === 0) { setError("Pilih minimal 1 penerima misi"); return; }
         if (!title.trim()) { setError("Judul misi wajib diisi"); return; }
         setSaving(true);
         try {
-            const res = await fetch("/api/missions", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    assigned_to: assignedTo, title: title.trim(), description: description.trim(),
-                    priority, due_date: dueDate ? new Date(dueDate).toISOString() : null, items: checklist,
-                }),
-            });
-            const data = await res.json();
-            if (!data.success) { setError(data.message); return; }
+            const payloadBase = {
+                title: title.trim(),
+                description: description.trim(),
+                priority,
+                due_date: dueDate ? new Date(dueDate).toISOString() : null,
+                items: checklist,
+            };
+
+            const results = await Promise.allSettled(
+                assignedTo.map(uid =>
+                    fetch("/api/missions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...payloadBase, assigned_to: uid }),
+                    }).then(async r => {
+                        const data = await r.json();
+                        if (!data.success) throw new Error(data.message ?? "Gagal");
+                        return data;
+                    })
+                )
+            );
+
+            const failed = results
+                .map((r, i) => ({ r, uid: assignedTo[i] }))
+                .filter(x => x.r.status === "rejected");
+
+            if (failed.length === assignedTo.length) {
+                const firstReason = (failed[0].r as PromiseRejectedResult).reason;
+                setError(firstReason?.message ?? "Semua misi gagal dibuat");
+                return;
+            }
+
+            if (failed.length > 0) {
+                const failedNames = failed
+                    .map(x => users.find(u => u.id === x.uid)?.name ?? "Unknown")
+                    .join(", ");
+                setError(`Berhasil ${assignedTo.length - failed.length}/${assignedTo.length} misi. Gagal untuk: ${failedNames}`);
+                onCreated();
+                return;
+            }
+
             onCreated();
-        } catch { setError("Terjadi kesalahan"); }
-        finally { setSaving(false); }
+        } catch (e: any) {
+            setError(e?.message ?? "Terjadi kesalahan");
+        } finally { setSaving(false); }
     };
 
     return (
@@ -626,19 +659,34 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 {error && <ErrorBox msg={error} />}
 
-                <Field label="Penerima Misi">
-                    {selectedUser && (
-                        <button type="button" onClick={() => setAssignedTo("")}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 mb-2 rounded-xl transition-all active:scale-[0.99]"
+                <Field label={`Penerima Misi ${assignedTo.length > 0 ? `(${assignedTo.length} dipilih)` : ""}`}>
+                    {/* ✅ FIX: chip list penerima terpilih (bisa lebih dari 1) */}
+                    {assignedTo.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1.5 p-2 rounded-xl"
                             style={{ background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", border: "1px solid #ddd6fe" }}>
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-black flex-shrink-0"
-                                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>{initials(selectedUser.name)}</div>
-                            <div className="min-w-0 flex-1 text-left">
-                                <p className="text-xs font-bold text-violet-800 truncate">{selectedUser.name}</p>
-                                <p className="text-[10px] text-violet-400 truncate">{ROLE_LABEL_MINI(selectedUser.roles?.[0] ?? selectedUser.role)}</p>
-                            </div>
-                            <span className="text-[10px] font-black text-violet-500 flex-shrink-0">Batalkan ✕</span>
-                        </button>
+                            {assignedTo.map(uid => {
+                                const u = users.find(x => x.id === uid);
+                                if (!u) return null;
+                                return (
+                                    <button key={uid} type="button"
+                                        onClick={() => setAssignedTo(prev => prev.filter(id => id !== uid))}
+                                        className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-full bg-white transition-all active:scale-95"
+                                        style={{ border: "1px solid #ddd6fe" }}>
+                                        <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-black flex-shrink-0"
+                                            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>{initials(u.name)}</span>
+                                        <span className="text-[11px] font-bold text-violet-800 truncate max-w-[100px]">{u.name}</span>
+                                        <span className="text-violet-400 text-[11px] font-black leading-none">×</span>
+                                    </button>
+                                );
+                            })}
+                            {assignedTo.length > 1 && (
+                                <button type="button" onClick={() => setAssignedTo([])}
+                                    className="text-[10px] font-bold px-2 py-1 rounded-full transition"
+                                    style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
+                                    Kosongkan semua
+                                </button>
+                            )}
+                        </div>
                     )}
 
                     <Input placeholder="🔍 Cari nama..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -660,10 +708,15 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                     ) : (
                         <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-0.5">
                             {filtered.map(u => {
-                                const active = assignedTo === u.id;
+                                // ✅ FIX: cek dari array assignedTo, bukan single ID
+                                const active = assignedTo.includes(u.id);
                                 return (
                                     <button key={u.id} type="button"
-                                        onClick={() => setAssignedTo(prev => (prev === u.id ? "" : u.id))}
+                                        onClick={() => setAssignedTo(prev =>
+                                            prev.includes(u.id)
+                                                ? prev.filter(id => id !== u.id)   // toggle off
+                                                : [...prev, u.id]                    // toggle on
+                                        )}
                                         className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all active:scale-[0.99] border"
                                         style={active ? { background: "#f5f3ff", borderColor: "#c4b5fd", boxShadow: "0 0 0 1.5px #ddd6fe" }
                                             : { background: "#f8fafc", borderColor: "#eef2f7" }}>
@@ -675,11 +728,23 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                                             <p className="text-xs font-bold truncate" style={{ color: active ? "#5b21b6" : "#334155" }}>{u.name}</p>
                                             <p className="text-[10px] truncate" style={{ color: active ? "#a78bfa" : "#94a3b8" }}>{ROLE_LABEL_MINI(u.roles?.[0] ?? u.role)}</p>
                                         </div>
-                                        {active && <span className="text-violet-600 text-xs font-black flex-shrink-0">✓</span>}
+                                        {/* ✅ FIX: checkbox indicator, bukan cuma centang */}
+                                        <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+                                            style={active
+                                                ? { background: "#7c3aed", color: "#fff", border: "1.5px solid #7c3aed" }
+                                                : { background: "#fff", border: "1.5px solid #cbd5e1" }}>
+                                            {active && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><polyline points="20 6 9 17 4 12" /></svg>}
+                                        </span>
                                     </button>
                                 );
                             })}
                         </div>
+                    )}
+
+                    {assignedTo.length > 1 && (
+                        <p className="text-[10px] mt-1.5" style={{ color: "#7c3aed" }}>
+                            💡 Misi yang sama akan dibuat untuk <b>{assignedTo.length} orang</b> — masing-masing punya progress sendiri.
+                        </p>
                     )}
                 </Field>
 
