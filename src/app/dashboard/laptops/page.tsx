@@ -376,6 +376,8 @@ export default function Page() {
             list = list.filter(x => (x.siap_jual ?? 0) > 0);
         } else if (filterStatus === "BELUM_SIAP") {
             list = list.filter(x => (x.stok_minus ?? 0) > 0);
+        } else if (filterStatus === "TERJUAL") {
+            list = list.filter(x => (x.terjual ?? 0) > 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
         if (filterProcessor !== "ALL") {
@@ -534,22 +536,28 @@ export default function Page() {
         wb.created = new Date();
 
         // Tentukan konteks berdasarkan filter status aktif
+        // Tentukan konteks berdasarkan filter status aktif
         const isSiapJualOnly = filterStatus === "SIAP_JUAL";
         const isMinusOnly = filterStatus === "BELUM_SIAP";
-        const isAllMode = !isSiapJualOnly && !isMinusOnly;
+        const isTerjualOnly = filterStatus === "TERJUAL";
+        const isAllMode = !isSiapJualOnly && !isMinusOnly && !isTerjualOnly;
 
         // Sheet name & file suffix mengikuti filter
         const sheetLabel = isSiapJualOnly
             ? "Laptop Siap Jual"
             : isMinusOnly
-            ? "Laptop Minus"
-            : "Data Laptop";
+                ? "Laptop Minus"
+                : isTerjualOnly
+                    ? "Laptop Terjual"
+                    : "Data Laptop";
 
         const fileSuffix = isSiapJualOnly
             ? "_siap_jual"
             : isMinusOnly
-            ? "_minus"
-            : "";
+                ? "_minus"
+                : isTerjualOnly
+                    ? "_terjual"
+                    : "";
 
         const ws = wb.addWorksheet(sheetLabel, {
             views: [{ state: "frozen", ySplit: 1 }],
@@ -557,26 +565,26 @@ export default function Page() {
         });
 
         const COLOR = {
-            headerBg:   "FF4B5563",
-            headerFg:   "FFFFFFFF",
-            rowEven:    "FFF8FAFC",
-            rowOdd:     "FFFFFFFF",
-            borderColor:"FFE2E8F0",
-            subTextFg:  "FF64748B",
-            siapBg:     "FFD1FAE5", // green-100
-            siapFg:     "FF065F46", // green-900
-            minusBg:    "FFFEE2E2", // red-100
-            minusFg:    "FF7F1D1D", // red-900
-            terjualBg:  "FFDBEAFE", // blue-100
-            terjualFg:  "FF1E3A8A", // blue-900
+            headerBg: "FF4B5563",
+            headerFg: "FFFFFFFF",
+            rowEven: "FFF8FAFC",
+            rowOdd: "FFFFFFFF",
+            borderColor: "FFE2E8F0",
+            subTextFg: "FF64748B",
+            siapBg: "FFD1FAE5", // green-100
+            siapFg: "FF065F46", // green-900
+            minusBg: "FFFEE2E2", // red-100
+            minusFg: "FF7F1D1D", // red-900
+            terjualBg: "FFDBEAFE", // blue-100
+            terjualFg: "FF1E3A8A", // blue-900
         };
 
         // ✅ Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
         ws.columns = [
-            { header: "No",      key: "no",      width: 6  },
+            { header: "No", key: "no", width: 6 },
             { header: "Product", key: "product", width: 35 },
-            { header: "CPU",     key: "cpu",     width: 28 },
-            { header: "RAM",     key: "ram",     width: 14 },
+            { header: "CPU", key: "cpu", width: 28 },
+            { header: "RAM", key: "ram", width: 14 },
             { header: "HDD/SSD", key: "storage", width: 16 },
             // Kolom stok utama — labelnya berubah sesuai konteks filter
             {
@@ -587,8 +595,8 @@ export default function Page() {
             // Kolom detail stok hanya muncul di mode ALL
             ...(isAllMode ? [
                 { header: "Siap Jual", key: "siap_jual", width: 12 },
-                { header: "Minus",     key: "minus",     width: 10 },
-                { header: "Terjual",   key: "terjual",   width: 10 },
+                { header: "Minus", key: "minus", width: 10 },
+                { header: "Terjual", key: "terjual", width: 10 },
             ] : []),
             { header: "Price Store", key: "price_store", width: 18 },
         ];
@@ -600,10 +608,10 @@ export default function Page() {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
             cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
             cell.border = {
-                top:    { style: "thin",   color: { argb: COLOR.borderColor } },
-                left:   { style: "thin",   color: { argb: COLOR.borderColor } },
+                top: { style: "thin", color: { argb: COLOR.borderColor } },
+                left: { style: "thin", color: { argb: COLOR.borderColor } },
                 bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-                right:  { style: "thin",   color: { argb: COLOR.borderColor } },
+                right: { style: "thin", color: { argb: COLOR.borderColor } },
             };
             cell.alignment = { horizontal: "center", vertical: "middle" };
         });
@@ -615,32 +623,32 @@ export default function Page() {
 
             // Hitung per-jenis unit dari raw laptop_units (bukan dari field cached)
             const siapJualCount = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
-            const minusCount    = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
-            const terjualCount  = units.filter((u: LaptopUnit) => u.status === "SOLD").length;
+            const minusCount = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+            const terjualCount = units.filter((u: LaptopUnit) => u.status === "SOLD").length;
             const tersediaCount = units.filter((u: LaptopUnit) => u.status !== "SOLD").length;
 
             // ✅ Nilai kolom "stock" disesuaikan dengan konteks filter
             const stockValue = isSiapJualOnly
                 ? siapJualCount
                 : isMinusOnly
-                ? minusCount
-                : tersediaCount;
+                    ? minusCount
+                    : tersediaCount;
 
             // Bangun row data — kolom detail hanya di mode ALL
             const rowData: Record<string, string | number> = {
-                no:          idx + 1,
-                product:     item.laptop_name   || "",
-                cpu:         item.cpu           || "",
-                ram:         item.ram           || "",
-                storage:     item.storage       || "",
-                stock:       stockValue,
+                no: idx + 1,
+                product: item.laptop_name || "",
+                cpu: item.cpu || "",
+                ram: item.ram || "",
+                storage: item.storage || "",
+                stock: stockValue,
                 price_store: item.selling_price || 0,
             };
 
             if (isAllMode) {
                 rowData.siap_jual = siapJualCount;
-                rowData.minus     = minusCount;
-                rowData.terjual   = terjualCount;
+                rowData.minus = minusCount;
+                rowData.terjual = terjualCount;
             }
 
             const row = ws.addRow(rowData);
@@ -652,28 +660,28 @@ export default function Page() {
                 // ── Base styling ──────────────────────────────────────────────
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
                 cell.border = {
-                    top:    { style: "hair", color: { argb: COLOR.borderColor } },
-                    left:   { style: "hair", color: { argb: COLOR.borderColor } },
+                    top: { style: "hair", color: { argb: COLOR.borderColor } },
+                    left: { style: "hair", color: { argb: COLOR.borderColor } },
                     bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-                    right:  { style: "hair", color: { argb: COLOR.borderColor } },
+                    right: { style: "hair", color: { argb: COLOR.borderColor } },
                 };
-                cell.font      = { size: 10, name: "Arial" };
+                cell.font = { size: 10, name: "Arial" };
                 cell.alignment = { vertical: "middle" };
 
                 // ── Per-column overrides ──────────────────────────────────────
                 if (key === "no") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font      = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
 
                 } else if (key === "product") {
-                    cell.font      = { size: 10, name: "Arial", bold: true };
+                    cell.font = { size: 10, name: "Arial", bold: true };
                     cell.alignment = { horizontal: "center", vertical: "middle" };
 
                 } else if (["cpu", "ram", "storage"].includes(key)) {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
 
                 } else if (key === "price_store") {
-                    cell.numFmt    = '"Rp "#,##0';
+                    cell.numFmt = '"Rp "#,##0';
                     cell.alignment = { horizontal: "center", vertical: "middle" };
 
                 } else if (key === "stock") {
@@ -730,21 +738,21 @@ export default function Page() {
 
         // Download
         const buffer = await wb.xlsx.writeBuffer();
-        const blob   = new Blob([buffer], {
+        const blob = new Blob([buffer], {
             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
-        const link      = document.createElement("a");
-        link.href       = URL.createObjectURL(blob);
-        link.download   = `data_laptop${fileSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `data_laptop${fileSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    const totalSisa     = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
+    const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
-    const totalMinus    = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
-    const totalTerjual  = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
+    const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
+    const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
     return (
         <>
@@ -852,6 +860,7 @@ export default function Page() {
                                     <option value="ALL">Semua Status</option>
                                     <option value="SIAP_JUAL">✅ Siap Jual</option>
                                     <option value="BELUM_SIAP">⚠️ Minus</option>
+                                    <option value="TERJUAL">💰 Terjual</option>
                                 </FilterSelect>
                                 <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                     {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
