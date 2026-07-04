@@ -151,11 +151,11 @@ function notifyBrowser(title: string, body: string) {
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
     return (
-        <div className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"}`}>
+        <div className={`fixed top-4 right-3 left-3 sm:left-auto sm:right-5 sm:top-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"}`}>
             {type === "ok"
                 ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg></div>
                 : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>}
-            {msg}
+            <span className="flex-1 min-w-0">{msg}</span>
         </div>
     );
 }
@@ -177,12 +177,12 @@ function ModalHeader({ title, subtitle, onClose, gradient = "linear-gradient(135
     title: string; subtitle: string; onClose: () => void; gradient?: string;
 }) {
     return (
-        <div className="relative px-6 py-5 flex items-center justify-between overflow-hidden" style={{ background: gradient }}>
+        <div className="relative px-5 sm:px-6 py-5 flex items-center justify-between overflow-hidden" style={{ background: gradient }}>
             <div className="absolute inset-0 pointer-events-none"
                 style={{ backgroundImage: "radial-gradient(ellipse at 85% 40%, rgba(255,255,255,0.14) 0%, transparent 60%)" }} />
-            <div className="z-10 min-w-0">
-                <p className="font-bold text-white text-sm tracking-tight">{title}</p>
-                <p className="text-[10.5px] mt-0.5 truncate max-w-[240px]" style={{ color: "rgba(255,255,255,0.55)" }}>{subtitle}</p>
+            <div className="z-10 min-w-0 flex-1 pr-3">
+                <p className="font-bold text-white text-sm tracking-tight truncate">{title}</p>
+                <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.55)" }}>{subtitle}</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10 flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.55)" }}>
@@ -220,12 +220,12 @@ function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
 // ── Badges ────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Mission["status"] }) {
     const s = MISSION_STATUS_META[status];
-    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold"
+    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
         style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>{s.icon} {s.label}</span>;
 }
 function PriorityBadge({ priority }: { priority: MissionPriority }) {
     const p = MISSION_PRIORITY_META[priority];
-    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold"
+    return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
         style={{ background: p.bg, color: p.text, border: `1px solid ${p.border}` }}>{p.icon} {p.label}</span>;
 }
 
@@ -282,7 +282,7 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
     return (
         <>
             <div className="flex items-start justify-between gap-3">
-                <h3 className="text-base font-black text-slate-800">{mission.title}</h3>
+                <h3 className="text-base font-black text-slate-800 min-w-0">{mission.title}</h3>
                 <StatusBadge status={mission.status} />
             </div>
             {mission.description && <p className="text-sm text-slate-500 leading-relaxed">{mission.description}</p>}
@@ -306,9 +306,9 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
 }
 function MetaCell({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-xl p-2.5" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
+        <div className="rounded-xl p-2.5 min-w-0" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
             <p className="text-slate-400 font-bold uppercase tracking-wide text-[9px] mb-0.5">{label}</p>
-            <p className="text-slate-700 font-semibold">{value}</p>
+            <p className="text-slate-700 font-semibold break-words">{value}</p>
         </div>
     );
 }
@@ -402,11 +402,11 @@ function MissionCard({
         <div className="relative">
             <button
                 onClick={onOpen}
-                className="w-full text-left bg-white rounded-2xl p-4 transition-all hover:shadow-md active:scale-[0.995]"
+                className="w-full text-left bg-white rounded-2xl p-3.5 sm:p-4 transition-all hover:shadow-md active:scale-[0.995]"
                 style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
             >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                    <p className={`text-sm font-bold text-slate-800 line-clamp-2 ${showQuickDelete ? "pr-9" : ""}`}>{m.title}</p>
+                <div className="flex items-start justify-between gap-2.5 mb-2">
+                    <p className={`text-sm font-bold text-slate-800 line-clamp-2 min-w-0 ${showQuickDelete ? "pr-9" : ""}`}>{m.title}</p>
                     <StatusBadge status={m.status} />
                 </div>
                 {m.description && <p className="text-xs text-slate-500 line-clamp-2 mb-2.5">{m.description}</p>}
@@ -423,7 +423,7 @@ function MissionCard({
 
                 <div className="flex items-center gap-2 flex-wrap">
                     <PriorityBadge priority={m.priority} />
-                    <span className="text-[10px] text-slate-400 font-medium">
+                    <span className="text-[10px] text-slate-400 font-medium min-w-0 truncate">
                         {otherLabel}: <span className="text-slate-600 font-semibold">{otherName}</span>
                     </span>
                 </div>
@@ -525,32 +525,32 @@ function MissionCalendar({
     const nextMonth = () => setCursor(c => { const d = new Date(c.y, c.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
     const goToday = () => { const n = new Date(); setCursor({ y: n.getFullYear(), m: n.getMonth() }); onSelectDate(today); };
 
-    const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition text-lg font-bold";
+    const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition text-lg font-bold flex-shrink-0";
 
     return (
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
-                <div className="flex items-center gap-1.5">
+            <div className="px-3 sm:px-4 py-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                     <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya">‹</button>
-                    <div className="text-center min-w-[128px]">
-                        <p className="text-sm font-black text-slate-800 leading-tight">{ID_MONTHS[cursor.m]} {cursor.y}</p>
+                    <div className="text-center min-w-0">
+                        <p className="text-sm font-black text-slate-800 leading-tight truncate">{ID_MONTHS[cursor.m]} {cursor.y}</p>
                         <p className="text-[10px] text-slate-400">{monthTotal} misi</p>
                     </div>
                     <button onClick={nextMonth} className={navBtn} aria-label="Bulan berikutnya">›</button>
                 </div>
                 <button onClick={goToday}
-                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition active:scale-95"
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition active:scale-95 flex-shrink-0"
                     style={{ background: "linear-gradient(135deg,#0f0c29,#1a1545)", color: "#fff" }}>
                     Hari Ini
                 </button>
             </div>
 
-            <div className="px-3 pt-3 flex items-center gap-1.5">
+            <div className="px-3 pt-3 flex flex-wrap items-center gap-1.5">
                 {([{ k: "created", label: "🗓️ Dibuat" }, { k: "due", label: "⏰ Tenggat" }] as { k: DateBasis; label: string }[]).map(b => {
                     const active = basis === b.k;
                     return (
                         <button key={b.k} onClick={() => onBasisChange(b.k)}
-                            className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition"
+                            className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
                             style={active ? { background: "#eef2ff", color: "#4f46e5", border: "1px solid #c7d2fe" }
                                 : { background: "#f8fafc", color: "#94a3b8", border: "1px solid #eef2f7" }}>
                             {b.label}
@@ -559,14 +559,14 @@ function MissionCalendar({
                 })}
                 {selectedDate && (
                     <button onClick={() => onSelectDate(null)}
-                        className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition"
+                        className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
                         style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
                         Semua Tanggal ✕
                     </button>
                 )}
             </div>
 
-            <div className="p-3">
+            <div className="p-2.5 sm:p-3">
                 <div className="grid grid-cols-7 gap-1 mb-1">
                     {ID_DOW.map(d => <div key={d} className="text-center text-[10px] font-bold text-slate-400 py-1">{d}</div>)}
                 </div>
@@ -639,7 +639,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
     }, []);
 
     const filtered = users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
-    
+
     const save = async () => {
         setError("");
         // ✅ FIX: validasi array
@@ -697,7 +697,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
     return (
         <ModalShell onClose={onClose}>
             <ModalHeader title="Buat Misi Baru" subtitle={loadingUsers ? "Memuat…" : `${users.length} orang bisa kamu beri misi`} onClose={onClose} />
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 {error && <ErrorBox msg={error} />}
 
                 <Field label={`Penerima Misi ${assignedTo.length > 0 ? `(${assignedTo.length} dipilih)` : ""}`}>
@@ -845,7 +845,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                 </Field>
             </div>
 
-            <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+            <div className="px-5 sm:px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
                 <button onClick={onClose} className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
                     style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
                 <button onClick={save} disabled={saving}
@@ -875,7 +875,7 @@ function ConfirmDeleteModal({
                 onClose={() => !deleting && onCancel()}
                 gradient="linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)"
             />
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4">
                 <div className="rounded-2xl p-4" style={{ background: "#fff1f2", border: "1px solid #fecdd3" }}>
                     <p className="text-sm font-black text-rose-700 mb-1">{mission.title}</p>
                     <p className="text-xs text-rose-500">
@@ -900,7 +900,7 @@ function ConfirmDeleteModal({
                 </div>
             </div>
 
-            <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+            <div className="px-5 sm:px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
                 <button
                     onClick={onCancel}
                     disabled={deleting}
@@ -983,7 +983,7 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
     return (
         <ModalShell onClose={onClose}>
             <ModalHeader title="Detail Misi" subtitle={`Dari ${mission.assigner?.name ?? "—"}`} onClose={onClose} />
-            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
+            <div className="p-5 sm:p-6 space-y-4 max-h-[72vh] overflow-y-auto">
                 <HeadlineBlock mission={mission} />
                 <ChecklistBlock mission={mission} interactive={canToggle} togglingId={togglingId} onToggle={toggleItem} />
                 <MetaGrid mission={mission} />
@@ -1002,7 +1002,7 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
                 )}
             </div>
 
-            <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+            <div className="px-5 sm:px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
                 {mode === "view" ? (
                     <>
                         <button onClick={onClose} className="flex-1 h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
@@ -1080,7 +1080,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
         <ModalShell onClose={onClose}>
             <ModalHeader title="Tinjau Misi" subtitle={`Untuk ${mission.assignee?.name ?? "—"}`} onClose={onClose}
                 gradient="linear-gradient(135deg,#312e81 0%,#4338ca 100%)" />
-            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
+            <div className="p-5 sm:p-6 space-y-4 max-h-[72vh] overflow-y-auto">
                 <HeadlineBlock mission={mission} />
                 <ChecklistBlock mission={mission} interactive={false} />
                 <MetaGrid mission={mission} />
@@ -1106,7 +1106,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                 )}
             </div>
 
-            <div className="px-6 pb-6 pt-4 space-y-2" style={{ borderTop: "1px solid #f1f5f9" }}>
+            <div className="px-5 sm:px-6 pb-6 pt-4 space-y-2" style={{ borderTop: "1px solid #f1f5f9" }}>
                 {mode === "view" && (
                     <>
                         {canDecide && (
@@ -1156,14 +1156,14 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
 // ── Stat kecil + skeleton ─────────────────────────────────────────────────────
 function MiniStat({ icon, value, label, accent }: { icon: string; value: number; label: string; accent: string }) {
     return (
-        <div className="bg-white rounded-2xl p-4 relative overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+        <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
             <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
-            <div className="pl-3">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg">{icon}</span>
-                    <span className="text-2xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
+            <div className="pl-2.5 sm:pl-3">
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <span className="text-base sm:text-lg">{icon}</span>
+                    <span className="text-xl sm:text-2xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
                 </div>
-                <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>{label}</p>
+                <p className="text-[10px] sm:text-[11px] font-bold leading-tight" style={{ color: "#64748b" }}>{label}</p>
             </div>
         </div>
     );
@@ -1189,7 +1189,7 @@ function CardSkeleton() {
 }
 function StatSkeleton() {
     return (
-        <div className="bg-white rounded-2xl p-4 animate-pulse" style={{ border: "1px solid #f0f0f8" }}>
+        <div className="bg-white rounded-2xl p-3 sm:p-4 animate-pulse" style={{ border: "1px solid #f0f0f8" }}>
             <div className="flex items-center justify-between mb-2">
                 <div className="h-5 w-5 bg-slate-200 rounded" />
                 <div className="h-6 w-8 bg-slate-200 rounded" />
@@ -1209,7 +1209,7 @@ function PageSkeleton() {
                         <div className="h-2.5 w-56 bg-slate-100 rounded animate-pulse" />
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">{Array(3).fill(0).map((_, i) => <StatSkeleton key={i} />)}</div>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">{Array(3).fill(0).map((_, i) => <StatSkeleton key={i} />)}</div>
                 <div className="h-12 bg-white rounded-2xl animate-pulse" style={{ border: "1px solid #f0f0f8" }} />
                 <div className="space-y-3">{Array(4).fill(0).map((_, i) => <CardSkeleton key={i} />)}</div>
             </div>
@@ -1422,21 +1422,21 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
 
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                             <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
                                 <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
                                 </svg>
                             </div>
-                            <div>
-                                <h1 className="text-xl font-black text-slate-900 tracking-tight">{SECTION_META[section].title}</h1>
+                            <div className="min-w-0">
+                                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">{SECTION_META[section].title}</h1>
                                 <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>{SECTION_META[section].subtitle}</p>
                             </div>
                         </div>
                         {iCanAssign && section === "dashboard" && (
                             <button onClick={() => setShowCreate(true)}
-                                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                 Beri Misi
@@ -1446,7 +1446,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
 
                     {/* Stats */}
                     {!showStructure && (
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
                             <MiniStat icon="⚙️" value={stats.pending} label="Sedang Berjalan" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
                             <MiniStat icon="📤" value={stats.review} label="Menunggu ACC" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
                             <MiniStat icon="✅" value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
@@ -1455,7 +1455,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
 
                     {/* Tabs */}
                     <div className="bg-white rounded-2xl p-1.5" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
                             {([
                                 { key: "received", label: "Misi Saya", emoji: "📥", onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
                                 ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", emoji: "📌", onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
@@ -1463,10 +1463,10 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                                 ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", emoji: "🧭", onClick: () => setShowStructure(true), active: showStructure }] : []),
                             ]).map(t => (
                                 <button key={t.key} onClick={t.onClick}
-                                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
+                                    className="flex-1 min-w-[72px] flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all"
                                     style={t.active ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                                         : { background: "#f5f7ff", color: "#64748b" }}>
-                                    <span>{t.emoji}</span><span>{t.label}</span>
+                                    <span className="text-sm">{t.emoji}</span><span>{t.label}</span>
                                 </button>
                             ))}
                         </div>
@@ -1485,7 +1485,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                                 </div>
                             </div>
 
-                            <div className="p-3.5">
+                            <div className="p-3.5 overflow-x-auto no-scrollbar">
                                 <AccessTree mine={mineRoles} />
                             </div>
 
@@ -1513,7 +1513,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                                     style={{ background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", border: "1px solid #ddd6fe" }}>
                                     <span className="text-xl">📌</span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-black text-violet-800">{fmtDayLabel(selectedDate)}</p>
+                                        <p className="text-sm font-black text-violet-800 truncate">{fmtDayLabel(selectedDate)}</p>
                                         <p className="text-[11px] text-violet-500">
                                             {filteredMissions.length} misi · basis {dateBasis === "due" ? "tenggat" : "dibuat"}
                                         </p>
@@ -1571,6 +1571,10 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
         .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.16,1,0.3,1); }
         .animate-scaleIn { animation: scaleIn 0.22s cubic-bezier(0.16,1,0.3,1); }
+
+        /* Hilangkan scrollbar untuk tab bar yang bisa di-scroll horizontal di HP */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         /* Vertical tree — hanya scroll vertikal, tidak geser samping */
         .vt-branch { margin-left: 12px; }
