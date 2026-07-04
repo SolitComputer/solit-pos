@@ -220,4 +220,5 @@ export const POST = withAuth(postHandler, [
   "PROGRAMMER",
   "ASISTEN_CEO",
   "KEPALA_SALES",
+  "KEPALA_SOTECH"
 ]);
