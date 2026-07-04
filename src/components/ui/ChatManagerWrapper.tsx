@@ -70,41 +70,43 @@ export function ChatManagerWrapper() {
 
     return (
         <>
-            <div className="fixed z-[9991] flex flex-row-reverse items-end"
-                style={{ bottom: 80, right: 20, gap: 10, maxWidth: "calc(100vw - 32px)" }}>
+            {/* Group modal — overlay full-screen sendiri (z-9998), tetap di atas floating button */}
+            {openGroupChat && (
+                <GroupChatPanel currentUser={currentUser} onClose={() => setOpenGroupChat(false)} />
+            )}
 
-                {/* GroupChat — paling kanan */}
-                {openGroupChat && (
-                    <div style={{ animation: "chatSlideUp .18s ease-out", flexShrink: 0 }}>
-                        <GroupChatPanel currentUser={currentUser} onClose={() => setOpenGroupChat(false)} />
-                    </div>
-                )}
+            {/* DM bubbles — z DI BAWAH floating button (9990) supaya popup daftar user tidak terhalang,
+                dan digeser ke kiri (right:80) supaya tombol FAB tidak menutupi tombol kirim/mic */}
+            {(expandedChat || minimizedChats.length > 0) && (
+                <div className="fixed z-[9985] flex flex-row-reverse items-end"
+                    style={{ bottom: 80, right: 80, gap: 10, maxWidth: "calc(100vw - 96px)" }}>
 
-                {/* DM expanded — full panel */}
-                {expandedChat && (
-                    <div key={expandedChat.id} style={{ animation: "chatSlideRight .2s ease-out", flexShrink: 0 }}>
-                        <ChatPanel
-                            currentUser={currentUser}
-                            targetUser={expandedChat}
-                            isMinimized={false}
-                            onToggleMinimize={() => setExpandedChatId(null)}   // minimize → jadi head
-                            onClose={() => { closeChat(expandedChat.id); setExpandedChatId(null); }}
-                            unread={0}
-                        />
-                    </div>
-                )}
+                    {/* DM expanded — full panel */}
+                    {expandedChat && (
+                        <div key={expandedChat.id} style={{ animation: "chatSlideRight .2s ease-out", flexShrink: 0 }}>
+                            <ChatPanel
+                                currentUser={currentUser}
+                                targetUser={expandedChat}
+                                isMinimized={false}
+                                onToggleMinimize={() => setExpandedChatId(null)}
+                                onClose={() => { closeChat(expandedChat.id); setExpandedChatId(null); }}
+                                unread={0}
+                            />
+                        </div>
+                    )}
 
-                {/* Chat head (minimized) — inisial nama, klik untuk expand */}
-                {minimizedChats.length > 0 && (
-                    <div className="flex flex-col-reverse gap-2 flex-shrink-0" style={{ marginBottom: 4 }}>
-                        {minimizedChats.map(u => (
-                            <MinimizedHead key={u.id} user={u}
-                                onOpen={() => setExpandedChatId(u.id)}
-                                onClose={() => { closeChat(u.id); if (expandedChatId === u.id) setExpandedChatId(null); }} />
-                        ))}
-                    </div>
-                )}
-            </div>
+                    {/* Chat head (minimized) */}
+                    {minimizedChats.length > 0 && (
+                        <div className="flex flex-col-reverse gap-2 flex-shrink-0" style={{ marginBottom: 4 }}>
+                            {minimizedChats.map(u => (
+                                <MinimizedHead key={u.id} user={u}
+                                    onOpen={() => setExpandedChatId(u.id)}
+                                    onClose={() => { closeChat(u.id); if (expandedChatId === u.id) setExpandedChatId(null); }} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <style>{`
                 @keyframes chatSlideUp { from { opacity:0; transform: translateY(12px);} to { opacity:1; transform: translateY(0);} }
