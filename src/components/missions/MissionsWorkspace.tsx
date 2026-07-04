@@ -16,6 +16,8 @@ import {
     canReviewMission,
     isMissionFullAccess,
 } from "@/lib/missions";
+import { useRouter } from "next/navigation";
+import { hasFullAccess } from "@/components/missions/missionShared";
 
 interface AssignableUser {
     id: string; name: string; role: string; roles: string[]; shift?: string;
@@ -1062,6 +1064,8 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
     const [detail, setDetail] = useState<{ m: Mission; mode: Perspective } | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
+    const router = useRouter();
+    const iAmAdmin = hasFullAccess(roles);
 
     const fetchMissions = async (b: Box, soft = false) => {
         if (!soft) setLoading(true);
@@ -1238,6 +1242,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                             {([
                                 { key: "received", label: "Misi Saya", emoji: "📥", onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
                                 ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", emoji: "📌", onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
+                                ...(iAmAdmin && section === "dashboard" ? [{ key: "all", label: "Semua Misi", emoji: "🗂️", onClick: () => router.push("/dashboard/missions/all"), active: false }] : []),
                                 ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", emoji: "🧭", onClick: () => setShowStructure(true), active: showStructure }] : []),
                             ]).map(t => (
                                 <button key={t.key} onClick={t.onClick}

@@ -56,8 +56,9 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
-  if (href === "/dashboard/missions") return pathname === "/dashboard/missions"; // fix turn lalu
-  return pathname.startsWith(href);
+  // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
+  if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
+  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
 }
 
 function getCachedUser() {
@@ -258,6 +259,13 @@ const Icons = {
       <polyline points="12 8 12 12 15 14" />
     </svg>
   ),
+  missionAll: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M3 9l9-6 9 6-9 6-9-6z" />
+      <path d="M3 15l9 6 9-6" />
+      <path d="M3 12l9 6 9-6" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -315,6 +323,14 @@ const MISSIONS_MENU: MenuGroup = {
     { name: "Progress Misi", href: "/dashboard/missions/progress", icon: Icons.missionProgress },
     { name: "Riwayat Misi", href: "/dashboard/missions/history", icon: Icons.missionHistory },
   ],
+};
+
+const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+
+const ITEM_MISSION_ALL: MenuItem = {
+  name: "Semua Misi",
+  href: "/dashboard/missions/all",
+  icon: Icons.missionAll,
 };
 
 // ── Preparation groups (UNION dari kedua versi; dedupe by href otomatis di mergeMenuGroups) ──
@@ -909,17 +925,29 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
 };
 
-const MISSION_HREFS = new Set(MISSIONS_MENU.items.map((i) => i.href));
-
+const MISSION_HREFS = new Set([
+  ...MISSIONS_MENU.items.map((i) => i.href),
+  ITEM_MISSION_ALL.href, // biar cleanup step 1 nge-strip item ini juga kalau kebawa dari inherit
+]);
 // ── Step 1: Bersihkan MISSIONS_MENU items dari semua group,
 //           lalu append MISSIONS_MENU khusus untuk non-PKL role.
+//           Untuk role full-access, tambahkan item "Semua Misi" ke MISSIONS_MENU.
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   ROLE_MENUS[role] = ROLE_MENUS[role]
     .map((g) => ({ ...g, items: g.items.filter((it) => !MISSION_HREFS.has(it.href)) }))
     .filter((g) => g.items.length > 0);
 
   if (!isPKLRole(role)) {
-    ROLE_MENUS[role] = [...ROLE_MENUS[role], MISSIONS_MENU];
+    const missionsForRole: MenuGroup = {
+      label: MISSIONS_MENU.label,
+      items: [...MISSIONS_MENU.items],
+    };
+
+    if (MISSION_FULL_ACCESS_ROLES.includes(role)) {
+      missionsForRole.items.push(ITEM_MISSION_ALL);
+    }
+
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], missionsForRole];
   }
 });
 
@@ -945,8 +973,8 @@ const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_KONTEN: "KONTEN",
   PKL_TEKNISI: "TEKNISI",
   PKL_PENGANTARAN: "PENGANTARAN",
-  PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",    
-  PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",    
+  PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",
+  PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
 };
 
 (Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(
@@ -989,8 +1017,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_TEKNISI: { label: "PKL Teknisi", className: "bg-amber-50 text-amber-700" },
   PKL_KONTEN: { label: "PKL Konten", className: "bg-amber-50 text-amber-700" },
   PKL_PENGANTARAN: { label: "PKL Pengantaran", className: "bg-amber-50 text-amber-700" },
-  PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" }, 
-  PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" }, 
+  PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
+  PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
 };
 
 function getInitials(name: string): string {
