@@ -32,13 +32,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             const limited = prev.length >= 3 ? prev.slice(1) : prev;
             return [...limited, user];
         });
+        setExpandedChatId(user.id);
     };
 
     const closeChat = (userId: string) => {
         setActiveChats(prev => prev.filter(c => c.id !== userId));
     };
 
-   return (
+    return (
         <ChatContext.Provider value={{
             activeChats,
             openChat,

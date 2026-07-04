@@ -139,8 +139,8 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
                     : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
             await sendPushBroadcast(senderId, {
-                title: `👥 All Team Solit — ${senderName}`,
-                body: pushBody,
+                title: "All Team Solit",              
+                body: `${senderName}: ${pushBody}`,   
                 tag: "group-chat",
                 url: "/dashboard/users",
                 requireInteraction: false,

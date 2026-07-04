@@ -991,7 +991,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
         edited_at: string | null;
         created_at: string;
         attachment_url: string | null;
-        attachment_type: "image" | "file" | null;
+        attachment_type: "image" | "file" | "voice" | null; // ⬅️ +voice
         attachment_name: string | null;
         attachment_size: number | null;
     }
@@ -999,6 +999,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
     const [messages, setMessages] = useState<DMMessage[]>([]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1018,7 +1019,6 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     }, [messages]);
 
-    // Realtime subscription
     useEffect(() => {
         const channel = supabase
             .channel(`embedded-dm:${[currentUser.id, targetUser.id].sort().join(":")}`)
@@ -1035,9 +1035,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                 (payload) => {
                     const u = payload.new as DMMessage;
                     setMessages(prev => prev.map(m => m.id === u.id
-                        ? { ...m, content: u.content, is_deleted: u.is_deleted, edited_at: u.edited_at }
-                        : m
-                    ));
+                        ? { ...m, content: u.content, is_deleted: u.is_deleted, edited_at: u.edited_at } : m));
                 }
             )
             .subscribe();
@@ -1069,18 +1067,66 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
         finally { setSending(false); setTimeout(() => inputRef.current?.focus(), 0); }
     };
 
+    // ── Voice Note ── (pola sama dgn ChatPanel: File eksplisit + MIME agar upload benar)
+    const sendVoiceNote = async (blob: Blob) => {
+        const tempId = `temp-${Date.now()}`;
+        const mimeType = blob.type && blob.type.startsWith("audio/") ? blob.type : "audio/webm";
+        const ext = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+        const fileName = `voice_${Date.now()}.${ext}`;
+        const previewUrl = URL.createObjectURL(blob);
+
+        const opt: DMMessage = {
+            id: tempId, sender_id: currentUser.id, receiver_id: targetUser.id,
+            content: "", is_read: false, is_deleted: false, edited_at: null,
+            created_at: new Date().toISOString(),
+            attachment_url: previewUrl, attachment_type: "voice",
+            attachment_name: fileName, attachment_size: blob.size,
+        };
+        setMessages(prev => [...prev, opt]);
+        setUploading(true);
+        try {
+            const audioFile = new File([blob], fileName, { type: mimeType }); // MIME eksplisit = kunci VN
+            const fd = new FormData();
+            fd.append("file", audioFile);
+            const up = await fetch("/api/messages/upload", { method: "POST", body: fd });
+            const upData = await up.json();
+            if (!upData.success) { URL.revokeObjectURL(previewUrl); setMessages(prev => prev.filter(m => m.id !== tempId)); return; }
+
+            const res = await fetch("/api/messages", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    receiver_id: targetUser.id, content: "",
+                    attachment_url: upData.url, attachment_type: "voice",
+                    attachment_name: fileName, attachment_size: blob.size,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+                setTimeout(() => URL.revokeObjectURL(previewUrl), 500);
+            } else {
+                URL.revokeObjectURL(previewUrl);
+                setMessages(prev => prev.filter(m => m.id !== tempId));
+            }
+        } catch (err) {
+            console.error("[embedded DM VN]", err);
+            URL.revokeObjectURL(previewUrl);
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        } finally { setUploading(false); }
+    };
+
     const handleKey = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     };
 
+    const isBusy = sending || uploading;
+
     return (
         <>
-            {/* Messages area */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
-                        <div className="w-5 h-5 rounded-full animate-spin"
-                            style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                        <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
@@ -1093,16 +1139,15 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     if (msg.is_deleted) {
                         return (
                             <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                                <span className="text-[10px] text-slate-400 italic px-2.5 py-1 bg-slate-100 rounded-lg">
-                                    Pesan dihapus
-                                </span>
+                                <span className="text-[10px] text-slate-400 italic px-2.5 py-1 bg-slate-100 rounded-lg">Pesan dihapus</span>
                             </div>
                         );
                     }
+                    const hasAttachment = !!msg.attachment_url && !!msg.attachment_type;
+                    const hasContent = !!msg.content;
                     return (
                         <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                            <div
-                                className="max-w-[82%] px-3 py-2 text-xs leading-relaxed break-words font-medium"
+                            <div className="max-w-[82%] px-3 py-2"
                                 style={{
                                     borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                                     background: isMine ? "linear-gradient(135deg,#1e1b4b,#3730a3)" : "#fff",
@@ -1110,14 +1155,24 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                                     boxShadow: isMine ? "0 2px 8px rgba(79,70,229,0.25)" : "0 1px 4px rgba(0,0,0,0.06)",
                                     color: isMine ? "#fff" : "#1e293b",
                                 }}>
-                                <p>{msg.content}</p>
+                                {hasAttachment && (
+                                    <div className={hasContent ? "mb-1.5" : ""}>
+                                        <AttachmentDisplay
+                                            url={msg.attachment_url!}
+                                            type={msg.attachment_type!}
+                                            name={msg.attachment_name}
+                                            size={msg.attachment_size}
+                                            isMine={isMine}
+                                        />
+                                    </div>
+                                )}
+                                {hasContent && <p className="text-xs leading-relaxed break-words font-medium">{msg.content}</p>}
                                 <div className="flex items-center justify-end gap-1 mt-1"
                                     style={{ color: isMine ? "rgba(255,255,255,0.4)" : "#94a3b8" }}>
                                     {msg.edited_at && <span className="text-[8px] italic">diedit ·</span>}
                                     <span className="text-[9px]">{formatTime(msg.created_at)}</span>
                                     {isMine && (
-                                        <span className="text-[9px]"
-                                            style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
+                                        <span className="text-[9px]" style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
                                             {msg.is_read ? "✓✓" : "✓"}
                                         </span>
                                     )}
@@ -1129,9 +1184,8 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                 <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
-            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white"
-                style={{ borderTop: "1px solid #f0f0f8" }}>
+            {/* Input — teks → tombol kirim, kosong → mic VN */}
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
                 <input
                     ref={inputRef}
                     value={input}
@@ -1139,32 +1193,23 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     onKeyDown={handleKey}
                     placeholder="Tulis pesan pribadi..."
                     maxLength={1000}
-                    disabled={sending}
-                    autoFocus
+                    disabled={isBusy}
                     className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-indigo-200"
-                    style={{
-                        background: "#f5f7ff",
-                        border: "1.5px solid #e8ecff",
-                        color: "#334155",
-                    }}
+                    style={{ background: "#f5f7ff", border: "1.5px solid #e8ecff", color: "#334155" }}
                 />
-                <button
-                    onClick={send}
-                    disabled={!input.trim() || sending}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
-                    style={{
-                        background: input.trim() ? "linear-gradient(135deg,#4f46e5,#7c3aed)" : "#e2e8f0",
-                        boxShadow: input.trim() ? "0 2px 8px rgba(79,70,229,0.35)" : "none",
-                    }}>
-                    {sending
-                        ? <div className="w-3 h-3 rounded-full animate-spin"
-                            style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                        : <svg className="w-3.5 h-3.5" fill="none" stroke={input.trim() ? "white" : "#94a3b8"} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
-                    }
-                </button>
+                {input.trim() ? (
+                    <button
+                        onClick={send}
+                        disabled={!input.trim() || sending}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
+                        style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)", boxShadow: "0 2px 8px rgba(79,70,229,0.35)" }}>
+                        {sending
+                            ? <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                            : <svg className="w-3.5 h-3.5" fill="none" stroke="white" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
+                    </button>
+                ) : (
+                    <VoiceRecorder onSend={sendVoiceNote} disabled={isBusy} />
+                )}
             </div>
         </>
     );
@@ -1640,7 +1685,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 }}>
 
                 {/* ── Sidebar kiri: Member List ── */}
-                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:flex md:border-r md:border-[#f0f0f8] ${mobileView === "members" && !embeddedDMUser ? "flex" : "hidden"}`}
+                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:border-r md:border-[#f0f0f8] ${embeddedDMUser ? "hidden md:flex" : `${mobileView === "members" ? "flex" : "hidden"} md:flex`}`}
                     style={{ background: "#fafbff" }}>
 
                     {/* Sidebar header */}
@@ -1697,6 +1742,24 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             ))}
                         </div>
                     </div>
+
+                    {/* ⬇️ BARU: entri grup — klik untuk balik ke All Team Solit dari sidebar */}
+                    <button
+                        onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser ? "bg-indigo-50" : "hover:bg-slate-50"}`}
+                        style={{ borderBottom: "1px solid #f0f0f8" }}>
+                        <div className="relative flex-shrink-0"
+                            style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", boxShadow: "0 2px 6px rgba(99,102,241,0.35)" }}>
+                            <SolitLogo size={34} radius={11} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-bold text-slate-800 truncate">All Team Solit</p>
+                            <p className="text-[9.5px] text-slate-400 truncate">
+                                Grup chat seluruh tim{onlineCount > 0 ? ` · ${onlineCount} online` : ""}
+                            </p>
+                        </div>
+                        {!embeddedDMUser && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                    </button>
 
                     {/* Member list */}
                     <div className="flex-1 overflow-y-auto py-2">
@@ -1793,7 +1856,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 </div>
 
                 {/* ── Kolom kanan: Header + Chat ── */}
-                <div className={`flex-1 flex-col overflow-hidden md:flex ${mobileView === "chat" && !embeddedDMUser ? "flex" : "hidden"}`} style={{ minWidth: 0 }}>
+                <div className={`flex-1 flex-col overflow-hidden ${embeddedDMUser ? "hidden" : `${mobileView === "chat" ? "flex" : "hidden"} md:flex`}`} style={{ minWidth: 0 }}>
+
+
 
                     {/* ── Header ── */}
                     <div
@@ -1999,16 +2064,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         onCancelReply={() => setReplyTo(null)}
                         onSend={send}
                         onSendAttachment={sendAttachment}
-                        onSendVoice={sendVoiceNote}  
+                        onSendVoice={sendVoiceNote}
                     />
                 </div>
 
                 {/* ── Kolom kanan: Embedded DM Panel ── */}
                 {embeddedDMUser && (
-                    <div
-                        className="flex-shrink-0 flex flex-col overflow-hidden w-full md:w-[340px] md:border-l md:border-[#f0f0f8]"
-                        style={{ animation: "dmSlideIn 0.2s ease-out" }}
-                    >
+                    <div className="flex-1 flex flex-col overflow-hidden min-w-0"
+                        style={{ animation: "dmSlideIn 0.22s cubic-bezier(0.22,1,0.36,1)", willChange: "transform, opacity" }}>
                         {/* DM Header */}
                         <div
                             className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5"
