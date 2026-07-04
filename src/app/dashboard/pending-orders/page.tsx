@@ -588,9 +588,16 @@ export default function PendingOrdersPage() {
     const [confirmPaymentTx, setConfirmPaymentTx] = useState<PendingTransaction | null>(null);
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
 
-    const canConfirm = userRole
-        ? (["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "KEPALA_SALES"] as UserRole[]).includes(userRole)
-        : false;
+    const CAN_CONFIRM_PAYMENT_ROLES: UserRole[] = [
+        "ADMIN",
+        "ASISTEN_CEO",
+        "PROGRAMMER",
+        "KEPALA_SALES",
+        "KEPALA_SOTECH",
+        "SOTECH",       
+    ];
+
+    const canConfirm = userRole ? CAN_CONFIRM_PAYMENT_ROLES.includes(userRole) : false;
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));

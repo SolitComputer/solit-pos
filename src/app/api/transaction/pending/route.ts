@@ -59,4 +59,6 @@ export const GET = withAuth(handler, [
   "CREW_SALES",
   "ACCOUNTING",
   "PENGANTARAN",
+  "KEPALA_SOTECH", // ✅ ADD
+  "SOTECH",        // ✅ ADD
 ]);

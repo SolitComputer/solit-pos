@@ -56,9 +56,9 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
-  // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
-  if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
-  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
+// Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
+if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
+if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";  return pathname.startsWith(href);
 }
 
 function getCachedUser() {
