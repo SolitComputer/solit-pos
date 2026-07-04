@@ -317,8 +317,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
-  "/api/units/confirm-payment": [...FULL_ACCESS, "KEPALA_SALES"],
-  "/api/users": [...FULL_ACCESS],
+  "/api/units/confirm-payment": [
+    ...FULL_ACCESS,
+    "KEPALA_SALES",
+    "KEPALA_SOTECH", // ✅ ADD
+    "SOTECH",        // ✅ ADD
+  ], "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
   "/api/attendance/salary": [...ALL_ROLES],
   "/api/attendance/leave": [...ALL_ROLES],

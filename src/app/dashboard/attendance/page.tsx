@@ -2525,8 +2525,20 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
 }
 
 export default function AttendanceDashboardPage() {
-    const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
-    const [attendances, setAttendances] = useState<Attendance[]>([]);
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(() => {
+        if (typeof window === "undefined") return null;
+        const y = parseInt(searchParams.get("year") ?? "", 10);
+        const m = parseInt(searchParams.get("month") ?? "", 10);
+
+        if (!Number.isNaN(y) && !Number.isNaN(m) && y >= 2000 && y <= 2100 && m >= 0 && m <= 11) {
+            const today = new Date();
+            const isFuture = y > today.getFullYear() || (y === today.getFullYear() && m > today.getMonth());
+            if (!isFuture) return { year: y, month: m };
+        }
+        return null;
+    }); const [attendances, setAttendances] = useState<Attendance[]>([]);
     const [manualRecords, setManualRecords] = useState<ManualAttendance[]>([]);
     const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
     const [allDateOffs, setAllDateOffs] = useState<DateOff[]>([]);
@@ -2541,8 +2553,6 @@ export default function AttendanceDashboardPage() {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [todayStatus, setTodayStatus] = useState<any>(null);
     const [statusLoading, setStatusLoading] = useState(false);
-    const router = useRouter();
-    const searchParams = useSearchParams();
     type ActiveTab = "calendar" | "summary" | "salary" | "salary-pkl" | "salary-slip" | "salary-history" | "leave" | "my-salary" | "my-slip";
 
     const VALID_TABS: ActiveTab[] = ["calendar", "summary", "salary", "salary-pkl", "salary-slip", "salary-history", "leave", "my-salary", "my-slip"];
@@ -3434,7 +3444,13 @@ export default function AttendanceDashboardPage() {
 
     if (!selectedMonth) return (
         <DashboardLayout>
-            <MonthSelector onSelect={(y, m) => setSelectedMonth({ year: y, month: m })} />
+            <MonthSelector onSelect={(y, m) => {
+                setSelectedMonth({ year: y, month: m });
+                const params = new URLSearchParams(searchParams.toString());
+                params.set("year", String(y));
+                params.set("month", String(m));
+                router.replace(`?${params.toString()}`, { scroll: false });
+            }} />
             <style jsx global>{`@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.animate-fadeIn{animation:fadeIn 0.35s ease-out;}`}</style>
         </DashboardLayout>
     );
@@ -3446,7 +3462,17 @@ export default function AttendanceDashboardPage() {
                 {/* ── Header ── */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <button onClick={() => setSelectedMonth(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
+                        <button
+                            onClick={() => {
+                                setSelectedMonth(null);
+                                const params = new URLSearchParams(searchParams.toString());
+                                params.delete("year");
+                                params.delete("month");
+                                const qs = params.toString();
+                                router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+                            }}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                        >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
                         <div>

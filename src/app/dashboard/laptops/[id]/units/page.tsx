@@ -142,6 +142,7 @@ function ConfirmModal({
     );
 }
 
+
 function BulkAddModal({
     laptopId,
     defaultSellingPrice,
@@ -591,6 +592,147 @@ function BulkAddModal({
     );
 }
 
+// ── Inline Edit Cell untuk Harga Modal ──────────────────────────────────────
+function EditablePriceCell({
+    unitId,
+    value,
+    onSaved,
+}: {
+    unitId: string;
+    value: number;
+    onSaved: (unitId: string, newPrice: number) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [inputVal, setInputVal] = useState(String(value));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!editing) setInputVal(String(value));
+    }, [value, editing]);
+
+    const handleSave = async () => {
+        const parsed = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            setError("Nominal tidak valid");
+            return;
+        }
+        if (parsed === value) {
+            setEditing(false);
+            return;
+        }
+
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/units/${unitId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ purchase_price: parsed }),
+            });
+            const result = await res.json();
+            if (!result.success) {
+                setError(result.message || "Gagal menyimpan");
+                return;
+            }
+            onSaved(unitId, parsed);
+            setEditing(false);
+        } catch {
+            setError("Koneksi gagal");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") handleSave();
+        if (e.key === "Escape") {
+            setEditing(false);
+            setInputVal(String(value));
+            setError("");
+        }
+    };
+
+    if (editing) {
+        return (
+            <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1">
+                    <input
+                        type="number"
+                        value={inputVal}
+                        onChange={e => { setInputVal(e.target.value); setError(""); }}
+                        onKeyDown={handleKeyDown}
+                        autoFocus
+                        className="w-36 h-7 border border-violet-400 rounded-lg px-2 text-xs text-right tabular-nums bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                        min={0}
+                    />
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-7 h-7 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition disabled:opacity-60"
+                        title="Simpan"
+                    >
+                        {saving ? (
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        ) : (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => { setEditing(false); setInputVal(String(value)); setError(""); }}
+                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition"
+                        title="Batal"
+                    >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                {error && <p className="text-[10px] text-red-500 font-medium">{error}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-700 tabular-nums font-medium">{fmt(value)}</span>
+            <button
+                onClick={() => { setEditing(true); setInputVal(String(value)); }}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 border border-violet-200 hover:border-violet-300 text-violet-600 hover:text-violet-700 rounded-md text-[10px] font-semibold transition-colors"
+                title="Edit harga modal"
+            >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Edit
+            </button>
+        </div>
+    );
+}
+
+// ── Toast notifikasi ringan ─────────────────────────────────────────────────
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+    useEffect(() => {
+        const t = setTimeout(onDone, 2500);
+        return () => clearTimeout(t);
+    }, [onDone]);
+
+    return (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-4">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            {message}
+        </div>
+    );
+}
+
 export default function UnitsPage() {
     const params = useParams();
     const laptopId = params.id as string;
@@ -622,6 +764,8 @@ export default function UnitsPage() {
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [toast, setToast] = useState("");
+
 
     const activeUnits = units.filter(u => u.status !== "SOLD");
 
@@ -685,6 +829,12 @@ export default function UnitsPage() {
         } catch { /* non-blocking */ }
     }, [laptopId]);
 
+    const handlePriceSaved = useCallback((unitId: string, newPrice: number) => {
+        setUnits(prev => prev.map(u =>
+            u.id === unitId ? { ...u, purchase_price: newPrice } : u
+        ));
+        setToast("Harga modal berhasil diperbarui!");
+    }, []);
 
     const filteredUnits = sortUnits(
         activeUnits.filter(u => {
@@ -1078,7 +1228,18 @@ export default function UnitsPage() {
                                             <Th>Grade</Th>
                                             <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
-                                            {canSeePriceInfo && <Th right>Harga Modal</Th>}
+                                            {canSeePriceInfo && (
+                                                <Th right>
+                                                    {canManageUnits ? (
+                                                        <span className="flex items-center justify-end gap-1">
+                                                            Harga Modal
+                                                            <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
+                                                        </span>
+                                                    ) : (
+                                                        "Harga Modal"
+                                                    )}
+                                                </Th>
+                                            )}
                                             <Th right>Harga Jual</Th>
                                             {canSeePriceInfo && <Th right>Margin</Th>}
                                             <Th>Status</Th>
@@ -1122,7 +1283,19 @@ export default function UnitsPage() {
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
                                                     </td>
                                                     {canSeePriceInfo && (
-                                                        <td className="px-4 py-3 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">{fmt(unit.purchase_price)}</td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            {canManageUnits ? (
+                                                                <EditablePriceCell
+                                                                    unitId={unit.id}
+                                                                    value={unit.purchase_price}
+                                                                    onSaved={handlePriceSaved}
+                                                                />
+                                                            ) : (
+                                                                <div className="text-right text-xs text-gray-500 tabular-nums">
+                                                                    {fmt(unit.purchase_price)}
+                                                                </div>
+                                                            )}
+                                                        </td>
                                                     )}
                                                     <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">{fmt(unit.selling_price)}</td>
                                                     {canSeePriceInfo && (
@@ -1217,39 +1390,23 @@ export default function UnitsPage() {
                                     </div>
                                 </div>
 
-                                {/* Harga */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Modal</label>
-                                        <input name="purchase_price" type="number" placeholder="0"
-                                            value={formData.purchase_price} onChange={handleChange}
-                                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                                            Harga Jual <span className="text-red-400">*</span>
-                                        </label>
-                                        <input name="selling_price" type="number" placeholder="0"
-                                            value={formData.selling_price} onChange={handleChange} required
-                                            className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
-                                    </div>
+                                {/* Harga Jual */}
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                        Harga Jual <span className="text-red-400">*</span>
+                                    </label>
+                                    <input name="selling_price" type="number" placeholder="0"
+                                        value={formData.selling_price} onChange={handleChange} required
+                                        className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                    {editingUnit && (
+                                        <p className="text-[10px] text-violet-600 mt-1 flex items-center gap-1">
+                                            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Harga modal diedit langsung dari tabel (kolom Harga Modal)
+                                        </p>
+                                    )}
                                 </div>
-
-                                {/* Estimasi Margin */}
-                                {formData.purchase_price && formData.selling_price && (
-                                    <div className="bg-gray-50 rounded-lg px-3 py-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-medium text-gray-500">Estimasi Margin</span>
-                                            <span className={`text-xs font-bold tabular-nums ${Number(formData.selling_price) - Number(formData.purchase_price) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                                {fmt(Number(formData.selling_price) - Number(formData.purchase_price))}
-                                            </span>
-                                        </div>
-                                        <div className="mt-1.5 h-1 bg-gray-200 rounded-full overflow-hidden">
-                                            <div className={`h-full rounded-full transition-all ${Number(formData.selling_price) - Number(formData.purchase_price) >= 0 ? "bg-emerald-500" : "bg-red-500"}`}
-                                                style={{ width: `${Math.min(100, Math.max(0, (Number(formData.selling_price) - Number(formData.purchase_price)) / Number(formData.selling_price) * 100))}%` }} />
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* ── CHANGED: Status — 2 tombol besar ── */}
                                 <div>
@@ -1452,6 +1609,7 @@ export default function UnitsPage() {
                     }}
                 />
             )}
+            {toast && <Toast message={toast} onDone={() => setToast("")} />}
         </DashboardLayout>
     );
 }
