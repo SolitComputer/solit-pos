@@ -19,8 +19,8 @@ self.addEventListener("push", (event) => {
 
     const title = payload.title || "Solit POS";
     const body = payload.body || "Ada pesan baru";
-    const icon = payload.icon || "/favicon.ico";
-    const badge = payload.badge || "/favicon.ico";
+    const icon = payload.icon || "/assets/solit03.jpeg";  
+    const badge = payload.badge || "/assets/solit03.jpeg";
     const tag = payload.tag || ("msg-" + Date.now());
     const data = payload.data || {};
     const requireInteraction = payload.requireInteraction || false;
@@ -44,26 +44,21 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
     event.notification.close();
-
     if (event.action === "dismiss") return;
 
     const url = (event.notification.data && event.notification.data.url)
         ? event.notification.data.url
-        : "/dashboard/users";
+        : "/dashboard";
 
-    event.waitUntil(
-        clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
-            for (var i = 0; i < clientList.length; i++) {
-                var client = clientList[i];
-                if (client.url.includes(self.location.origin) && "focus" in client) {
-                    client.focus();
-                    client.postMessage({ type: "NOTIFICATION_CLICK", url: url });
-                    return;
-                }
+    event.waitUntil((async () => {
+        const clientList = await clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of clientList) {
+            if (client.url.includes(self.location.origin) && "focus" in client) {
+                await client.focus();                                  
+                client.postMessage({ type: "NOTIFICATION_CLICK", url }); 
+                return;
             }
-            if (clients.openWindow) {
-                return clients.openWindow(url);
-            }
-        })
-    );
+        }
+        if (clients.openWindow) await clients.openWindow(url);         
+    })());
 });

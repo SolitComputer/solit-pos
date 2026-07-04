@@ -98,10 +98,10 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
       await sendPushToUser(receiver_id, {
-        title: `💬 ${senderName}`,
+        title: senderName,          
         body: pushBody,
         tag: `dm-${senderId}`,
-        url: `/dashboard?dm=${senderId}`, 
+        url: `/dashboard?dm=${senderId}`,
         requireInteraction: false,
       });
     } catch (err) {
