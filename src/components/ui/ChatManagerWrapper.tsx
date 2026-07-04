@@ -24,7 +24,8 @@ const getColor = (r: string) => ROLE_COLOR[r] ?? "#6b7280";
 
 function MinimizedHead({ user, onOpen, onClose }: { user: ChatUser; onOpen: () => void; onClose: () => void; }) {
     return (
-        <div className="group relative flex items-center" style={{ animation: "headPop .18s ease-out" }}>
+        <div className="group relative flex items-center"
+            style={{ animation: "headSlideIn .22s cubic-bezier(0.22,1,0.36,1)" }}>
             <button onClick={onOpen} title={`Buka chat ${user.name}`}
                 className="relative flex items-center justify-center text-white font-bold select-none transition hover:scale-105"
                 style={{ width: 48, height: 48, borderRadius: 16, background: `linear-gradient(135deg, ${getColor(user.role)}cc, ${getColor(user.role)})`, boxShadow: "0 4px 14px rgba(0,0,0,.22)", fontSize: 15 }}>
@@ -79,7 +80,7 @@ export function ChatManagerWrapper() {
                 dan digeser ke kiri (right:80) supaya tombol FAB tidak menutupi tombol kirim/mic */}
             {(expandedChat || minimizedChats.length > 0) && (
                 <div className="fixed z-[9985] flex flex-row-reverse items-end"
-                    style={{ bottom: 80, right: 80, gap: 10, maxWidth: "calc(100vw - 96px)" }}>
+                    style={{ bottom: 150, right: 20, gap: 10, maxWidth: "calc(100vw - 40px)" }}>
 
                     {/* DM expanded — full panel */}
                     {expandedChat && (
@@ -112,6 +113,7 @@ export function ChatManagerWrapper() {
                 @keyframes chatSlideUp { from { opacity:0; transform: translateY(12px);} to { opacity:1; transform: translateY(0);} }
                 @keyframes chatSlideRight { from { opacity:0; transform: translateX(16px);} to { opacity:1; transform: translateX(0);} }
                 @keyframes headPop { from { opacity:0; transform: scale(.6);} to { opacity:1; transform: scale(1);} }
+                @keyframes headSlideIn { from { opacity:0; transform: translateX(28px) scale(.6);} to { opacity:1; transform: translateX(0) scale(1);} }
             `}</style>
         </>
     );
