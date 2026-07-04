@@ -30,6 +30,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 }
 
 async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
+  // ... (biarkan seperti aslinya — tidak berubah)
   try {
     const { id } = await props.params;
     const body = await req.json();
@@ -37,7 +38,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const {
       serial_number, grade, condition_note,
       purchase_price, selling_price, status, notes,
-      received_at, // ← tambah ini
+      received_at,
     } = body;
 
     const { data, error } = await supabase
@@ -85,5 +86,6 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(getHandler);
+
+export const GET = withAuth(getHandler, PERMISSIONS.VIEW_UNITS);
 export const POST = withAuth(postHandler, PERMISSIONS.CREATE_LAPTOP);
