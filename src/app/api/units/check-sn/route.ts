@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 
@@ -15,11 +14,12 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    // ── 1) Cari di laptop_units dulu (perilaku lama, dipertahankan) ──
-    const { data: laptopUnit, error: laptopErr } = await supabase
+    // ── 1) Laptop dulu — .eq case-sensitive (perilaku lama, dipertahankan) ──
+    // Kolom di-select eksplisit biar buy_price (modal) TIDAK bocor ke client.
+    const { data: laptopUnit, error: laptopErr } = await supabaseAdmin
       .from("laptop_units")
       .select(`
-        *,
+        id, serial_number, grade, condition_note, selling_price, status, notes,
         laptop:laptops (
           id, laptop_name, brand, cpu, ram, storage, gpu, display
         )
@@ -36,19 +36,16 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       });
     }
 
-    // ── 2) Fallback: cari di accessory_units ──
-    // Pakai supabaseAdmin biar konsisten dgn route accessories lain
-    // & aman dari RLS. SN aksesoris disimpan UPPERCASE → ilike biar
-    // tetap ketemu walau scanner ngirim lowercase.
+    // ── 2) Fallback: accessory_units — .ilike biar case-insensitive ──
     const { data: accUnit, error: accErr } = await supabaseAdmin
       .from("accessory_units")
       .select(`
-        *,
+        id, serial_number, condition, selling_price, status, notes,
         accessory:accessories (
           id, name, category, brand, spec
         )
       `)
-      .eq("serial_number", sn.toUpperCase())
+      .ilike("serial_number", sn)
       .maybeSingle();
 
     if (accErr) console.error("[check-sn] accessory_units:", accErr);
