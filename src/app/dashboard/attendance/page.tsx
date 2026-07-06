@@ -2679,6 +2679,7 @@ export default function AttendanceDashboardPage() {
     }, []);
 
     const [salarySlips, setSalarySlips] = useState<any[]>([]);
+    const [slipPklFilter, setSlipPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
     const sortedSalarySlips = useMemo(() => {
         return [...salarySlips].sort((a, b) => {
             const nameA = a.users?.name ?? "";
@@ -3348,6 +3349,61 @@ export default function AttendanceDashboardPage() {
             return false;
         }
     }, [salaryMap, allowanceMap, overtimeTotal, calYear, calMonth]);
+
+    // ✅ NEW: Generator slip khusus PKL — tanpa tunjangan, kasbon, pensiun.
+    // Fallback ke rate harian (PKL_DAILY_RATE / PKL_LATE_RATE) kalau belum ada config gaji,
+    // biar nominal di slip PERSIS sama dengan yang tampil di tab Rekap Gaji PKL.
+    const generateSlipPKL = useCallback(async (userStat: typeof userSummary[0]) => {
+        try {
+            const sal = salaryMap[userStat.userId];
+            const overtimeAmount = overtimeTotal[userStat.userId] || 0;
+            const hasSalaryConfig = !!sal && sal.base_salary > 0;
+
+            const salaryIncome = hasSalaryConfig
+                ? (sal!.salary_type === "FIXED"
+                    ? sal!.base_salary
+                    : userStat.totalWorkdays > 0
+                        ? Math.round((sal!.base_salary / userStat.totalWorkdays) * userStat.score)
+                        : 0)
+                : (userStat.present * PKL_DAILY_RATE) + (userStat.late * PKL_LATE_RATE);
+
+            // PKL: tidak ada tunjangan & tidak ada potongan
+            const grossIncome = salaryIncome + overtimeAmount;
+            const netSalary = grossIncome;
+
+            const res = await fetch("/api/attendance/salary-slip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userStat.userId,
+                    year: calYear,
+                    month: calMonth + 1,
+                    salary_type: sal?.salary_type || "FIXED",
+                    base_salary: sal?.base_salary || 0,
+                    salary_income: salaryIncome,
+                    allowance_wife: 0,
+                    allowance_child: 0,
+                    overtime: overtimeAmount,
+                    total_income: grossIncome,
+                    deduction_loan: 0,
+                    deduction_pension: 0,
+                    total_deduction: 0,
+                    net_salary: netSalary,
+                }),
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                alert(`Gagal generate slip PKL ${userStat.name}: ${data.message}`);
+                return false;
+            }
+            return true;
+        } catch (err) {
+            console.error("[generateSlipPKL] error:", err);
+            alert("Gagal generate slip PKL. Lihat console untuk detail.");
+            return false;
+        }
+    }, [salaryMap, overtimeTotal, calYear, calMonth]);
 
     const buildAttendanceDetail = useCallback((
         userName: string,
@@ -4599,7 +4655,7 @@ export default function AttendanceDashboardPage() {
                             <div>
                                 <p className="text-base font-bold text-gray-800">🎓 Rekap Gaji PKL — {MONTH_NAMES[calMonth]} {calYear}</p>
                                 <p className="text-[10px] text-amber-600 mt-1 font-semibold">
-                                    Gaji PKL dihitung terpisah dari karyawan tetap
+                                    Gaji Pokok + Lemburan · <span className="text-gray-400 font-medium">tanpa tunjangan, kasbon & pensiun</span>
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -4619,7 +4675,7 @@ export default function AttendanceDashboardPage() {
                                 ))}
                             </div>
                         ) : (() => {
-                            // Filter hanya user PKL
+                            // Hanya user PKL
                             const pklSummary = userSummary.filter(u => {
                                 const uInfo = allUsers.find(au => au.id === u.userId);
                                 return uInfo ? isPKLRole(uInfo.role) : false;
@@ -4637,23 +4693,22 @@ export default function AttendanceDashboardPage() {
                                 );
                             }
 
-                            const totalNetPKL = pklSummary.reduce((sum, u) => {
+                            // ✅ Helper hitung gaji pokok PKL (tanpa potongan/tunjangan)
+                            const calcPklIncome = (u: typeof pklSummary[0]) => {
                                 const sal = salaryMap[u.userId];
-                                const allow = allowanceMap[u.userId];
-                                const overtime = overtimeTotal[u.userId] || 0;
-                                const hasSalaryConfig = sal && sal.base_salary > 0;
-                                const salaryIncome = hasSalaryConfig
+                                const hasSalaryConfig = !!sal && sal.base_salary > 0;
+                                return hasSalaryConfig
                                     ? (sal!.salary_type === "FIXED"
                                         ? sal!.base_salary
-                                        : sal! && u.totalWorkdays > 0
+                                        : u.totalWorkdays > 0
                                             ? Math.round((sal!.base_salary / u.totalWorkdays) * u.score)
                                             : 0)
                                     : (u.present * PKL_DAILY_RATE) + (u.late * PKL_LATE_RATE);
-                                const deductionLoan = allow?.deduction_loan || 0;
-                                const deductionPension = allow?.deduction_pension || 0;
-                                const gross = salaryIncome + overtime;
-                                return sum + gross - deductionLoan - deductionPension;
-                            }, 0);
+                            };
+
+                            const totalPokokPKL = pklSummary.reduce((s, u) => s + calcPklIncome(u), 0);
+                            const totalOvertimePKL = pklSummary.reduce((s, u) => s + (overtimeTotal[u.userId] || 0), 0);
+                            const totalNetPKL = totalPokokPKL + totalOvertimePKL; // ✅ PKL: net = pokok + lembur
 
                             return (
                                 <>
@@ -4666,6 +4721,12 @@ export default function AttendanceDashboardPage() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Total Lemburan</span>
+                                            <span className="text-sm font-black text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full font-mono">
+                                                {formatRupiah(totalOvertimePKL)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Total Gaji Bersih</span>
                                             <span className="text-sm font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full font-mono">
                                                 {formatRupiah(totalNetPKL)}
@@ -4675,40 +4736,30 @@ export default function AttendanceDashboardPage() {
 
                                     {/* Table PKL */}
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-sm min-w-[900px]">
+                                        <table className="w-full text-sm min-w-[1000px]">
                                             <thead>
                                                 <tr className="border-b border-gray-100 bg-gray-50/60">
-                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">#</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">PKL</th>
-                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hadir</th>
-                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
-                                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hadir</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
                                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kehadiran %</th>
-                                                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Bersih</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Pokok</th>
+                                                    <th className="px-3 py-4 text-center text-[10px] font-black text-orange-500 uppercase tracking-widest">Lemburan</th>
+                                                    <th className="px-3 py-4 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Gaji Bersih</th>
                                                     <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {pklSummary.map((u, i) => {
                                                     const sal = salaryMap[u.userId];
-                                                    const allow = allowanceMap[u.userId];
                                                     const overtime = overtimeTotal[u.userId] || 0;
+                                                    const hasSalaryConfig = !!sal && sal.base_salary > 0;
 
-                                                    const hasSalaryConfig = sal && sal.base_salary > 0;
-
-                                                    const pklIncome = hasSalaryConfig
-                                                        ? (sal!.salary_type === "FIXED"
-                                                            ? sal!.base_salary
-                                                            : sal! && u.totalWorkdays > 0
-                                                                ? Math.round((sal!.base_salary / u.totalWorkdays) * u.score)
-                                                                : 0)
-                                                        : (u.present * PKL_DAILY_RATE) + (u.late * PKL_LATE_RATE);
-
-                                                    const salaryIncome = pklIncome;
-                                                    const deductionLoan = allow?.deduction_loan || 0;
-                                                    const deductionPension = allow?.deduction_pension || 0;
-                                                    const gross = salaryIncome + overtime;
-                                                    const net = gross - deductionLoan - deductionPension;
+                                                    const salaryIncome = calcPklIncome(u);
+                                                    const net = salaryIncome + overtime; // ✅ tanpa potongan
 
                                                     const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
                                                     const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
@@ -4733,7 +4784,7 @@ export default function AttendanceDashboardPage() {
                                                             </td>
 
                                                             {/* Hadir */}
-                                                            <td className="px-4 py-4 text-center">
+                                                            <td className="px-3 py-4 text-center">
                                                                 {u.present > 0 ? (
                                                                     <button
                                                                         onClick={() => setAttendanceSummaryDetail(buildAttendanceDetail(u.name, "present"))}
@@ -4745,7 +4796,7 @@ export default function AttendanceDashboardPage() {
                                                             </td>
 
                                                             {/* Terlambat */}
-                                                            <td className="px-4 py-4 text-center">
+                                                            <td className="px-3 py-4 text-center">
                                                                 {u.late > 0 ? (
                                                                     <button
                                                                         onClick={() => setAttendanceSummaryDetail(buildAttendanceDetail(u.name, "late"))}
@@ -4757,7 +4808,7 @@ export default function AttendanceDashboardPage() {
                                                             </td>
 
                                                             {/* Tidak Hadir */}
-                                                            <td className="px-4 py-4 text-center">
+                                                            <td className="px-3 py-4 text-center">
                                                                 {u.absences.length > 0 ? (
                                                                     <button
                                                                         onClick={() => setAbsenceDetail({ name: u.name, absences: u.absences, offDates: u.offDates })}
@@ -4768,7 +4819,8 @@ export default function AttendanceDashboardPage() {
                                                                 ) : <span className="text-gray-200 text-sm font-black">—</span>}
                                                             </td>
 
-                                                            <td className="px-4 py-4 text-center">
+                                                            {/* Cuti */}
+                                                            <td className="px-3 py-4 text-center">
                                                                 {u.leave > 0 ? (
                                                                     <span
                                                                         className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 text-sm font-black border border-cyan-200"
@@ -4776,9 +4828,7 @@ export default function AttendanceDashboardPage() {
                                                                     >
                                                                         {u.leave}
                                                                     </span>
-                                                                ) : (
-                                                                    <span className="text-gray-200 text-sm font-black">—</span>
-                                                                )}
+                                                                ) : <span className="text-gray-200 text-sm font-black">—</span>}
                                                             </td>
 
                                                             {/* Kehadiran % */}
@@ -4799,28 +4849,44 @@ export default function AttendanceDashboardPage() {
                                                                 </div>
                                                             </td>
 
-                                                            {/* Gaji Bersih — editable */}
-                                                            <td className="px-4 py-4 text-right">
+                                                            {/* Gaji Pokok */}
+                                                            <td className="px-3 py-4 text-center">
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="font-mono font-bold text-gray-800 text-xs">
+                                                                        {formatRupiah(salaryIncome)}
+                                                                    </span>
+                                                                    {hasSalaryConfig ? (
+                                                                        <span className="text-[8px] text-gray-400">
+                                                                            {sal!.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[8px] text-amber-500 font-semibold whitespace-nowrap">
+                                                                            {u.present}×10k{u.late > 0 ? ` +${u.late}×5k` : ""}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Lemburan */}
+                                                            <td className="px-3 py-4 text-center">
+                                                                {overtime > 0 ? (
+                                                                    <span className="font-mono font-bold text-orange-600 text-xs">
+                                                                        +{formatRupiah(overtime)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-gray-300 text-xs">—</span>
+                                                                )}
+                                                            </td>
+
+                                                            {/* Gaji Bersih */}
+                                                            <td className="px-3 py-4 text-right">
                                                                 <div className="inline-flex flex-col items-end gap-1">
-                                                                    {/* Nominal bersih */}
                                                                     <div className="inline-flex flex-col items-end gap-0.5 bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-lg px-3 py-1.5">
                                                                         <span className="font-black text-emerald-700 text-sm font-mono">
                                                                             {formatRupiah(net)}
                                                                         </span>
-                                                                        {/* Breakdown jika pakai rate harian */}
-                                                                        {!hasSalaryConfig && (
-                                                                            <span className="text-[9px] text-amber-500 font-semibold">
-                                                                                {u.present}×Rp10k {u.late > 0 ? `+ ${u.late}×Rp5k` : ""}
-                                                                            </span>
-                                                                        )}
-                                                                        {/* Breakdown jika ada potongan */}
-                                                                        {(deductionLoan + deductionPension) > 0 && (
-                                                                            <span className="text-[9px] text-red-500 font-semibold">
-                                                                                -{formatRupiah(deductionLoan + deductionPension)}
-                                                                            </span>
-                                                                        )}
+                                                                        <span className="text-[8px] text-emerald-600 font-semibold">bersih</span>
                                                                     </div>
-                                                                    {/* Tombol edit */}
                                                                     <button
                                                                         onClick={() => setEditSalaryUser({
                                                                             userId: u.userId,
@@ -4839,8 +4905,8 @@ export default function AttendanceDashboardPage() {
                                                                 <div className="flex items-center gap-1.5 justify-center flex-wrap">
                                                                     <button
                                                                         onClick={async () => {
-                                                                            if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
-                                                                            const success = await generateSlipFromRecapan(u);
+                                                                            if (!confirm(`Generate slip gaji PKL ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
+                                                                            const success = await generateSlipPKL(u);
                                                                             if (success) {
                                                                                 fetchSalarySlips(calYear, calMonth);
                                                                                 alert(`✅ Slip gaji PKL ${u.name} berhasil di-generate!`);
@@ -4870,10 +4936,22 @@ export default function AttendanceDashboardPage() {
                                             {/* Footer total */}
                                             <tfoot>
                                                 <tr className="border-t-2 border-amber-200 bg-amber-50/40">
-                                                    <td colSpan={6} className="px-4 py-4 text-sm font-black text-amber-700">
+                                                    <td colSpan={7} className="px-4 py-4 text-sm font-black text-amber-700">
                                                         TOTAL GAJI PKL — {MONTH_NAMES[calMonth]} {calYear}
                                                     </td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-3 py-4 text-center">
+                                                        <span className="font-mono font-black text-gray-700 text-xs block">
+                                                            {formatRupiah(totalPokokPKL)}
+                                                        </span>
+                                                        <span className="text-[8px] text-gray-400">Pokok</span>
+                                                    </td>
+                                                    <td className="px-3 py-4 text-center">
+                                                        <span className="font-mono font-black text-orange-600 text-xs block">
+                                                            {formatRupiah(totalOvertimePKL)}
+                                                        </span>
+                                                        <span className="text-[8px] text-gray-400">Lembur</span>
+                                                    </td>
+                                                    <td className="px-3 py-4 text-right">
                                                         <span className="font-black text-emerald-700 text-sm font-mono bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg">
                                                             {formatRupiah(totalNetPKL)}
                                                         </span>
@@ -4886,9 +4964,11 @@ export default function AttendanceDashboardPage() {
 
                                     {/* Legend */}
                                     <div className="px-6 py-4 bg-amber-50/30 border-t border-amber-100 flex items-center gap-4 flex-wrap text-[10px] text-gray-500 font-medium">
-                                        <span>🎓 <span className="text-amber-600 font-semibold">Gaji PKL</span> — dihitung terpisah dari karyawan tetap</span>
+                                        <span>🎓 <span className="text-amber-600 font-semibold">Gaji PKL</span> = Gaji Pokok + Lemburan</span>
                                         <span>•</span>
-                                        <span>💡 Gunakan tombol <strong>✏️ Edit Gaji</strong> untuk atur nominal per PKL</span>
+                                        <span>🚫 <span className="text-gray-500 font-semibold">Tanpa tunjangan, kasbon & pensiun</span></span>
+                                        <span>•</span>
+                                        <span>💡 Belum diatur gaji → fallback rate harian <strong>Rp10rb/hadir</strong>, <strong>Rp5rb/telat</strong></span>
                                     </div>
                                 </>
                             );
