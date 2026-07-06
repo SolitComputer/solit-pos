@@ -951,45 +951,6 @@ const MISSION_HREFS = new Set([
   }
 });
 
-// ── Step 2: PKL variant inherit menu penuh dari parent role.
-//           Dilakukan SETELAH cleanup di atas, supaya MISSIONS_MENU
-//           udah ke-append di parent → otomatis ikut ter-share ke PKL variant.
-//
-//           Mapping sesuai permintaan Ikmal:
-//             PKL_MARKETING → MARKETING
-//             PKL_SALES     → CREW_SALES
-//             PKL_SOTECH    → SOTECH
-//             PKL_ONPOINT   → ONPOINT
-//             PKL_KONTEN    → KONTEN
-//             PKL_TEKNISI   → TEKNISI
-//
-//           PKL polos & PKL_PENYEDIA_BARANG TIDAK diubah (tetap pakai
-//           PKL_MENU / PKL_PENYEDIA_MENU) karena tidak diminta.
-// ── Step 2: PKL variant inherit menu penuh dari parent role.
-//           Dilakukan SETELAH cleanup di atas, supaya MISSIONS_MENU
-//           udah ke-append di parent → otomatis ikut ter-share ke PKL variant.
-//
-//           ⚠️ Setelah inherit, ada 2 penyesuaian WAJIB untuk PKL variant:
-//             1. Inject ITEM_PKL_REPORT ke grup "Overview" (kalau belum ada)
-//                → biar semua PKL bisa lihat menu Laporan Kerja PKL.
-//             2. Strip semua item Misi (MISSIONS_MENU items + ITEM_MISSIONS
-//                + ITEM_MISSION_ALL) dari SEMUA grup → sesuai spec, PKL tidak
-//                boleh akses menu Misi.
-//
-//           Mapping sesuai permintaan Ikmal:
-//             PKL_MARKETING → MARKETING
-//             PKL_SALES     → CREW_SALES
-//             PKL_SOTECH    → SOTECH
-//             PKL_ONPOINT   → ONPOINT
-//             PKL_KONTEN    → KONTEN
-//             PKL_TEKNISI   → TEKNISI
-//             PKL_PENGANTARAN → PENGANTARAN
-//             PKL_CUSTOMER_SERVICE → CUSTOMER_SERVICE
-//             PKL_PENGELOLA_BARANG → PENGELOLA_BARANG
-//
-//           PKL polos & PKL_PENYEDIA_BARANG TIDAK diubah (tetap pakai
-//           PKL_MENU / PKL_PENYEDIA_MENU) karena keduanya sudah punya
-//           ITEM_PKL_REPORT dan tidak punya ITEM_MISSIONS.
 const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_MARKETING: "MARKETING",
   PKL_SALES: "CREW_SALES",
