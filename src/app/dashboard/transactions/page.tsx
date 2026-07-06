@@ -1247,6 +1247,8 @@ export default function Page() {
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [highlightInvoice, setHighlightInvoice] = useState<string | null>(null);
+  const [highlightName, setHighlightName] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -1257,6 +1259,14 @@ export default function Page() {
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+  }, []);
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const hl = p.get("highlight");
+    const nm = p.get("nama");
+    if (hl) { setHighlightInvoice(hl); setSearch(hl); }
+    if (nm) setHighlightName(nm);
   }, []);
 
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
@@ -1611,6 +1621,23 @@ export default function Page() {
             )}
           </div>
         </div>
+
+        {/* ── Banner deep-link dari Cashflow ── */}
+        {highlightInvoice && (
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-xs text-amber-800">
+              🔗 Menyorot transaksi dari <b>Cashflow</b>
+              {highlightName ? <>: <b>{highlightName}</b></> : ""}{" "}
+              <span className="font-mono text-amber-600">({highlightInvoice})</span>
+            </p>
+            <button
+              onClick={() => { setHighlightInvoice(null); setHighlightName(null); setSearch(""); }}
+              className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold whitespace-nowrap"
+            >
+              ✕ Tampilkan semua
+            </button>
+          </div>
+        )}
 
         {/* ── Search + Filter ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">

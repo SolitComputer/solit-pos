@@ -110,14 +110,12 @@ export const GET = withAuth(async () => {
 // ── POST /api/cashflow — input manual (uang keluar / uang masuk non-otomatis) ──
 export const POST = withAuth(async (req, _ctx, user: any) => {
     const body = await req.json();
-    const { direction, category, nama, nominal, keterangan, tanggal, modal } = body as {
+    const { direction, category, nominal, keterangan, tanggal } = body as {
         direction: string;
         category: string;
-        nama: string;
         nominal: number | string;
         keterangan?: string;
         tanggal?: string;
-        modal?: number | string;
     };
 
     if (direction !== "OUT")
@@ -126,9 +124,6 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             { status: 400 }
         );
 
-    if (!nama?.trim())
-        return NextResponse.json({ success: false, message: "Nama wajib diisi" }, { status: 400 });
-
     if (!isValidCategory(direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
@@ -136,15 +131,18 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     if (!Number.isFinite(nom) || nom <= 0)
         return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
 
+    // ✅ Nama = nama user yg mengisi formulir (bukan input manual lagi)
+    const userName = (user?.name && String(user.name).trim()) || "—";
+
     const supabase = getAdmin();
     const { data, error } = await supabase
         .from("cashflow_entries")
         .insert({
             direction,
             category,
-            nama: nama.trim(),
+            nama: userName,
             nominal: nom,
-            modal: modal !== undefined && modal !== null && `${modal}`.trim() !== "" ? Math.round(Number(modal)) : null,
+            modal: null, // harga modal dihapus dari input
             keterangan: keterangan?.trim() || null,
             tanggal: tanggal || new Date().toISOString().slice(0, 10),
             source_type: "MANUAL",

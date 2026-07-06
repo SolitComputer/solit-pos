@@ -2,6 +2,7 @@
 // src/app/dashboard/cashflow/page.tsx
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { EXPENSE_CATEGORIES, categoryLabel } from "@/lib/cashflow";
 
@@ -19,6 +20,7 @@ type Entry = {
   modal: number | null;
   keterangan: string | null;
   source_type: "MANUAL" | "TRANSACTION" | "SERVICE";
+  source_id: string | null;
   tanggal: string;
   is_audited: boolean;
   audited_at: string | null;
@@ -54,22 +56,32 @@ const IconClock = () => (
     <circle cx="12" cy="12" r="10" /><polyline points="12 7 12 12 15 14" />
   </svg>
 );
+const IconExternal = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
 
-// ── Audit pill button ────────────────────────────────────────────────────────
-function AuditToggle({ entry, onToggle, busy }: { entry: Entry; onToggle: () => void; busy: boolean }) {
+// ── Audit cell (one-way: sekali audit → terkunci) ────────────────────────────
+function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
+  if (entry.is_audited) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+        title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Sudah diaudit"}
+      >
+        <IconCheck /> Sudah Audit
+      </span>
+    );
+  }
   return (
     <button
-      onClick={onToggle}
+      onClick={(ev) => { ev.stopPropagation(); onAudit(); }}
       disabled={busy}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition disabled:opacity-50 ${
-        entry.is_audited
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-          : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-      }`}
-      title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Klik untuk audit"}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+      title="Klik untuk audit (tidak bisa dibatalkan)"
     >
-      {entry.is_audited ? <IconCheck /> : <IconClock />}
-      {entry.is_audited ? "Sudah Audit" : "Belum Audit"}
+      <IconClock /> {busy ? "Memproses..." : "Belum Audit"}
     </button>
   );
 }
@@ -78,12 +90,10 @@ function AuditToggle({ entry, onToggle, busy }: { entry: Entry; onToggle: () => 
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const categories = Object.entries(EXPENSE_CATEGORIES);
 
-  const [nama, setNama] = useState("");
   const [category, setCategory] = useState(categories[0]?.[0] ?? "");
   const [nominal, setNominal] = useState("");
   const [keterangan, setKeterangan] = useState("");
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-  const [modal, setModal] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -94,7 +104,6 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   }, [onClose]);
 
   const submit = async () => {
-    if (!nama.trim()) return setError("Nama wajib diisi");
     if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
     setSaving(true);
     setError("");
@@ -105,11 +114,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         body: JSON.stringify({
           direction: "OUT",
           category,
-          nama: nama.trim(),
           nominal: Number(nominal),
           keterangan: keterangan.trim() || null,
           tanggal,
-          modal: modal ? Number(modal) : undefined,
         }),
       });
       const json = await res.json();
@@ -138,7 +145,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900 leading-tight">Tambah Uang Keluar</p>
-              <p className="text-[11px] text-gray-400">Pengeluaran manual</p>
+              <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
@@ -151,11 +158,6 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         {/* Body */}
         <div className="p-5 space-y-3.5">
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nama</label>
-            <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Contoh: Bayar listrik toko" className={inputCls} autoFocus />
-          </div>
-
-          <div>
             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
               {categories.map(([k, label]) => (
@@ -167,7 +169,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal</label>
-              <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} />
+              <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
               {nominal && Number(nominal) > 0 && (
                 <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>
               )}
@@ -176,16 +178,6 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
               <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
             </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
-              Harga Modal <span className="text-gray-400 font-normal">(opsional)</span>
-            </label>
-            <input type="number" value={modal} onChange={(e) => setModal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} />
-            {modal && Number(modal) > 0 && (
-              <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(modal))}</p>
-            )}
           </div>
 
           <div>
@@ -236,11 +228,13 @@ function StatCard({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [masuk, setMasuk] = useState<Entry[]>([]);
   const [keluar, setKeluar] = useState<Entry[]>([]);
   const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0 });
   const [tab, setTab] = useState<"IN" | "OUT">("IN");
+  const [period, setPeriod] = useState<"today" | "month">("today");
   const [showModal, setShowModal] = useState(false);
   const [auditingId, setAuditingId] = useState<string | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -275,6 +269,7 @@ export default function CashflowPage() {
   }, [allowed, fetchData]);
 
   const toggleAudit = async (entry: Entry) => {
+    if (entry.is_audited) return; // one-way, guard tambahan
     setAuditingId(entry.id);
     try {
       const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -290,11 +285,22 @@ export default function CashflowPage() {
   };
 
   const deleteEntry = async (entry: Entry) => {
-    if (!confirm(`Hapus "${entry.nama}"?`)) return;
+    if (!confirm(`Hapus pengeluaran "${entry.keterangan || entry.nama}"?`)) return;
     const res = await fetch(`/api/cashflow/${entry.id}`, { method: "DELETE" });
     const json = await res.json();
     if (json.success) fetchData();
     else alert(json.message || "Gagal menghapus");
+  };
+
+  // ── Klik baris uang masuk → nge-link ke sumbernya ──
+  const openSource = (e: Entry) => {
+    if (e.direction !== "IN") return;
+    if (e.source_type === "TRANSACTION" && e.source_id) {
+      const q = new URLSearchParams({ highlight: e.source_id, nama: e.nama || "" }).toString();
+      router.push(`/dashboard/transactions?${q}`);
+    } else if (e.source_type === "SERVICE") {
+      router.push("/dashboard/service/history");
+    }
   };
 
   if (allowed === false) {
@@ -309,7 +315,14 @@ export default function CashflowPage() {
   }
 
   const rows = tab === "IN" ? masuk : keluar;
-  const colCount = tab === "OUT" ? 9 : 8;
+  const colCount = 8;
+
+  // ── Total uang masuk per periode (client-side, WIB) ──
+  const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
+  const monthPrefix = jakartaToday.slice(0, 7);
+  const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
+  const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
+  const incomeValue = period === "today" ? incomeToday : incomeMonth;
 
   return (
     <DashboardLayout>
@@ -335,7 +348,35 @@ export default function CashflowPage() {
           </button>
         </div>
 
-        {/* Summary */}
+        {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
+              </p>
+              <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
+                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
+            </div>
+            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+              {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setPeriod(val)}
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${
+                    period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
           <StatCard
@@ -370,7 +411,6 @@ export default function CashflowPage() {
             ))}
           </div>
 
-          {/* Tombol tambah HANYA untuk uang keluar */}
           {tab === "OUT" && (
             <button
               onClick={() => setShowModal(true)}
@@ -388,21 +428,21 @@ export default function CashflowPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0">
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            Uang masuk otomatis tercatat dari <b>Riwayat Transaksi</b> (lunas) & <b>Service</b>. Tidak ada input manual.
+            Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> / <b>Service</b>. Uang masuk otomatis, tanpa input manual.
           </div>
         )}
 
         {/* Table */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: 880 }}>
+            <table className="w-full text-sm" style={{ minWidth: 820 }}>
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/70">
-                  {["Tanggal", "Nama", "Kategori", "Nominal", ...(tab === "OUT" ? ["Modal"] : []), "Keterangan", "Audit", "Oleh", ""].map((h, i) => (
+                  {["Tanggal", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
                     <th
                       key={i}
                       className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${
-                        h === "Nominal" || h === "Modal" ? "text-right" : "text-left"
+                        h === "Nominal" ? "text-right" : "text-left"
                       } first:pl-5`}
                     >
                       {h}
@@ -431,48 +471,52 @@ export default function CashflowPage() {
                     </td>
                   </tr>
                 ) : (
-                  rows.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="pl-5 pr-3.5 py-3 text-[12px] text-gray-500 whitespace-nowrap">{fmtTanggal(e.tanggal)}</td>
-                      <td className="px-3.5 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[13px] font-semibold text-gray-800">{e.nama}</span>
-                          {e.source_type !== "MANUAL" && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">AUTO</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
-                          {categoryLabel(e.direction, e.category)}
-                        </span>
-                      </td>
-                      <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
-                        {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
-                      </td>
-                      {tab === "OUT" && (
-                        <td className="px-3.5 py-3 text-right font-mono text-[12px] text-gray-400 tabular-nums whitespace-nowrap">
-                          {e.modal ? fmtRupiah(e.modal) : "—"}
+                  rows.map((e) => {
+                    const clickable = e.direction === "IN";
+                    return (
+                      <tr
+                        key={e.id}
+                        onClick={() => clickable && openSource(e)}
+                        className={`transition-colors ${clickable ? "cursor-pointer hover:bg-blue-50/50" : "hover:bg-gray-50/70"}`}
+                      >
+                        <td className="pl-5 pr-3.5 py-3 text-[12px] text-gray-500 whitespace-nowrap">{fmtTanggal(e.tanggal)}</td>
+                        <td className="px-3.5 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[13px] font-semibold text-gray-800">{e.nama}</span>
+                            {e.source_type !== "MANUAL" && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">AUTO</span>
+                            )}
+                          </div>
                         </td>
-                      )}
-                      <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[220px] truncate">{e.keterangan || "—"}</td>
-                      <td className="px-3.5 py-3">
-                        <AuditToggle entry={e} busy={auditingId === e.id} onToggle={() => toggleAudit(e)} />
-                      </td>
-                      <td className="px-3.5 py-3 text-[11px] whitespace-nowrap">
-                        {e.created_by_user?.name && <span className="text-gray-500" title="Dibuat oleh">✍️ {e.created_by_user.name}</span>}
-                        {e.audited_by_user?.name && <span className="block text-emerald-600" title="Diaudit oleh">🔍 {e.audited_by_user.name}</span>}
-                        {!e.created_by_user?.name && !e.audited_by_user?.name && <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-3.5 py-3 text-right">
-                        {e.source_type === "MANUAL" && (
-                          <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
-                            <IconTrash />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        <td className="px-3.5 py-3">
+                          <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
+                            {categoryLabel(e.direction, e.category)}
+                          </span>
+                        </td>
+                        <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                          {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
+                        </td>
+                        <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px] truncate">{e.keterangan || "—"}</td>
+                        <td className="px-3.5 py-3" onClick={(ev) => ev.stopPropagation()}>
+                          <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} />
+                        </td>
+                        <td className="px-3.5 py-3 text-[11px] whitespace-nowrap">
+                          {e.audited_by_user?.name
+                            ? <span className="text-emerald-600" title="Diaudit oleh">🔍 {e.audited_by_user.name}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3.5 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
+                          {e.direction === "OUT" && e.source_type === "MANUAL" ? (
+                            <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
+                              <IconTrash />
+                            </button>
+                          ) : clickable ? (
+                            <span className="inline-flex text-gray-300" title="Buka sumber"><IconExternal /></span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

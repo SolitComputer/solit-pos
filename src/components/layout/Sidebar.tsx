@@ -60,12 +60,7 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href.startsWith("/dashboard/service/")) return pathname === href;
   // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
   if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
-<<<<<<< HEAD
   if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
-=======
-  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";
-  return pathname.startsWith(href);
->>>>>>> origin/branch-moreno
 }
 
 function getCachedUser() {
