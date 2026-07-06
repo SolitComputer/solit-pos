@@ -652,7 +652,20 @@ export default function CreatePaymentPage() {
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
                                 <select className={selectClass} {...register("source_platform")}>
-                                    {["Instagram", "TikTok", "Facebook", "WhatsApp", "Google", "Shopee", "Tokopedia", "Teman", "Lainnya"].map(s => (
+                                    // AFTER
+                                    {[
+                                        "Ads Facebook",
+                                        "Ads Instagram",
+                                        "Instagram",
+                                        "TikTok",
+                                        "Facebook",
+                                        "WhatsApp",
+                                        "Google",
+                                        "Shopee",
+                                        "Tokopedia",
+                                        "Teman",
+                                        "Lainnya"
+                                    ].map(s => (
                                         <option key={s} value={s}>{s}</option>
                                     ))}
                                 </select>
