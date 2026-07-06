@@ -92,7 +92,6 @@ const SALES_ACCESS: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
 ];
 
-// UNION: versi Ikmal lebih lengkap (tambah KEPALA_TEKNISI, KEPALA_PENGELOLA_BARANG)
 const TRANSACTION_VIEW: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "TEKNISI", "KEPALA_TEKNISI",
@@ -108,74 +107,56 @@ export const ALL_UNITS_ROLES: UserRole[] = [
 
 // ─── Preparation Roles ────────────────────────────────────────────────────────
 
-/** PKL (anak magang) — dipakai di grup preparation (dari versi teman/develop) */
 const PKL_PREP_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  "PKL_PENGANTARAN",   // ← NEW
+  "PKL_PENGANTARAN",
 ];
 
-/** Sales yang bisa CREATE format penyiapan (UNION kedua versi) */
 const PREPARATION_SALES_ROLES: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
   "KEPALA_ONPOINT", "ONPOINT",
-  "KEPALA_MARKETING", // dari versi teman
-  "PKL_SALES",        // dari versi Ikmal
+  "KEPALA_MARKETING",
+  "PKL_SALES",
 ];
 
-/** Penyedia barang yang cek & tandai done */
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-  "PKL_PENYEDIA_BARANG", // ← PKL penyedia = sama seperti penyedia barang (receive/check/done)
+  "PKL_PENYEDIA_BARANG",
 ];
 
-/**
- * Role tambahan (DI LUAR penyedia inti) yang atas permintaan bisnis diberi
- * akses PENUH fitur penyedia barang (receive/check/done/view). (dari versi Ikmal)
- * ⚠️ MERGE-CONFLICT (DONE): versi teman TIDAK memberi role ini akses "done".
- *    Kalau ingin batasi "done" hanya penyedia+admin, kosongkan array ini
- *    (biarkan tetap dipakai di VIEW_ROLES saja).
- */
 const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING",
   "KEPALA_SOTECH", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
 ];
 
-/** Buat format penyiapan (Sales + PKL + Admin) — UNION */
 export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
 
-/** Terima & DONE penyiapan — HANYA penyedia barang inti + admin */
 export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_PENYEDIA_ROLES,
-
 ]));
 
-/** Dispatch pilih metode kirim (Sales + PKL + Admin) — PENGANTARAN tidak termasuk */
 export const PREPARATION_DISPATCH_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
 
-/** BATALKAN pesanan — HANYA Admin, Programmer, Kepala Sales (dari versi teman) */
 export const PREPARATION_CANCEL_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES"];
 export const PREPARATION_FORCE_COMPLETE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES"];
 
-/** Role yang handle delivery tracking */
 export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
   ...FULL_ACCESS, "PENGANTARAN", ...PREPARATION_PENYEDIA_ROLES,
 ];
 
-/** Role yang bisa LIHAT antrian masuk (done roles + sales view-only) (dari versi teman) */
 export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...PREPARATION_DONE_ROLES,
-  "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH", "ONPOINT",
-  "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
+  "KEPALA_SALES", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH",
+  "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
   "PENGANTARAN",
 ]));
 
-/** Semua yang bisa LIHAT penyiapan (UNION kedua versi) */
 export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_SALES_ROLES,
@@ -185,7 +166,6 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   "KEPALA_ONPOINT", "PENGANTARAN",
 ]));
 
-/** Role yang MENJADI pengantar (bukan yang assign) */
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN", "PKL_PENGANTARAN"];
 
 // ─── Voice / HT Roles ────────────────────────────────────────────────────────
@@ -228,7 +208,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
     "PKL_SALES",
-    // ✅ ADD: semua PKL variants biar konsisten
     "PKL_MARKETING", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
     "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN",
     "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
@@ -243,18 +222,23 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+
+  // ✅ FIX: Tambah KEPALA_ONPOINT, KEPALA_SOTECH ke warranty — disamakan KEPALA_SALES
+  // ONPOINT & SOTECH tidak diubah (tetap seperti semula)
   "/dashboard/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_MARKETING",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD
+    "PKL_SALES",
   ],
+
   "/dashboard/transactions": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     ...TRANSACTION_VIEW,
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "PKL_SALES",
   ],
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
@@ -269,9 +253,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh melakukan pembayaran
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "PKL_SALES",
   ],
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
@@ -288,14 +271,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
-    // ✅ ADD: 3 PKL variants baru
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ],
   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh membuat transaksi
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -305,34 +286,43 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "PKL_SALES",
   ],
+
+  // ✅ FIX: Tambah KEPALA_ONPOINT, KEPALA_SOTECH ke api/warranty
+  // ONPOINT tidak diubah
   "/api/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD
+    "PKL_SALES",
   ],
+
   "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
   "/api/units/reserve": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh reserve stok
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/units/hold": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh hold stok
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
+
+  // ✅ FIX: KEPALA_ONPOINT & KEPALA_SOTECH disamakan KEPALA_SALES
+  // ONPOINT tidak diubah (tidak ada di sini sebelumnya)
   "/api/units/confirm-payment": [
     ...FULL_ACCESS,
     "KEPALA_SALES",
-    "KEPALA_SOTECH", // ✅ ADD
-    "SOTECH",        // ✅ ADD
-  ], "/api/users": [...FULL_ACCESS],
+    "KEPALA_SOTECH", // sudah ada sebelumnya
+    "SOTECH",        // sudah ada sebelumnya
+    "KEPALA_ONPOINT", // ✅ ADD
+  ],
+
+  "/api/users": [...FULL_ACCESS],
   "/api/attendance/manual": [...ALL_ROLES],
   "/api/attendance/salary": [...ALL_ROLES],
   "/api/attendance/leave": [...ALL_ROLES],
@@ -372,7 +362,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
-  // Antrian: pakai ANTRIAN_VIEW (done roles + sales view-only) — superset dari kedua versi
   "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
@@ -382,8 +371,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
-  // Route cancel tidak ada di kedua versi; kalau kamu punya endpointnya, pakai:
-  // "/api/preparation/cancel": [...PREPARATION_CANCEL_ROLES],
 
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
   "/api/cashflow": [...CASHFLOW_ROLES],
@@ -405,12 +392,12 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
     ...TRANSACTION_VIEW,
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES",
   ] as UserRole[],
 
   CREATE_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh membuat transaksi
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -427,7 +414,6 @@ export const PERMISSIONS = {
   RESERVE_UNIT: [
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    // PENGANTARAN sengaja TIDAK diikutkan — kurir tidak boleh reserve unit
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -439,7 +425,6 @@ export const PERMISSIONS = {
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING",
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
-    // ✅ ADD: semua PKL variants boleh lihat laptop
     "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
@@ -450,13 +435,13 @@ export const PERMISSIONS = {
   VIEW_BARCODE: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
+    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ FIX: kepala saja
   ] as UserRole[],
 
   VIEW_UNITS: [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
-    // ✅ ADD: semua PKL boleh VIEW units (view-only, tidak bisa edit/create)
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
@@ -469,10 +454,12 @@ export const PERMISSIONS = {
    *  TETAP pakai EDIT_UNITS/CREATE_UNITS yang sudah ada — bukan permission baru. */
   VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
+  // ✅ FIX: hanya KEPALA_ONPOINT & KEPALA_SOTECH yang ditambah, ONPOINT tidak
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
     "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD (bukan ONPOINT)
+    "PKL_SALES",
   ] as UserRole[],
   EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
@@ -481,6 +468,7 @@ export const PERMISSIONS = {
     "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "CUSTOMER_SERVICE",
@@ -502,10 +490,8 @@ export const PERMISSIONS = {
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
-  /** Sales pilih metode pengiriman setelah penyedia done */
   DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
-  /** Batalkan pesanan (dari versi teman) */
   CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
   FORCE_COMPLETE_PREPARATION: [...PREPARATION_FORCE_COMPLETE_ROLES] as UserRole[],
 
@@ -529,7 +515,7 @@ export function hasPermission(
 export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_TEKNISI: [
     "TEKNISI", "PKL_TEKNISI",
-    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",     // ← NEW
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
     "PENGELOLA_BARANG",
   ],
   KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
@@ -538,12 +524,13 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
   KEPALA_PENGELOLA_BARANG: [
-    "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",     // ← NEW
+    "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",
     "TEKNISI", "PKL_TEKNISI",
-    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",     // ← NEW (dual, sesuai request)
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
   ],
   ADMIN: ["PENGELOLA_BARANG"],
 };
+
 export const PKL_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -564,7 +551,6 @@ export const LAPTOP_VIEW_ROLES: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT",
   "KEPALA_TEKNISI", "TEKNISI",
   "PKL", "CUSTOMER_SERVICE",
-  // ✅ ADD: semua PKL variants
   "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
@@ -581,12 +567,6 @@ export const LAPTOP_DELETE_ROLES: UserRole[] = [
 ];
 
 // ─── PKL → Parent Role Mapping ────────────────────────────────────────────────
-/**
- * PKL inherit akses dari role induknya. Contoh:
- *   PKL_SALES  → akses = CREW_SALES
- *   PKL_TEKNISI → akses = TEKNISI
- * PKL polos (tanpa suffix) tetap standalone — tidak inherit apapun.
- */
 export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
   PKL_SALES: "CREW_SALES",
   PKL_MARKETING: "MARKETING",
@@ -600,16 +580,10 @@ export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
   PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
 };
 
-/** Ambil parent role dari PKL variant. Return null kalau bukan PKL bervariant. */
 export function getPKLParentRole(role: string): UserRole | null {
   return (PKL_PARENT_ROLE[role as UserRole] ?? null) as UserRole | null;
 }
 
-/**
- * Expand userRoles dengan parent role dari tiap PKL variant.
- * Contoh: ["PKL_SALES"] → ["PKL_SALES", "CREW_SALES"]
- * Dipakai untuk permission check biar PKL otomatis inherit akses induknya.
- */
 export function expandRolesWithParents(userRoles: string[]): string[] {
   const set = new Set<string>(userRoles);
   for (const r of userRoles) {
@@ -619,7 +593,6 @@ export function expandRolesWithParents(userRoles: string[]): string[] {
   return Array.from(set);
 }
 
-/** Effective primary role — kalau PKL variant, pakai parent-nya. */
 export function getEffectivePrimaryRole(userRoles: string[]): UserRole {
   const primary = (userRoles[0] as UserRole) ?? "CREW_SALES";
   return (PKL_PARENT_ROLE[primary] ?? primary) as UserRole;
@@ -684,12 +657,10 @@ export function getDivisionLabel(headRole: string): string {
 
 // ─── Multi-Role Helpers ───────────────────────────────────────────────────────
 
-/** Ambil primary role (role pertama / role utama). */
 export function getPrimaryRole(roles: string[]): UserRole {
   return (roles[0] as UserRole) ?? "CREW_SALES";
 }
 
-/** True jika SALAH SATU role user ada di allowed list. */
 export function hasAnyRole(
   userRoles: string[],
   allowed: readonly UserRole[] | UserRole[]
@@ -697,7 +668,6 @@ export function hasAnyRole(
   return userRoles.some(r => (allowed as string[]).includes(r));
 }
 
-/** Gabungkan semua route permissions dari semua roles (untuk middleware). */
 export function getEffectivePermissions(userRoles: string[]): Set<string> {
   const routes = new Set<string>();
   for (const [route, allowedRoles] of Object.entries(ROUTE_PERMISSIONS)) {
@@ -708,7 +678,6 @@ export function getEffectivePermissions(userRoles: string[]): Set<string> {
   return routes;
 }
 
-/** Gabungkan menu sidebar dari semua roles (union, dedupe by href). */
 export function mergeMenuGroups(
   roleMenus: Record<string, any[]>,
   userRoles: string[]
@@ -736,7 +705,6 @@ export function mergeMenuGroups(
   return result;
 }
 
-/** Default redirect terbaik dari semua roles. */
 export function getEffectiveRedirect(
   userRoles: string[],
   redirectMap: Record<string, string>
@@ -749,7 +717,6 @@ export function getEffectiveRedirect(
   return redirectMap[primary] ?? "/dashboard";
 }
 
-/** True jika salah satu role user FULL_ACCESS. */
 export function isFullAccessMulti(userRoles: string[]): boolean {
   return userRoles.some(r => isFullAccess(r));
 }
