@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface UnitResult {
+interface LaptopUnitResult {
+    type: "LAPTOP";
     id: string;
     serial_number: string;
     grade: "A" | "B" | "C";
@@ -21,6 +22,26 @@ interface UnitResult {
         storage: string;
     };
 }
+
+interface AccessoryUnitResult {
+    type: "ACCESSORY";
+    id: string;
+    serial_number: string;
+    condition: string;        // BARU | BEKAS
+    selling_price: number;
+    status: string;           // TERSEDIA | TERJUAL | ...
+    notes: string | null;
+    accessory: {
+        id: string;
+        name: string;
+        category: string;
+        brand: string | null;
+        spec: string | null;
+    };
+}
+
+// Union — nama tetap UnitResult biar state & referensi lain nggak berubah
+type UnitResult = LaptopUnitResult | AccessoryUnitResult;
 
 interface AuthUser {
     id: string;
@@ -42,6 +63,12 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string 
     BELUM_SIAP: { label: "Belum Siap", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700 border-amber-200" },
     SERVICE: { label: "Service", dot: "bg-blue-500", badge: "bg-blue-50 text-blue-700 border-blue-200" },
     SOLD: { label: "Terjual", dot: "bg-gray-400", badge: "bg-gray-100 text-gray-500 border-gray-200" },
+};
+
+const ACC_STATUS_CONFIG: Record<string, { label: string; dot: string; badge: string }> = {
+    TERSEDIA: { label: "Tersedia", dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    TERJUAL: { label: "Terjual", dot: "bg-gray-400", badge: "bg-gray-100 text-gray-500 border-gray-200" },
+    RUSAK: { label: "Rusak", dot: "bg-red-500", badge: "bg-red-50 text-red-700 border-red-200" },
 };
 
 export default function QuickScan({ user }: { user: AuthUser | null }) {
@@ -108,7 +135,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
     };
 
     const handleSell = () => {
-        if (!result) return;
+        if (!result || result.type !== "LAPTOP") return;
         const params = new URLSearchParams({
             unit_id: result.id,
             laptop_id: result.laptop.id,
@@ -210,6 +237,82 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
 
                     {/* Success result */}
                     {!loading && result && (() => {
+                        // ── Cabang: Aksesoris ──
+                        if (result.type === "ACCESSORY") {
+                            const accStatus = ACC_STATUS_CONFIG[result.status] || {
+                                label: result.status,
+                                dot: "bg-gray-300",
+                                badge: "bg-gray-50 text-gray-500 border-gray-200",
+                            };
+                            return (
+                                <div className="bg-white">
+                                    <div className="p-4">
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className="text-xl flex-shrink-0 mt-0.5">🎧</div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm text-[#1a1a2e] leading-snug">
+                                                    {result.accessory.name}
+                                                </p>
+                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                    {[result.accessory.category, result.accessory.brand, result.accessory.spec]
+                                                        .filter(Boolean).join(" · ")}
+                                                </p>
+                                            </div>
+                                            <button onClick={closeResult} className="text-gray-300 hover:text-gray-500 transition p-1 flex-shrink-0">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+
+                                        {/* SN + Tipe + Kondisi + Status */}
+                                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                                            <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                                {result.serial_number}
+                                            </span>
+                                            <span className="text-xs font-bold px-2 py-1 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                Aksesoris
+                                            </span>
+                                            <span className="text-xs font-medium px-2 py-1 rounded-full border bg-gray-50 text-gray-600 border-gray-200">
+                                                {result.condition}
+                                            </span>
+                                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full border ${accStatus.badge}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${accStatus.dot}`} />
+                                                {accStatus.label}
+                                            </span>
+                                        </div>
+
+                                        {result.notes && (
+                                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3">
+                                                {result.notes}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-gray-400">Harga Jual</span>
+                                            <span className="text-base font-bold text-[#1a1a2e]">
+                                                {fmt(result.selling_price)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 px-4 pb-4">
+                                        <Link
+                                            href={`/dashboard/accessories/${result.accessory.id}`}
+                                            className="flex-1 flex items-center justify-center gap-1.5 h-9 px-3 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 transition whitespace-nowrap"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Lihat Data
+                                        </Link>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // ── Cabang: Laptop (default, seperti sebelumnya) ──
                         const grade = GRADE_COLOR[result.grade] || GRADE_COLOR.A;
                         const status = STATUS_CONFIG[result.status] || STATUS_CONFIG.BELUM_SIAP;
                         const canSellThisUnit = canSell && result.status === "SIAP_JUAL";
@@ -298,7 +401,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
-                            ``            Lihat Data
+                                        Lihat Data
                                     </Link>
                                 </div>
                             </div>
