@@ -56,9 +56,9 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
-// Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
-if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
-if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";  return pathname.startsWith(href);
+  // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
+  if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
+  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
 }
 
 function getCachedUser() {
@@ -227,6 +227,12 @@ const Icons = {
       <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
+  cashflow: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+    </svg>
+  ),
   managementSeller: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
@@ -327,6 +333,11 @@ const ITEM_MISSIONS: MenuItem = {
   href: "/dashboard/missions",
   icon: Icons.missions,
 };
+const ITEM_CASHFLOW: MenuItem = {
+  name: "Cashflow",
+  href: "/dashboard/cashflow",
+  icon: Icons.cashflow,
+};
 
 const MISSIONS_MENU: MenuGroup = {
   label: "Misi Pekerjaan",
@@ -411,6 +422,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+    { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
   ],
@@ -590,6 +602,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        ITEM_CASHFLOW,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],

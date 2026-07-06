@@ -212,6 +212,10 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
   ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
 ];
 
+// ─── Cashflow Roles ───────────────────────────────────────────────────────────
+// Sesuai permintaan: HANYA Admin & Programmer (ASISTEN_CEO sengaja TIDAK diikutkan)
+export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
@@ -381,6 +385,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // Route cancel tidak ada di kedua versi; kalau kamu punya endpointnya, pakai:
   // "/api/preparation/cancel": [...PREPARATION_CANCEL_ROLES],
 
+  "/dashboard/cashflow": [...CASHFLOW_ROLES],
+  "/api/cashflow": [...CASHFLOW_ROLES],
+
   "/dashboard/missions": [...ALL_ROLES],
   "/dashboard/missions/progress": [...ALL_ROLES],
   "/dashboard/missions/history": [...ALL_ROLES],
@@ -505,6 +512,11 @@ export const PERMISSIONS = {
   // ── Voice HT ────────────────────────────────────────────────────────────────
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
   DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[],
+
+  // ── Cashflow ────────────────────────────────────────────────────────────────
+  VIEW_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
+  MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
+  AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(

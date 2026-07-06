@@ -5,8 +5,18 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE";
-export type LogEntity = "laptop" | "unit" | "transaction" | "warranty" | "seller_followup" | "preparation";
+// ✅ ADD: "AUDIT" & "UNAUDIT" untuk aksi verifikasi audit di cashflow
+export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "AUDIT" | "UNAUDIT";
+
+// ✅ ADD: "cashflow" sebagai entity baru
+export type LogEntity =
+  | "laptop"
+  | "unit"
+  | "transaction"
+  | "warranty"
+  | "seller_followup"
+  | "preparation"
+  | "cashflow";
 
 interface LogActivityParams {
   userId: string;
@@ -15,7 +25,7 @@ interface LogActivityParams {
   action: LogAction;
   entity: LogEntity;
   entityId?: string;
-  entityLabel?: string;      
+  entityLabel?: string;
   beforeData?: Record<string, any> | null;
   afterData?: Record<string, any> | null;
 }
