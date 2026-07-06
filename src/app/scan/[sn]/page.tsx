@@ -4,8 +4,8 @@
 // URL: /scan/ABC123
 // - Fetch data unit berdasarkan SN dari params
 // - Cek role user (dari /api/auth/me)
-// - SALES / ADMIN: tampilkan 2 opsi (Lihat Data + Jual Sekarang)
-// - Role lain / guest: hanya Lihat Data
+// - Laptop: SALES/ADMIN → Lihat Data + Jual Sekarang; role lain → Lihat Data
+// - Aksesoris: Lihat Detail Aksesoris
 
 "use client";
 
@@ -14,7 +14,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface UnitData {
+interface LaptopUnitData {
+  type: "LAPTOP";
   id: string;
   serial_number: string;
   grade: "A" | "B" | "C";
@@ -33,6 +34,26 @@ interface UnitData {
     display: string;
   };
 }
+
+interface AccessoryUnitData {
+  type: "ACCESSORY";
+  id: string;
+  serial_number: string;
+  condition: string;        // BARU | BEKAS
+  selling_price: number;
+  status: string;           // TERSEDIA | TERJUAL | ...
+  notes: string | null;
+  accessory: {
+    id: string;
+    name: string;
+    category: string;
+    brand: string | null;
+    spec: string | null;
+  };
+}
+
+// Nama tetap UnitData biar useState & referensi lain nggak berubah
+type UnitData = LaptopUnitData | AccessoryUnitData;
 
 interface AuthUser {
   id: string;
@@ -54,6 +75,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string 
   BELUM_SIAP: { label: "Belum Siap", color: "#d97706", dot: "#f59e0b" },
   SERVICE: { label: "Service", color: "#2563eb", dot: "#3b82f6" },
   SOLD: { label: "Terjual", color: "#6b7280", dot: "#9ca3af" },
+};
+
+const ACC_STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+  TERSEDIA: { label: "Tersedia", color: "#059669", dot: "#10b981" },
+  TERJUAL: { label: "Terjual", color: "#6b7280", dot: "#9ca3af" },
+  RUSAK: { label: "Rusak", color: "#dc2626", dot: "#ef4444" },
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -100,17 +127,21 @@ export default function ScanPage() {
     if (decodedSn) init();
   }, [decodedSn]);
 
-  // Role check: hanya ADMIN dan SALES yang bisa jual
-  const canSell =
-    user?.role === "ADMIN" || user?.role === "SALES";
-
-  const canSellUnit = canSell && unit?.status === "SIAP_JUAL";
-
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return <ScanLoadingScreen sn={decodedSn} />;
 
   // ── Error ──────────────────────────────────────────────────────────────────
   if (error || !unit) return <ScanErrorScreen sn={decodedSn} message={error} />;
+
+  // ── Cabang: Aksesoris (early-return, sebelum kode laptop) ──
+  if (unit.type === "ACCESSORY") {
+    return <AccessoryScanView decodedSn={decodedSn} unit={unit} user={user} />;
+  }
+
+  // ── Di bawah sini `unit` sudah pasti LaptopUnitData (TS narrowing) ──
+  // Role check: hanya ADMIN dan SALES yang bisa jual
+  const canSell = user?.role === "ADMIN" || user?.role === "SALES";
+  const canSellUnit = canSell && unit.status === "SIAP_JUAL";
 
   const grade = GRADE_CONFIG[unit.grade] ?? GRADE_CONFIG.A;
   const status = STATUS_CONFIG[unit.status] ?? { label: unit.status, color: "#6b7280", dot: "#9ca3af" };
@@ -283,6 +314,144 @@ export default function ScanPage() {
           </p>
         )}
 
+      </div>
+    </div>
+  );
+}
+
+// ─── Accessory Scan View ──────────────────────────────────────────────────────
+function AccessoryScanView({
+  decodedSn,
+  unit,
+  user,
+}: {
+  decodedSn: string;
+  unit: AccessoryUnitData;
+  user: AuthUser | null;
+}) {
+  const acc = unit.accessory;
+  const status =
+    ACC_STATUS_CONFIG[unit.status] ?? { label: unit.status, color: "#6b7280", dot: "#9ca3af" };
+
+  const specs = [
+    { label: "Kategori", value: acc.category },
+    { label: "Brand", value: acc.brand },
+    { label: "Spesifikasi", value: acc.spec },
+  ].filter((s) => s.value);
+
+  return (
+    <div style={styles.root}>
+      <div style={styles.bgCircle1} />
+      <div style={styles.bgCircle2} />
+
+      <div style={styles.container}>
+        {/* Header */}
+        <div style={styles.header}>
+          <div style={styles.scanIcon}>
+            <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 4v1m0 14v1M4 12H3m18 0h-1M6.343 6.343l-.707-.707m13.728 13.728l-.707-.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707" />
+            </svg>
+          </div>
+          <div>
+            <p style={styles.headerLabel}>Hasil Scan</p>
+            <p style={styles.headerSn}>{decodedSn}</p>
+          </div>
+          {user && (
+            <div style={styles.userBadge}>
+              <span style={styles.userRole}>{user.role}</span>
+              <span style={styles.userName}>{user.name}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Card */}
+        <div style={styles.card}>
+          <div style={styles.laptopHeader}>
+            <div style={styles.laptopIcon}>🎧</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={styles.laptopName}>{acc.name}</h2>
+              <p style={styles.laptopBrand}>{acc.brand || acc.category}</p>
+            </div>
+            <div style={{
+              ...styles.statusBadge,
+              background: status.color + "15",
+              border: `1px solid ${status.color}30`,
+            }}>
+              <span style={{ ...styles.statusDot, background: status.dot }} />
+              <span style={{ color: status.color, fontSize: 11, fontWeight: 600 }}>
+                {status.label}
+              </span>
+            </div>
+          </div>
+
+          {/* Specs */}
+          {specs.length > 0 && (
+            <div style={styles.specsGrid}>
+              {specs.map((s) => (
+                <div key={s.label} style={styles.specItem}>
+                  <span style={styles.specLabel}>{s.label}</span>
+                  <span style={styles.specValue}>{s.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* SN + Kondisi */}
+          <div style={styles.snGradeRow}>
+            <div style={styles.snBox}>
+              <span style={styles.snLabel}>Serial Number</span>
+              <span style={styles.snValue}>{unit.serial_number}</span>
+            </div>
+            <div style={{ ...styles.gradeBox, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+              <span style={{ color: "#4338ca", fontSize: 12, fontWeight: 700 }}>{unit.condition}</span>
+              <span style={{ color: "#4338ca", fontSize: 10, opacity: 0.8 }}>Kondisi</span>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {unit.notes && (
+            <div style={styles.conditionNote}>
+              <svg width="13" height="13" fill="none" stroke="#b45309" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span style={{ color: "#92400e", fontSize: 12 }}>{unit.notes}</span>
+            </div>
+          )}
+
+          {/* Price */}
+          <div style={styles.priceRow}>
+            <span style={styles.priceLabel}>Harga Jual</span>
+            <span style={styles.priceValue}>{fmt(unit.selling_price)}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={styles.actions}>
+          <Link href={`/dashboard/accessories/${acc.id}`} style={styles.btnView}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Lihat Detail Aksesoris
+          </Link>
+
+          {user && (
+            <Link href="/dashboard/accessories" style={styles.btnBack}>
+              ← Kembali ke Dashboard
+            </Link>
+          )}
+        </div>
+
+        {!user && (
+          <p style={styles.guestNotice}>
+            <Link href="/login" style={{ color: "#1a1a2e", fontWeight: 600 }}>Login</Link>
+            {" "}untuk mengakses opsi lainnya
+          </p>
+        )}
       </div>
     </div>
   );
