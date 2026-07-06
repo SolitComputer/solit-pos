@@ -36,24 +36,46 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       });
     }
 
-    // ── 2) Fallback: accessory_units — .ilike biar case-insensitive ──
+    // ── 2) Fallback: accessory_units ──
+    // Normalisasi SN → uppercase (kolom disimpan uppercase), pakai .eq exact.
+    const snUpper = sn.toUpperCase();
+
     const { data: accUnit, error: accErr } = await supabaseAdmin
       .from("accessory_units")
-      .select(`
-        id, serial_number, condition, selling_price, status, notes,
-        accessory:accessories (
-          id, name, category, brand, spec
-        )
-      `)
-      .ilike("serial_number", sn)
+      .select("id, serial_number, condition, selling_price, status, notes, accessory_id")
+      .eq("serial_number", snUpper)
       .maybeSingle();
 
     if (accErr) console.error("[check-sn] accessory_units:", accErr);
 
     if (accUnit) {
+      // Ambil master accessory terpisah (hindari ketergantungan FK embed)
+      const { data: accMaster, error: masterErr } = await supabaseAdmin
+        .from("accessories")
+        .select("id, name, category, brand, spec")
+        .eq("id", accUnit.accessory_id)
+        .maybeSingle();
+
+      if (masterErr) console.error("[check-sn] accessories master:", masterErr);
+
       return NextResponse.json({
         success: true,
-        data: { ...accUnit, type: "ACCESSORY" },
+        data: {
+          id: accUnit.id,
+          serial_number: accUnit.serial_number,
+          condition: accUnit.condition,
+          selling_price: accUnit.selling_price,
+          status: accUnit.status,
+          notes: accUnit.notes,
+          accessory: accMaster ?? {
+            id: accUnit.accessory_id,
+            name: "Aksesoris",
+            category: "-",
+            brand: null,
+            spec: null,
+          },
+          type: "ACCESSORY",
+        },
       });
     }
 
