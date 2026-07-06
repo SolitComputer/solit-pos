@@ -101,6 +101,11 @@ const TRANSACTION_VIEW: UserRole[] = [
 
 const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING"];
 
+/** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
+export const ALL_UNITS_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+];
+
 // ─── Preparation Roles ────────────────────────────────────────────────────────
 
 /** PKL (anak magang) — dipakai di grup preparation (dari versi teman/develop) */
@@ -209,8 +214,9 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
+  "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
   "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
+  "/dashboard/units": [...ALL_UNITS_ROLES],
   "/dashboard/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
@@ -268,7 +274,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/group-chat": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/api/push/subscribe": [...ALL_ROLES],
 
-  "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
+  "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
   "/api/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
@@ -431,7 +437,7 @@ export const PERMISSIONS = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ] as UserRole[],
-  CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
+  CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
 
   VIEW_BARCODE: [
@@ -451,6 +457,10 @@ export const PERMISSIONS = {
   ] as UserRole[],
   CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+
+  /** Akses halaman "Semua Unit" (global inventory view). Aksi tulis (create/edit/delete unit)
+   *  TETAP pakai EDIT_UNITS/CREATE_UNITS yang sudah ada — bukan permission baru. */
+  VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
