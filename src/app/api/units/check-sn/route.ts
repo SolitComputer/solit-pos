@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
@@ -14,7 +15,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    const { data: unit, error } = await supabase
+    // ── 1) Cari di laptop_units dulu (perilaku lama, dipertahankan) ──
+    const { data: laptopUnit, error: laptopErr } = await supabase
       .from("laptop_units")
       .select(`
         *,
@@ -23,18 +25,48 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         )
       `)
       .eq("serial_number", sn)
-      .single();
+      .maybeSingle();
 
-    if (error || !unit) {
-      return NextResponse.json(
-        { success: false, message: `Serial number "${sn}" tidak ditemukan` },
-        { status: 404 }
-      );
+    if (laptopErr) console.error("[check-sn] laptop_units:", laptopErr);
+
+    if (laptopUnit) {
+      return NextResponse.json({
+        success: true,
+        data: { ...laptopUnit, type: "LAPTOP" },
+      });
     }
 
-    return NextResponse.json({ success: true, data: unit });
+    // ── 2) Fallback: cari di accessory_units ──
+    // Pakai supabaseAdmin biar konsisten dgn route accessories lain
+    // & aman dari RLS. SN aksesoris disimpan UPPERCASE → ilike biar
+    // tetap ketemu walau scanner ngirim lowercase.
+    const { data: accUnit, error: accErr } = await supabaseAdmin
+      .from("accessory_units")
+      .select(`
+        *,
+        accessory:accessories (
+          id, name, category, brand, spec
+        )
+      `)
+      .eq("serial_number", sn.toUpperCase())
+      .maybeSingle();
+
+    if (accErr) console.error("[check-sn] accessory_units:", accErr);
+
+    if (accUnit) {
+      return NextResponse.json({
+        success: true,
+        data: { ...accUnit, type: "ACCESSORY" },
+      });
+    }
+
+    // ── 3) Nggak ketemu di dua-duanya ──
+    return NextResponse.json(
+      { success: false, message: `Serial number "${sn}" tidak ditemukan` },
+      { status: 404 }
+    );
   } catch (err) {
-    console.error(err);
+    console.error("[check-sn] fatal:", err);
     return NextResponse.json(
       { success: false, message: "Terjadi kesalahan server" },
       { status: 500 }
