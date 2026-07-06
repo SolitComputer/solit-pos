@@ -97,22 +97,22 @@ type XlsxCellStyle = {
 };
 
 const BORDER_THIN = {
-    top:    { style: "thin",   color: { rgb: "D1D5DB" } },
-    bottom: { style: "thin",   color: { rgb: "D1D5DB" } },
-    left:   { style: "thin",   color: { rgb: "D1D5DB" } },
-    right:  { style: "thin",   color: { rgb: "D1D5DB" } },
+    top: { style: "thin", color: { rgb: "D1D5DB" } },
+    bottom: { style: "thin", color: { rgb: "D1D5DB" } },
+    left: { style: "thin", color: { rgb: "D1D5DB" } },
+    right: { style: "thin", color: { rgb: "D1D5DB" } },
 };
 const BORDER_HEADER = {
-    top:    { style: "medium", color: { rgb: "1F2937" } },
+    top: { style: "medium", color: { rgb: "1F2937" } },
     bottom: { style: "medium", color: { rgb: "1F2937" } },
-    left:   { style: "thin",   color: { rgb: "374151" } },
-    right:  { style: "thin",   color: { rgb: "374151" } },
+    left: { style: "thin", color: { rgb: "374151" } },
+    right: { style: "thin", color: { rgb: "374151" } },
 };
 const BORDER_TOTAL = {
-    top:    { style: "medium", color: { rgb: "111827" } },
+    top: { style: "medium", color: { rgb: "111827" } },
     bottom: { style: "medium", color: { rgb: "111827" } },
-    left:   { style: "thin",   color: { rgb: "4B5563" } },
-    right:  { style: "thin",   color: { rgb: "4B5563" } },
+    left: { style: "thin", color: { rgb: "4B5563" } },
+    right: { style: "thin", color: { rgb: "4B5563" } },
 };
 
 function xCell(v: string | number, s: XlsxCellStyle = {}) {
@@ -120,76 +120,76 @@ function xCell(v: string | number, s: XlsxCellStyle = {}) {
 }
 function sHeader(center = false): XlsxCellStyle {
     return {
-        font:      { bold: true, color: { rgb: "FFFFFF" }, sz: 10, name: "Calibri" },
-        fill:      { fgColor: { rgb: "1F2937" }, patternType: "solid" },
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10, name: "Calibri" },
+        fill: { fgColor: { rgb: "1F2937" }, patternType: "solid" },
         alignment: { horizontal: center ? "center" : "left", vertical: "center" },
-        border:    BORDER_HEADER,
+        border: BORDER_HEADER,
     };
 }
 function sData(right = false, currency = false): XlsxCellStyle {
     return {
-        font:      { sz: 10, name: "Calibri", color: { rgb: "111827" } },
-        fill:      { fgColor: { rgb: "FFFFFF" }, patternType: "solid" },
+        font: { sz: 10, name: "Calibri", color: { rgb: "111827" } },
+        fill: { fgColor: { rgb: "FFFFFF" }, patternType: "solid" },
         alignment: { horizontal: right ? "right" : "left", vertical: "center" },
-        border:    BORDER_THIN,
+        border: BORDER_THIN,
         ...(currency ? { numFmt: '"Rp "#,##0' } : {}),
     };
 }
 function sZebra(right = false, currency = false): XlsxCellStyle {
     return {
-        font:      { sz: 10, name: "Calibri", color: { rgb: "111827" } },
-        fill:      { fgColor: { rgb: "F9FAFB" }, patternType: "solid" },
+        font: { sz: 10, name: "Calibri", color: { rgb: "111827" } },
+        fill: { fgColor: { rgb: "F9FAFB" }, patternType: "solid" },
         alignment: { horizontal: right ? "right" : "left", vertical: "center" },
-        border:    BORDER_THIN,
+        border: BORDER_THIN,
         ...(currency ? { numFmt: '"Rp "#,##0' } : {}),
     };
 }
 function sTotal(right = false, currency = false): XlsxCellStyle {
     return {
-        font:      { bold: true, sz: 10, name: "Calibri", color: { rgb: "FFFFFF" } },
-        fill:      { fgColor: { rgb: "374151" }, patternType: "solid" },
+        font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "374151" }, patternType: "solid" },
         alignment: { horizontal: right ? "right" : "left", vertical: "center" },
-        border:    BORDER_TOTAL,
+        border: BORDER_TOTAL,
         ...(currency ? { numFmt: '"Rp "#,##0' } : {}),
     };
 }
 function sSN(zebraGroup = false): XlsxCellStyle {
     return {
-        font:      { sz: 9, name: "Courier New", color: { rgb: "1D4ED8" } },
-        fill:      { fgColor: { rgb: zebraGroup ? "DBEAFE" : "EFF6FF" }, patternType: "solid" },
+        font: { sz: 9, name: "Courier New", color: { rgb: "1D4ED8" } },
+        fill: { fgColor: { rgb: zebraGroup ? "DBEAFE" : "EFF6FF" }, patternType: "solid" },
         alignment: { horizontal: "left", vertical: "center", wrapText: true },
-        border:    BORDER_THIN,
+        border: BORDER_THIN,
     };
 }
 function sStatus(status: string): XlsxCellStyle {
     const map: Record<string, { bg: string; fg: string }> = {
         "Tersedia": { bg: "ECFDF5", fg: "065F46" },
-        "Terjual":  { bg: "F3F4F6", fg: "6B7280" },
+        "Terjual": { bg: "F3F4F6", fg: "6B7280" },
         "Reserved": { bg: "FFFBEB", fg: "92400E" },
     };
     const c = map[status] ?? { bg: "FFFFFF", fg: "374151" };
     return {
-        font:      { bold: true, sz: 9, color: { rgb: c.fg } },
-        fill:      { fgColor: { rgb: c.bg }, patternType: "solid" },
+        font: { bold: true, sz: 9, color: { rgb: c.fg } },
+        fill: { fgColor: { rgb: c.bg }, patternType: "solid" },
         alignment: { horizontal: "center", vertical: "center" },
-        border:    BORDER_THIN,
+        border: BORDER_THIN,
     };
 }
 function sKondisi(kondisi: string): XlsxCellStyle {
     return {
-        font:      { bold: true, sz: 9, color: { rgb: kondisi === "BARU" ? "065F46" : "92400E" } },
-        fill:      { fgColor: { rgb: kondisi === "BARU" ? "ECFDF5" : "FFFBEB" }, patternType: "solid" },
+        font: { bold: true, sz: 9, color: { rgb: kondisi === "BARU" ? "065F46" : "92400E" } },
+        fill: { fgColor: { rgb: kondisi === "BARU" ? "ECFDF5" : "FFFBEB" }, patternType: "solid" },
         alignment: { horizontal: "center", vertical: "center" },
-        border:    BORDER_THIN,
+        border: BORDER_THIN,
     };
 }
 function sMargin(margin: number): XlsxCellStyle {
     return {
-        font:      { bold: true, sz: 10, color: { rgb: margin >= 0 ? "065F46" : "991B1B" } },
-        fill:      { fgColor: { rgb: margin >= 0 ? "ECFDF5" : "FEF2F2" }, patternType: "solid" },
+        font: { bold: true, sz: 10, color: { rgb: margin >= 0 ? "065F46" : "991B1B" } },
+        fill: { fgColor: { rgb: margin >= 0 ? "ECFDF5" : "FEF2F2" }, patternType: "solid" },
         alignment: { horizontal: "right", vertical: "center" },
-        border:    BORDER_THIN,
-        numFmt:    '"Rp "#,##0',
+        border: BORDER_THIN,
+        numFmt: '"Rp "#,##0',
     };
 }
 
@@ -217,8 +217,8 @@ function CategoryBadge({ cat }: { cat: string }) {
 function StatusBadge({ status }: { status: string }) {
     const map: Record<string, { badge: string; dot: string; label: string }> = {
         TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Tersedia" },
-        TERJUAL:  { badge: "bg-gray-100 text-gray-500 border-gray-200",         dot: "bg-gray-400",   label: "Terjual"  },
-        RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200",       dot: "bg-amber-400",  label: "Reserved" },
+        TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
+        RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Reserved" },
     };
     const s = map[status] ?? map.TERSEDIA;
     return (
@@ -283,7 +283,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
 
     const handleSubmit = async () => {
         if (!form.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
-        if (!form.category)    { toast.error("Kategori wajib dipilih"); return; }
+        if (!form.category) { toast.error("Kategori wajib dipilih"); return; }
         await onSave({ ...form, sell_price: parseRupiah(sellInput) });
     };
 
@@ -490,7 +490,7 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2.5">
-                        {[{label:"Total Unit",value:total,color:"text-gray-800"},{label:"Tersedia",value:tersedia,color:"text-emerald-600"},{label:"Reserved",value:reserved,color:"text-amber-600"},{label:"Terjual",value:terjual,color:"text-gray-400"}].map(s => (
+                        {[{ label: "Total Unit", value: total, color: "text-gray-800" }, { label: "Tersedia", value: tersedia, color: "text-emerald-600" }, { label: "Reserved", value: reserved, color: "text-amber-600" }, { label: "Terjual", value: terjual, color: "text-gray-400" }].map(s => (
                             <div key={s.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
                                 <p className={`text-xl font-black tabular-nums ${s.color}`}>{s.value}</p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{s.label}</p>
@@ -500,7 +500,7 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                     <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                            {[{label:"Kategori",value:accessory.category},{label:"Merk",value:accessory.brand},{label:"Spesifikasi",value:accessory.spec}].map(({label,value}) => (
+                            {[{ label: "Kategori", value: accessory.category }, { label: "Merk", value: accessory.brand }, { label: "Spesifikasi", value: accessory.spec }].map(({ label, value }) => (
                                 <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
                                     <p className="text-sm font-semibold text-gray-800 break-all leading-tight">{value || <span className="text-gray-300 font-normal">—</span>}</p>
@@ -526,7 +526,7 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M8 12h.01M12 12h.01M16 12h.01" /></svg>
                             Kelola Unit/SN
                         </button>
-                        <button onClick={onEdit}   className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">Edit</button>
+                        <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">Edit</button>
                         <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>
                     </div>
                 </div>
@@ -656,7 +656,7 @@ function DeleteConfirm({ open, title, name, onClose, onConfirm, loading }: {
                 <div className="p-6">
                     <p className="text-sm text-gray-600 text-center mb-6 leading-relaxed">Yakin hapus <span className="font-bold text-gray-800 break-all">{name}</span>?</p>
                     <div className="flex gap-3">
-                        <button onClick={onClose}   disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 active:scale-[0.98] transition-all disabled:opacity-50">Batal</button>
+                        <button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 active:scale-[0.98] transition-all disabled:opacity-50">Batal</button>
                         <button onClick={onConfirm} disabled={loading} className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-gray-800/20 flex items-center justify-center gap-2">
                             {loading && <Spinner />}Hapus
                         </button>
@@ -670,22 +670,22 @@ function DeleteConfirm({ open, title, name, onClose, onConfirm, loading }: {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
-export default function AccessoriesPage() {
+export function AccessoriesContent() {
     const router = useRouter();
-    const [items,          setItems]          = useState<Accessory[]>([]);
-    const [total,          setTotal]          = useState(0);
-    const [page,           setPage]           = useState(1);
-    const [search,         setSearch]         = useState("");
+    const [items, setItems] = useState<Accessory[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("");
-    const [fetching,       setFetching]       = useState(true);
-    const [isExporting,    setIsExporting]    = useState(false);
-    const [accModalOpen,   setAccModalOpen]   = useState(false);
-    const [editAcc,        setEditAcc]        = useState<Accessory | null>(null);
-    const [deleteAcc,      setDeleteAcc]      = useState<Accessory | null>(null);
-    const [savingAcc,      setSavingAcc]      = useState(false);
-    const [deletingAcc,    setDeletingAcc]    = useState(false);
-    const [selectedAcc,    setSelectedAcc]    = useState<Accessory | null>(null);
-    const [view,           setView]           = useState<"detail" | null>(null);
+    const [fetching, setFetching] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
+    const [accModalOpen, setAccModalOpen] = useState(false);
+    const [editAcc, setEditAcc] = useState<Accessory | null>(null);
+    const [deleteAcc, setDeleteAcc] = useState<Accessory | null>(null);
+    const [savingAcc, setSavingAcc] = useState(false);
+    const [deletingAcc, setDeletingAcc] = useState(false);
+    const [selectedAcc, setSelectedAcc] = useState<Accessory | null>(null);
+    const [view, setView] = useState<"detail" | null>(null);
 
     const LIMIT = 20;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -713,10 +713,10 @@ export default function AccessoriesPage() {
     }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const stats = useMemo(() => ({
-        jenis:     total,
-        tersedia:  items.reduce((s, i) => s + i.stock_tersedia, 0),
+        jenis: total,
+        tersedia: items.reduce((s, i) => s + i.stock_tersedia, 0),
         totalUnit: items.reduce((s, i) => s + i.stock_total, 0),
-        habis:     items.filter(i => i.stock_tersedia === 0).length,
+        habis: items.filter(i => i.stock_tersedia === 0).length,
     }), [items, total]);
 
     const handleSaveAcc = async (data: AccessoryForm) => {
@@ -755,10 +755,10 @@ export default function AccessoriesPage() {
         try {
             const params = new URLSearchParams({
                 page: "1", limit: String(total > 0 ? total : 9999),
-                ...(search         && { search }),
+                ...(search && { search }),
                 ...(filterCategory && { category: filterCategory }),
             });
-            const res  = await fetch(`/api/accessories?${params}`);
+            const res = await fetch(`/api/accessories?${params}`);
             const json = await res.json();
             const all: Accessory[] = json.success ? json.data : items;
 
@@ -784,36 +784,36 @@ export default function AccessoriesPage() {
                 ];
 
                 all.forEach((a, idx) => {
-                    const units      = a.accessory_units ?? [];
-                    const terjual    = units.filter(u => u.status === "TERJUAL").length;
+                    const units = a.accessory_units ?? [];
+                    const terjual = units.filter(u => u.status === "TERJUAL").length;
                     const snTersedia = units.filter(u => u.status === "TERSEDIA").map(u => u.serial_number).join(", ") || "—";
-                    const snSemua    = units.map(u => u.serial_number).join(", ") || "—";
-                    const tanggal    = a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-                    const isZebra    = idx % 2 === 1;
-                    const d          = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
+                    const snSemua = units.map(u => u.serial_number).join(", ") || "—";
+                    const tanggal = a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+                    const isZebra = idx % 2 === 1;
+                    const d = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
                     // Warna stok: merah=0, kuning<=2, hijau>2
-                    const stokColor  = a.stock_tersedia === 0 ? "DC2626" : a.stock_tersedia <= 2 ? "D97706" : "059669";
+                    const stokColor = a.stock_tersedia === 0 ? "DC2626" : a.stock_tersedia <= 2 ? "D97706" : "059669";
 
                     wsData.push([
-                        xCell(idx + 1,           d(true)),
-                        xCell(a.name,            d()),
-                        xCell(a.category,        { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
-                        xCell(a.brand ?? "—",    d()),
-                        xCell(a.spec  ?? "—",    d()),
+                        xCell(idx + 1, d(true)),
+                        xCell(a.name, d()),
+                        xCell(a.category, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
+                        xCell(a.brand ?? "—", d()),
+                        xCell(a.spec ?? "—", d()),
                         xCell(a.sell_price || 0, d(true, true)),
-                        xCell(snTersedia,         sSN(isZebra)),
-                        xCell(snSemua,            { ...d(), font: { sz: 9, name: "Courier New", color: { rgb: "6B7280" } }, alignment: { horizontal: "left", wrapText: true } }),
-                        xCell(a.stock_tersedia,  { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: stokColor } } }),
-                        xCell(a.stock_total,     d(true)),
-                        xCell(terjual,           d(true)),
-                        xCell(a.notes ?? "—",   d()),
-                        xCell(tanggal,           d(true)),
+                        xCell(snTersedia, sSN(isZebra)),
+                        xCell(snSemua, { ...d(), font: { sz: 9, name: "Courier New", color: { rgb: "6B7280" } }, alignment: { horizontal: "left", wrapText: true } }),
+                        xCell(a.stock_tersedia, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: stokColor } } }),
+                        xCell(a.stock_total, d(true)),
+                        xCell(terjual, d(true)),
+                        xCell(a.notes ?? "—", d()),
+                        xCell(tanggal, d(true)),
                     ]);
                 });
 
                 const ws = XLSX.utils.aoa_to_sheet(wsData);
                 ws["!cols"] = [
-                    { wch: 5  }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
+                    { wch: 5 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
                     { wch: 20 }, { wch: 44 }, { wch: 44 },
                     { wch: 13 }, { wch: 11 }, { wch: 10 }, { wch: 26 }, { wch: 16 },
                 ];
@@ -839,54 +839,54 @@ export default function AccessoriesPage() {
 
                 all.forEach((a, ai) => {
                     (a.accessory_units ?? []).forEach(u => {
-                        const margin    = (u.selling_price || 0) - (u.buy_price || 0);
+                        const margin = (u.selling_price || 0) - (u.buy_price || 0);
                         const marginPct = u.buy_price > 0 ? `${Math.round((margin / u.buy_price) * 100)}%` : "—";
-                        totalModal  += u.buy_price     || 0;
-                        totalJual   += u.selling_price || 0;
+                        totalModal += u.buy_price || 0;
+                        totalJual += u.selling_price || 0;
                         totalMargin += margin;
                         const isZebra = ai % 2 === 1; // zebra per grup aksesori
-                        const d       = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
+                        const d = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
                         const tanggal = u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
                         wsData.push([
-                            xCell(unitNo++,                               d(true)),
-                            xCell(a.name,                                 d()),
-                            xCell(a.category,                             { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
-                            xCell(a.brand ?? "—",                         d()),
-                            xCell(u.serial_number,                        sSN(isZebra)),
-                            xCell(u.condition,                            sKondisi(u.condition)),
-                            xCell(statusLabel[u.status] ?? u.status,      sStatus(statusLabel[u.status])),
-                            xCell(u.buy_price     || 0,                   d(true, true)),
-                            xCell(u.selling_price || 0,                   d(true, true)),
-                            xCell(margin,                                  sMargin(margin)),
-                            xCell(marginPct,                               { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: margin >= 0 ? "065F46" : "991B1B" } } }),
-                            xCell(u.notes ?? "—",                         d()),
-                            xCell(tanggal,                                 d(true)),
+                            xCell(unitNo++, d(true)),
+                            xCell(a.name, d()),
+                            xCell(a.category, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
+                            xCell(a.brand ?? "—", d()),
+                            xCell(u.serial_number, sSN(isZebra)),
+                            xCell(u.condition, sKondisi(u.condition)),
+                            xCell(statusLabel[u.status] ?? u.status, sStatus(statusLabel[u.status])),
+                            xCell(u.buy_price || 0, d(true, true)),
+                            xCell(u.selling_price || 0, d(true, true)),
+                            xCell(margin, sMargin(margin)),
+                            xCell(marginPct, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: margin >= 0 ? "065F46" : "991B1B" } } }),
+                            xCell(u.notes ?? "—", d()),
+                            xCell(tanggal, d(true)),
                         ]);
                     });
                 });
 
                 // Baris TOTAL
                 wsData.push([
-                    xCell("",           sTotal()),
-                    xCell("TOTAL",      sTotal()),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
-                    xCell(totalModal,   sTotal(true, true)),
-                    xCell(totalJual,    sTotal(true, true)),
-                    xCell(totalMargin,  sTotal(true, true)),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
-                    xCell("",           sTotal()),
+                    xCell("", sTotal()),
+                    xCell("TOTAL", sTotal()),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
+                    xCell(totalModal, sTotal(true, true)),
+                    xCell(totalJual, sTotal(true, true)),
+                    xCell(totalMargin, sTotal(true, true)),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
+                    xCell("", sTotal()),
                 ]);
 
                 if (wsData.length > 1) {
                     const ws = XLSX.utils.aoa_to_sheet(wsData);
                     ws["!cols"] = [
-                        { wch: 5  }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
+                        { wch: 5 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
                         { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 },
                         { wch: 16 }, { wch: 10 }, { wch: 22 }, { wch: 16 },
                     ];
@@ -900,7 +900,7 @@ export default function AccessoriesPage() {
                 }
             }
 
-            const now     = new Date();
+            const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
             XLSX.writeFile(wb, `Aksesori_${dateStr}.xlsx`);
             toast.success(`Export berhasil — ${all.length} jenis aksesori`);
@@ -912,7 +912,7 @@ export default function AccessoriesPage() {
     };
 
     const totalPages = Math.ceil(total / LIMIT);
-    const hasFilter  = !!(search || filterCategory);
+    const hasFilter = !!(search || filterCategory);
 
     return (
         <>
@@ -941,216 +941,222 @@ export default function AccessoriesPage() {
                     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
                     background-position: right 10px center; background-repeat: no-repeat; background-size: 16px; padding-right: 32px !important;
                 }
-            `}</style>
+ `}</style>
 
-            <DashboardLayout>
-                <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-                    <div className="max-w-full mx-auto space-y-5">
+            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+                <div className="max-w-full mx-auto space-y-5">
 
-                        {/* HEADER */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 animate-slideDown">
-                            <div className="flex items-center gap-3.5">
-                                <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                        <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M8 12h.01M12 12h.01M16 12h.01" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Data Aksesori</h1>
-                                    <p className="text-xs text-gray-400 mt-0.5 font-medium">Kelola inventaris aksesori Solit 03</p>
-                                </div>
+                    {/* HEADER */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 animate-slideDown">
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M8 12h.01M12 12h.01M16 12h.01" />
+                                </svg>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={exportToExcel} disabled={isExporting || fetching || items.length === 0}
-                                    title={items.length === 0 ? "Tidak ada data untuk di-export" : "Export semua data ke Excel"}
-                                    className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-xl active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed">
-                                    {isExporting ? (
-                                        <><svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><span className="hidden sm:inline">Mengexport...</span></>
-                                    ) : (
-                                        <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg><span className="hidden sm:inline">Export Excel</span><span className="sm:hidden">Excel</span></>
-                                    )}
-                                </button>
-                                <button onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
-                                    className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                                    Tambah Aksesori
-                                </button>
+                            <div>
+                                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Data Aksesori</h1>
+                                <p className="text-xs text-gray-400 mt-0.5 font-medium">Kelola inventaris aksesori Solit 03</p>
                             </div>
                         </div>
-
-                        {/* STAT CARDS */}
-                        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 animate-slideDown">
-                            <StatCard label="Total Jenis"   value={`${stats.jenis} jenis`}    accent="bg-gray-700"    icon={<svg className="w-4 h-4 text-gray-600"    fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>} />
-                            <StatCard label="Unit Tersedia" value={`${stats.tersedia} unit`}  accent="bg-emerald-500" icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-                            <StatCard label="Total Unit"    value={`${stats.totalUnit} unit`} accent="bg-blue-500"    icon={<svg className="w-4 h-4 text-blue-600"    fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
-                            <StatCard label="Stok Habis"    value={`${stats.habis} jenis`}    accent="bg-red-500"    icon={<svg className="w-4 h-4 text-red-500"     fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
+                        <div className="flex items-center gap-2">
+                            <button onClick={exportToExcel} disabled={isExporting || fetching || items.length === 0}
+                                title={items.length === 0 ? "Tidak ada data untuk di-export" : "Export semua data ke Excel"}
+                                className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-xl active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed">
+                                {isExporting ? (
+                                    <><svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><span className="hidden sm:inline">Mengexport...</span></>
+                                ) : (
+                                    <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg><span className="hidden sm:inline">Export Excel</span><span className="sm:hidden">Excel</span></>
+                                )}
+                            </button>
+                            <button onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
+                                className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                Tambah Aksesori
+                            </button>
                         </div>
-
-                        {/* FILTER */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                <div className="relative group lg:col-span-2">
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
-                                    </div>
-                                    <input className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all font-medium placeholder:text-gray-400 placeholder:font-normal"
-                                        placeholder="Cari nama, merk, spesifikasi..." value={search} onChange={e => handleSearch(e.target.value)} />
-                                </div>
-                                <FilterSelect value={filterCategory} onChange={e => { setFilterCategory(e.target.value); fetchItems(1, search, e.target.value); }}>
-                                    <option value="">Semua Kategori</option>
-                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </FilterSelect>
-                                <button onClick={() => { setSearch(""); setFilterCategory(""); fetchItems(1, "", ""); }} disabled={!hasFilter}
-                                    className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* TABLE */}
-                        {fetching ? <SkeletonTable /> : items.length === 0 ? (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
-                                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🧰</div>
-                                <p className="text-gray-700 font-bold text-base">Belum ada data aksesori</p>
-                                <p className="text-gray-400 text-sm mt-1.5">{hasFilter ? "Coba ubah filter pencarian" : "Klik tombol Tambah Aksesori untuk mulai"}</p>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
-                                <div className="overflow-x-auto table-scroll">
-                                    <table className="w-full text-sm border-collapse">
-                                        <thead>
-                                            <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                                <Th center>No</Th>
-                                                <Th>Nama Aksesori</Th>
-                                                <Th>Kategori</Th>
-                                                <Th>Merk</Th>
-                                                <Th>Spek</Th>
-                                                <Th>Serial Number (Tersedia)</Th>
-                                                <Th right>Harga Jual Default</Th>
-                                                <Th right>Stok Tersedia</Th>
-                                                <Th right>Total Unit</Th>
-                                                <Th right>Aksi</Th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {items.map((item, idx) => {
-                                                const unitsTersedia = (item.accessory_units ?? []).filter(u => u.status === "TERSEDIA");
-                                                const snVisible     = unitsTersedia.slice(0, 3);
-                                                const snOverflow    = unitsTersedia.length - 3;
-                                                return (
-                                                    <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
-                                                        onClick={() => { setSelectedAcc(item); setView("detail"); }}>
-                                                        <td className="px-4 py-3.5 text-center w-10">
-                                                            <span className="text-xs font-semibold text-gray-300 tabular-nums">{String((page - 1) * LIMIT + idx + 1).padStart(2, "0")}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 max-w-[200px]">
-                                                            <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.name}>{item.name}</span>
-                                                            {item.notes && <span className="block text-[11px] text-gray-400 truncate mt-0.5">{item.notes}</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap"><CategoryBadge cat={item.category} /></td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span></td>
-                                                        <td className="px-4 py-3.5 max-w-[140px]"><span className="block text-xs text-gray-600 truncate" title={item.spec ?? ""}>{item.spec || <span className="text-gray-200">—</span>}</span></td>
-
-                                                        {/* Serial Number chips */}
-                                                        <td className="px-4 py-3.5 max-w-[240px]" onClick={e => e.stopPropagation()}>
-                                                            {unitsTersedia.length === 0 ? (
-                                                                <span className="text-[11px] text-gray-300 font-medium italic">Tidak ada stok</span>
-                                                            ) : (
-                                                                <div className="flex flex-wrap gap-1">
-                                                                    {snVisible.map(u => (
-                                                                        <span key={u.id} title={u.serial_number}
-                                                                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-100 leading-none whitespace-nowrap">
-                                                                            {u.serial_number}
-                                                                        </span>
-                                                                    ))}
-                                                                    {snOverflow > 0 && (
-                                                                        <span title={unitsTersedia.slice(3).map(u => u.serial_number).join(", ")}
-                                                                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 leading-none cursor-default">
-                                                                            +{snOverflow} lagi
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </td>
-
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className="text-[13px] font-bold text-gray-800 tabular-nums">{item.sell_price > 0 ? fmt(item.sell_price) : <span className="text-gray-200 font-medium">—</span>}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${item.stock_tersedia === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : item.stock_tersedia <= 2 ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>
-                                                                {item.stock_tersedia}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className="text-sm font-semibold text-gray-600 tabular-nums">{item.stock_total}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <button onClick={() => router.push(`/dashboard/accessories/${item.id}/units`)}
-                                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Kelola Unit/SN">
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M8 12h.01M12 12h.01M16 12h.01" /></svg>
-                                                                </button>
-                                                                <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }}
-                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
-                                                                <button onClick={() => setDeleteAcc(item)}
-                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Pagination */}
-                                <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
-                                    <p className="text-xs text-gray-400 font-medium">
-                                        Menampilkan <span className="text-gray-700 font-bold">{(page - 1) * LIMIT + 1}</span>–<span className="text-gray-700 font-bold">{Math.min(page * LIMIT, total)}</span> dari <span className="text-gray-700 font-bold">{total}</span>
-                                    </p>
-                                    {totalPages > 1 && (
-                                        <div className="flex items-center gap-1.5">
-                                            <button disabled={page <= 1}         onClick={() => fetchItems(page - 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
-                                            </button>
-                                            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
-                                                <button key={p} onClick={() => fetchItems(p)} className={`w-7 h-7 rounded-lg text-xs font-bold transition ${p === page ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{p}</button>
-                                            ))}
-                                            <button disabled={page >= totalPages} onClick={() => fetchItems(page + 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </main>
 
-                <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} />
+                    {/* STAT CARDS */}
+                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 animate-slideDown">
+                        <StatCard label="Total Jenis" value={`${stats.jenis} jenis`} accent="bg-gray-700" icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>} />
+                        <StatCard label="Unit Tersedia" value={`${stats.tersedia} unit`} accent="bg-emerald-500" icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+                        <StatCard label="Total Unit" value={`${stats.totalUnit} unit`} accent="bg-blue-500" icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
+                        <StatCard label="Stok Habis" value={`${stats.habis} jenis`} accent="bg-red-500" icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
+                    </div>
 
-                {view === "detail" && (
-                    <AccessoryDetailModal accessory={selectedAcc}
-                        onClose={() => { setView(null); setSelectedAcc(null); }}
-                        onManageUnits={() => { setView(null); router.push(`/dashboard/accessories/${selectedAcc!.id}/units`); }}
-                        onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }}
-                        onDelete={() => setDeleteAcc(selectedAcc)} />
-                )}
+                    {/* FILTER */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <div className="relative group lg:col-span-2">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
+                                </div>
+                                <input className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all font-medium placeholder:text-gray-400 placeholder:font-normal"
+                                    placeholder="Cari nama, merk, spesifikasi..." value={search} onChange={e => handleSearch(e.target.value)} />
+                            </div>
+                            <FilterSelect value={filterCategory} onChange={e => { setFilterCategory(e.target.value); fetchItems(1, search, e.target.value); }}>
+                                <option value="">Semua Kategori</option>
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </FilterSelect>
+                            <button onClick={() => { setSearch(""); setFilterCategory(""); fetchItems(1, "", ""); }} disabled={!hasFilter}
+                                className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
 
-                <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""}
-                    onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
-            </DashboardLayout>
+                    {/* TABLE */}
+                    {fetching ? <SkeletonTable /> : items.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🧰</div>
+                            <p className="text-gray-700 font-bold text-base">Belum ada data aksesori</p>
+                            <p className="text-gray-400 text-sm mt-1.5">{hasFilter ? "Coba ubah filter pencarian" : "Klik tombol Tambah Aksesori untuk mulai"}</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                            <div className="overflow-x-auto table-scroll">
+                                <table className="w-full text-sm border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b-2 border-gray-100">
+                                            <Th center>No</Th>
+                                            <Th>Nama Aksesori</Th>
+                                            <Th>Kategori</Th>
+                                            <Th>Merk</Th>
+                                            <Th>Spek</Th>
+                                            <Th>Serial Number (Tersedia)</Th>
+                                            <Th right>Harga Jual Default</Th>
+                                            <Th right>Stok Tersedia</Th>
+                                            <Th right>Total Unit</Th>
+                                            <Th right>Aksi</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {items.map((item, idx) => {
+                                            const unitsTersedia = (item.accessory_units ?? []).filter(u => u.status === "TERSEDIA");
+                                            const snVisible = unitsTersedia.slice(0, 3);
+                                            const snOverflow = unitsTersedia.length - 3;
+                                            return (
+                                                <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
+                                                    onClick={() => { setSelectedAcc(item); setView("detail"); }}>
+                                                    <td className="px-4 py-3.5 text-center w-10">
+                                                        <span className="text-xs font-semibold text-gray-300 tabular-nums">{String((page - 1) * LIMIT + idx + 1).padStart(2, "0")}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 max-w-[200px]">
+                                                        <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.name}>{item.name}</span>
+                                                        {item.notes && <span className="block text-[11px] text-gray-400 truncate mt-0.5">{item.notes}</span>}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 whitespace-nowrap"><CategoryBadge cat={item.category} /></td>
+                                                    <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span></td>
+                                                    <td className="px-4 py-3.5 max-w-[140px]"><span className="block text-xs text-gray-600 truncate" title={item.spec ?? ""}>{item.spec || <span className="text-gray-200">—</span>}</span></td>
+
+                                                    {/* Serial Number chips */}
+                                                    <td className="px-4 py-3.5 max-w-[240px]" onClick={e => e.stopPropagation()}>
+                                                        {unitsTersedia.length === 0 ? (
+                                                            <span className="text-[11px] text-gray-300 font-medium italic">Tidak ada stok</span>
+                                                        ) : (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {snVisible.map(u => (
+                                                                    <span key={u.id} title={u.serial_number}
+                                                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-100 leading-none whitespace-nowrap">
+                                                                        {u.serial_number}
+                                                                    </span>
+                                                                ))}
+                                                                {snOverflow > 0 && (
+                                                                    <span title={unitsTersedia.slice(3).map(u => u.serial_number).join(", ")}
+                                                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 leading-none cursor-default">
+                                                                        +{snOverflow} lagi
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="text-[13px] font-bold text-gray-800 tabular-nums">{item.sell_price > 0 ? fmt(item.sell_price) : <span className="text-gray-200 font-medium">—</span>}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${item.stock_tersedia === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : item.stock_tersedia <= 2 ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>
+                                                            {item.stock_tersedia}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="text-sm font-semibold text-gray-600 tabular-nums">{item.stock_total}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <button onClick={() => router.push(`/dashboard/accessories/${item.id}/units`)}
+                                                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Kelola Unit/SN">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M8 12h.01M12 12h.01M16 12h.01" /></svg>
+                                                            </button>
+                                                            <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }}
+                                                                className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                            <button onClick={() => setDeleteAcc(item)}
+                                                                className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination */}
+                            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-xs text-gray-400 font-medium">
+                                    Menampilkan <span className="text-gray-700 font-bold">{(page - 1) * LIMIT + 1}</span>–<span className="text-gray-700 font-bold">{Math.min(page * LIMIT, total)}</span> dari <span className="text-gray-700 font-bold">{total}</span>
+                                </p>
+                                {totalPages > 1 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <button disabled={page <= 1} onClick={() => fetchItems(page - 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                                        </button>
+                                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+                                            <button key={p} onClick={() => fetchItems(p)} className={`w-7 h-7 rounded-lg text-xs font-bold transition ${p === page ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{p}</button>
+                                        ))}
+                                        <button disabled={page >= totalPages} onClick={() => fetchItems(page + 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} />
+
+            {view === "detail" && (
+                <AccessoryDetailModal accessory={selectedAcc}
+                    onClose={() => { setView(null); setSelectedAcc(null); }}
+                    onManageUnits={() => { setView(null); router.push(`/dashboard/accessories/${selectedAcc!.id}/units`); }}
+                    onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }}
+                    onDelete={() => setDeleteAcc(selectedAcc)} />
+            )}
+
+            <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""}
+                onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
         </>
+    );
+}
+
+export default function AccessoriesPage() {
+    return (
+        <DashboardLayout>
+            <AccessoriesContent />
+        </DashboardLayout>
     );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED STYLE CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════
-const inputCls    = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150";
+const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150";
 const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150 resize-none";
-const labelCls    = "block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5";
+const labelCls = "block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER COMPONENTS
@@ -1199,13 +1205,13 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No","Nama Aksesori","Kategori","Merk","Spek","Serial Number","Harga","Stok","Total","Aksi"].map(h => (
+                            {["No", "Nama Aksesori", "Kategori", "Merk", "Spek", "Serial Number", "Harga", "Stok", "Total", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {[1,2,3,4,5,6].map(r => (
+                        {[1, 2, 3, 4, 5, 6].map(r => (
                             <tr key={r} className="border-b border-gray-50">
                                 <td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={150} h={13} /></td>

@@ -168,7 +168,7 @@ function TotalBar({ totals, count }: {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function ReadyPage() {
+export function ReadyContent() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
@@ -299,7 +299,7 @@ export default function ReadyPage() {
     const hasActiveFilter = search || filterStatus !== "ALL" || filterGrade !== "ALL";
 
     return (
-        <DashboardLayout>
+        <>
             <style>{`
                 @keyframes fadeIn  { from { opacity:0; transform:scale(0.95) }  to { opacity:1; transform:scale(1) } }
                 @keyframes scaleIn { from { opacity:0; transform:scale(0.9) }   to { opacity:1; transform:scale(1) } }
@@ -612,7 +612,7 @@ export default function ReadyPage() {
                                     unit
                                     {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
                                 </p>
-                               
+
                             </div>
                         </div>
                     )}
@@ -649,6 +649,14 @@ export default function ReadyPage() {
                     }}
                 />
             )}
+        </>
+    );
+}
+
+export default function ReadyPage() {
+    return (
+        <DashboardLayout>
+            <ReadyContent />
         </DashboardLayout>
     );
 }

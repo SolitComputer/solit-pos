@@ -270,7 +270,7 @@ function DeleteConfirmModal({
     );
 }
 
-export default function Page() {
+export function LaptopsContent() {
     const [laptops, setLaptops] = useState<Laptop[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -785,10 +785,9 @@ export default function Page() {
                     background-size: 16px;
                     padding-right: 32px !important;
                 }
-            `}</style>
+    `}</style>
 
-            <DashboardLayout>
-                <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
                     <div className="max-w-full mx-auto space-y-5">
 
                         {/* ── HEADER ───────────────────────────────────────── */}
@@ -1279,8 +1278,15 @@ export default function Page() {
                         }}
                     />
                 )}
-            </DashboardLayout>
-        </>
+   </>
+    );
+}
+
+export default function LaptopsPage() {
+    return (
+        <DashboardLayout>
+            <LaptopsContent />
+        </DashboardLayout>
     );
 }
 

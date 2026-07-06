@@ -154,8 +154,8 @@ function EditRepairModal({
                 type="button"
                 onClick={() => setUnitStatus("SIAP_JUAL")}
                 className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${unitStatus === "SIAP_JUAL"
-                    ? "border-emerald-500 bg-emerald-50 shadow-sm"
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                  ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
                   }`}
               >
                 <div className="flex items-center gap-2 mb-0.5">
@@ -171,8 +171,8 @@ function EditRepairModal({
                 type="button"
                 onClick={() => setUnitStatus("BELUM_SIAP")}
                 className={`relative py-3 px-3 rounded-xl border-2 transition-all text-left ${unitStatus === "BELUM_SIAP"
-                    ? "border-amber-500 bg-amber-50 shadow-sm"
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                  ? "border-amber-500 bg-amber-50 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
                   }`}
               >
                 <div className="flex items-center gap-2 mb-0.5">
@@ -212,10 +212,10 @@ function EditRepairModal({
                   : "Diagnosa masalah unit (opsional)..."
               }
               className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 transition resize-none ${needsAnalisa
-                  ? "border-red-300 bg-red-50/40 focus:ring-red-200 focus:border-red-400"
-                  : isBelumSiap
-                    ? "border-amber-200 bg-amber-50/40 focus:ring-amber-200 focus:border-amber-400 focus:bg-white"
-                    : "border-gray-200 bg-gray-50 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white"
+                ? "border-red-300 bg-red-50/40 focus:ring-red-200 focus:border-red-400"
+                : isBelumSiap
+                  ? "border-amber-200 bg-amber-50/40 focus:ring-amber-200 focus:border-amber-400 focus:bg-white"
+                  : "border-gray-200 bg-gray-50 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white"
                 }`}
             />
             {needsAnalisa && (
@@ -261,8 +261,8 @@ function EditRepairModal({
                   type="button"
                   onClick={() => setRepairStatus(key)}
                   className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${repairStatus === key
-                      ? `${val.badge} shadow-sm scale-[1.01]`
-                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? `${val.badge} shadow-sm scale-[1.01]`
+                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                 >
                   <span className="text-base flex-shrink-0">{val.emoji}</span>
@@ -336,7 +336,7 @@ function EditRepairModal({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function MinusPage() {
+export function MinusContent() {
   const [units, setUnits] = useState<MinusUnit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -438,7 +438,7 @@ export default function MinusPage() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
         <div className="max-w-full mx-auto space-y-5">
 
@@ -661,8 +661,8 @@ export default function MinusPage() {
                             {canEdit && (
                               <button onClick={() => setEditTarget(unit)}
                                 className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${missingAnalisa
-                                    ? "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
-                                    : "text-gray-600 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                                  ? "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
+                                  : "text-gray-600 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                                   }`}>
                                 Update
                               </button>
@@ -721,7 +721,15 @@ export default function MinusPage() {
       <style jsx>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
-      `}</style>
+ `}</style>
+    </>
+  );
+}
+
+export default function MinusPage() {
+  return (
+    <DashboardLayout>
+      <MinusContent />
     </DashboardLayout>
   );
 }
