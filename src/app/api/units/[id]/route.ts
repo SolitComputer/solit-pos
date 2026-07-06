@@ -257,6 +257,6 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
-export const PATCH = withAuth(patchHandler, PERMISSIONS.EDIT_TRANSACTION);
-export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_LAPTOP);
+export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_UNITS);
+export const PATCH = withAuth(patchHandler, PERMISSIONS.EDIT_UNITS);
+export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_UNITS);

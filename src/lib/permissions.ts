@@ -406,7 +406,7 @@ export const PERMISSIONS = {
   EDIT_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL_SALES", // UNION (dari versi Ikmal)
+    "PKL_SALES",
   ] as UserRole[],
 
   RESTORE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],

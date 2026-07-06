@@ -951,20 +951,6 @@ const MISSION_HREFS = new Set([
   }
 });
 
-// ── Step 2: PKL variant inherit menu penuh dari parent role.
-//           Dilakukan SETELAH cleanup di atas, supaya MISSIONS_MENU
-//           udah ke-append di parent → otomatis ikut ter-share ke PKL variant.
-//
-//           Mapping sesuai permintaan Ikmal:
-//             PKL_MARKETING → MARKETING
-//             PKL_SALES     → CREW_SALES
-//             PKL_SOTECH    → SOTECH
-//             PKL_ONPOINT   → ONPOINT
-//             PKL_KONTEN    → KONTEN
-//             PKL_TEKNISI   → TEKNISI
-//
-//           PKL polos & PKL_PENYEDIA_BARANG TIDAK diubah (tetap pakai
-//           PKL_MENU / PKL_PENYEDIA_MENU) karena tidak diminta.
 const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_MARKETING: "MARKETING",
   PKL_SALES: "CREW_SALES",
@@ -977,13 +963,44 @@ const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
 };
 
+const PKL_STRIP_HREFS = new Set<string>([
+  ...MISSIONS_MENU.items.map((i) => i.href),
+  ITEM_MISSIONS.href,
+  ITEM_MISSION_ALL.href,
+]);
+
 (Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(
   ([pklRole, parentRole]) => {
-    // Clone array biar mutasi selanjutnya (kalau ada) nggak nyebrang antar role.
-    ROLE_MENUS[pklRole] = [...ROLE_MENUS[parentRole]];
+    const inherited: MenuGroup[] = ROLE_MENUS[parentRole].map((g) => ({
+      label: g.label,
+      items: [...g.items],
+    }));
+
+    const stripped = inherited
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)),
+      }))
+      .filter((g) => g.items.length > 0);
+
+    const overviewIdx = stripped.findIndex((g) => g.label === "Overview");
+    if (overviewIdx >= 0) {
+      const alreadyHas = stripped[overviewIdx].items.some(
+        (it) => it.href === ITEM_PKL_REPORT.href
+      );
+      if (!alreadyHas) {
+        stripped[overviewIdx].items.push(ITEM_PKL_REPORT);
+      }
+    } else {
+      stripped.unshift({
+        label: "Overview",
+        items: [ITEM_PKL_REPORT],
+      });
+    }
+
+    ROLE_MENUS[pklRole] = stripped;
   }
 );
-
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
