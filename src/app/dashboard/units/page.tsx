@@ -1,45 +1,34 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import Link from "next/link";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { Trash2 } from "lucide-react";
-import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
-import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
+import UnitFormModal, { LaptopUnit as BaseLaptopUnit } from "@/components/inventory/UnitFormModal";
+import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
+import LaptopPickerModal, { PickableLaptop } from "@/components/inventory/LaptopPickerModal";
+import AddLaptopModal from "@/components/inventory/AddLaptopModal";
 
-interface LaptopUnit {
-    id: string;
-    laptop_id: string;
-    serial_number: string;
-    grade: "A" | "B" | "C";
-    condition_note: string;
-    purchase_price: number;
-    selling_price: number;
-    status: string;
-    notes: string;
-    received_at?: string;
-    created_at: string;
-}
-
-interface Laptop {
-    id: string;
+interface GlobalUnit extends BaseLaptopUnit {
     laptop_name: string;
     brand: string;
     cpu: string;
     ram: string;
     storage: string;
-    selling_price: number;
+}
+
+interface RawGlobalUnit extends BaseLaptopUnit {
+    laptops?: { laptop_name: string; brand: string; cpu: string; ram: string; storage: string } | null;
 }
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
-const GRADE_STYLE: Record<string, { badge: string; label: string; desc: string; color: string }> = {
-    A: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Grade A", desc: "Sempurna", color: "emerald" },
-    B: { badge: "bg-amber-50 text-amber-700 border-amber-200", label: "Grade B", desc: "Minus", color: "amber" },
-    C: { badge: "bg-red-50 text-red-700 border-red-200", label: "Grade C", desc: "Banyak minus", color: "red" },
+const GRADE_STYLE: Record<string, { badge: string; label: string }> = {
+    A: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Grade A" },
+    B: { badge: "bg-amber-50 text-amber-700 border-amber-200", label: "Grade B" },
+    C: { badge: "bg-red-50 text-red-700 border-red-200", label: "Grade C" },
 };
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
@@ -51,12 +40,17 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 
 const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
 
-function sortUnits(units: LaptopUnit[]): LaptopUnit[] {
+function sortUnits(units: GlobalUnit[]): GlobalUnit[] {
     return [...units].sort((a, b) => {
         const gradeDiff = GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade];
         if (gradeDiff !== 0) return gradeDiff;
         return b.serial_number.localeCompare(a.serial_number, undefined, { numeric: true });
     });
+}
+
+function fmtDate(iso?: string) {
+    if (!iso) return "—";
+    return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
 }
 
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
@@ -126,8 +120,6 @@ function ConfirmModal({
     );
 }
 
-
-// ── Toast notifikasi ringan ─────────────────────────────────────────────────
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
     useEffect(() => {
         const t = setTimeout(onDone, 2500);
@@ -144,16 +136,49 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
     );
 }
 
-export default function UnitsPage() {
-    const params = useParams();
-    const laptopId = params.id as string;
+function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+    return (
+        <th className={`px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
+            {children}
+        </th>
+    );
+}
 
-    const [laptop, setLaptop] = useState<Laptop | null>(null);
-    const [units, setUnits] = useState<LaptopUnit[]>([]);
+function SkeletonUnits() {
+    return (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="bg-gray-50/80 border-b border-gray-100">
+                            {["Laptop", "Serial Number", "Grade", "Tgl Masuk", "Harga Modal", "Harga Jual", "Margin", "Status", "Aksi"].map(h => (
+                                <th key={h} className="px-4 py-3 text-left">
+                                    <div className="h-2.5 bg-gray-200 rounded w-16 animate-pulse" />
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                        {[...Array(4)].map((_, i) => (
+                            <tr key={i}>
+                                {[140, 90, 50, 70, 70, 70, 60, 60, 50].map((w, j) => (
+                                    <td key={j} className="px-4 py-3">
+                                        <div className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+export default function AllUnitsPage() {
+    const [units, setUnits] = useState<GlobalUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    const [showForm, setShowForm] = useState(false);
-    const [editingUnit, setEditingUnit] = useState<LaptopUnit | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterGradeTab, setFilterGradeTab] = useState("ALL");
@@ -168,16 +193,24 @@ export default function UnitsPage() {
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
     ] as UserRole[]);
+
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
-    const [showBulkModal, setShowBulkModal] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [bulkDeleting, setBulkDeleting] = useState(false);
     const [toast, setToast] = useState("");
 
+    // ── Unit form (create/edit) ──────────────────────────────────────────────
+    const [editingUnit, setEditingUnit] = useState<GlobalUnit | null>(null);
+    const [newUnitLaptop, setNewUnitLaptop] = useState<PickableLaptop | null>(null);
+    const showUnitForm = !!editingUnit || !!newUnitLaptop;
 
-    const activeUnits = units.filter(u => u.status !== "SOLD");
+    // ── Bulk add ──────────────────────────────────────────────────────────────
+    const [bulkLaptop, setBulkLaptop] = useState<PickableLaptop | null>(null);
 
+    // ── Laptop picker (shared by "Tambah Unit" & "Tambah Banyak") ────────────
+    const [pickerMode, setPickerMode] = useState<"unit" | "bulk" | null>(null);
+
+    // ── Tambah Laptop ─────────────────────────────────────────────────────────
+    const [showAddLaptopModal, setShowAddLaptopModal] = useState(false);
 
     useEffect(() => {
         fetch("/api/auth/me")
@@ -192,51 +225,30 @@ export default function UnitsPage() {
             .catch(() => setUserRoles([]));
     }, []);
 
-    const fmtDate = (iso: string) => {
-        if (!iso) return "—";
-        return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
-    };
-
-    const fetchData = useCallback(async () => {
+    const fetchUnits = useCallback(async () => {
         setIsLoading(true);
         try {
-            const [laptopRes, unitsRes] = await Promise.all([
-                fetch(`/api/laptops/${laptopId}`),
-                fetch(`/api/laptops/${laptopId}/units`),
-            ]);
-            const laptopData = await laptopRes.json();
-            const unitsData = await unitsRes.json();
-            if (laptopData.data) {
-                setLaptop({ ...laptopData.data, selling_price: Math.round(Number(laptopData.data.selling_price) || 0) });
-            }
-            if (unitsData.data) {
-                const normalized: LaptopUnit[] = (unitsData.data).map((u: LaptopUnit) => ({
-                    ...u,
-                    purchase_price: Math.round(Number(u.purchase_price) || 0),
-                    selling_price: Math.round(Number(u.selling_price) || 0),
-                }));
-                setUnits(normalized);
-            }
-        } catch { /* ignore */ } finally {
+            const res = await fetch("/api/units");
+            const result = await res.json();
+            const normalized: GlobalUnit[] = (result.data || []).map((u: RawGlobalUnit) => ({
+                ...u,
+                purchase_price: Math.round(Number(u.purchase_price) || 0),
+                selling_price: Math.round(Number(u.selling_price) || 0),
+                laptop_name: u.laptops?.laptop_name ?? "—",
+                brand: u.laptops?.brand ?? "",
+                cpu: u.laptops?.cpu ?? "",
+                ram: u.laptops?.ram ?? "",
+                storage: u.laptops?.storage ?? "",
+            }));
+            setUnits(normalized);
+        } catch {
+            setUnits([]);
+        } finally {
             setIsLoading(false);
         }
-    }, [laptopId]);
+    }, []);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
-
-    useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterGradeTab, searchSN]);
-
-    const syncLaptopStats = useCallback(async (latestUnits: LaptopUnit[]) => {
-        const siapCount = latestUnits.filter(u => u.status === "SIAP_JUAL").length;
-        const newStatus = siapCount > 0 ? "SIAP_JUAL" : latestUnits.length === 0 ? "BELUM_SIAP" : "SOLD";
-        try {
-            await fetch(`/api/laptops/${laptopId}/sync-units`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ qty: siapCount, status: newStatus }),
-            });
-        } catch { /* non-blocking */ }
-    }, [laptopId]);
+    useEffect(() => { fetchUnits(); }, [fetchUnits]);
 
     const handlePriceSaved = useCallback((unitId: string, newPrice: number) => {
         setUnits(prev => prev.map(u =>
@@ -244,6 +256,8 @@ export default function UnitsPage() {
         ));
         setToast("Harga modal berhasil diperbarui!");
     }, []);
+
+    const activeUnits = units.filter(u => u.status !== "SOLD");
 
     const filteredUnits = sortUnits(
         activeUnits.filter(u => {
@@ -257,112 +271,173 @@ export default function UnitsPage() {
     );
 
     const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax;
-    const isAllSelected = filteredUnits.length > 0 && filteredUnits.every(u => selectedIds.has(u.id));
-    const isIndeterminate = filteredUnits.some(u => selectedIds.has(u.id)) && !isAllSelected;
-
-    const toggleSelectAll = () => {
-        if (isAllSelected) { setSelectedIds(new Set()); }
-        else { setSelectedIds(new Set(filteredUnits.map(u => u.id))); }
-    };
-
-    const toggleSelect = (id: string) => {
-        setSelectedIds(prev => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
-    };
-
-    const handleBulkDelete = () => {
-        if (selectedIds.size === 0) return;
-        setConfirmModal({
-            message: `Hapus ${selectedIds.size} unit yang dipilih? Tindakan ini tidak dapat dibatalkan.`,
-            onConfirm: async () => {
-                setConfirmModal(null);
-                setBulkDeleting(true);
-                try {
-                    await Promise.all(Array.from(selectedIds).map(id => fetch(`/api/units/${id}`, { method: "DELETE" })));
-                    const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
-                    const freshData = await freshRes.json();
-                    const freshUnits: LaptopUnit[] = freshData.data || [];
-                    setUnits(freshUnits);
-                    await syncLaptopStats(freshUnits);
-                    setSelectedIds(new Set());
-                } catch {
-                    setAlertModal("Gagal menghapus beberapa unit");
-                } finally {
-                    setBulkDeleting(false);
-                }
-            },
-        });
-    };
-
-    const counts = {
-        total: activeUnits.length,
-        siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
-        sold: units.filter(u => u.status === "SOLD").length,
-        service: activeUnits.filter(u => u.status === "SERVICE").length,
-        belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
-        gradeA: activeUnits.filter(u => u.grade === "A").length,
-        gradeB: activeUnits.filter(u => u.grade === "B").length,
-        gradeC: activeUnits.filter(u => u.grade === "C").length,
-    };
-
-    const openCreate = () => {
-        setEditingUnit(null);
-        setShowForm(true);
-    };
-
-    const openEdit = (unit: LaptopUnit) => {
-        setEditingUnit(unit);
-        setShowForm(true);
-    };
-
-    const closeForm = () => { setShowForm(false); setEditingUnit(null); };
-
-    const handleFormSuccess = async () => {
-        const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
-        const freshData = await freshRes.json();
-        const freshUnits: LaptopUnit[] = freshData.data || [];
-        setUnits(freshUnits);
-        await syncLaptopStats(freshUnits);
-    };
-
-    const handleDelete = (unit: LaptopUnit) => {
-        setConfirmModal({
-            message: `Hapus unit SN: ${unit.serial_number}?`,
-            onConfirm: async () => {
-                setConfirmModal(null);
-                try {
-                    await fetch(`/api/units/${unit.id}`, { method: "DELETE" });
-                    const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
-                    const freshData = await freshRes.json();
-                    const freshUnits: LaptopUnit[] = freshData.data || [];
-                    setUnits(freshUnits);
-                    await syncLaptopStats(freshUnits);
-                } catch { setAlertModal("Gagal menghapus"); }
-            },
-        });
-    };
 
     const resetFilters = () => {
         setSearchSN(""); setFilterPriceMin(""); setFilterPriceMax("");
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
     };
 
+    const counts = {
+        total: activeUnits.length,
+        siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
+        belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
+        service: activeUnits.filter(u => u.status === "SERVICE").length,
+        sold: units.filter(u => u.status === "SOLD").length,
+        gradeA: activeUnits.filter(u => u.grade === "A").length,
+        gradeB: activeUnits.filter(u => u.grade === "B").length,
+        gradeC: activeUnits.filter(u => u.grade === "C").length,
+    };
+
+    const openEdit = (unit: GlobalUnit) => {
+        setNewUnitLaptop(null);
+        setEditingUnit(unit);
+    };
+
+    const closeUnitForm = () => {
+        setEditingUnit(null);
+        setNewUnitLaptop(null);
+    };
+
+    const handleDelete = (unit: GlobalUnit) => {
+        setConfirmModal({
+            message: `Hapus unit SN: ${unit.serial_number}?`,
+            onConfirm: async () => {
+                setConfirmModal(null);
+                try {
+                    await fetch(`/api/units/${unit.id}`, { method: "DELETE" });
+                    await fetchUnits();
+                } catch {
+                    setAlertModal("Gagal menghapus");
+                }
+            },
+        });
+    };
+
+    const handleExportExcel = async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+        try {
+            const wb = new ExcelJS.Workbook();
+            wb.creator = "Solit POS";
+            wb.created = new Date();
+
+            const ws = wb.addWorksheet("Semua Unit", {
+                views: [{ state: "frozen", ySplit: 1 }],
+                pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+            });
+
+            const COL_DEFS = [
+                { header: "Laptop", key: "laptop", width: 30 },
+                { header: "Brand", key: "brand", width: 16 },
+                { header: "CPU", key: "cpu", width: 22 },
+                { header: "RAM", key: "ram", width: 10 },
+                { header: "Storage", key: "storage", width: 13 },
+                { header: "Serial Number", key: "sn", width: 22 },
+                { header: "Grade", key: "grade", width: 10 },
+                { header: "Status", key: "status", width: 14 },
+                { header: "Tgl Masuk", key: "tanggal", width: 14 },
+                { header: "Harga Modal", key: "modal", width: 18 },
+                { header: "Harga Jual", key: "jual", width: 18 },
+                { header: "Margin", key: "margin", width: 18 },
+                { header: "Kondisi", key: "kondisi", width: 28 },
+            ];
+
+            ws.columns = COL_DEFS;
+
+            const LEFT_KEYS = new Set(["laptop", "kondisi", "tanggal"]);
+            const CURR_KEYS = new Set(["modal", "jual", "margin"]);
+
+            const tableRows = filteredUnits.map(u => {
+                const modal = canSeePriceInfo ? u.purchase_price : 0;
+                const margin = canSeePriceInfo ? (u.selling_price - u.purchase_price) : 0;
+                return [
+                    u.laptop_name, u.brand, u.cpu, u.ram, u.storage,
+                    u.serial_number, u.grade, STATUS_STYLE[u.status]?.label ?? u.status,
+                    fmtDate(u.created_at), modal, u.selling_price, margin,
+                    u.condition_note || "",
+                ];
+            });
+
+            if (tableRows.length > 0) {
+                ws.addTable({
+                    name: "TabelSemuaUnit", ref: "A1",
+                    headerRow: true, totalsRow: false,
+                    style: { theme: "TableStyleMedium7", showRowStripes: true },
+                    columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
+                    rows: tableRows,
+                });
+            } else {
+                const hRow = ws.getRow(1);
+                hRow.height = 30;
+                COL_DEFS.forEach((col, ci) => {
+                    const cell = hRow.getCell(ci + 1);
+                    cell.value = col.header;
+                    cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+                    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+                    cell.alignment = { horizontal: "center", vertical: "middle" };
+                });
+            }
+
+            const headerRow = ws.getRow(1);
+            headerRow.height = 30;
+            headerRow.eachCell((cell, colNum) => {
+                const key = COL_DEFS[colNum - 1]?.key ?? "";
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF166534" } };
+                cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Arial" };
+                cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle" };
+                cell.border = {
+                    top: { style: "thin", color: { argb: "FFCBD5E1" } },
+                    left: { style: "thin", color: { argb: "FFCBD5E1" } },
+                    bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+                    right: { style: "thin", color: { argb: "FFCBD5E1" } },
+                };
+            });
+
+            tableRows.forEach((_, idx) => {
+                const rowNum = idx + 2;
+                const row = ws.getRow(rowNum);
+                row.height = 22;
+                row.eachCell((cell, colNum) => {
+                    const key = COL_DEFS[colNum - 1]?.key ?? "";
+                    cell.font = { size: 10, name: "Arial", color: { argb: "FF111827" } };
+                    cell.alignment = { horizontal: LEFT_KEYS.has(key) ? "left" : "center", vertical: "middle", wrapText: false };
+                    cell.border = {
+                        top: { style: "hair", color: { argb: "FFCBD5E1" } },
+                        left: { style: "hair", color: { argb: "FFCBD5E1" } },
+                        bottom: { style: "hair", color: { argb: "FFCBD5E1" } },
+                        right: { style: "hair", color: { argb: "FFCBD5E1" } },
+                    };
+                    if (CURR_KEYS.has(key)) cell.numFmt = '"Rp "#,##0';
+                });
+            });
+
+            COL_DEFS.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width; });
+
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            const dateStr = new Date()
+                .toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
+                .replace(/\//g, "-");
+            link.download = `Semua_Unit_Solit_${dateStr}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        } catch (err) {
+            console.error("Export error:", err);
+            const msg = err instanceof Error ? err.message : String(err);
+            setAlertModal(`Gagal export Excel: ${msg}`);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <DashboardLayout>
             <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto space-y-5">
-
-                    {/* Breadcrumb */}
-                    <div className="flex items-center gap-2 text-sm">
-                        <Link href="/dashboard/laptops" className="text-gray-400 hover:text-gray-600 transition">Data Laptop</Link>
-                        <svg className="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="text-gray-600 font-medium truncate">{isLoading ? "Memuat..." : laptop?.laptop_name || "Units"}</span>
-                    </div>
 
                     {/* Header */}
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -373,34 +448,52 @@ export default function UnitsPage() {
                                         <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
                                 </div>
-                                <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">{laptop?.laptop_name || "—"}</h1>
+                                <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">Semua Unit</h1>
                             </div>
-                            <p className="text-xs text-gray-400 ml-9">
-                                {[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ") || "Detail laptop"}
-                            </p>
+                            <p className="text-xs text-gray-400 ml-9">Lihat &amp; kelola unit dari semua laptop sekaligus</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link
-                                href={`/dashboard/laptops/${laptopId}/units/sold`}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition shadow-sm"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                Terjual ({counts.sold})
-                            </Link>
-
+                            {!isLoading && filteredUnits.length > 0 && (
+                                <button onClick={handleExportExcel} disabled={isExporting}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-emerald-200 rounded-lg text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition disabled:opacity-60">
+                                    {isExporting ? (
+                                        <>
+                                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Mengekspor...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                                <polyline points="14 2 14 8 20 8" />
+                                                <polyline points="8 13 12 17 16 13" />
+                                                <line x1="12" y1="17" x2="12" y2="11" />
+                                            </svg>
+                                            Export Excel
+                                        </>
+                                    )}
+                                </button>
+                            )}
                             {canManageUnits && (
                                 <>
-                                    <button onClick={openCreate}
+                                    <button onClick={() => setShowAddLaptopModal(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition shadow-sm">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                                        </svg>
+                                        Tambah Laptop
+                                    </button>
+                                    <button onClick={() => setPickerMode("unit")}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#1a1a2e] rounded-lg text-sm font-medium text-white hover:bg-[#16213e] transition shadow-sm">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                         </svg>
                                         Tambah Unit
                                     </button>
-                                    <button onClick={() => setShowBulkModal(true)}
+                                    <button onClick={() => setPickerMode("bulk")}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white transition shadow-sm">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -412,30 +505,25 @@ export default function UnitsPage() {
                         </div>
                     </div>
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        {[
-                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: "📦" },
-                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: "✅" },
-                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: "⏳" },
-                            { label: "Service", value: counts.service, color: "text-blue-600", icon: "🔧" },
-                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: "💰" },
-                        ].map(stat => (
-                            <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs text-gray-400">{stat.label}</p>
-                                    <span className="text-sm opacity-50">{stat.icon}</span>
-                                </div>
-                                <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-                            </div>
-                        ))}
+
+                    {/* Total Modal Card */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-400">Total Harga Modal</p>
+                            <p className="text-lg font-bold text-gray-800">{fmt(activeUnits.reduce((s, u) => s + (u.purchase_price || 0), 0))}</p>
+                        </div>
                     </div>
 
-                    {/* Grade Tabs */}
+
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
                         <div className="flex gap-1.5">
                             {[
-                                { value: "ALL", label: "Semua Grade", count: units.length },
+                                { value: "ALL", label: "Semua Grade", count: activeUnits.length },
                                 { value: "A", label: "Grade A", count: counts.gradeA },
                                 { value: "B", label: "Grade B", count: counts.gradeB },
                                 { value: "C", label: "Grade C", count: counts.gradeC },
@@ -460,10 +548,10 @@ export default function UnitsPage() {
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-2">
                         <div className="flex flex-wrap gap-1.5">
                             {[
-                                { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? units.length : units.filter(u => u.grade === filterGradeTab).length },
-                                { value: "SIAP_JUAL", label: "Siap Jual", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
-                                { value: "BELUM_SIAP", label: "Belum Siap", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
-                                { value: "SERVICE", label: "Service", count: units.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
+                                { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? activeUnits.length : activeUnits.filter(u => u.grade === filterGradeTab).length },
+                                { value: "SIAP_JUAL", label: "Siap Jual", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
+                                { value: "BELUM_SIAP", label: "Belum Siap", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
+                                { value: "SERVICE", label: "Service", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
@@ -526,33 +614,6 @@ export default function UnitsPage() {
                         )}
                     </div>
 
-                    {/* Bulk Action Bar */}
-                    {selectedIds.size > 0 && (
-                        <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
-                            <div className="flex items-center gap-2">
-                                <span className="w-5 h-5 rounded bg-red-500 flex items-center justify-center flex-shrink-0">
-                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </span>
-                                <p className="text-sm font-semibold text-red-700">{selectedIds.size} unit dipilih</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-500 font-medium underline underline-offset-2 active:opacity-60 transition">Batal pilih</button>
-                                <button onClick={handleBulkDelete} disabled={bulkDeleting}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold active:bg-red-600 transition disabled:opacity-50">
-                                    {bulkDeleting ? (
-                                        <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menghapus...</>
-                                    ) : (
-                                        <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>Hapus {selectedIds.size} Unit</>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Table */}
                     {isLoading ? (
                         <SkeletonUnits />
@@ -577,21 +638,9 @@ export default function UnitsPage() {
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-gray-50/80 border-b border-gray-100">
-                                            {canManageUnits && (
-                                                <th className="px-4 py-3 w-14">
-                                                    <button onClick={toggleSelectAll}
-                                                        className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 ${isAllSelected ? "bg-[#1a1a2e] border-[#1a1a2e]" : isIndeterminate ? "bg-gray-300 border-gray-300" : "bg-white border-gray-300 hover:border-gray-400"}`}>
-                                                        {(isAllSelected || isIndeterminate) && (
-                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isIndeterminate ? "M5 12h14" : "M5 13l4 4L19 7"} />
-                                                            </svg>
-                                                        )}
-                                                    </button>
-                                                </th>
-                                            )}
+                                            <Th>Laptop</Th>
                                             <Th>Serial Number</Th>
                                             <Th>Grade</Th>
-                                            <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
                                             {canSeePriceInfo && (
                                                 <Th right>
@@ -616,21 +665,14 @@ export default function UnitsPage() {
                                             const s = STATUS_STYLE[unit.status];
                                             const g = GRADE_STYLE[unit.grade];
                                             const margin = (unit.selling_price || 0) - (unit.purchase_price || 0);
-                                            const isSelected = selectedIds.has(unit.id);
                                             return (
-                                                <tr key={unit.id} className={`transition-colors group ${isSelected ? "bg-red-50/60" : "hover:bg-gray-50/60"}`}>
-                                                    {canManageUnits && (
-                                                        <td className="px-4 py-3">
-                                                            <button onClick={() => toggleSelect(unit.id)}
-                                                                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 ${isSelected ? "bg-red-500 border-red-500" : "bg-white border-gray-300 hover:border-gray-400"}`}>
-                                                                {isSelected && (
-                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                )}
-                                                            </button>
-                                                        </td>
-                                                    )}
+                                                <tr key={unit.id} className="transition-colors group hover:bg-gray-50/60">
+                                                    <td className="px-4 py-3 max-w-[220px]">
+                                                        <p className="text-xs font-semibold text-gray-800 truncate">{unit.laptop_name}</p>
+                                                        <p className="text-[10px] text-gray-400 truncate">
+                                                            {[unit.brand, unit.cpu, unit.ram, unit.storage].filter(Boolean).join(" · ") || "—"}
+                                                        </p>
+                                                    </td>
                                                     <td className="px-4 py-3">
                                                         <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
                                                     </td>
@@ -638,11 +680,6 @@ export default function UnitsPage() {
                                                         {g && (
                                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${g.badge}`}>{g.label}</span>
                                                         )}
-                                                    </td>
-                                                    <td className="px-4 py-3 max-w-[180px]">
-                                                        <span className="text-xs text-gray-600 line-clamp-2" title={unit.condition_note}>
-                                                            {unit.condition_note || <span className="text-gray-300">—</span>}
-                                                        </span>
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
@@ -702,7 +739,7 @@ export default function UnitsPage() {
                             </div>
                             <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between">
                                 <span className="text-xs text-gray-400">
-                                    Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{units.length}</span> unit
+                                    Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{activeUnits.length}</span> unit
                                 </span>
                                 {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
                                     <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
@@ -713,14 +750,47 @@ export default function UnitsPage() {
                 </div>
             </main>
 
-            {showForm && (
+            {/* Laptop picker — shared by Tambah Unit & Tambah Banyak */}
+            {pickerMode && (
+                <LaptopPickerModal
+                    title={pickerMode === "unit" ? "Pilih Laptop untuk Unit Baru" : "Pilih Laptop untuk Tambah Banyak Unit"}
+                    onClose={() => setPickerMode(null)}
+                    onSelect={(laptop) => {
+                        if (pickerMode === "unit") {
+                            setEditingUnit(null);
+                            setNewUnitLaptop(laptop);
+                        } else {
+                            setBulkLaptop(laptop);
+                        }
+                        setPickerMode(null);
+                    }}
+                />
+            )}
+
+            {showUnitForm && (
                 <UnitFormModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
+                    laptopId={editingUnit ? editingUnit.laptop_id : newUnitLaptop!.id}
+                    defaultSellingPrice={editingUnit ? 0 : newUnitLaptop!.selling_price}
                     editingUnit={editingUnit}
-                    onClose={closeForm}
-                    onSuccess={handleFormSuccess}
+                    onClose={closeUnitForm}
+                    onSuccess={fetchUnits}
                     onError={(msg) => setAlertModal(msg)}
+                />
+            )}
+
+            {bulkLaptop && (
+                <BulkAddUnitModal
+                    laptopId={bulkLaptop.id}
+                    defaultSellingPrice={bulkLaptop.selling_price}
+                    onClose={() => setBulkLaptop(null)}
+                    onSuccess={fetchUnits}
+                />
+            )}
+
+            {showAddLaptopModal && (
+                <AddLaptopModal
+                    onClose={() => setShowAddLaptopModal(false)}
+                    onSuccess={() => setToast("Laptop berhasil ditambahkan")}
                 />
             )}
 
@@ -728,54 +798,7 @@ export default function UnitsPage() {
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
             )}
-            {showBulkModal && (
-                <BulkAddUnitModal
-                    laptopId={laptopId}
-                    defaultSellingPrice={laptop?.selling_price ?? 0}
-                    onClose={() => setShowBulkModal(false)}
-                    onSuccess={handleFormSuccess}
-                />
-            )}
             {toast && <Toast message={toast} onDone={() => setToast("")} />}
         </DashboardLayout>
-    );
-}
-
-function SkeletonUnits() {
-    return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-gray-50/80 border-b border-gray-100">
-                            {["Serial Number", "Grade", "Kondisi", "Harga Modal", "Harga Jual", "Margin", "Status", "Aksi"].map(h => (
-                                <th key={h} className="px-4 py-3 text-left">
-                                    <div className="h-2.5 bg-gray-200 rounded w-16 animate-pulse" />
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {[...Array(3)].map((_, i) => (
-                            <tr key={i}>
-                                {[90, 50, 120, 70, 70, 60, 60, 50].map((w, j) => (
-                                    <td key={j} className="px-4 py-3">
-                                        <div className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
-                                    </td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-    return (
-        <th className={`px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
-            {children}
-        </th>
     );
 }

@@ -214,6 +214,13 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
+  allUnits: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M12 2 2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  ),
   monitorChat: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -281,6 +288,11 @@ const ITEM_ACCESSORIES: MenuItem = {
   name: "Data Aksesori",
   href: "/dashboard/accessories",
   icon: Icons.accessories,
+};
+const ITEM_ALL_UNITS: MenuItem = {
+  name: "Semua Unit",
+  href: "/dashboard/units",
+  icon: Icons.allUnits,
 };
 const ITEM_MANAGEMENT_SELLER: MenuItem = {
   name: "Management Seller",
@@ -408,6 +420,7 @@ const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
     { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+    ITEM_ALL_UNITS,
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
     { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
     { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
@@ -683,6 +696,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
@@ -754,6 +768,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_ALL_UNITS,
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
