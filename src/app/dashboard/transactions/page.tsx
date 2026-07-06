@@ -111,11 +111,21 @@ function getSourcePlatformBadge(platform: string): { text: string; color: string
   const p = (platform ?? "").toUpperCase();
   if (p.includes("SHOPEE")) return { text: "🛒 Shopee", color: "bg-red-50 text-red-700 border-red-200" };
   if (p.includes("TOKOPEDIA")) return { text: "🏪 Tokopedia", color: "bg-green-50 text-green-700 border-green-200" };
-  if (p.includes("COD") || p.includes("CASH ON DELIVERY")) return { text: "🚗 COD", color: "bg-blue-50 text-blue-700 border-blue-200" };
+  if (p.includes("COD") || p.includes("CASH ON DELIVERY"))
+    return { text: "🚗 COD", color: "bg-blue-50 text-blue-700 border-blue-200" };
+  // ── Ads (lebih spesifik, harus dicek SEBELUM plain Instagram/Facebook) ──
   if (p.includes("ADS INSTAGRAM")) return { text: "📸 Ads Instagram", color: "bg-pink-50 text-pink-700 border-pink-200" };
-  if (p.includes("ADS FACEBOOK")) return { text: "📣 Ads Facebook", color: "bg-blue-50 text-blue-700 border-blue-200" };
-  if (p.includes("FACEBOOK") || p.includes("FB")) return { text: "👥 Facebook", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
-  if (p.includes("WHATSAPP") || p.includes("WA")) return { text: "💬 WhatsApp", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (p.includes("ADS FACEBOOK")) return { text: "📣 Ads Facebook", color: "bg-violet-50 text-violet-700 border-violet-200" };
+  // ── Platform organik ──
+  if (p === "INSTAGRAM") return { text: "📷 Instagram", color: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200" };
+  if (p === "TIKTOK") return { text: "🎵 TikTok", color: "bg-slate-50 text-slate-700 border-slate-200" };
+  if (p.includes("FACEBOOK") || p.includes("FB"))
+    return { text: "👥 Facebook", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+  if (p.includes("WHATSAPP") || p.includes("WA"))
+    return { text: "💬 WhatsApp", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (p.includes("GOOGLE")) return { text: "🔍 Google", color: "bg-yellow-50 text-yellow-700 border-yellow-200" };
+  if (p.includes("TEMAN")) return { text: "🤝 Teman", color: "bg-orange-50 text-orange-700 border-orange-200" };
+  if (p.includes("LAINNYA")) return { text: "🔖 Lainnya", color: "bg-gray-50 text-gray-600 border-gray-200" };
   return { text: platform || "-", color: "bg-gray-50 text-gray-700 border-gray-200" };
 }
 
