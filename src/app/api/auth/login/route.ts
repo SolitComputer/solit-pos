@@ -200,10 +200,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // ── ✅ FIX: Clear force_logout_at setelah login berhasil ─────────────────
-        // ROOT CAUSE: Tanpa ini, middleware terus detect force_logout_at > token.iat
-        // dan redirect ke /login?reason=force_logout meskipun token baru sudah di-issue.
-        // Solusi: clear kolom ini di DB tepat setelah password verified.
         try {
             await supabaseAdmin
                 .from("users")

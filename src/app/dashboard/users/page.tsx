@@ -610,6 +610,82 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
+// ── ConfirmDeleteModal ────────────────────────────────────────────────────────
+function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>🗑️</div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Akun {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          Akun ini akan dihapus permanen dari sistem.
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold"
+          style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
+          ⚠️ Tindakan ini tidak bisa dibatalkan!
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : "🗑️ Ya, Hapus"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ConfirmResetPasswordModal ─────────────────────────────────────────────────
+function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
+          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>🔑</div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Password {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          Password akan direset. User harus membuat password baru saat login berikutnya.
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold"
+          style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
+          💡 Status "Belum PW" akan aktif kembali
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : "🔑 Ya, Reset"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
@@ -658,6 +734,10 @@ export default function UsersPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [confirmLogoutUser, setConfirmLogoutUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmResetPwUser, setConfirmResetPwUser] = useState<User | null>(null);
+  const [resettingPw, setResettingPw] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
@@ -729,6 +809,52 @@ export default function UsersPage() {
     finally { setLoggingOut(false); setConfirmLogoutUser(null); }
   };
 
+  const handleDeleteUser = async () => {
+    if (!confirmDeleteUser) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/users?id=${confirmDeleteUser.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ Akun ${confirmDeleteUser.name} berhasil dihapus`, "ok");
+        fetchUsers();
+      } else {
+        showToast(data.message ?? "Gagal menghapus user", "err");
+      }
+    } catch {
+      showToast("Terjadi kesalahan", "err");
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteUser(null);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!confirmResetPwUser) return;
+    setResettingPw(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: confirmResetPwUser.id, _resetPassword: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✅ Password ${confirmResetPwUser.name} berhasil direset`, "ok");
+        fetchUsers();
+      } else {
+        showToast(data.message ?? "Gagal reset password", "err");
+      }
+    } catch {
+      showToast("Terjadi kesalahan", "err");
+    } finally {
+      setResettingPw(false);
+      setConfirmResetPwUser(null);
+    }
+  };
+
   const filtered = useMemo(() => {
     let result = users.filter(u => {
       const matchSearch = !search
@@ -796,6 +922,12 @@ export default function UsersPage() {
       )}
       {isAdmin && confirmLogoutUser && (
         <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
+      )}
+      {isAdmin && confirmDeleteUser && (
+        <ConfirmDeleteModal user={confirmDeleteUser} onClose={() => setConfirmDeleteUser(null)} onConfirm={handleDeleteUser} loading={deleting} />
+      )}
+      {isAdmin && confirmResetPwUser && (
+        <ConfirmResetPasswordModal user={confirmResetPwUser} onClose={() => setConfirmResetPwUser(null)} onConfirm={handleResetPassword} loading={resettingPw} />
       )}
       {isAdmin && showCreate && (
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
@@ -1116,8 +1248,23 @@ export default function UsersPage() {
                                   </svg>
                                 </ActionBtn>
                               )}
+                              {isAdmin && (
+                                <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
                             </div>
-
                           </div>
 
                           {/* Action buttons — mobile row (di bawah nama, biar tidak sempit) */}
@@ -1154,6 +1301,22 @@ export default function UsersPage() {
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                       d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && (
+                                <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                  </svg>
+                                </ActionBtn>
+                              )}
+                              {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </ActionBtn>
                               )}
