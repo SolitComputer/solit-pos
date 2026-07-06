@@ -8,6 +8,8 @@
 // Fix: banner alarm versi B tadinya ditulis sebagai block-statement di body fungsi
 //      (jadi TIDAK pernah ter-render). Di sini banner dipindah ke dalam return JSX.
 // v2: Tambah ITEM_MISSIONS ke semua role kecuali PKL (semua varian).
+// v3: KEPALA_ONPOINT & KEPALA_SOTECH disamakan dengan KEPALA_SALES.
+//     ONPOINT & SOTECH TIDAK berubah (tetap seperti semula).
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -56,9 +58,14 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
-// Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
-if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
-if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";  return pathname.startsWith(href);
+  // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
+  if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
+<<<<<<< HEAD
+  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
+=======
+  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";
+  return pathname.startsWith(href);
+>>>>>>> origin/branch-moreno
 }
 
 function getCachedUser() {
@@ -227,6 +234,12 @@ const Icons = {
       <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
+  cashflow: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+    </svg>
+  ),
   managementSeller: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
@@ -241,14 +254,12 @@ const Icons = {
       <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
     </svg>
   ),
-  // ── Missions icon ──────────────────────────────────────────────────────────
   missions: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M9 11l3 3L22 4" />
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
-  // ── Missions category icons ──────────────────────────────────────────────────
   missionDashboard: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
@@ -327,6 +338,11 @@ const ITEM_MISSIONS: MenuItem = {
   href: "/dashboard/missions",
   icon: Icons.missions,
 };
+const ITEM_CASHFLOW: MenuItem = {
+  name: "Cashflow",
+  href: "/dashboard/cashflow",
+  icon: Icons.cashflow,
+};
 
 const MISSIONS_MENU: MenuGroup = {
   label: "Misi Pekerjaan",
@@ -345,7 +361,7 @@ const ITEM_MISSION_ALL: MenuItem = {
   icon: Icons.missionAll,
 };
 
-// ── Preparation groups (UNION dari kedua versi; dedupe by href otomatis di mergeMenuGroups) ──
+// ── Preparation groups ────────────────────────────────────────────────────────
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
@@ -401,7 +417,6 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
 };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
-// ITEM_MISSIONS disertakan di sini agar semua role yang pakai ADMIN_OVERVIEW dapat menu Misi
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
@@ -411,6 +426,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+    { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
   ],
@@ -448,8 +464,7 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
-// ITEM_MISSIONS disertakan di sini agar semua role yang pakai SALES_OVERVIEW() dapat menu Misi
-// Role yang pakai function ini: KEPALA_SALES, CREW_SALES, SOTECH, PENGANTARAN,
+// Role yang pakai SALES_OVERVIEW(): KEPALA_SALES, CREW_SALES, SOTECH, PENGANTARAN,
 // KEPALA_ONPOINT, ONPOINT, KEPALA_SOTECH, KEPALA_MARKETING, ACCOUNTING
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
@@ -576,7 +591,7 @@ const PKL_PENYEDIA_MENU: MenuGroup[] = [
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── ADMIN & setara ──────────────────────────────────────────────────────────
   ADMIN: [
-    ADMIN_OVERVIEW, // sudah include ITEM_MISSIONS
+    ADMIN_OVERVIEW,
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
@@ -586,10 +601,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        ITEM_CASHFLOW,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
@@ -603,7 +619,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
@@ -614,7 +630,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   // ── SALES ──────────────────────────────────────────────────────────────────
-  // SALES_OVERVIEW() sudah include ITEM_MISSIONS
   KEPALA_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
@@ -627,6 +642,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
+  // SOTECH — tidak berubah dari versi original
   SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
@@ -639,18 +655,21 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_PENGANTARAN_MENU,
   ],
 
+  // ✅ FIX: KEPALA_ONPOINT disamakan dengan KEPALA_SALES
   KEPALA_ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
+  // ONPOINT — tidak berubah dari versi original
   ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
+  // ✅ FIX: KEPALA_SOTECH disamakan dengan KEPALA_SALES (sudah sama sebelumnya, diperjelas)
   KEPALA_SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
@@ -664,7 +683,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -689,7 +708,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -709,7 +728,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   // ── ACCOUNTING ─────────────────────────────────────────────────────────────
   ACCOUNTING: [
-    SALES_OVERVIEW([ // sudah include ITEM_MISSIONS
+    SALES_OVERVIEW([
       { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ITEM_USERS,
     ]),
@@ -740,7 +759,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -761,7 +780,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -780,7 +799,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   MARKETING: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS], // ✅
+      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
     },
     {
       label: "Inventaris",
@@ -792,7 +811,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   KEPALA_MARKETING: [
-    SALES_OVERVIEW([ITEM_USERS]), // sudah include ITEM_MISSIONS
+    SALES_OVERVIEW([ITEM_USERS]),
     {
       label: "Inventaris",
       items: [
@@ -821,7 +840,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -840,7 +859,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -863,7 +882,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -884,7 +903,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   KONTEN: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS], // ✅
+      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
     },
     {
       label: "Inventaris",
@@ -906,7 +925,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
-        ITEM_MISSIONS, // ✅
+        ITEM_MISSIONS,
       ],
     },
     {
@@ -942,11 +961,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
 const MISSION_HREFS = new Set([
   ...MISSIONS_MENU.items.map((i) => i.href),
-  ITEM_MISSION_ALL.href, // biar cleanup step 1 nge-strip item ini juga kalau kebawa dari inherit
+  ITEM_MISSION_ALL.href,
 ]);
-// ── Step 1: Bersihkan MISSIONS_MENU items dari semua group,
-//           lalu append MISSIONS_MENU khusus untuk non-PKL role.
-//           Untuk role full-access, tambahkan item "Semua Misi" ke MISSIONS_MENU.
+
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   ROLE_MENUS[role] = ROLE_MENUS[role]
     .map((g) => ({ ...g, items: g.items.filter((it) => !MISSION_HREFS.has(it.href)) }))
@@ -1016,6 +1033,7 @@ const PKL_STRIP_HREFS = new Set<string>([
     ROLE_MENUS[pklRole] = stripped;
   }
 );
+
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
@@ -1057,7 +1075,6 @@ function getInitials(name: string): string {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-// ── Multi-role: tampilkan semua role sebagai badge bertumpuk ──────────────────
 function RoleBadges({ user }: { user: any }) {
   const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
   if (roles.length === 0) return null;
@@ -1100,16 +1117,13 @@ function NavItem({ item, isActive, onClick, badge, rail }: {
             transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`}
         />
       )}
-
       <span
         className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
           ${isActive ? (rail ? "text-white" : "text-white/80") : "text-gray-400 group-hover:text-gray-600"}`}
       >
         {item.icon}
       </span>
-
       {!rail && <span className="flex-1 truncate">{item.name}</span>}
-
       {badge && badge > 0 ? (
         <span
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
@@ -1152,7 +1166,6 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-      {/* ── Logo + User ── */}
       <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
         <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
@@ -1166,8 +1179,6 @@ function SidebarContent({
             </div>
             {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
           </div>
-
-          {/* Rail toggle (desktop only) */}
           {onToggleRail && !rail && (
             <button
               onClick={onToggleRail}
@@ -1179,7 +1190,6 @@ function SidebarContent({
               </svg>
             </button>
           )}
-
           {onClose && (
             <button
               onClick={onClose}
@@ -1225,7 +1235,6 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Expand button saat rail */}
       {rail && onToggleRail && (
         <button
           onClick={onToggleRail}
@@ -1240,7 +1249,6 @@ function SidebarContent({
 
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
-      {/* ── Nav ── */}
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
@@ -1254,7 +1262,6 @@ function SidebarContent({
             ))}
           </div>
         ) : rail ? (
-          // ── Mode rail: icon-only, flat, dengan divider antar grup ──
           groups.map((group, gi) => (
             <div key={group.label} className="space-y-0.5">
               {group.items.map(item => (
@@ -1271,7 +1278,6 @@ function SidebarContent({
             </div>
           ))
         ) : (
-          // ── Mode normal: accordion kategori ──
           groups.map((group, gi) => {
             const isOpen = openMap[group.label] ?? true;
             const hasActive = group.items.some(it => isItemActive(it.href, pathname));
@@ -1297,8 +1303,6 @@ function SidebarContent({
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
-
-                {/* Accordion body — animasi height pakai grid-rows trick */}
                 <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
                   <div className="overflow-hidden min-h-0">
                     <div className="space-y-0.5">
@@ -1320,7 +1324,6 @@ function SidebarContent({
         )}
       </nav>
 
-      {/* ── Logout ── */}
       <div className={`pb-5 border-t border-gray-100 flex-shrink-0 ${rail ? "p-2" : "p-3"}`}>
         <button
           onClick={onLogout}
@@ -1338,15 +1341,12 @@ function SidebarContent({
 
 function dedupeGroups(groups: MenuGroup[]): MenuGroup[] {
   const byLabel = new Map<string, MenuGroup>();
-
   for (const group of groups) {
     const existing = byLabel.get(group.label);
-
     if (!existing) {
       byLabel.set(group.label, { label: group.label, items: [...group.items] });
       continue;
     }
-
     const seen = new Set(existing.items.map((it) => it.href));
     for (const item of group.items) {
       if (!seen.has(item.href)) {
@@ -1355,7 +1355,6 @@ function dedupeGroups(groups: MenuGroup[]): MenuGroup[] {
       }
     }
   }
-
   return Array.from(byLabel.values());
 }
 
@@ -1367,14 +1366,12 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
 
-  // ── Rail (minimize) + width (resize) ──
   const [rail, setRail] = useState(false);
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
   const widthRef = useRef(DEFAULT_W);
   useEffect(() => { widthRef.current = width; }, [width]);
 
-  // ── Accordion open state (shared mobile & desktop) ──
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -1411,13 +1408,12 @@ export default function Sidebar() {
     window.location.href = "/login";
   };
 
-  // Multi-role → merge menu
   const userRoles: string[] =
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
       : user?.role ? [user.role] : [];
 
-  const effectiveRoles = expandRolesWithParents(userRoles); // ✅ tambahan
+  const effectiveRoles = expandRolesWithParents(userRoles);
 
   const groups: MenuGroup[] = effectiveRoles.length > 0
     ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
@@ -1425,7 +1421,6 @@ export default function Sidebar() {
 
   const groupsSig = groups.map(g => g.label).join("|");
 
-  // Init open state per role: default buka kategori yg berisi route aktif, sisanya tutup
   useEffect(() => {
     if (groups.length === 0) return;
     let saved: Record<string, boolean> | null = null;
@@ -1442,7 +1437,6 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupsSig]);
 
-  // Saat navigasi: pastikan kategori aktif kebuka (tanpa nutup yg lain)
   useEffect(() => {
     const active = groups.find(g => g.items.some(it => isItemActive(it.href, pathname)));
     if (!active) return;
@@ -1466,7 +1460,6 @@ export default function Sidebar() {
     });
   }, []);
 
-  // ── Resize drag (desktop) ──
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setDragging(true);
@@ -1474,7 +1467,6 @@ export default function Sidebar() {
     const startW = widthRef.current;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
-
     const onMove = (ev: MouseEvent) => {
       const next = Math.min(MAX_W, Math.max(MIN_W, startW + (ev.clientX - startX)));
       setWidth(next);
@@ -1491,7 +1483,6 @@ export default function Sidebar() {
     window.addEventListener("mouseup", onUp);
   }, []);
 
-  // Prep notify + alarm
   const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
@@ -1536,7 +1527,6 @@ export default function Sidebar() {
         }
       `}</style>
 
-      {/* ── Banner alarm global ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
           <button
@@ -1563,7 +1553,6 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Mobile toggle */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
@@ -1574,28 +1563,23 @@ export default function Sidebar() {
         </svg>
       </button>
 
-      {/* Mobile overlay */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Mobile sidebar (drawer — tanpa rail/resize) */}
       <aside
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      {/* Desktop sidebar (rail + resizable) */}
       <aside
         style={{ width: rail ? RAIL_W : width, transition: dragging ? "none" : "width 0.2s ease-out" }}
         className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
       >
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
-
-        {/* Handle resize */}
         {!rail && (
           <div
             onMouseDown={startResize}
