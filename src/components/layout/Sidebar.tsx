@@ -1,15 +1,22 @@
 "use client";
 // src/components/layout/Sidebar.tsx
 // ── MERGE NOTES ──────────────────────────────────────────────────────────────
-// Gabungan dua versi Sidebar:
-//  • Versi A (teman)  : basic + useDeliveryBadge
-//  • Versi B (Ikmal)  : + usePrepNotify / usePrepAlarm / unlockAudio / banner alarm
+// Gabungan tiga versi Sidebar:
+//  • Versi A (teman lama)   : basic sidebar
+//  • Versi B (update teman) : + Data Aksesori, KEPALA_PENGELOLA_BARANG fix
+//  • Versi C (Ikmal/latest) : + rail mode, resize, collapse group, missions,
+//                              preparation menus, badge notifikasi, alarm,
+//                              multi-role support, usePrepNotify, usePrepAlarm
 // Strategi: UNION. Semua fitur & menu per-role dipertahankan (tidak ada yang hilang).
-// Fix: banner alarm versi B tadinya ditulis sebagai block-statement di body fungsi
-//      (jadi TIDAK pernah ter-render). Di sini banner dipindah ke dalam return JSX.
-// v2: Tambah ITEM_MISSIONS ke semua role kecuali PKL (semua varian).
-// v3: KEPALA_ONPOINT & KEPALA_SOTECH disamakan dengan KEPALA_SALES.
-//     ONPOINT & SOTECH TIDAK berubah (tetap seperti semula).
+//
+// ── UPDATE: Konsolidasi Inventaris ───────────────────────────────────────────
+// "Data Laptop", "Laptop Siap Jual", "Laptop Minus", "Data Aksesori" DIHAPUS
+// sebagai item terpisah → digabung jadi 1 item "Data Barang" yang mengarah ke
+// /dashboard/data-barang?tab=laptops (halaman ber-tab).
+// Item lain di grup Inventaris (Semua Unit, Garansi) TIDAK terpengaruh.
+// Penggantian dilakukan lewat normalization pass di akhir file (lihat bagian
+// "Konsolidasi item inventaris") supaya semua role otomatis kena, termasuk PKL.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -21,9 +28,7 @@ import { UserRole } from "@/lib/auth";
 import { mergeMenuGroups, isPKLRole, expandRolesWithParents } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 
-
 const CACHE_KEY = "solit_sidebar_user";
-
 const RAIL_KEY = "solit_sidebar_rail";
 const WIDTH_KEY = "solit_sidebar_width";
 const GROUPS_KEY = "solit_sidebar_groups_open";
@@ -32,11 +37,24 @@ const MAX_W = 360;
 const DEFAULT_W = 240;
 const RAIL_W = 74;
 
-// ── Single source untuk active-state (dipakai render + default-open kategori) ──
+// ── Single source untuk active-state ─────────────────────────────────────────
 function isItemActive(href: string, pathname: string): boolean {
   if (pathname === href) return true;
   if (href === "/dashboard") return false;
   if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
+
+  // Data Barang: usePathname() membuang query string, jadi saat berada di
+  // /dashboard/data-barang?tab=laptops, `pathname` = "/dashboard/data-barang".
+  // Sedangkan href-nya mengandung "?tab=laptops". Tanpa branch ini,
+  // pathname === href & startsWith keduanya false → menu tidak pernah active.
+  // Kita cocokkan berdasarkan pathname saja (semua tab tetap meng-highlight menu).
+  if (href.startsWith("/dashboard/data-barang")) {
+    return (
+      pathname === "/dashboard/data-barang" ||
+      pathname.startsWith("/dashboard/data-barang/")
+    );
+  }
+
   if (href === "/dashboard/preparation") {
     return (
       pathname === "/dashboard/preparation" ||
@@ -49,6 +67,9 @@ function isItemActive(href: string, pathname: string): boolean {
         !pathname.startsWith("/dashboard/preparation/siap-kirim"))
     );
   }
+  // NOTE: branch laptops di bawah ini sekarang praktis dead-code (tidak ada item
+  // dengan href /dashboard/laptops lagi), tapi dibiarkan agar deep-link lama
+  // /dashboard/laptops (kalau masih ada) tetap ter-handle dengan benar.
   if (href === "/dashboard/laptops") {
     return (
       pathname === "/dashboard/laptops" ||
@@ -58,9 +79,9 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
-  // Semua route misi harus exact match — biar Dashboard tidak nge-claim semua sub-route misi
   if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
-  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all"; return pathname.startsWith(href);
+  if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";
+  return pathname.startsWith(href);
 }
 
 function getCachedUser() {
@@ -216,6 +237,14 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
+  // ── Icon baru untuk "Data Barang" (package/box) ─────────────────────────────
+  barang: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  ),
   allUnits: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M12 2 2 7l10 5 10-5-10-5z" />
@@ -285,58 +314,19 @@ const Icons = {
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
-const ITEM_PKL_REPORT: MenuItem = {
-  name: "Laporan Kerja PKL",
-  href: "/dashboard/pkl-reports",
-  icon: Icons.pklReport,
-};
-const ITEM_ACCESSORIES: MenuItem = {
-  name: "Data Aksesori",
-  href: "/dashboard/accessories",
-  icon: Icons.accessories,
-};
-const ITEM_ALL_UNITS: MenuItem = {
-  name: "Semua Unit",
-  href: "/dashboard/units",
-  icon: Icons.allUnits,
-};
-const ITEM_MANAGEMENT_SELLER: MenuItem = {
-  name: "Management Seller",
-  href: "/dashboard/management-seller",
-  icon: Icons.managementSeller,
-};
-const ITEM_PREPARATION: MenuItem = {
-  name: "Dashboard Penyiapan",
-  href: "/dashboard/preparation",
-  icon: Icons.pendingOrders,
-};
-const ITEM_PREPARATION_HISTORY: MenuItem = {
-  name: "Riwayat Pengantaran",
-  href: "/dashboard/preparation/history",
-  icon: Icons.deliveryRoute,
-};
-const ITEM_SIAP_KIRIM: MenuItem = {
-  name: "Siap Dikirim 🔔",
-  href: "/dashboard/preparation/siap-kirim",
-  icon: Icons.serviceQueue,
-};
-const ITEM_PREPARATION_PENGANTARAN: MenuItem = {
-  name: "Tugas Antar Saya",
-  href: "/dashboard/preparation/pengantaran",
-  icon: Icons.deliveryRoute,
-};
-const ITEM_ANTRIAN_MASUK: MenuItem = {
-  name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue,
-};
-const ITEM_MISSIONS: MenuItem = {
-  name: "Misi Pekerjaan",
-  href: "/dashboard/missions",
-  icon: Icons.missions,
-};
-const ITEM_CASHFLOW: MenuItem = {
-  name: "Cashflow",
-  href: "/dashboard/cashflow",
-  icon: Icons.cashflow,
+const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard/pkl-reports", icon: Icons.pklReport };
+const ITEM_ACCESSORIES: MenuItem = { name: "Data Aksesori", href: "/dashboard/accessories", icon: Icons.accessories };
+const ITEM_ALL_UNITS: MenuItem = { name: "Semua Unit", href: "/dashboard/units", icon: Icons.allUnits };
+const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
+const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
+const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
+const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
+
+// ── Item gabungan baru ────────────────────────────────────────────────────────
+const ITEM_DATA_BARANG: MenuItem = {
+  name: "Data Barang",
+  href: "/dashboard/data-barang?tab=laptops",
+  icon: Icons.barang,
 };
 
 const MISSIONS_MENU: MenuGroup = {
@@ -350,11 +340,7 @@ const MISSIONS_MENU: MenuGroup = {
 
 const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-const ITEM_MISSION_ALL: MenuItem = {
-  name: "Semua Misi",
-  href: "/dashboard/missions/all",
-  icon: Icons.missionAll,
-};
+const ITEM_MISSION_ALL: MenuItem = { name: "Semua Misi", href: "/dashboard/missions/all", icon: Icons.missionAll };
 
 // ── Preparation groups ────────────────────────────────────────────────────────
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
@@ -427,6 +413,8 @@ const ADMIN_OVERVIEW: MenuGroup = {
   ],
 };
 
+// NOTE: item laptop/aksesoris di grup Inventaris dibiarkan apa adanya di sini.
+// Nanti di-replace jadi 1 "Data Barang" oleh normalization pass di akhir file.
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
@@ -459,8 +447,6 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
-// Role yang pakai SALES_OVERVIEW(): KEPALA_SALES, CREW_SALES, SOTECH, PENGANTARAN,
-// KEPALA_ONPOINT, ONPOINT, KEPALA_SOTECH, KEPALA_MARKETING, ACCOUNTING
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
@@ -526,7 +512,6 @@ const PKL_MENU: MenuGroup[] = [
   },
 ];
 
-// ── PKL Sales menu — SENGAJA tidak ada ITEM_MISSIONS ─────────────────────────
 const PKL_SALES_MENU: MenuGroup[] = [
   {
     label: "Overview",
@@ -555,7 +540,6 @@ const PKL_SALES_MENU: MenuGroup[] = [
   PREPARATION_SALES_DELIVERY_MENU,
 ];
 
-// ── PKL Penyedia menu — SENGAJA tidak ada ITEM_MISSIONS ──────────────────────
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
   {
     label: "Overview",
@@ -637,7 +621,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // SOTECH — tidak berubah dari versi original
   SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
@@ -650,21 +633,18 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_PENGANTARAN_MENU,
   ],
 
-  // ✅ FIX: KEPALA_ONPOINT disamakan dengan KEPALA_SALES
   KEPALA_ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // ONPOINT — tidak berubah dari versi original
   ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // ✅ FIX: KEPALA_SOTECH disamakan dengan KEPALA_SALES (sudah sama sebelumnya, diperjelas)
   KEPALA_SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
     SALES_INVENTARIS, SALES_TRANSAKSI,
@@ -786,6 +766,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
         { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
       ],
+    },
+    {
+      label: "Transaksi",
+      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
@@ -969,11 +953,9 @@ const MISSION_HREFS = new Set([
       label: MISSIONS_MENU.label,
       items: [...MISSIONS_MENU.items],
     };
-
     if (MISSION_FULL_ACCESS_ROLES.includes(role)) {
       missionsForRole.items.push(ITEM_MISSION_ALL);
     }
-
     ROLE_MENUS[role] = [...ROLE_MENUS[role], missionsForRole];
   }
 });
@@ -996,38 +978,60 @@ const PKL_STRIP_HREFS = new Set<string>([
   ITEM_MISSION_ALL.href,
 ]);
 
-(Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(
-  ([pklRole, parentRole]) => {
-    const inherited: MenuGroup[] = ROLE_MENUS[parentRole].map((g) => ({
-      label: g.label,
-      items: [...g.items],
-    }));
-
-    const stripped = inherited
-      .map((g) => ({
-        ...g,
-        items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)),
-      }))
-      .filter((g) => g.items.length > 0);
-
-    const overviewIdx = stripped.findIndex((g) => g.label === "Overview");
-    if (overviewIdx >= 0) {
-      const alreadyHas = stripped[overviewIdx].items.some(
-        (it) => it.href === ITEM_PKL_REPORT.href
-      );
-      if (!alreadyHas) {
-        stripped[overviewIdx].items.push(ITEM_PKL_REPORT);
-      }
-    } else {
-      stripped.unshift({
-        label: "Overview",
-        items: [ITEM_PKL_REPORT],
-      });
-    }
-
-    ROLE_MENUS[pklRole] = stripped;
+(Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(([pklRole, parentRole]) => {
+  const inherited: MenuGroup[] = ROLE_MENUS[parentRole].map((g) => ({
+    label: g.label,
+    items: [...g.items],
+  }));
+  const stripped = inherited
+    .map((g) => ({ ...g, items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)) }))
+    .filter((g) => g.items.length > 0);
+  const overviewIdx = stripped.findIndex((g) => g.label === "Overview");
+  if (overviewIdx >= 0) {
+    const alreadyHas = stripped[overviewIdx].items.some((it) => it.href === ITEM_PKL_REPORT.href);
+    if (!alreadyHas) stripped[overviewIdx].items.push(ITEM_PKL_REPORT);
+  } else {
+    stripped.unshift({ label: "Overview", items: [ITEM_PKL_REPORT] });
   }
-);
+  ROLE_MENUS[pklRole] = stripped;
+});
+
+// ── Konsolidasi item inventaris → satu "Data Barang" ─────────────────────────
+// HARUS jalan PALING AKHIR (setelah mission normalization & PKL inherit) supaya
+// menu PKL yang di-inherit dari parent juga ikut ter-normalisasi.
+//
+// Behaviour:
+//  • "Data Laptop", "Laptop Siap Jual", "Laptop Minus", "Data Aksesori" (4 href
+//    di bawah) di setiap grup → di-collapse jadi 1 entri "Data Barang" yang
+//    disisipkan di posisi item pertama yang match. Item legacy lainnya di-skip.
+//  • Item lain (Semua Unit, Garansi, dll) tidak tersentuh.
+//  • Kalau sebuah grup jadi kosong (isinya cuma item legacy), grup itu di-drop.
+const DATA_BARANG_LEGACY_HREFS = new Set<string>([
+  "/dashboard/laptops",
+  "/dashboard/laptops/ready",
+  "/dashboard/laptops/minus",
+  "/dashboard/accessories",
+]);
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  ROLE_MENUS[role] = ROLE_MENUS[role]
+    .map((group) => {
+      let inserted = false;
+      const items: MenuItem[] = [];
+      for (const item of group.items) {
+        if (DATA_BARANG_LEGACY_HREFS.has(item.href)) {
+          if (!inserted) {
+            items.push(ITEM_DATA_BARANG); // sisipkan sekali
+            inserted = true;
+          }
+          continue; // skip item laptop/aksesoris lainnya (dedupe jadi 1)
+        }
+        items.push(item);
+      }
+      return { ...group, items };
+    })
+    .filter((group) => group.items.length > 0);
+});
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -1036,6 +1040,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
   ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
   PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
+  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },
@@ -1052,7 +1057,6 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ONPOINT: { label: "Onpoint", className: "bg-emerald-50 text-emerald-700" },
   KEPALA_SOTECH: { label: "Kepala Sotech", className: "bg-lime-50 text-lime-700" },
   CUSTOMER_SERVICE: { label: "Customer Service", className: "bg-sky-50 text-sky-700" },
-  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-700" },
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
   PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
@@ -1161,6 +1165,7 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
+      {/* ── Logo + User ── */}
       <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
         <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
@@ -1244,6 +1249,7 @@ function SidebarContent({
 
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
+      {/* ── Nav ── */}
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
@@ -1319,6 +1325,7 @@ function SidebarContent({
         )}
       </nav>
 
+      {/* ── Logout ── */}
       <div className={`pb-5 border-t border-gray-100 flex-shrink-0 ${rail ? "p-2" : "p-3"}`}>
         <button
           onClick={onLogout}
@@ -1522,6 +1529,7 @@ export default function Sidebar() {
         }
       `}</style>
 
+      {/* ── Alarm banners ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
           <button
@@ -1548,6 +1556,7 @@ export default function Sidebar() {
         </div>
       )}
 
+      {/* ── Mobile toggle ── */}
       <button
         onClick={() => setOpen(true)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
@@ -1558,18 +1567,21 @@ export default function Sidebar() {
         </svg>
       </button>
 
+      {/* ── Mobile overlay ── */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
+      {/* ── Mobile sidebar ── */}
       <aside
         className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
+      {/* ── Desktop sidebar (resizable) ── */}
       <aside
         style={{ width: rail ? RAIL_W : width, transition: dragging ? "none" : "width 0.2s ease-out" }}
         className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
