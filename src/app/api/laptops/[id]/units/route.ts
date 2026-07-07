@@ -7,6 +7,7 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+// ── GET: Ambil semua unit milik laptop tertentu ───────────────────────────────
 async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
@@ -15,7 +16,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       .from("laptop_units")
       .select("*")
       .eq("laptop_id", id)
-      .order("created_at", { ascending: false });
+      .order("serial_number", { ascending: true }); // ← konsisten dgn /api/units
 
     if (error) throw error;
 
@@ -29,17 +30,37 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
+// ── POST: Tambah satu unit baru ke laptop ─────────────────────────────────────
 async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
-  // ... (biarkan seperti aslinya — tidak berubah)
   try {
     const { id } = await props.params;
     const body = await req.json();
 
     const {
-      serial_number, grade, condition_note,
-      purchase_price, selling_price, status, notes,
+      serial_number,
+      grade,
+      condition_note,
+      purchase_price,
+      selling_price,
+      sparepart_cost, // ← kolom baru
+      status,
+      notes,
       received_at,
     } = body;
+
+    // Cek duplikat SN sebelum insert
+    const { data: existing } = await supabase
+      .from("laptop_units")
+      .select("id")
+      .eq("serial_number", serial_number)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { success: false, message: `Serial number "${serial_number}" sudah terdaftar` },
+        { status: 409 }
+      );
+    }
 
     const { data, error } = await supabase
       .from("laptop_units")
@@ -50,6 +71,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         condition_note,
         purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
         selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
+        sparepart_cost: sparepart_cost != null ? Math.round(Number(sparepart_cost)) : 0, // ← kolom baru
         status,
         notes,
         ...(received_at ? { created_at: received_at } : {}),
@@ -85,7 +107,6 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     );
   }
 }
-
 
 export const GET = withAuth(getHandler, PERMISSIONS.VIEW_UNITS);
 export const POST = withAuth(postHandler, PERMISSIONS.CREATE_UNITS);
