@@ -51,8 +51,10 @@ const ROLE_VISUAL: Record<string, { label: string; emoji: string; color: string;
     PENYEDIA_BARANG: { label: "Penyedia Barang", emoji: "🏭", color: "#ca8a04", border: "#fef08a" },
     KEPALA_ONPOINT: { label: "Kepala Onpoint", emoji: "🎯", color: "#16a34a", border: "#bbf7d0" },
     ONPOINT: { label: "Onpoint", emoji: "📍", color: "#15803d", border: "#a7f3d0" },
+    PKL_ONPOINT: { label: "PKL Onpoint", emoji: "🎓", color: "#15803d", border: "#a7f3d0" },
     KEPALA_SOTECH: { label: "Kepala Sotech", emoji: "⚙️", color: "#4d7c0f", border: "#d9f99d" },
     SOTECH: { label: "Sotech", emoji: "🛠️", color: "#65a30d", border: "#d9f99d" },
+    PKL_SOTECH: { label: "PKL Sotech", emoji: "🎓", color: "#65a30d", border: "#d9f99d" },
     KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola", emoji: "📦", color: "#1d4ed8", border: "#bfdbfe" },
     PENGELOLA_BARANG: { label: "Adm / Pengelola Barang", emoji: "📦", color: "#2563eb", border: "#bfdbfe" },
     ACCOUNTING: { label: "Accounting", emoji: "💰", color: "#d97706", border: "#fde68a" },
@@ -85,8 +87,8 @@ const ACCESS_TREE: DNode = {
             rnode("KEPALA_PENGELOLA_BARANG", [rnode("PENGELOLA_BARANG")]),
         ]),
         { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", emoji: "💻", color: "#4f46e5", children: [] },
-        rnode("KEPALA_SOTECH", [rnode("SOTECH")]),
-        rnode("KEPALA_ONPOINT", [rnode("ONPOINT")]),
+        rnode("KEPALA_SOTECH", [rnode("SOTECH"), rnode("PKL_SOTECH")]),
+        rnode("KEPALA_ONPOINT", [rnode("ONPOINT"), rnode("PKL_ONPOINT")]),
     ],
 };
 
