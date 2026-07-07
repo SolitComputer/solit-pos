@@ -60,6 +60,10 @@ function canInputManual(roles?: string | string[]): boolean {
   return arr.some(r => Object.keys(DIVISION_HEAD_MAP).includes(r));
 }
 
+function isUserPKL(role: string): boolean {
+  return role === "PKL" || role.startsWith("PKL_");
+}
+
 function getManualAllowedRoles(roles?: string | string[]): string[] | null {
   const arr = Array.isArray(roles) ? roles : roles ? [roles] : [];
   if (arr.length === 0) return [];
@@ -1488,6 +1492,7 @@ export default function OvertimePage() {
   const [proofPhotoData, setProofPhotoData] = useState<OvertimeRequest | null>(null);
   const [editData, setEditData] = useState<OvertimeRequest | null>(null);
   const [deleteData, setDeleteData] = useState<OvertimeRequest | null>(null);
+  const [activeTab, setActiveTab] = useState<"KARYAWAN" | "PKL">("KARYAWAN");
   const autoCompletingIds = useRef<Set<string>>(new Set());
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
@@ -1576,6 +1581,18 @@ export default function OvertimePage() {
     const result = Array.from(map.values()).filter(g => !hasStatusFilter || g.items.length > 0);
     return result.sort((a, b) => a.user.name.localeCompare(b.user.name, "id-ID"));
   }, [filtered, allUsers, filterStatus, searchQuery]);
+
+  const groupedKaryawan = useMemo(
+    () => groupedByUser.filter(g => !isUserPKL(g.user.role)),
+    [groupedByUser]
+  );
+
+  const groupedPKL = useMemo(
+    () => groupedByUser.filter(g => isUserPKL(g.user.role)),
+    [groupedByUser]
+  );
+
+  const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
 
   const selectedUserData = useMemo(() => {
     if (!selectedUserId) return null;
@@ -1712,6 +1729,33 @@ export default function OvertimePage() {
             )}
           </div>
 
+          {/* ── Tab Karyawan / PKL ── */}
+          {!selectedUserId && (
+            <div className="flex gap-1 p-1 bg-white rounded-2xl border border-gray-100 shadow-sm">
+              {(["KARYAWAN", "PKL"] as const).map(tab => {
+                const count = tab === "KARYAWAN" ? groupedKaryawan.length : groupedPKL.length;
+                const active = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); }}
+                    className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
+                        ? "bg-[#0f0c29] text-white shadow-md"
+                        : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                      }`}
+                  >
+                    <span className="text-sm">{tab === "KARYAWAN" ? "👥" : "🎓"}</span>
+                    <span>{tab === "KARYAWAN" ? "Karyawan" : "PKL"}</span>
+                    <span className={`min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* ── Employee List / Detail ── */}
           {selectedUserId && selectedUserData ? (
             <EmployeeDetailView
@@ -1726,7 +1770,7 @@ export default function OvertimePage() {
             />
           ) : (
             <EmployeeListPanel
-              groupedByUser={groupedByUser}
+              groupedByUser={activeGroupedByUser}
               loading={loading}
               userCanViewPay={userCanViewPay}
               currentUser={currentUser}
