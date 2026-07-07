@@ -468,9 +468,22 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 customer_type: body.customer_type,
             });
 
-            sendWhatsapp(body.customer_phone, message)
-                .then(sent => console.log(sent ? "✅ WA BERHASIL" : "⚠️ WA GAGAL"))
-                .catch(err => console.error("❌ WA Error:", err));
+            const waTimeout = new Promise<boolean>((resolve) =>
+                setTimeout(() => {
+                    console.warn("[WA] Timeout 15s — lanjut tanpa WA");
+                    resolve(false);
+                }, 15_000)
+            );
+
+            try {
+                const waSent = await Promise.race([
+                    sendWhatsapp(body.customer_phone, message),
+                    waTimeout,
+                ]);
+                console.log(`[WA] ${waSent ? "✅ Terkirim" : "⚠️ Gagal/Timeout"} → ${body.customer_phone} | Invoice: ${invoice_number}`);
+            } catch (waErr: any) {
+                console.error("[WA] Error:", waErr?.message ?? waErr);
+            }
         }
 
         return NextResponse.json({
