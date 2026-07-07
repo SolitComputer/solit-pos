@@ -2688,6 +2688,14 @@ export default function AttendanceDashboardPage() {
         });
     }, [salarySlips]);
 
+    const visibleSalarySlips = useMemo(() => {
+        if (slipPklFilter === "all") return sortedSalarySlips;
+        return sortedSalarySlips.filter(s => {
+            const isPkl = isPKLRole(s.users?.role);
+            return slipPklFilter === "pkl" ? isPkl : !isPkl;
+        });
+    }, [sortedSalarySlips, slipPklFilter]);
+
     const [mySlips, setMySlips] = useState<SalarySlip[]>([]);
     const [mySlipsLoading, setMySlipsLoading] = useState(false);
 
@@ -5458,13 +5466,13 @@ export default function AttendanceDashboardPage() {
             {/* ════ TAB SLIP GAJI (admin only) ════ */}
             {activeTab === "salary-slip" && canViewSalary(currentUser?.role) && (
                 <div className="space-y-4">
-                    {/* Month Selector */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                    {/* Month Selector + Filter */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div>
                                 <p className="text-sm font-bold text-gray-800">Slip Gaji</p>
                                 <p className="text-[11px] text-gray-400 mt-0.5">
-                                    ✅ Data dari rekapan gaji (tab Rekap Gaji) · Gunakan tombol <strong>📄 Slip</strong> untuk generate
+                                    ✅ Data dari rekapan gaji · Gunakan tombol <strong>📄 Slip</strong> untuk generate
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -5487,11 +5495,47 @@ export default function AttendanceDashboardPage() {
                                 >▶</button>
                             </div>
                         </div>
+
+                        {/* ✅ NEW: Toggle Karyawan / PKL / Semua */}
+                        <div className="flex items-center justify-between gap-3 flex-wrap border-t border-gray-100 pt-3">
+                            <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setSlipPklFilter("karyawan")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${slipPklFilter === "karyawan"
+                                        ? "bg-white text-gray-800 shadow-sm"
+                                        : "text-gray-400 hover:text-gray-600"
+                                        }`}
+                                >
+                                    👥 Karyawan
+                                </button>
+                                <button
+                                    onClick={() => setSlipPklFilter("pkl")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${slipPklFilter === "pkl"
+                                        ? "bg-amber-500 text-white shadow-sm"
+                                        : "text-gray-400 hover:text-amber-600"
+                                        }`}
+                                >
+                                    🎓 PKL
+                                </button>
+                                <button
+                                    onClick={() => setSlipPklFilter("all")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${slipPklFilter === "all"
+                                        ? "bg-[#1a1a2e] text-white shadow-sm"
+                                        : "text-gray-400 hover:text-gray-600"
+                                        }`}
+                                >
+                                    🌐 Semua
+                                </button>
+                            </div>
+                            <span className="text-[10px] font-bold text-gray-400">
+                                {visibleSalarySlips.length} slip
+                                {slipPklFilter === "pkl" ? " PKL" : slipPklFilter === "karyawan" ? " karyawan" : " total"}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Slip List */}
                     {loading ? (
-                        // ✅ Skeleton loading
                         <div className="space-y-2">
                             {Array(4).fill(0).map((_, i) => (
                                 <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
@@ -5517,16 +5561,25 @@ export default function AttendanceDashboardPage() {
                                 </div>
                             ))}
                         </div>
-                    ) : sortedSalarySlips.length === 0 ? (
+                    ) : visibleSalarySlips.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
                             <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                <span className="text-2xl opacity-50">📄</span>
+                                <span className="text-2xl opacity-50">{slipPklFilter === "pkl" ? "🎓" : "📄"}</span>
                             </div>
-                            <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji bulan ini</p>
-                            <p className="text-xs text-gray-300 mt-1 mb-4">Klik tombol di bawah untuk generate slip semua karyawan</p>
+                            <p className="text-sm text-gray-400 font-medium">
+                                Belum ada slip {slipPklFilter === "pkl" ? "PKL" : slipPklFilter === "karyawan" ? "karyawan" : ""} bulan ini
+                            </p>
+                            <p className="text-xs text-gray-300 mt-1 mb-4">
+                                Klik tombol di bawah untuk generate slip {slipPklFilter === "pkl" ? "semua PKL" : slipPklFilter === "karyawan" ? "semua karyawan" : "semua user"}
+                            </p>
                             <button
                                 onClick={async () => {
-                                    const usersToGen = allUsers.length > 0 ? allUsers : await fetchAllUsers();
+                                    const base = allUsers.length > 0 ? allUsers : await fetchAllUsers();
+                                    // ✅ Hormati filter aktif: cuma generate grup yang dipilih
+                                    const usersToGen = (base as UserInfo[]).filter(u => {
+                                        if (slipPklFilter === "all") return true;
+                                        return slipPklFilter === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role);
+                                    });
                                     for (const u of usersToGen) {
                                         await fetch("/api/attendance/salary-slip", {
                                             method: "POST",
@@ -5541,7 +5594,7 @@ export default function AttendanceDashboardPage() {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {sortedSalarySlips.map(slip => (
+                            {visibleSalarySlips.map(slip => (
                                 <SalarySlipCard
                                     key={slip.id}
                                     slip={slip}
