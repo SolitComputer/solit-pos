@@ -140,10 +140,8 @@ export default function CreatePaymentPage() {
     const [snResults, setSnResults] = useState<UnitOption[]>([]);
     const [isLoadingUnits, setIsLoadingUnits] = useState(false);
 
-    // ── Pricing ───────────────────────────────────────────────────────────────
     const [rawDealPrice, setRawDealPrice] = useState<number>(0);
-
-    // ── Payment method ────────────────────────────────────────────────────────
+    const [unitPrices, setUnitPrices] = useState<Record<string, number>>({});
     const [splitTF, setSplitTF] = useState<number>(0);
     const [splitCash, setSplitCash] = useState<number>(0);
 
@@ -192,11 +190,8 @@ export default function CreatePaymentPage() {
     const paymentMethod = watch("payment_method");
     const pickupMethod = watch("pickup_method");
 
-    // Total harga modal semua unit terpilih
     const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
-    // Selisih: deal price - modal
     const margin = rawDealPrice - totalInventoryPrice;
-    // Kalau trade-in: cash yang diterima = deal_price - trade_in_value
     const tradeInReceived = isTradeIn ? (rawDealPrice - tradeInValue) : 0;
 
     useEffect(() => {
@@ -209,6 +204,15 @@ export default function CreatePaymentPage() {
     const canSeeMargin = userRole
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
+
+    useEffect(() => {
+        const total = selectedUnits.reduce(
+            (sum, u) => sum + (unitPrices[u.unit_id] || 0),
+            0
+        );
+        setRawDealPrice(total);
+        setValue("amount", total);
+    }, [unitPrices, selectedUnits, setValue]);
 
     useEffect(() => {
         if (fromScan || fromPrep) return;
@@ -227,6 +231,7 @@ export default function CreatePaymentPage() {
         if (draft._sellerType) setSellerType(draft._sellerType);
         if (draft._selectedUnits) setSelectedUnits(draft._selectedUnits);
         if (draft._rawDealPrice) setRawDealPrice(draft._rawDealPrice);
+        if (draft._unitPrices) setUnitPrices(draft._unitPrices);
         if (draft._isTradeIn) setIsTradeIn(draft._isTradeIn);
         if (draft._tradeInItem) setTradeInItem(draft._tradeInItem);
         if (draft._tradeInValue) setTradeInValue(draft._tradeInValue);
@@ -245,13 +250,14 @@ export default function CreatePaymentPage() {
             ...watchedFields,
             _step: step, _customerType: customerType, _sellerType: sellerType,
             _selectedUnits: selectedUnits, _rawDealPrice: rawDealPrice,
+            _unitPrices: unitPrices,
             _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
             _splitTF: splitTF, _splitCash: splitCash,
             _savedAt: new Date().toISOString(),
         });
     }, [watchedFields, step, customerType, sellerType, selectedUnits, rawDealPrice,
-        isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
+        unitPrices, isTradeIn, tradeInItem, tradeInValue, tradeInCash, splitTF, splitCash, isSubmitted]);
 
     // ── Load unit dari scan ───────────────────────────────────────────────────
     useEffect(() => {
@@ -490,6 +496,10 @@ export default function CreatePaymentPage() {
                     is_ecommerce: isEcommerce,
                     ecommerce_platform: isEcommerce ? ecommercePlatform : null,
                     ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
+                    unit_prices: selectedUnits.map(u => ({
+                        unit_id: u.unit_id,
+                        deal_price: unitPrices[u.unit_id] || 0,
+                    })),
                 }),
             });
             const result = await res.json();
@@ -754,32 +764,54 @@ export default function CreatePaymentPage() {
                                         <SelectedUnitCard key={u.unit_id} unit={u} index={i} onRemove={() => handleRemoveUnit(i)} />
                                     ))}
 
-                                    {/* Harga Deal */}
+                                    {/* Harga Deal per Unit */}
                                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
-                                        <div>
-                                            <label className="text-xs text-gray-500 mb-1.5 block">
-                                                Total Harga Deal * ({selectedUnits.length > 1 ? `${selectedUnits.length} unit` : "1 unit"})
-                                            </label>
-                                            <input
-                                                type="text" inputMode="numeric"
-                                                placeholder="Masukkan total harga deal"
-                                                className={inputClass}
-                                                defaultValue={rawDealPrice > 0 ? rawDealPrice.toLocaleString("id-ID") : ""}
-                                                onChange={e => {
-                                                    const raw = e.target.value.replace(/\D/g, "");
-                                                    const num = raw ? Number(raw) : 0;
-                                                    setRawDealPrice(num);
-                                                    setValue("amount", num);
-                                                }}
-                                                onBlur={e => {
-                                                    const raw = e.target.value.replace(/\D/g, "");
-                                                    if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
-                                                }}
-                                                onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
-                                            />
+                                        <label className="text-xs text-gray-500 block">
+                                            Harga Deal per Unit *
+                                            <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
+                                        </label>
+
+                                        {selectedUnits.map((u, i) => (
+                                            <div key={u.unit_id} className="space-y-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
+                                                        {i + 1}
+                                                    </span>
+                                                    <p className="text-xs font-semibold text-gray-700 truncate flex-1">{u.laptop_name}</p>
+                                                    {u.grade && (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 flex-shrink-0">
+                                                            {u.grade}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] font-mono text-gray-400 ml-5.5">SN: {u.serial_number}</p>
+                                                <input
+                                                    type="text" inputMode="numeric"
+                                                    placeholder="Harga deal unit ini"
+                                                    className={inputClass}
+                                                    defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
+                                                    onChange={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        const num = raw ? Number(raw) : 0;
+                                                        setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
+                                                    }}
+                                                    onBlur={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                    }}
+                                                    onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                                />
+                                            </div>
+                                        ))}
+
+                                        {/* Total otomatis */}
+                                        <div className="flex justify-between text-xs border-t border-gray-200 pt-2.5">
+                                            <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
+                                            <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
                                         </div>
+
                                         {rawDealPrice > 0 && canSeeMargin && (
-                                            <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                                            <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500">Selisih / Margin</span>
                                                 <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
                                                     {margin >= 0 ? "+" : ""}{fmt(margin)}
@@ -887,38 +919,41 @@ export default function CreatePaymentPage() {
                                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2 mb-1">
                                     <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Unit Terpilih</p>
                                     {selectedUnits.map((u, i) => (
-                                        <div key={u.unit_id} className="text-xs text-gray-700">
-                                            <span className="font-semibold">{u.laptop_name}</span>
-                                            <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
+                                        <div key={u.unit_id} className="space-y-1.5 pb-2">
+                                            <div className="text-xs text-gray-700">
+                                                <span className="font-semibold">{i + 1}. {u.laptop_name}</span>
+                                                <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
+                                            </div>
+                                            <input
+                                                type="text" inputMode="numeric"
+                                                placeholder="Harga deal unit ini"
+                                                className={inputClass}
+                                                defaultValue={unitPrices[u.unit_id] > 0 ? unitPrices[u.unit_id].toLocaleString("id-ID") : ""}
+                                                onChange={e => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    const num = raw ? Number(raw) : 0;
+                                                    setUnitPrices(prev => ({ ...prev, [u.unit_id]: num }));
+                                                }}
+                                                onBlur={e => {
+                                                    const raw = e.target.value.replace(/\D/g, "");
+                                                    if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
+                                                }}
+                                                onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
+                                            />
                                         </div>
                                     ))}
-                                    <div>
-                                        <label className="text-xs text-gray-500 mb-1.5 block">Harga Deal *</label>
-                                        <input
-                                            type="text" inputMode="numeric"
-                                            placeholder="Masukkan harga deal"
-                                            className={inputClass}
-                                            onChange={e => {
-                                                const raw = e.target.value.replace(/\D/g, "");
-                                                const num = raw ? Number(raw) : 0;
-                                                setRawDealPrice(num);
-                                                setValue("amount", num);
-                                            }}
-                                            onBlur={e => {
-                                                const raw = e.target.value.replace(/\D/g, "");
-                                                if (raw) e.target.value = Number(raw).toLocaleString("id-ID");
-                                            }}
-                                            onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }}
-                                        />
-                                        {rawDealPrice > 0 && canSeeMargin && (
-                                            <div className="flex justify-between text-sm pt-1 border-t border-gray-200 mt-2">
-                                                <span className="text-gray-500">Selisih</span>
-                                                <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
-                                                    {margin >= 0 ? "+" : ""}{fmt(margin)}
-                                                </span>
-                                            </div>
-                                        )}
+                                    <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                                        <span className="text-gray-600 font-semibold">Total</span>
+                                        <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
                                     </div>
+                                    {rawDealPrice > 0 && canSeeMargin && (
+                                        <div className="flex justify-between text-sm pt-1">
+                                            <span className="text-gray-500">Selisih</span>
+                                            <span className={`font-semibold ${margin >= 0 ? "text-gray-600" : "text-red-500"}`}>
+                                                {margin >= 0 ? "+" : ""}{fmt(margin)}
+                                            </span>
+                                        </div>
+                                    )}
                                     <input type="text" placeholder="Request Software (opsional)" className={inputClass} {...register("software_request")} />
                                 </div>
                             )}
@@ -1192,8 +1227,8 @@ export default function CreatePaymentPage() {
                                         <p className="text-xs text-gray-400 mb-1.5">💻 Unit ({selectedUnits.length})</p>
                                         {selectedUnits.map((u, i) => (
                                             <div key={u.unit_id} className="flex justify-between text-xs mb-1">
-                                                <span className="text-gray-600 truncate max-w-[55%]">{i + 1}. {u.laptop_name}</span>
-                                                <span className="font-mono text-gray-500">{u.serial_number}</span>
+                                                <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
+                                                <span className="font-mono text-gray-700 font-semibold">{fmt(unitPrices[u.unit_id] || 0)}</span>
                                             </div>
                                         ))}
                                     </div>

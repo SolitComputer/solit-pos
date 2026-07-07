@@ -13,11 +13,12 @@ function getAdmin(): SupabaseClient {
 }
 
 // ── Sync uang masuk otomatis dari transaksi & service (mulai 06/07/2026) ──────
+// ── Sync uang masuk otomatis dari transaksi & service (mulai 06/07/2026) ──────
 async function syncDerivedEntries(supabase: SupabaseClient) {
     // 1) Penjualan laptop → transaksi PAID
     const { data: trx } = await supabase
         .from("transactions")
-        .select("invoice_number, customer_name, deal_price, amount, created_at")
+        .select("invoice_number, customer_name, sales_name, deal_price, amount, created_at")
         .eq("status", "PAID")
         .gte("created_at", CASHFLOW_CUTOFF_ISO);
 
@@ -25,9 +26,11 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         .map((t: any) => ({
             direction: "IN",
             category: "PENJUALAN_LAPTOP",
-            nama: t.customer_name || t.invoice_number,
+            // ✅ FIXED: Prioritas sales_name, fallback ke "—" bukan customer_name
+            // customer_name tidak dipakai supaya kolom Nama = Sales, bukan Customer
+            nama: (t.sales_name && String(t.sales_name).trim()) || "—",
             nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
-            keterangan: `Invoice ${t.invoice_number}`,
+            keterangan: `Invoice ${t.invoice_number} · ${t.customer_name || ""}`.trim().replace(/·\s*$/, ""),
             source_type: "TRANSACTION",
             source_id: t.invoice_number,
             tanggal: (t.created_at ?? "").slice(0, 10) || null,
@@ -38,7 +41,7 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
     // 2) Service → payment_amount > 0
     const { data: svc } = await supabase
         .from("service_orders")
-        .select("id, nama, payment_amount, payment_confirmed_at, payment_method")
+        .select("id, nama, teknisi, payment_amount, payment_confirmed_at, payment_method")
         .gt("payment_amount", 0)
         .gte("payment_confirmed_at", CASHFLOW_CUTOFF_ISO);
 
@@ -46,9 +49,11 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         .map((s: any) => ({
             direction: "IN",
             category: "SERVICE",
-            nama: s.nama || "Service",
+            // ✅ teknisi = staff yang handle, nama = customer service (untuk info)
+            nama: (s.teknisi && String(s.teknisi).trim()) || "—",
             nominal: Math.round(Number(s.payment_amount ?? 0)),
-            keterangan: `Servis · ${s.payment_method || "CASH"}`,
+            // ✅ Taruh nama customer di keterangan supaya tetap terlacak
+            keterangan: `Servis · ${s.payment_method || "CASH"} · ${s.nama || ""}`.trim().replace(/·\s*$/, ""),
             source_type: "SERVICE",
             source_id: s.id,
             tanggal: (s.payment_confirmed_at ?? "").slice(0, 10) || null,
@@ -58,10 +63,12 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
 
     const all = [...trxRows, ...svcRows];
     if (all.length > 0) {
-        // ignoreDuplicates: true → hanya INSERT yg baru, audit lama TIDAK ke-reset
+        // ✅ FIXED: ignoreDuplicates: false → nama sales ter-update kalau ada perubahan
+        // is_audited TIDAK ikut di-update karena kita tidak include field itu di rows
+        // Supabase upsert hanya update field yang ada di object → is_audited aman
         await supabase
             .from("cashflow_entries")
-            .upsert(all, { onConflict: "source_type,source_id", ignoreDuplicates: true });
+            .upsert(all, { onConflict: "source_type,source_id", ignoreDuplicates: false });
     }
 }
 
