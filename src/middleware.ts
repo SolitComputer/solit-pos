@@ -172,6 +172,9 @@ export async function middleware(request: NextRequest) {
   const isPageRoute = !pathname.startsWith("/api/");
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
+  // ✅ throttle cek force_logout: max 1x / 5 menit per sesi
+  let shouldRefreshFlCookie = false;
+
   if (isPageRoute) {
     const issuedAt: number = (user as any).iat ?? 0;
     const autoLogoutThreshold = getAutoLogoutThreshold();
@@ -181,45 +184,38 @@ export async function middleware(request: NextRequest) {
       return clearSessionAndRedirect(loginUrl);
     }
 
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-      );
-      const { data: userRecord } = await supabase
-        .from("users")
-        .select("force_logout_at")
-        .eq("id", user.id)
-        .maybeSingle();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const lastFlCheck = Number(request.cookies.get("fl_check")?.value ?? 0);
+    const FL_CHECK_INTERVAL = 300; // 5 menit
 
-      if (userRecord?.force_logout_at) {
-        const forceLogoutAtSec =
-          new Date(userRecord.force_logout_at).getTime() / 1000;
+    // hanya query DB kalau sudah lewat interval → hemat invocation & CPU
+    if (nowSec - lastFlCheck > FL_CHECK_INTERVAL) {
+      shouldRefreshFlCookie = true;
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { persistSession: false } }
+        );
+        const { data: userRecord } = await supabase
+          .from("users")
+          .select("force_logout_at")
+          .eq("id", user.id)
+          .maybeSingle();
 
-        // ✅ FIX: Tambah buffer 5 detik untuk cegah false positive.
-        //
-        // Skenario tanpa buffer (bug lama):
-        //   1. Admin set force_logout_at = T
-        //   2. User login → token.iat = T+1 (sedetik setelah)
-        //   3. Login route belum clear force_logout_at (async lag)
-        //   4. Middleware: T+1 > T → lolos ✅ (seharusnya)
-        //   ... tapi kalau login route baru clear SETELAH middleware check
-        //   di page berikutnya, masih bisa kena loop
-        //
-        // Dengan fix utama (clear di login route) + buffer di sini:
-        //   - Primary fix: force_logout_at = null setelah login sukses
-        //   - Buffer ini: safety net jika clear belum propagate ke DB
-        //   - Token yang di-issue >= 5 detik SETELAH force_logout → aman
-        const BUFFER_SECONDS = 5;
-        if (issuedAt < forceLogoutAtSec - BUFFER_SECONDS) {
-          const loginUrl = new URL("/login", request.url);
-          loginUrl.searchParams.set("reason", "force_logout");
-          return clearSessionAndRedirect(loginUrl);
+        if (userRecord?.force_logout_at) {
+          const forceLogoutAtSec =
+            new Date(userRecord.force_logout_at).getTime() / 1000;
+          const BUFFER_SECONDS = 5;
+          if (issuedAt < forceLogoutAtSec - BUFFER_SECONDS) {
+            const loginUrl = new URL("/login", request.url);
+            loginUrl.searchParams.set("reason", "force_logout");
+            return clearSessionAndRedirect(loginUrl);
+          }
         }
+      } catch {
+        // fail-open: jangan block kalau DB tidak bisa diakses
       }
-    } catch {
-      // fail-open: jangan block request jika DB tidak bisa diakses
     }
   }
 
@@ -274,6 +270,18 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-user-role", user.role);
   response.headers.set("x-user-roles", userRoles.join(","));
   response.headers.set("x-user-name", user.name);
+
+  // ✅ tandai kapan terakhir cek force_logout
+  if (shouldRefreshFlCookie) {
+    response.cookies.set("fl_check", String(Math.floor(Date.now() / 1000)), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+    });
+  }
+
   return response;
 }
 
