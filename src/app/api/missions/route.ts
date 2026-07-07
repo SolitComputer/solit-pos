@@ -140,7 +140,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       assigned_to,
       priority,
       due_date: due_date || null,
-      status: "PENDING",
+      status: "IN_PROGRESS",
     })
     .select("id").single();
 
