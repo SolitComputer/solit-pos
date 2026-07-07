@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
-import { Trash2 } from "lucide-react";
+import { Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import UnitFormModal, { LaptopUnit as BaseLaptopUnit } from "@/components/inventory/UnitFormModal";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import LaptopPickerModal, { PickableLaptop } from "@/components/inventory/LaptopPickerModal";
 import AddLaptopModal from "@/components/inventory/AddLaptopModal";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface GlobalUnit extends BaseLaptopUnit {
     laptop_name: string;
@@ -17,11 +19,17 @@ interface GlobalUnit extends BaseLaptopUnit {
     cpu: string;
     ram: string;
     storage: string;
+    sparepart_cost: number;
 }
 
 interface RawGlobalUnit extends BaseLaptopUnit {
     laptops?: { laptop_name: string; brand: string; cpu: string; ram: string; storage: string } | null;
+    sparepart_cost?: number;
 }
+
+type SortOrder = "asc" | "desc";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
@@ -40,11 +48,11 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 
 const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
 
-function sortUnits(units: GlobalUnit[]): GlobalUnit[] {
+function sortUnits(units: GlobalUnit[], snOrder: SortOrder): GlobalUnit[] {
     return [...units].sort((a, b) => {
-        const gradeDiff = GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade];
-        if (gradeDiff !== 0) return gradeDiff;
-        return b.serial_number.localeCompare(a.serial_number, undefined, { numeric: true });
+        const snCmp = a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true });
+        if (snCmp !== 0) return snOrder === "asc" ? snCmp : -snCmp;
+        return GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade];
     });
 }
 
@@ -52,6 +60,8 @@ function fmtDate(iso?: string) {
     if (!iso) return "—";
     return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
 }
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
     useEffect(() => {
@@ -71,10 +81,8 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
                     </svg>
                 </div>
                 <p className="text-gray-700 text-sm font-medium mb-4">{message}</p>
-                <button
-                    onClick={onClose}
-                    className="w-full h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-medium hover:bg-[#16213e] transition"
-                >
+                <button onClick={onClose}
+                    className="w-full h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-medium hover:bg-[#16213e] transition">
                     OK
                 </button>
             </div>
@@ -151,7 +159,7 @@ function SkeletonUnits() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50/80 border-b border-gray-100">
-                            {["Laptop", "Serial Number", "Grade", "Tgl Masuk", "Harga Modal", "Harga Jual", "Margin", "Status", "Aksi"].map(h => (
+                            {["Serial Number", "Laptop", "Grade", "Tgl Masuk", "Harga Sparepart", "Harga Modal", "Total Modal", "Harga Jual", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3 text-left">
                                     <div className="h-2.5 bg-gray-200 rounded w-16 animate-pulse" />
                                 </th>
@@ -161,7 +169,7 @@ function SkeletonUnits() {
                     <tbody className="divide-y divide-gray-50">
                         {[...Array(4)].map((_, i) => (
                             <tr key={i}>
-                                {[140, 90, 50, 70, 70, 70, 60, 60, 50].map((w, j) => (
+                                {[90, 140, 50, 70, 80, 80, 80, 70, 60, 50].map((w, j) => (
                                     <td key={j} className="px-4 py-3">
                                         <div className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
                                     </td>
@@ -175,17 +183,139 @@ function SkeletonUnits() {
     );
 }
 
+// ─── SN Sort Button ───────────────────────────────────────────────────────────
+
+function SnSortButton({ order, onToggle }: { order: SortOrder; onToggle: () => void }) {
+    return (
+        <button
+            onClick={onToggle}
+            title={order === "asc" ? "Urutan: SN Terkecil → Terbesar (klik untuk balik)" : "Urutan: SN Terbesar → Terkecil (klik untuk balik)"}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+        >
+            {order === "asc" ? (
+                <><ArrowUp className="w-3 h-3" /> A→Z</>
+            ) : (
+                <><ArrowDown className="w-3 h-3" /> Z→A</>
+            )}
+        </button>
+    );
+}
+
+// ─── Editable Sparepart Cell ──────────────────────────────────────────────────
+// Identik dgn EditablePriceCell tapi PATCH field sparepart_cost ke /api/units/[id]
+// Dibuat terpisah agar tidak break EditablePriceCell yang dipakai di halaman lain.
+
+function EditableSparepartCell({
+    unitId,
+    value,
+    onSaved,
+}: {
+    unitId: string;
+    value: number;
+    onSaved: (unitId: string, newValue: number) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [input, setInput] = useState("");
+    const [saving, setSaving] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const startEdit = () => {
+        setInput(String(value || 0));
+        setEditing(true);
+    };
+
+    useEffect(() => {
+        if (editing) inputRef.current?.select();
+    }, [editing]);
+
+    const cancel = () => setEditing(false);
+
+    const save = async () => {
+        const newVal = Math.round(Number(input));
+        if (!Number.isFinite(newVal) || newVal < 0) { cancel(); return; }
+        if (newVal === value) { cancel(); return; }
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/units/${unitId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sparepart_cost: newVal }),
+            });
+            const result = await res.json();
+            if (result.success) {
+                onSaved(unitId, newVal);
+                setEditing(false);
+            }
+        } catch {
+            // silent fail — nilai kembali ke semula
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") cancel();
+    };
+
+    if (editing) {
+        return (
+            <div className="flex items-center justify-end gap-1">
+                <input
+                    ref={inputRef}
+                    type="number"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={save}
+                    disabled={saving}
+                    className="w-28 h-7 text-right text-xs border border-violet-400 rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 tabular-nums"
+                />
+                {saving && (
+                    <svg className="w-3 h-3 animate-spin text-violet-400 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-800 font-medium tabular-nums">{fmt(value || 0)}</span>
+            <button
+                onClick={startEdit}
+                title="Klik untuk edit harga sparepart"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition"
+            >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit
+            </button>
+        </div>
+    );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function AllUnitsPage() {
     const [units, setUnits] = useState<GlobalUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
 
+    // Filter & search state
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterGradeTab, setFilterGradeTab] = useState("ALL");
     const [searchSN, setSearchSN] = useState("");
+    const [searchLaptop, setSearchLaptop] = useState("");
     const [filterPriceMin, setFilterPriceMin] = useState("");
     const [filterPriceMax, setFilterPriceMax] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+    const [snSortOrder, setSnSortOrder] = useState<SortOrder>("asc");
+    const [showSold, setShowSold] = useState(false);
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
@@ -198,18 +328,12 @@ export default function AllUnitsPage() {
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [toast, setToast] = useState("");
 
-    // ── Unit form (create/edit) ──────────────────────────────────────────────
     const [editingUnit, setEditingUnit] = useState<GlobalUnit | null>(null);
     const [newUnitLaptop, setNewUnitLaptop] = useState<PickableLaptop | null>(null);
     const showUnitForm = !!editingUnit || !!newUnitLaptop;
 
-    // ── Bulk add ──────────────────────────────────────────────────────────────
     const [bulkLaptop, setBulkLaptop] = useState<PickableLaptop | null>(null);
-
-    // ── Laptop picker (shared by "Tambah Unit" & "Tambah Banyak") ────────────
     const [pickerMode, setPickerMode] = useState<"unit" | "bulk" | null>(null);
-
-    // ── Tambah Laptop ─────────────────────────────────────────────────────────
     const [showAddLaptopModal, setShowAddLaptopModal] = useState(false);
 
     useEffect(() => {
@@ -234,6 +358,7 @@ export default function AllUnitsPage() {
                 ...u,
                 purchase_price: Math.round(Number(u.purchase_price) || 0),
                 selling_price: Math.round(Number(u.selling_price) || 0),
+                sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
                 laptop_name: u.laptops?.laptop_name ?? "—",
                 brand: u.laptops?.brand ?? "",
                 cpu: u.laptops?.cpu ?? "",
@@ -250,6 +375,8 @@ export default function AllUnitsPage() {
 
     useEffect(() => { fetchUnits(); }, [fetchUnits]);
 
+    // ── Callbacks untuk inline edit ───────────────────────────────────────────
+
     const handlePriceSaved = useCallback((unitId: string, newPrice: number) => {
         setUnits(prev => prev.map(u =>
             u.id === unitId ? { ...u, purchase_price: newPrice } : u
@@ -257,23 +384,37 @@ export default function AllUnitsPage() {
         setToast("Harga modal berhasil diperbarui!");
     }, []);
 
+    // Callback untuk EditableSparepartCell — update state lokal + trigger recalc Total Modal
+    const handleSparepartSaved = useCallback((unitId: string, newValue: number) => {
+        setUnits(prev => prev.map(u =>
+            u.id === unitId ? { ...u, sparepart_cost: newValue } : u
+        ));
+        setToast("Harga sparepart berhasil diperbarui!");
+    }, []);
+
+    // ── Computed data ─────────────────────────────────────────────────────────
+
     const activeUnits = units.filter(u => u.status !== "SOLD");
+    const baseUnits = showSold ? units : activeUnits;
 
     const filteredUnits = sortUnits(
-        activeUnits.filter(u => {
+        baseUnits.filter(u => {
             if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
             if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
             if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
+            if (searchLaptop && !u.laptop_name.toLowerCase().includes(searchLaptop.toLowerCase())) return false;
             if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
             if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
             return true;
-        })
+        }),
+        snSortOrder
     );
 
-    const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax;
+    const hasActiveFilter = searchSN || searchLaptop || filterPriceMin || filterPriceMax;
 
     const resetFilters = () => {
-        setSearchSN(""); setFilterPriceMin(""); setFilterPriceMax("");
+        setSearchSN(""); setSearchLaptop("");
+        setFilterPriceMin(""); setFilterPriceMax("");
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
     };
 
@@ -288,15 +429,13 @@ export default function AllUnitsPage() {
         gradeC: activeUnits.filter(u => u.grade === "C").length,
     };
 
-    const openEdit = (unit: GlobalUnit) => {
-        setNewUnitLaptop(null);
-        setEditingUnit(unit);
-    };
+    // Total summary card — hanya unit aktif (non-SOLD)
+    const totalSparepart = activeUnits.reduce((s, u) => s + (u.sparepart_cost || 0), 0);
+    const totalPurchase = activeUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
+    const totalModal = totalSparepart + totalPurchase;
 
-    const closeUnitForm = () => {
-        setEditingUnit(null);
-        setNewUnitLaptop(null);
-    };
+    const openEdit = (unit: GlobalUnit) => { setNewUnitLaptop(null); setEditingUnit(unit); };
+    const closeUnitForm = () => { setEditingUnit(null); setNewUnitLaptop(null); };
 
     const handleDelete = (unit: GlobalUnit) => {
         setConfirmModal({
@@ -313,6 +452,8 @@ export default function AllUnitsPage() {
         });
     };
 
+    // ── Excel Export ──────────────────────────────────────────────────────────
+
     const handleExportExcel = async () => {
         if (isExporting) return;
         setIsExporting(true);
@@ -326,34 +467,41 @@ export default function AllUnitsPage() {
                 pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
             });
 
+            // Urutan kolom Excel: SN dulu baru Laptop (konsisten dgn tampilan tabel)
             const COL_DEFS = [
+                { header: "Serial Number", key: "sn", width: 22 },
                 { header: "Laptop", key: "laptop", width: 30 },
                 { header: "Brand", key: "brand", width: 16 },
                 { header: "CPU", key: "cpu", width: 22 },
                 { header: "RAM", key: "ram", width: 10 },
                 { header: "Storage", key: "storage", width: 13 },
-                { header: "Serial Number", key: "sn", width: 22 },
                 { header: "Grade", key: "grade", width: 10 },
                 { header: "Status", key: "status", width: 14 },
                 { header: "Tgl Masuk", key: "tanggal", width: 14 },
-                { header: "Harga Modal", key: "modal", width: 18 },
+                { header: "Harga Modal", key: "modal", width: 18 },       // ← pindah ke sini
+                { header: "Harga Sparepart", key: "sparepart", width: 18 }, // ← pindah ke sini
+                { header: "Total Modal", key: "total_modal", width: 18 },
                 { header: "Harga Jual", key: "jual", width: 18 },
-                { header: "Margin", key: "margin", width: 18 },
                 { header: "Kondisi", key: "kondisi", width: 28 },
             ];
 
             ws.columns = COL_DEFS;
 
-            const LEFT_KEYS = new Set(["laptop", "kondisi", "tanggal"]);
-            const CURR_KEYS = new Set(["modal", "jual", "margin"]);
+            const LEFT_KEYS = new Set(["sn", "laptop", "kondisi", "tanggal"]);
+            const CURR_KEYS = new Set(["sparepart", "modal", "total_modal", "jual"]);
 
+            // tableRows — tukar urutan nilai modal & sparepart
             const tableRows = filteredUnits.map(u => {
+                const sparepart = canSeePriceInfo ? (u.sparepart_cost || 0) : 0;
                 const modal = canSeePriceInfo ? u.purchase_price : 0;
-                const margin = canSeePriceInfo ? (u.selling_price - u.purchase_price) : 0;
+                const totalMod = canSeePriceInfo ? (sparepart + modal) : 0;
                 return [
-                    u.laptop_name, u.brand, u.cpu, u.ram, u.storage,
-                    u.serial_number, u.grade, STATUS_STYLE[u.status]?.label ?? u.status,
-                    fmtDate(u.created_at), modal, u.selling_price, margin,
+                    u.serial_number, u.laptop_name, u.brand, u.cpu, u.ram, u.storage,
+                    u.grade, STATUS_STYLE[u.status]?.label ?? u.status,
+                    fmtDate(u.created_at),
+                    modal,      // ← Harga Modal duluan
+                    sparepart,  // ← Harga Sparepart kedua
+                    totalMod, u.selling_price,
                     u.condition_note || "",
                 ];
             });
@@ -363,7 +511,7 @@ export default function AllUnitsPage() {
                     name: "TabelSemuaUnit", ref: "A1",
                     headerRow: true, totalsRow: false,
                     style: { theme: "TableStyleMedium7", showRowStripes: true },
-                    columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })),
+                    columns: COL_DEFS.map(c => ({ name: c.header, filterButton: true })),
                     rows: tableRows,
                 });
             } else {
@@ -394,8 +542,7 @@ export default function AllUnitsPage() {
             });
 
             tableRows.forEach((_, idx) => {
-                const rowNum = idx + 2;
-                const row = ws.getRow(rowNum);
+                const row = ws.getRow(idx + 2);
                 row.height = 22;
                 row.eachCell((cell, colNum) => {
                     const key = COL_DEFS[colNum - 1]?.key ?? "";
@@ -434,18 +581,21 @@ export default function AllUnitsPage() {
         }
     };
 
+    // ─── Render ───────────────────────────────────────────────────────────────
+
     return (
         <DashboardLayout>
             <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
                 <div className="max-w-7xl mx-auto space-y-5">
 
-                    {/* Header */}
+                    {/* ── Header ── */}
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="w-7 h-7 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-lg flex items-center justify-center">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                        <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                                        <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
                                 </div>
                                 <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">Semua Unit</h1>
@@ -482,7 +632,8 @@ export default function AllUnitsPage() {
                                     <button onClick={() => setShowAddLaptopModal(true)}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition shadow-sm">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                                            <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
                                         </svg>
                                         Tambah Laptop
                                     </button>
@@ -505,21 +656,56 @@ export default function AllUnitsPage() {
                         </div>
                     </div>
 
+                    {/* ── Summary Card: Sparepart + Modal = Total ── */}
+                    {canSeePriceInfo && (
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex items-center gap-3 flex-1 min-w-[180px]">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400">Total Harga Sparepart</p>
+                                        <p className="text-base font-bold text-gray-800">{fmt(totalSparepart)}</p>
+                                    </div>
+                                </div>
 
-                    {/* Total Modal Card */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                                <div className="flex items-center text-gray-300 font-light text-xl select-none">+</div>
+
+                                <div className="flex items-center gap-3 flex-1 min-w-[180px]">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 7h3M4 11h3M4 15h3" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400">Total Harga Modal</p>
+                                        <p className="text-base font-bold text-gray-800">{fmt(totalPurchase)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center text-gray-300 font-light text-xl select-none">=</div>
+
+                                <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-400">Total Harga Modal</p>
+                                        <p className="text-lg font-black text-violet-700">{fmt(totalModal)}</p>
+                                        <p className="text-[10px] text-gray-400">Sparepart + Modal</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-xs text-gray-400">Total Harga Modal</p>
-                            <p className="text-lg font-bold text-gray-800">{fmt(activeUnits.reduce((s, u) => s + (u.purchase_price || 0), 0))}</p>
-                        </div>
-                    </div>
+                    )}
 
-
+                    {/* ── Grade Filter Tabs ── */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
                         <div className="flex gap-1.5">
                             {[
@@ -544,14 +730,28 @@ export default function AllUnitsPage() {
                         </div>
                     </div>
 
-                    {/* Status Filter Tabs */}
+                    {/* ── Status Filter Tabs ── */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-2">
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 items-center">
                             {[
-                                { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? activeUnits.length : activeUnits.filter(u => u.grade === filterGradeTab).length },
-                                { value: "SIAP_JUAL", label: "Siap Jual", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length },
-                                { value: "BELUM_SIAP", label: "Belum Siap", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length },
-                                { value: "SERVICE", label: "Service", count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length },
+                                {
+                                    value: "ALL", label: "Semua Status",
+                                    count: filterGradeTab === "ALL"
+                                        ? (showSold ? units.length : activeUnits.length)
+                                        : (showSold ? units : activeUnits).filter(u => u.grade === filterGradeTab).length,
+                                },
+                                {
+                                    value: "SIAP_JUAL", label: "Siap Jual",
+                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length,
+                                },
+                                {
+                                    value: "BELUM_SIAP", label: "Belum Siap",
+                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length,
+                                },
+                                {
+                                    value: "SERVICE", label: "Service",
+                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length,
+                                },
                             ].map(opt => (
                                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
@@ -561,12 +761,27 @@ export default function AllUnitsPage() {
                                     </span>
                                 </button>
                             ))}
+
+                            {/* Toggle tampil SOLD */}
+                            <button
+                                onClick={() => { setShowSold(v => !v); setFilterStatus("ALL"); }}
+                                className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition border ${showSold ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${showSold ? "bg-gray-300" : "bg-gray-400"}`} />
+                                    Terjual
+                                    <span className={`px-1.5 py-0.5 rounded text-xs ${showSold ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                        {counts.sold}
+                                    </span>
+                                </span>
+                            </button>
                         </div>
                     </div>
 
-                    {/* Search & Filter */}
+                    {/* ── Search & Filter ── */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 space-y-3">
                         <div className="flex gap-2">
+                            {/* Search SN */}
                             <div className="relative flex-1">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -581,6 +796,25 @@ export default function AllUnitsPage() {
                                     </button>
                                 )}
                             </div>
+
+                            {/* Search nama laptop */}
+                            <div className="relative flex-1">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" strokeWidth={2} strokeLinecap="round" />
+                                    <line x1="8" y1="21" x2="16" y2="21" strokeWidth={2} />
+                                    <line x1="12" y1="17" x2="12" y2="21" strokeWidth={2} />
+                                </svg>
+                                <input type="text" placeholder="Cari nama laptop..." value={searchLaptop} onChange={e => setSearchLaptop(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                {searchLaptop && (
+                                    <button onClick={() => setSearchLaptop("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
+
                             <button onClick={() => setShowAdvancedFilter(v => !v)}
                                 className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition ${showAdvancedFilter || filterPriceMin || filterPriceMax ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -589,6 +823,7 @@ export default function AllUnitsPage() {
                                 Filter
                                 {(filterPriceMin || filterPriceMax) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                             </button>
+
                             {hasActiveFilter && (
                                 <button onClick={resetFilters} className="inline-flex items-center gap-1 px-2.5 h-9 rounded-lg text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 transition">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -598,6 +833,7 @@ export default function AllUnitsPage() {
                                 </button>
                             )}
                         </div>
+
                         {showAdvancedFilter && (
                             <div className="border-t border-gray-100 pt-3 grid grid-cols-2 gap-3">
                                 <div>
@@ -614,7 +850,7 @@ export default function AllUnitsPage() {
                         )}
                     </div>
 
-                    {/* Table */}
+                    {/* ── Table ── */}
                     {isLoading ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
@@ -638,24 +874,42 @@ export default function AllUnitsPage() {
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="bg-gray-50/80 border-b border-gray-100">
+                                            {/* ← SN kolom PERTAMA dengan sort button */}
+                                            <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap text-left">
+                                                <div className="flex items-center gap-2">
+                                                    <span>Serial Number</span>
+                                                    <SnSortButton
+                                                        order={snSortOrder}
+                                                        onToggle={() => setSnSortOrder(o => o === "asc" ? "desc" : "asc")}
+                                                    />
+                                                </div>
+                                            </th>
+                                            {/* ← Laptop kolom KEDUA */}
                                             <Th>Laptop</Th>
-                                            <Th>Serial Number</Th>
                                             <Th>Grade</Th>
                                             <Th>Tgl Masuk</Th>
                                             {canSeePriceInfo && (
-                                                <Th right>
-                                                    {canManageUnits ? (
-                                                        <span className="flex items-center justify-end gap-1">
-                                                            Harga Modal
-                                                            <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
-                                                        </span>
-                                                    ) : (
-                                                        "Harga Modal"
-                                                    )}
-                                                </Th>
+                                                <>
+                                                    <Th right>
+                                                        {canManageUnits ? (
+                                                            <span className="flex items-center justify-end gap-1">
+                                                                Harga Modal
+                                                                <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
+                                                            </span>
+                                                        ) : "Harga Modal"}
+                                                    </Th>
+                                                    <Th right>
+                                                        {canManageUnits ? (
+                                                            <span className="flex items-center justify-end gap-1">
+                                                                Harga Sparepart
+                                                                <span className="text-blue-400 font-bold normal-case tracking-normal">(editable)</span>
+                                                            </span>
+                                                        ) : "Harga Sparepart"}
+                                                    </Th>
+                                                    <Th right>Total Modal</Th>
+                                                </>
                                             )}
                                             <Th right>Harga Jual</Th>
-                                            {canSeePriceInfo && <Th right>Margin</Th>}
                                             <Th>Status</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
@@ -664,49 +918,75 @@ export default function AllUnitsPage() {
                                         {filteredUnits.map(unit => {
                                             const s = STATUS_STYLE[unit.status];
                                             const g = GRADE_STYLE[unit.grade];
-                                            const margin = (unit.selling_price || 0) - (unit.purchase_price || 0);
+                                            // Total Modal per-row reaktif: update otomatis saat sparepart/modal di-edit
+                                            const totalUnitModal = (unit.sparepart_cost || 0) + (unit.purchase_price || 0);
+                                            const isSold = unit.status === "SOLD";
                                             return (
-                                                <tr key={unit.id} className="transition-colors group hover:bg-gray-50/60">
+                                                <tr key={unit.id} className={`transition-colors group hover:bg-gray-50/60 ${isSold ? "opacity-60" : ""}`}>
+                                                    {/* ← SN kolom PERTAMA */}
+                                                    <td className="px-4 py-3">
+                                                        <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                                                            {unit.serial_number}
+                                                        </span>
+                                                    </td>
+                                                    {/* ← Laptop kolom KEDUA */}
                                                     <td className="px-4 py-3 max-w-[220px]">
                                                         <p className="text-xs font-semibold text-gray-800 truncate">{unit.laptop_name}</p>
                                                         <p className="text-[10px] text-gray-400 truncate">
                                                             {[unit.brand, unit.cpu, unit.ram, unit.storage].filter(Boolean).join(" · ") || "—"}
                                                         </p>
                                                     </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
-                                                    </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {g && (
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${g.badge}`}>{g.label}</span>
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${g.badge}`}>
+                                                                {g.label}
+                                                            </span>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
                                                     </td>
                                                     {canSeePriceInfo && (
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            {canManageUnits ? (
-                                                                <EditablePriceCell
-                                                                    unitId={unit.id}
-                                                                    value={unit.purchase_price}
-                                                                    onSaved={handlePriceSaved}
-                                                                />
-                                                            ) : (
-                                                                <div className="text-right text-xs text-gray-500 tabular-nums">
-                                                                    {fmt(unit.purchase_price)}
-                                                                </div>
-                                                            )}
-                                                        </td>
+                                                        <>
+                                                            {/* Harga Sparepart — editable */}
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                {canManageUnits && !isSold ? (
+                                                                    <EditablePriceCell
+                                                                        unitId={unit.id}
+                                                                        value={unit.purchase_price}
+                                                                        onSaved={handlePriceSaved}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-right text-xs text-gray-500 tabular-nums">
+                                                                        {fmt(unit.purchase_price)}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {/* Harga Sparepart — editable */}
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                {canManageUnits && !isSold ? (
+                                                                    <EditableSparepartCell
+                                                                        unitId={unit.id}
+                                                                        value={unit.sparepart_cost || 0}
+                                                                        onSaved={handleSparepartSaved}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-right text-xs text-blue-600 font-medium tabular-nums">
+                                                                        {fmt(unit.sparepart_cost || 0)}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {/* Total Modal = Sparepart + Modal, reaktif */}
+                                                            <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                                                                <span className="text-xs font-semibold text-violet-700">
+                                                                    {fmt(totalUnitModal)}
+                                                                </span>
+                                                            </td>
+                                                        </>
                                                     )}
-                                                    <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">{fmt(unit.selling_price)}</td>
-                                                    {canSeePriceInfo && (
-                                                        <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                                                            <span className={`text-xs font-semibold ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                                                {margin >= 0 ? "+" : ""}{fmt(Math.abs(margin))}
-                                                            </span>
-                                                        </td>
-                                                    )}
+                                                    <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">
+                                                        {fmt(unit.selling_price)}
+                                                    </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {s && (
                                                             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -717,7 +997,7 @@ export default function AllUnitsPage() {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            {canManageUnits && (
+                                                            {canManageUnits && !isSold && (
                                                                 <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
@@ -725,7 +1005,8 @@ export default function AllUnitsPage() {
                                                             )}
                                                             {canManageUnits && (
                                                                 <button onClick={() => handleDelete(unit)}
-                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center"
+                                                                    title="Hapus Unit">
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </button>
                                                             )}
@@ -739,7 +1020,10 @@ export default function AllUnitsPage() {
                             </div>
                             <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between">
                                 <span className="text-xs text-gray-400">
-                                    Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{activeUnits.length}</span> unit
+                                    Menampilkan{" "}
+                                    <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari{" "}
+                                    <span className="font-medium text-gray-600">{showSold ? units.length : activeUnits.length}</span> unit
+                                    {showSold && <span className="ml-1 text-gray-400">(termasuk terjual)</span>}
                                 </span>
                                 {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
                                     <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
@@ -750,18 +1034,14 @@ export default function AllUnitsPage() {
                 </div>
             </main>
 
-            {/* Laptop picker — shared by Tambah Unit & Tambah Banyak */}
+            {/* ── Modals ── */}
             {pickerMode && (
                 <LaptopPickerModal
                     title={pickerMode === "unit" ? "Pilih Laptop untuk Unit Baru" : "Pilih Laptop untuk Tambah Banyak Unit"}
                     onClose={() => setPickerMode(null)}
-                    onSelect={(laptop) => {
-                        if (pickerMode === "unit") {
-                            setEditingUnit(null);
-                            setNewUnitLaptop(laptop);
-                        } else {
-                            setBulkLaptop(laptop);
-                        }
+                    onSelect={laptop => {
+                        if (pickerMode === "unit") { setEditingUnit(null); setNewUnitLaptop(laptop); }
+                        else { setBulkLaptop(laptop); }
                         setPickerMode(null);
                     }}
                 />
@@ -774,7 +1054,7 @@ export default function AllUnitsPage() {
                     editingUnit={editingUnit}
                     onClose={closeUnitForm}
                     onSuccess={fetchUnits}
-                    onError={(msg) => setAlertModal(msg)}
+                    onError={msg => setAlertModal(msg)}
                 />
             )}
 
@@ -795,9 +1075,7 @@ export default function AllUnitsPage() {
             )}
 
             {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
-            {confirmModal && (
-                <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
-            )}
+            {confirmModal && <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />}
             {toast && <Toast message={toast} onDone={() => setToast("")} />}
         </DashboardLayout>
     );

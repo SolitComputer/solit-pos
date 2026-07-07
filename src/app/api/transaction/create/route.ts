@@ -162,6 +162,14 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
         const invoice_number = await generateInvoice();
         const deal_price = Number(body.amount) || 0;
+
+        const unitPriceMap = new Map<string, number>();
+        if (Array.isArray(body.unit_prices)) {
+            for (const p of body.unit_prices) {
+                if (p?.unit_id) unitPriceMap.set(String(p.unit_id), toNumber(p.deal_price));
+            }
+        }
+        const perUnitFallback = Math.round(deal_price / units.length);
         const inventory_price = units.reduce((sum, u) => sum + (u.cost_price ?? 0), 0);
         const payment_method = body.payment_method || "CASH";
 
@@ -286,15 +294,13 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const itemsToInsert = units.map(u => ({
             transaction_id: transaction.id,
             invoice_number,
-            // Laptop: isi unit_id, kosongkan accessory_unit_id
-            // Aksesori: unit_id null, isi accessory_unit_id
             unit_id: u.unit_type === "laptop" ? u.unit_id : null,
             accessory_unit_id: u.unit_type === "accessory" ? u.unit_id : null,
             laptop_id: u.unit_type === "laptop" ? u.laptop_id : null,
             serial_number: u.serial_number,
             laptop_name: u.laptop_name,
             selling_price: u.cost_price ?? 0,
-            deal_price: Math.round(deal_price / units.length),
+            deal_price: unitPriceMap.get(u.unit_id) || perUnitFallback,
             grade: u.grade ?? null,
         }));
 
@@ -468,9 +474,22 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 customer_type: body.customer_type,
             });
 
-            sendWhatsapp(body.customer_phone, message)
-                .then(sent => console.log(sent ? "✅ WA BERHASIL" : "⚠️ WA GAGAL"))
-                .catch(err => console.error("❌ WA Error:", err));
+            const waTimeout = new Promise<boolean>((resolve) =>
+                setTimeout(() => {
+                    console.warn("[WA] Timeout 15s — lanjut tanpa WA");
+                    resolve(false);
+                }, 15_000)
+            );
+
+            try {
+                const waSent = await Promise.race([
+                    sendWhatsapp(body.customer_phone, message),
+                    waTimeout,
+                ]);
+                console.log(`[WA] ${waSent ? "✅ Terkirim" : "⚠️ Gagal/Timeout"} → ${body.customer_phone} | Invoice: ${invoice_number}`);
+            } catch (waErr: any) {
+                console.error("[WA] Error:", waErr?.message ?? waErr);
+            }
         }
 
         return NextResponse.json({

@@ -15,31 +15,18 @@ export type MissionPriority = "LOW" | "MEDIUM" | "HIGH";
 
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-/**
- * Peta penugasan misi: role atasan → daftar role yang boleh diberi misi.
- *
- * Beda dari DIVISION_MAP (dipakai absensi) karena rantai komando misi
- * mengikuti struktur operasional yang kamu minta.
- *
- * FULL_ACCESS (ADMIN/CEO, PROGRAMMER, ASISTEN_CEO) TIDAK perlu didaftarkan —
- * mereka otomatis boleh assign ke SEMUA role (lihat isMissionFullAccess).
- *
- * CATATAN: role "finance" & "masak" pada struktur yang kamu kirim BELUM ada
- * di UserRole. Kalau nanti ditambahkan, tinggal buka komentar di bawah.
- */
+
 export const MISSION_ASSIGN_MAP: Record<string, UserRole[]> = {
-    KEPALA_MARKETING: ["KEPALA_SALES", "KONTEN", "MARKETING"],
-    KEPALA_SALES: ["CREW_SALES", "PENGANTARAN"],
-    KEPALA_TEKNISI: ["CUSTOMER_SERVICE", "TEKNISI"],
-    KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG"],
-    KEPALA_ONPOINT: ["ONPOINT"],
-    KEPALA_SOTECH: ["SOTECH"],
-    KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG"],
+    KEPALA_MARKETING: ["KEPALA_SALES", "KONTEN", "MARKETING", "PKL_MARKETING", "PKL_KONTEN"],
+    KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
+    KEPALA_TEKNISI: ["CUSTOMER_SERVICE", "TEKNISI", "PKL_TEKNISI", "PKL_CUSTOMER_SERVICE"],
+    KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
+    KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
+    KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
+    KEPALA_PENGELOLA_BARANG: ["PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG"],
     ACCOUNTING: ["PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
 
-    // ── Belum ada role-nya di UserRole — aktifkan kalau sudah dibuat ──
-    // FINANCE: ["CREW_SALES", "MARKETING", "KEPALA_TEKNISI"],
-    // (contoh "masak" biasanya penerima misi saja, bukan pemberi)
+
 };
 
 export function isMissionFullAccess(userRoles: string[]): boolean {

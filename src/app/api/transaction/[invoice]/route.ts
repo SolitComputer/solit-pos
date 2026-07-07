@@ -50,6 +50,12 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    const { data: txItems } = await supabase
+      .from("transaction_items")
+      .select("unit_id, serial_number, deal_price")
+      .eq("invoice_number", invoice);
+    const itemsPayload = txItems ?? [];
+
     // ── Enrich grouped_items dengan purchase_price TERKINI dari laptop_units ──
     // FIX: Selalu baca purchase_price dari laptop_units (bukan dari tx.inventory_price)
     // supaya perubahan modal yang disimpan via PUT langsung keliatan
@@ -104,6 +110,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
             success: true,
             data: {
               ...tx,
+              transaction_items: itemsPayload,
               purchase_price_total: totalModalFromUnits,
               inventory_price: totalModalFromUnits,
               other:
@@ -121,6 +128,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
           success: true,
           data: {
             ...tx,
+            transaction_items: itemsPayload,
             grouped_items: enriched,
             // FIX: Gunakan total dari laptop_units, bukan tx.inventory_price
             purchase_price_total: enrichedTotal,
@@ -135,6 +143,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       success: true,
       data: {
         ...tx,
+        transaction_items: itemsPayload,
         purchase_price_total: Number(tx.inventory_price ?? 0),
       },
     });
@@ -212,6 +221,8 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       allowedFields.trade_in_value = Number(body.trade_in_value);
     if (body.trade_in_cash !== undefined)
       allowedFields.trade_in_cash = Number(body.trade_in_cash);
+    if (body.price_per_unit !== undefined)
+      allowedFields.price_per_unit = Number(body.price_per_unit);
 
     // ── FIX: Handle update purchase_price per unit ───────────────────
     // Bug lama: filter `> 0` bikin unit dengan modal 0 tidak diupdate
@@ -266,15 +277,54 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    // ── BARU: update deal_price per unit di transaction_items ──
+    type DealPriceUpdate = { unit_id?: string; serial_number?: string; deal_price: number };
+    const dealPricesPerUnit: DealPriceUpdate[] = Array.isArray(body.deal_prices_per_unit)
+      ? body.deal_prices_per_unit
+      : [];
+
+    let newDealTotal: number | null = null;
+
+    if (dealPricesPerUnit.length > 0) {
+      const validDeal = dealPricesPerUnit.filter(
+        (p) => Number.isFinite(Number(p.deal_price)) && Number(p.deal_price) >= 0
+      );
+
+      await Promise.allSettled(
+        validDeal.map((p) => {
+          const base = supabase
+            .from("transaction_items")
+            .update({ deal_price: Math.round(Number(p.deal_price)) })
+            .eq("invoice_number", invoice);
+          // Prioritas match by unit_id, fallback serial_number (buat aksesori / legacy)
+          return p.unit_id && String(p.unit_id).trim().length > 0
+            ? base.eq("unit_id", p.unit_id)
+            : base.eq("serial_number", p.serial_number ?? "");
+        })
+      );
+
+      newDealTotal = dealPricesPerUnit.reduce(
+        (s, p) => s + Math.round(Number(p.deal_price) || 0),
+        0
+      );
+    }
+
     // ── Hitung field other (profit) ──────────────────────────────────
     const dealPrice =
-      body.deal_price ?? body.amount ?? before?.deal_price ?? before?.amount ?? 0;
+      newDealTotal !== null
+        ? newDealTotal
+        : (body.deal_price ?? body.amount ?? before?.deal_price ?? before?.amount ?? 0);
     const inventoryPrice =
       newInventoryPrice !== null
         ? newInventoryPrice
         : before?.inventory_price ?? 0;
 
     allowedFields.other = Number(dealPrice) - Number(inventoryPrice);
+
+    if (newDealTotal !== null) {
+      allowedFields.deal_price = newDealTotal;
+      allowedFields.amount = newDealTotal;
+    }
 
     if (newInventoryPrice !== null) {
       allowedFields.inventory_price = newInventoryPrice;

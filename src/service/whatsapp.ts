@@ -5,25 +5,34 @@ export async function sendWhatsapp(
   const MAX_RETRIES = 3;
   let lastError: unknown;
 
+  if (!target || !message) {
+    console.warn("[Fonnte] Target atau message kosong");
+    return false;
+  }
+
+  // Normalisasi nomor
+  let normalized = target.replace(/\D/g, "");
+  if (normalized.startsWith("0")) {
+    normalized = "62" + normalized.slice(1);
+  } else if (!normalized.startsWith("62")) {
+    normalized = "62" + normalized;
+  }
+
+  // ── TAMBAHAN: validasi panjang nomor Indonesia ──
+  // Format: 62 + 8-13 digit = total 10-15 karakter
+  if (normalized.length < 10 || normalized.length > 15) {
+    console.warn("[Fonnte] Nomor tidak valid (panjang):", normalized);
+    return false;
+  }
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      if (!target || !message) {
-        console.warn("[Fonnte] Target atau message kosong");
-        return false;
-      }
-
-      // Normalisasi nomor → format internasional 62xxx
-      let normalized = target.replace(/\D/g, "");
-      if (normalized.startsWith("0")) {
-        normalized = "62" + normalized.slice(1);
-      } else if (!normalized.startsWith("62")) {
-        normalized = "62" + normalized;
-      }
-
-      console.log(`[Fonnte] Attempt ${attempt}/${MAX_RETRIES} → ${normalized}`);
+      console.log(`[Fonnte] Attempt ${attempt}/${MAX_RETRIES} → ${normalized} | Invoice hint: ${message.slice(0, 40)}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12_000);
+      // ── Turunkan timeout per attempt dari 12s → 8s ──
+      // Supaya 3 retry masih muat dalam window 15s dari race di create/route.ts
+      const timeoutId = setTimeout(() => controller.abort(), 8_000);
 
       const res = await fetch("https://api.fonnte.com/send", {
         method: "POST",
@@ -33,7 +42,7 @@ export async function sendWhatsapp(
         },
         body: JSON.stringify({
           target: normalized,
-          message: message,
+          message,
           delay: "2",
         }),
         signal: controller.signal,
@@ -42,17 +51,24 @@ export async function sendWhatsapp(
       clearTimeout(timeoutId);
 
       const result = await res.json().catch(() => ({}));
-      console.log(`[Fonnte] HTTP ${res.status} | Response:`, result);
+      console.log(`[Fonnte] HTTP ${res.status} | Body:`, JSON.stringify(result));
 
       if (!res.ok || result.status === false) {
         console.error(`[Fonnte] Gagal attempt ${attempt}:`, result);
         lastError = result;
 
-        // Jika token invalid, jangan retry
         if (res.status === 401 || res.status === 403) {
-          console.error("[Fonnte] Token tidak valid, hentikan retry");
+          console.error("[Fonnte] Token invalid — hentikan retry");
           break;
         }
+
+        // ── TAMBAHAN: device disconnect = tidak perlu retry ──
+        if (result.reason?.toLowerCase?.().includes("disconnect") ||
+            result.reason?.toLowerCase?.().includes("not found")) {
+          console.error("[Fonnte] Device tidak terhubung — hentikan retry");
+          break;
+        }
+
         continue;
       }
 
@@ -66,13 +82,12 @@ export async function sendWhatsapp(
       console.error(`[Fonnte] Error attempt ${attempt}: ${errName} — ${errMsg}`);
 
       if (attempt < MAX_RETRIES) {
-        // Exponential backoff: 1s, 2s, 3s
         await new Promise((r) => setTimeout(r, 1_000 * attempt));
       }
     }
   }
 
-  console.error("[Fonnte] ❌ Gagal setelah semua retry:", lastError);
+  console.error("[Fonnte] ❌ Gagal setelah semua retry. Last error:", JSON.stringify(lastError));
   return false;
 }
 

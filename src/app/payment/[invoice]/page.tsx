@@ -59,7 +59,8 @@ interface ActiveUnit {
   laptop_id: string;
   selling_price: number;
   grade: string;
-  purchase_price: number; // ← harga modal unit
+  purchase_price: number;
+  deal_price: number;
 }
 
 const inputCls =
@@ -103,30 +104,47 @@ export default function EditTransactionPage() {
           setTransaction(tx);
           setFormData(tx);
 
+          const dealMap = new Map<string, number>();
+          for (const it of ((tx as any).transaction_items ?? [])) {
+            if (it.unit_id) dealMap.set(String(it.unit_id), Number(it.deal_price ?? 0));
+            if (it.serial_number) dealMap.set(String(it.serial_number), Number(it.deal_price ?? 0));
+          }
+
           const sns: string[] =
             Array.isArray(tx.serial_numbers) && tx.serial_numbers.length > 0
               ? tx.serial_numbers
               : tx.serial_number
-              ? [tx.serial_number]
-              : [];
+                ? [tx.serial_number]
+                : [];
 
           const unitIds: string[] =
             Array.isArray(tx.unit_ids) && tx.unit_ids.length > 0
               ? tx.unit_ids
               : tx.unit_id
-              ? [tx.unit_id]
-              : [];
+                ? [tx.unit_id]
+                : [];
 
           if (sns.length > 0) {
             const { data: unitDetails } = await fetchUnitDetailsBySNs(sns);
             if (unitDetails) {
-              setActiveUnits(unitDetails);
+              // ← BARU: tempel deal_price per unit dari dealMap
+              const withDeal = unitDetails.map((u) => ({
+                ...u,
+                deal_price:
+                  dealMap.get(u.unit_id) ??
+                  dealMap.get(u.serial_number) ??
+                  0,
+              }));
+              setActiveUnits(withDeal);
             } else {
-              // Fallback: pakai inventory_price dari transaksi dibagi rata
               const perUnitModal =
                 unitIds.length > 0
                   ? Math.round((tx.inventory_price ?? 0) / unitIds.length)
                   : tx.inventory_price ?? 0;
+              const perUnitDeal =
+                unitIds.length > 0
+                  ? Math.round((tx.deal_price ?? tx.amount ?? 0) / unitIds.length)
+                  : (tx.deal_price ?? 0);
               setActiveUnits(
                 sns.map((sn, i) => ({
                   unit_id: unitIds[i] ?? "",
@@ -136,6 +154,7 @@ export default function EditTransactionPage() {
                   selling_price: tx.deal_price,
                   grade: "",
                   purchase_price: perUnitModal,
+                  deal_price: dealMap.get(unitIds[i] ?? "") ?? dealMap.get(sn) ?? perUnitDeal, // ← BARU
                 }))
               );
             }
@@ -189,6 +208,7 @@ export default function EditTransactionPage() {
             selling_price: r.selling_price ?? 0,
             grade: r.grade ?? "",
             purchase_price: Number(r.purchase_price ?? 0),
+            deal_price: 0,
           };
         })
         .filter((u): u is ActiveUnit => u !== null);
@@ -222,6 +242,7 @@ export default function EditTransactionPage() {
       selling_price: unit.selling_price,
       grade: unit.grade,
       purchase_price: Number(unit.purchase_price ?? 0),
+      deal_price: 0,
     };
     const updated = [...activeUnits, newUnit];
     setActiveUnits(updated);
@@ -258,6 +279,7 @@ export default function EditTransactionPage() {
       selling_price: newUnit.selling_price,
       grade: newUnit.grade,
       purchase_price: Number(newUnit.purchase_price ?? 0),
+      deal_price: 0, // ← tambah: unit pengganti default 0, admin isi manual
     };
     const updated = activeUnits.map((u, i) => (i === idx ? replacement : u));
     setActiveUnits(updated);
@@ -269,6 +291,14 @@ export default function EditTransactionPage() {
   const handleUpdatePurchasePrice = (idx: number, price: number) => {
     const updated = activeUnits.map((u, i) =>
       i === idx ? { ...u, purchase_price: price } : u
+    );
+    setActiveUnits(updated);
+    setHasChanges(true);
+  };
+
+  const handleUpdateDealPrice = (idx: number, price: number) => {
+    const updated = activeUnits.map((u, i) =>
+      i === idx ? { ...u, deal_price: price } : u
     );
     setActiveUnits(updated);
     setHasChanges(true);
@@ -318,20 +348,29 @@ export default function EditTransactionPage() {
         purchase_price: u.purchase_price,
       }));
 
+      // ← BARU: kirim deal_price per unit
+      const dealPricesPerUnit = activeUnits.map((u) => ({
+        unit_id: u.unit_id,
+        serial_number: u.serial_number,
+        deal_price: u.deal_price,
+      }));
+      const totalDeal = activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0);
+
       const res = await fetch(`/api/transaction/${invoice}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          deal_price: Number(formData.deal_price || formData.amount),
-          amount: Number(formData.deal_price || formData.amount),
+          deal_price: totalDeal || Number(formData.deal_price || formData.amount),
+          amount: totalDeal || Number(formData.deal_price || formData.amount),
           serial_numbers: sns,
           unit_ids: unitIds,
           serial_number: sns[0] ?? "",
           unit_id: unitIds[0] ?? null,
           laptop_name: laptopNames.join(" + "),
           laptop_id: activeUnits[0]?.laptop_id ?? null,
-          purchase_prices_per_unit: purchasePricesPerUnit, // ← BARU
+          purchase_prices_per_unit: purchasePricesPerUnit,
+          deal_prices_per_unit: dealPricesPerUnit, // ← BARU
         }),
       });
       const result = await res.json();
@@ -412,8 +451,11 @@ export default function EditTransactionPage() {
   }
 
   const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
-  const dealPrice = Number(formData.deal_price || formData.amount || 0);
-
+  const totalDealFromUnits = activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0);
+  const dealPrice =
+    totalDealFromUnits > 0
+      ? totalDealFromUnits
+      : Number(formData.deal_price || formData.amount || 0);
   // ← BARU: hitung total modal realtime dari activeUnits
   const totalInventoryPrice = activeUnits.reduce(
     (s, u) => s + (u.purchase_price || 0),
@@ -656,11 +698,10 @@ export default function EditTransactionPage() {
                     }));
                     setHasChanges(true);
                   }}
-                  className={`ctype-btn ${
-                    (formData.customer_type ?? "UMUM") === opt.value
-                      ? "active"
-                      : ""
-                  }`}
+                  className={`ctype-btn ${(formData.customer_type ?? "UMUM") === opt.value
+                    ? "active"
+                    : ""
+                    }`}
                 >
                   <span>{opt.icon}</span>
                   {opt.label}
@@ -744,6 +785,9 @@ export default function EditTransactionPage() {
                     onReplace={(newUnit) => handleReplaceUnit(idx, newUnit)}
                     onPurchasePriceChange={(price) =>
                       handleUpdatePurchasePrice(idx, price)
+                    }
+                    onDealPriceChange={(price) =>
+                      handleUpdateDealPrice(idx, price)
                     }
                   />
                 ))}
@@ -842,14 +886,14 @@ export default function EditTransactionPage() {
           {/* ─ Section: Harga ─ */}
           <SectionHeader icon="💰" title="Harga & Pembayaran" color="#ECFDF5" />
           <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Harga Deal (Rp)" required>
+            <Field label="Total Harga Deal (Rp)">
               <input
                 name="deal_price"
-                type="number"
-                value={formData.deal_price || formData.amount || ""}
-                onChange={handleChange}
-                className={inputCls}
-                placeholder="0"
+                type="text"
+                value={fmt(dealPrice)}
+                readOnly
+                className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed`}
+                placeholder="Otomatis dari harga tiap unit"
               />
             </Field>
             <Field label="Metode Pembayaran">
@@ -911,9 +955,8 @@ export default function EditTransactionPage() {
                   Profit
                 </p>
                 <p
-                  className={`text-sm font-extrabold mt-0.5 ${
-                    other >= 0 ? "text-emerald-600" : "text-red-500"
-                  }`}
+                  className={`text-sm font-extrabold mt-0.5 ${other >= 0 ? "text-emerald-600" : "text-red-500"
+                    }`}
                 >
                   {other >= 0 ? "+" : ""}
                   {fmt(other)}
@@ -1087,15 +1130,15 @@ export default function EditTransactionPage() {
                 </div>
                 {transaction.deal_price !==
                   Number(formData.deal_price || formData.amount) && (
-                  <div className="text-right">
-                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wider">
-                      Sebelumnya
-                    </p>
-                    <p className="text-sm text-gray-400 line-through mt-0.5">
-                      {fmt(transaction.deal_price)}
-                    </p>
-                  </div>
-                )}
+                    <div className="text-right">
+                      <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wider">
+                        Sebelumnya
+                      </p>
+                      <p className="text-sm text-gray-400 line-through mt-0.5">
+                        {fmt(transaction.deal_price)}
+                      </p>
+                    </div>
+                  )}
               </div>
 
               {/* ← UPDATED: Units preview dengan modal info */}
@@ -1159,9 +1202,8 @@ export default function EditTransactionPage() {
                       Estimasi Profit
                     </span>
                     <span
-                      className={`text-xs font-extrabold font-mono ${
-                        other >= 0 ? "text-emerald-600" : "text-red-500"
-                      }`}
+                      className={`text-xs font-extrabold font-mono ${other >= 0 ? "text-emerald-600" : "text-red-500"
+                        }`}
                     >
                       {other >= 0 ? "+" : ""}
                       {fmt(other)}
@@ -1229,7 +1271,6 @@ export default function EditTransactionPage() {
   );
 }
 
-// ── UnitEditRow ───────────────────────────────────────────────────────────────
 function UnitEditRow({
   unit,
   index,
@@ -1238,7 +1279,8 @@ function UnitEditRow({
   canRemove,
   onRemove,
   onReplace,
-  onPurchasePriceChange, // ← BARU
+  onPurchasePriceChange,
+  onDealPriceChange,
 }: {
   unit: ActiveUnit;
   index: number;
@@ -1247,7 +1289,8 @@ function UnitEditRow({
   canRemove: boolean;
   onRemove: () => void;
   onReplace: (newUnit: ReadyUnit) => void;
-  onPurchasePriceChange: (price: number) => void; // ← BARU
+  onPurchasePriceChange: (price: number) => void;
+  onDealPriceChange: (price: number) => void;
 }) {
   const [showReplace, setShowReplace] = useState(false);
   const [replaceSearch, setReplaceSearch] = useState("");
@@ -1268,13 +1311,12 @@ function UnitEditRow({
     C: { bg: "#EEF2FF", color: "#6366F1" },
   };
   const gradeStyle = unit.grade
-    ? (gradeColors[unit.grade] ?? { bg: "#F1F5F9", color: "#64748B" })
+    ? gradeColors[unit.grade] ?? { bg: "#F1F5F9", color: "#64748B" }
     : null;
 
-  // Kalkulasi estimasi margin unit ini
-  const unitMargin = unit.purchase_price > 0
-    ? unit.selling_price - unit.purchase_price
-    : null;
+  // Margin unit ini = harga deal − harga modal
+  const unitMargin =
+    unit.purchase_price > 0 ? unit.deal_price - unit.purchase_price : null;
 
   return (
     <div className="unit-row">
@@ -1355,40 +1397,57 @@ function UnitEditRow({
         </div>
       </div>
 
-      {/* ← BARU: ─ Harga Modal ─ */}
+      {/* ─ Harga Modal & Harga Deal per unit ─ */}
       <div
-        className="border-t border-gray-100 px-3.5 py-2.5 flex items-center gap-3"
+        className="border-t border-gray-100 px-3.5 py-2.5 grid grid-cols-2 gap-3"
         style={{ background: "#F8FAFC" }}
       >
-        <div className="flex-1">
+        <div>
           <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-            🏷️ Harga Modal (Rp)
+            🏷️ Harga Modal
           </label>
           <input
             type="number"
             value={unit.purchase_price || ""}
             onChange={(e) => onPurchasePriceChange(Number(e.target.value))}
             onFocus={(e) => e.target.select()}
-            placeholder="Masukkan harga beli..."
+            placeholder="Modal..."
             className="w-full border border-gray-200 rounded-lg h-8 px-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition placeholder:text-gray-300"
           />
         </div>
-        {unitMargin !== null && (
-          <div className="text-right flex-shrink-0 min-w-[90px]">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Est. Margin
-            </p>
-            <p
-              className={`text-xs font-extrabold font-mono ${
-                unitMargin >= 0 ? "text-emerald-600" : "text-red-500"
-              }`}
-            >
-              {unitMargin >= 0 ? "+" : ""}
-              {fmt(Math.abs(unitMargin))}
-            </p>
-          </div>
-        )}
+        <div>
+          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+            💰 Harga Deal
+          </label>
+          <input
+            type="number"
+            value={unit.deal_price || ""}
+            onChange={(e) => onDealPriceChange(Number(e.target.value))}
+            onFocus={(e) => e.target.select()}
+            placeholder="Deal..."
+            className="w-full border border-gray-200 rounded-lg h-8 px-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition placeholder:text-gray-300"
+          />
+        </div>
       </div>
+
+      {/* ─ Est. Margin ─ */}
+      {unitMargin !== null && (
+        <div
+          className="border-t border-gray-100 px-3.5 py-1.5 flex items-center justify-end gap-2"
+          style={{ background: "#F8FAFC" }}
+        >
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+            Est. Margin
+          </span>
+          <span
+            className={`text-xs font-extrabold font-mono ${unitMargin >= 0 ? "text-emerald-600" : "text-red-500"
+              }`}
+          >
+            {unitMargin >= 0 ? "+" : ""}
+            {fmt(Math.abs(unitMargin))}
+          </span>
+        </div>
+      )}
 
       {/* ─ Replace panel ─ */}
       {showReplace && (
