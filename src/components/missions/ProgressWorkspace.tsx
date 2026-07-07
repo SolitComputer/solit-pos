@@ -14,8 +14,8 @@ type FilterKey = "ALL" | MissionStatus;
 const FILTERS: { key: FilterKey; label: string; status?: MissionStatus }[] = [
   { key: "ALL", label: "Semua" },
   { key: "PENDING", label: "Belum", status: "PENDING" },
-  { key: "IN_PROGRESS", label: "Berjalan", status: "IN_PROGRESS" },
-  { key: "SUBMITTED", label: "Menunggu ACC", status: "SUBMITTED" },
+  { key: "IN_PROGRESS", label: "On Progress", status: "IN_PROGRESS" },
+  { key: "SUBMITTED", label: "Audit", status: "SUBMITTED" },
   { key: "REJECTED", label: "Revisi", status: "REJECTED" },
 ];
 
