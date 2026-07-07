@@ -42,32 +42,37 @@ const IconPlus = () => (
     </svg>
 );
 const IconTrash = () => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
     </svg>
 );
 const IconCheck = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12" />
     </svg>
 );
 const IconClock = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" /><polyline points="12 7 12 12 15 14" />
     </svg>
 );
 const IconExternal = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
     </svg>
 );
+const IconInfo = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="shrink-0">
+        <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+);
 
-// ── Audit cell (one-way: sekali audit → terkunci) ────────────────────────────
+// ── Audit cell ────────────────────────────────────────────────────────────────
 function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
     if (entry.is_audited) {
         return (
             <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default whitespace-nowrap"
                 title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Sudah diaudit"}
             >
                 <IconCheck /> Sudah Audit
@@ -78,7 +83,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
         <button
             onClick={(ev) => { ev.stopPropagation(); onAudit(); }}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap"
             title="Klik untuk audit (tidak bisa dibatalkan)"
         >
             <IconClock /> {busy ? "Memproses..." : "Belum Audit"}
@@ -86,7 +91,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
     );
 }
 
-// ── Expense Modal (input manual — uang keluar saja) ──────────────────────────
+// ── Expense Modal ────────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const categories = Object.entries(EXPENSE_CATEGORIES);
 
@@ -202,26 +207,22 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     );
 }
 
-// ── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({
-    label, value, accent, hint, loading,
-}: {
-    label: string; value: string; accent: "dark" | "red" | "amber"; hint?: string; loading: boolean;
-}) {
-    const accentMap = {
-        dark: { bar: "bg-gray-900", text: "text-gray-900" },
-        red: { bar: "bg-red-500", text: "text-red-600" },
-        amber: { bar: "bg-amber-500", text: "text-amber-600" },
-    }[accent];
-
+// ── Period Toggle ─────────────────────────────────────────────────────────────
+function PeriodToggle({ value, onChange }: { value: "today" | "month"; onChange: (v: "today" | "month") => void }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className={`absolute top-0 left-0 h-full w-1 ${accentMap.bar}`} />
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-            <p className={`text-2xl font-black tracking-tight tabular-nums ${accentMap.text}`}>
-                {loading ? <span className="text-gray-300">—</span> : value}
-            </p>
-            {hint && <p className="text-[11px] text-gray-400 mt-1.5">{hint}</p>}
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 shrink-0">
+            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
+                <button
+                    key={val}
+                    onClick={() => onChange(val)}
+                    className={`px-3 py-1 rounded-md text-[11px] font-semibold transition ${value === val
+                        ? "bg-gray-900 text-white shadow-sm"
+                        : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                >
+                    {label}
+                </button>
+            ))}
         </div>
     );
 }
@@ -250,11 +251,10 @@ export default function CashflowPage() {
             .catch(() => setAllowed(false));
     }, []);
 
-    // silent = refresh background tanpa skeleton (dipakai polling & focus)
     const fetchData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const res = await fetch("/api/cashflow", { cache: "no-store" }); // ✅ hindari data basi
+            const res = await fetch("/api/cashflow", { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMasuk(json.data.masuk ?? []);
@@ -273,16 +273,13 @@ export default function CashflowPage() {
 
     useEffect(() => {
         if (!allowed) return;
-
         const interval = setInterval(() => {
             if (document.visibilityState === "visible") fetchData(true);
         }, 7000);
-
         const onFocus = () => fetchData(true);
         const onVisible = () => { if (document.visibilityState === "visible") fetchData(true); };
         window.addEventListener("focus", onFocus);
         document.addEventListener("visibilitychange", onVisible);
-
         return () => {
             clearInterval(interval);
             window.removeEventListener("focus", onFocus);
@@ -291,7 +288,7 @@ export default function CashflowPage() {
     }, [allowed, fetchData]);
 
     const toggleAudit = async (entry: Entry) => {
-        if (entry.is_audited) return; // one-way, guard tambahan
+        if (entry.is_audited) return;
         setAuditingId(entry.id);
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -314,7 +311,6 @@ export default function CashflowPage() {
         else alert(json.message || "Gagal menghapus");
     };
 
-    // ── Klik baris uang masuk → nge-link ke sumbernya ──
     const openSource = (e: Entry) => {
         if (e.direction !== "IN") return;
         if (e.source_type === "TRANSACTION" && e.source_id) {
@@ -339,44 +335,60 @@ export default function CashflowPage() {
     const rows = tab === "IN" ? masuk : keluar;
     const colCount = 8;
 
-    // ── Total uang masuk per periode (client-side, WIB) ──
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
+    // ── Kalkulasi per-periode client-side (WIB) ──────────────────────────────
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const monthPrefix = jakartaToday.slice(0, 7);
+
     const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
     const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
     const incomeValue = period === "today" ? incomeToday : incomeMonth;
+
+    const expenseToday = keluar.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
+    const expenseMonth = keluar.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
+    const expenseValue = period === "today" ? expenseToday : expenseMonth;
+
+    const saldoValue = incomeValue - expenseValue;
+    const periodLabel = period === "today" ? "Hari Ini" : "Bulan Ini";
 
     return (
         <DashboardLayout>
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={fetchData} />}
 
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-8 bg-gray-900 rounded-full" />
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Cashflow</h1>
-                            <p className="text-sm text-gray-500">Arus kas uang masuk & keluar · sejak 06 Jul 2026</p>
+            <div className="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-4">
+
+                {/* ── Header ───────────────────────────────────────────────── */}
+                <div className="flex items-center justify-between gap-3">
+                    {/* Title */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-1 h-7 bg-gray-900 rounded-full shrink-0" />
+                        <div className="min-w-0">
+                            <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight leading-none">Cashflow</h1>
+                            <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 truncate">Arus kas masuk & keluar · sejak 06 Jul 2026</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {/* Indikator live */}
-                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
-                            <span className="relative flex h-2 w-2">
+
+                    {/* Right actions */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Live badge */}
+                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700">
+                            <span className="relative flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                             </span>
-                            Live
+                            LIVE
                         </span>
+
+                        {/* Timestamp */}
                         {lastUpdated && (
-                            <span className="hidden md:inline text-[11px] text-gray-400 tabular-nums">
+                            <span className="hidden lg:inline-block text-[10px] text-gray-400 tabular-nums bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg font-mono">
                                 {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                             </span>
                         )}
+
+                        {/* Refresh */}
                         <button
                             onClick={() => fetchData()}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 bg-white hover:bg-gray-50 transition active:scale-95"
                             title={lastUpdated ? `Terakhir diperbarui ${lastUpdated.toLocaleTimeString("id-ID")}` : "Refresh"}
                         >
                             <IconRefresh />
@@ -385,167 +397,232 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
-                            </p>
-                            <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
-                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
-                            </p>
-                            <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
+                {/* ── Saldo Hero + Period Toggle ────────────────────────────── */}
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    {/* Top strip aksen */}
+                    <div className="h-1 bg-gradient-to-r from-gray-900 via-gray-700 to-gray-500" />
+                    <div className="p-4 sm:p-5">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            {/* Saldo */}
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                    💼 Saldo Cashflow · Semua Waktu
+                                </p>
+                                <p className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tight ${summary.saldo >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                                    {loading ? <span className="text-gray-200">——————</span> : fmtRupiah(summary.saldo)}
+                                </p>
+                                <p className="text-[11px] text-gray-400 mt-1.5">
+                                    Total masuk dikurangi keluar · akumulasi semua waktu
+                                </p>
+                            </div>
+
+                            {/* Period control */}
+                            <div className="flex flex-col items-end gap-1.5">
+                                <PeriodToggle value={period} onChange={setPeriod} />
+                                <p className="text-[10px] text-gray-400">Berlaku untuk kartu di bawah</p>
+                            </div>
                         </div>
-                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-                            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
-                                <button
-                                    key={val}
-                                    onClick={() => setPeriod(val)}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                        }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
+
+                        {/* Divider */}
+                        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3 sm:gap-4">
+                            {/* Masuk */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Masuk · {periodLabel}</p>
+                                    <p className="text-base sm:text-lg font-black tabular-nums text-emerald-600">
+                                        {loading ? <span className="text-gray-200">——</span> : fmtRupiah(incomeValue)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Keluar */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></svg>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide leading-none mb-1">Keluar · {periodLabel}</p>
+                                    <p className="text-base sm:text-lg font-black tabular-nums text-red-600">
+                                        {loading ? <span className="text-gray-200">——</span> : fmtRupiah(expenseValue)}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
-                    <StatCard
-                        label="Saldo Cashflow"
-                        value={fmtRupiah(summary.saldo)}
-                        accent="dark"
-                        hint="Total masuk dikurangi total keluar"
-                        loading={loading}
-                    />
-                    <StatCard
-                        label="Belum Diaudit"
-                        value={`${summary.belum_audit} entry`}
-                        accent="amber"
-                        hint="Menunggu verifikasi audit"
-                        loading={loading}
-                    />
-                </div>
-
-                {/* Tabs + Add */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+                {/* ── Tabs + Action Bar ─────────────────────────────────────── */}
+                <div className="flex items-center justify-between gap-3">
+                    {/* Tabs */}
+                    <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
                         {(["IN", "OUT"] as const).map((t) => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
-                                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${tab === t
+                                    ? "bg-gray-900 text-white shadow-sm"
+                                    : "text-gray-500 hover:bg-gray-50"
                                     }`}
                             >
-                                {t === "IN" ? `Uang Masuk (${masuk.length})` : `Uang Keluar (${keluar.length})`}
+                                {t === "IN" ? (
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 hidden sm:inline-block" />
+                                        Uang Masuk
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${tab === "IN" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                            {masuk.length}
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 hidden sm:inline-block" />
+                                        Uang Keluar
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${tab === "OUT" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                                            {keluar.length}
+                                        </span>
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
 
+                    {/* Add button */}
                     {tab === "OUT" && (
                         <button
                             onClick={() => setShowModal(true)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 transition"
+                            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 transition shadow-sm active:scale-95"
                         >
                             <IconPlus />
-                            Tambah Uang Keluar
+                            <span className="hidden xs:inline">Tambah</span>
+                            <span className="hidden sm:inline">Uang Keluar</span>
                         </button>
                     )}
                 </div>
 
-                {/* Info uang masuk otomatis */}
-                {tab === "IN" && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-[12px] text-blue-700">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0">
-                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                        </svg>
-                        Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> / <b>Service</b>. Uang masuk otomatis, tanpa input manual.
-                    </div>
-                )}
+                {/* ── Info banner uang masuk ────────────────────────────────── */}
+                
 
-                {/* Table */}
+                {/* ── Table ────────────────────────────────────────────────── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm" style={{ minWidth: 820 }}>
+                        <table className="w-full text-sm" style={{ minWidth: 780 }}>
                             <thead>
-                                <tr className="border-b border-gray-100 bg-gray-50/70">
-                                    {["Tanggal", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
+                                <tr className="border-b border-gray-100 bg-gray-50/80">
+                                    {[
+                                        { label: "Tanggal", align: "left" },
+                                        { label: "Sales / Sumber", align: "left" },
+                                        { label: "Kategori", align: "left" },
+                                        { label: "Nominal", align: "right" },
+                                        { label: "Keterangan", align: "left" },
+                                        { label: "Audit", align: "left" },
+                                        { label: "Diaudit Oleh", align: "left" },
+                                        { label: "", align: "right" },
+                                    ].map((h, i) => (
                                         <th
                                             key={i}
-                                            className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${h === "Nominal" ? "text-right" : "text-left"
-                                                } first:pl-5`}
+                                            className={`px-3 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap ${h.align === "right" ? "text-right" : "text-left"} ${i === 0 ? "pl-4 sm:pl-5" : ""}`}
                                         >
-                                            {h}
+                                            {h.label}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
+                                    Array.from({ length: 6 }).map((_, i) => (
                                         <tr key={i}>
                                             {Array.from({ length: colCount }).map((__, j) => (
-                                                <td key={j} className="px-3.5 py-3.5">
-                                                    <div className="h-3 rounded-full bg-gray-100 animate-pulse" style={{ width: j === 1 ? 120 : 60 }} />
+                                                <td key={j} className="px-3 py-3.5">
+                                                    <div className="h-2.5 rounded-full bg-gray-100 animate-pulse" style={{ width: j === 1 ? 120 : j === 4 ? 160 : 64, opacity: 1 - i * 0.12 }} />
                                                 </td>
                                             ))}
                                         </tr>
                                     ))
                                 ) : rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={colCount} className="px-3.5 py-16 text-center">
-                                            <div className="text-3xl mb-2 opacity-30">📭</div>
+                                        <td colSpan={colCount} className="px-4 py-16 text-center">
+                                            <div className="text-4xl mb-2.5 opacity-30">📭</div>
                                             <p className="text-sm text-gray-400 font-medium">
                                                 Belum ada data {tab === "IN" ? "uang masuk" : "uang keluar"}.
                                             </p>
                                         </td>
                                     </tr>
                                 ) : (
-                                    rows.map((e) => {
+                                    rows.map((e, idx) => {
                                         const clickable = e.direction === "IN";
                                         return (
                                             <tr
                                                 key={e.id}
                                                 onClick={() => clickable && openSource(e)}
-                                                className={`transition-colors ${clickable ? "cursor-pointer hover:bg-blue-50/50" : "hover:bg-gray-50/70"}`}
+                                                className={`transition-colors duration-100 ${clickable
+                                                    ? "cursor-pointer hover:bg-blue-50/40"
+                                                    : "hover:bg-gray-50/60"
+                                                    }`}
                                             >
-                                                <td className="pl-5 pr-3.5 py-3 text-[12px] text-gray-500 whitespace-nowrap">{fmtTanggal(e.tanggal)}</td>
-                                                <td className="px-3.5 py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="text-[13px] font-semibold text-gray-800">{e.nama}</span>
-                                                        {e.source_type !== "MANUAL" && (
-                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">AUTO</span>
-                                                        )}
-                                                    </div>
+                                                {/* Tanggal */}
+                                                <td className="pl-4 sm:pl-5 pr-3 py-3 text-[11px] text-gray-400 whitespace-nowrap font-mono tabular-nums">
+                                                    {fmtTanggal(e.tanggal)}
                                                 </td>
-                                                <td className="px-3.5 py-3">
-                                                    <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">
+
+                                                {/* Sales */}
+                                                <td className="px-3 py-3 max-w-[160px]">
+                                                    <p className="text-[12px] font-semibold text-gray-800 truncate leading-tight">
+                                                        {e.source_type === "MANUAL"
+                                                            ? (e.created_by_user?.name ?? e.nama)
+                                                            : e.nama}
+                                                    </p>
+                                                    {e.source_type === "TRANSACTION" && e.keterangan && (
+                                                        <p className="text-[10px] text-gray-400 leading-tight mt-0.5 truncate">
+                                                            {e.keterangan}
+                                                        </p>
+                                                    )}
+                                                </td>
+
+                                                {/* Kategori */}
+                                                <td className="px-3 py-3 whitespace-nowrap">
+                                                    <span className="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
                                                         {categoryLabel(e.direction, e.category)}
                                                     </span>
                                                 </td>
-                                                <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+
+                                                {/* Nominal */}
+                                                <td className={`px-3 py-3 text-right font-mono font-black text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                 </td>
-                                                <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px] truncate">{e.keterangan || "—"}</td>
-                                                <td className="px-3.5 py-3" onClick={(ev) => ev.stopPropagation()}>
+
+                                                {/* Keterangan */}
+                                                <td className="px-3 py-3 text-[11px] text-gray-400 max-w-[200px] truncate">
+                                                    {e.keterangan || <span className="text-gray-200">—</span>}
+                                                </td>
+
+                                                {/* Audit */}
+                                                <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} />
                                                 </td>
-                                                <td className="px-3.5 py-3 text-[11px] whitespace-nowrap">
+
+                                                {/* Diaudit oleh */}
+                                                <td className="px-3 py-3 text-[11px] whitespace-nowrap">
                                                     {e.audited_by_user?.name
-                                                        ? <span className="text-emerald-600" title="Diaudit oleh">🔍 {e.audited_by_user.name}</span>
-                                                        : <span className="text-gray-300">—</span>}
+                                                        ? <span className="text-emerald-600 font-medium">🔍 {e.audited_by_user.name}</span>
+                                                        : <span className="text-gray-200">—</span>}
                                                 </td>
-                                                <td className="px-3.5 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
+
+                                                {/* Actions */}
+                                                <td className="px-3 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
-                                                        <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
+                                                        <button
+                                                            onClick={() => deleteEntry(e)}
+                                                            className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                                            title="Hapus"
+                                                        >
                                                             <IconTrash />
                                                         </button>
                                                     ) : clickable ? (
-                                                        <span className="inline-flex text-gray-300" title="Buka sumber"><IconExternal /></span>
+                                                        <span className="inline-flex items-center justify-center w-6 h-6 text-gray-300 hover:text-blue-400 transition">
+                                                            <IconExternal />
+                                                        </span>
                                                     ) : null}
                                                 </td>
                                             </tr>
@@ -556,14 +633,24 @@ export default function CashflowPage() {
                         </table>
                     </div>
 
+                    {/* Table footer */}
                     {!loading && rows.length > 0 && (
-                        <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/40">
-                            <p className="text-[11px] text-gray-400 font-medium">
-                                Menampilkan {rows.length} entry {tab === "IN" ? "uang masuk" : "uang keluar"}
+                        <div className="px-4 sm:px-5 py-2.5 border-t border-gray-50 bg-gray-50/50 flex items-center justify-between gap-2">
+                            <p className="text-[10px] text-gray-400 font-medium">
+                                {rows.length} entri {tab === "IN" ? "uang masuk" : "uang keluar"}
                             </p>
+                            {tab === "OUT" && (
+                                <button
+                                    onClick={() => setShowModal(true)}
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 hover:text-gray-900 transition"
+                                >
+                                    <IconPlus /> Tambah
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
+
             </div>
         </DashboardLayout>
     );
