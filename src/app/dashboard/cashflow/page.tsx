@@ -206,12 +206,13 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 function StatCard({
     label, value, accent, hint, loading,
 }: {
-    label: string; value: string; accent: "dark" | "red" | "amber"; hint?: string; loading: boolean;
+    label: string; value: string; accent: "dark" | "red" | "amber" | "emerald"; hint?: string; loading: boolean;
 }) {
     const accentMap = {
-        dark: { bar: "bg-gray-900", text: "text-gray-900" },
-        red: { bar: "bg-red-500", text: "text-red-600" },
-        amber: { bar: "bg-amber-500", text: "text-amber-600" },
+        dark:    { bar: "bg-gray-900",   text: "text-gray-900"   },
+        red:     { bar: "bg-red-500",    text: "text-red-600"    },
+        amber:   { bar: "bg-amber-500",  text: "text-amber-600"  },
+        emerald: { bar: "bg-emerald-500", text: "text-emerald-600" },
     }[accent];
 
     return (
@@ -222,6 +223,33 @@ function StatCard({
                 {loading ? <span className="text-gray-300">—</span> : value}
             </p>
             {hint && <p className="text-[11px] text-gray-400 mt-1.5">{hint}</p>}
+        </div>
+    );
+}
+
+// ── Period Toggle (reusable mini pill) ────────────────────────────────────────
+function PeriodToggle({
+    value,
+    onChange,
+}: {
+    value: "today" | "month";
+    onChange: (v: "today" | "month") => void;
+}) {
+    return (
+        <div className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 shrink-0">
+            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
+                <button
+                    key={val}
+                    onClick={() => onChange(val)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${
+                        value === val
+                            ? "bg-gray-900 text-white shadow-sm"
+                            : "text-gray-500 hover:bg-gray-100"
+                    }`}
+                >
+                    {label}
+                </button>
+            ))}
         </div>
     );
 }
@@ -254,7 +282,7 @@ export default function CashflowPage() {
     const fetchData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const res = await fetch("/api/cashflow", { cache: "no-store" }); // ✅ hindari data basi
+            const res = await fetch("/api/cashflow", { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMasuk(json.data.masuk ?? []);
@@ -291,7 +319,7 @@ export default function CashflowPage() {
     }, [allowed, fetchData]);
 
     const toggleAudit = async (entry: Entry) => {
-        if (entry.is_audited) return; // one-way, guard tambahan
+        if (entry.is_audited) return;
         setAuditingId(entry.id);
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -339,19 +367,40 @@ export default function CashflowPage() {
     const rows = tab === "IN" ? masuk : keluar;
     const colCount = 8;
 
-    // ── Total uang masuk per periode (client-side, WIB) ──
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
-    const monthPrefix = jakartaToday.slice(0, 7);
-    const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
-    const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
+    // ── Kalkulasi per-periode client-side (WIB) ──────────────────────────────
+    // Keduanya dihitung dari array lokal supaya toggle period ngaruh ke dua kartu sekaligus.
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // "yyyy-mm-dd"
+    const monthPrefix  = jakartaToday.slice(0, 7); // "yyyy-mm"
+
+    // Uang masuk per periode
+    const incomeToday = masuk.reduce(
+        (s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0
+    );
+    const incomeMonth = masuk.reduce(
+        (s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0
+    );
     const incomeValue = period === "today" ? incomeToday : incomeMonth;
+
+    // ── Uang keluar per periode — dihitung dari array `keluar` (sama polanya) ──
+    const expenseToday = keluar.reduce(
+        (s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0
+    );
+    const expenseMonth = keluar.reduce(
+        (s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0
+    );
+    const expenseValue = period === "today" ? expenseToday : expenseMonth;
+
+    // ── Saldo per periode (masuk - keluar, scope sama) ────────────────────────
+    const saldoValue = incomeValue - expenseValue;
+
+    const periodLabel = period === "today" ? "Hari Ini" : "Bulan Ini";
 
     return (
         <DashboardLayout>
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={fetchData} />}
 
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
-                {/* Header */}
+                {/* ── Header ── */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-1.5 h-8 bg-gray-900 rounded-full" />
@@ -385,45 +434,46 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
+                {/* ── Hero: Saldo Cashflow (paling atas) ── */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
+                                💼 Saldo Cashflow — {periodLabel}
                             </p>
-                            <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
-                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
+                            <p className={`text-3xl sm:text-4xl font-black tracking-tight tabular-nums ${saldoValue >= 0 ? "text-gray-900" : "text-red-600"}`}>
+                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(saldoValue)}
                             </p>
-                            <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
+                            <p className="text-[11px] text-gray-400 mt-1.5">
+                                Uang masuk dikurangi uang keluar · {periodLabel.toLowerCase()}
+                            </p>
                         </div>
-                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-                            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
-                                <button
-                                    key={val}
-                                    onClick={() => setPeriod(val)}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                        }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
+                        {/* Toggle period — satu toggle, ngaruh ke semua kartu */}
+                        <div className="flex flex-col items-end gap-1.5">
+                            <PeriodToggle value={period} onChange={setPeriod} />
+                            <p className="text-[10px] text-gray-400">Filter berlaku untuk semua kartu</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
+                {/* ── Summary Cards: Uang Masuk | Uang Keluar | Belum Audit ── */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
                     <StatCard
-                        label="Saldo Cashflow"
-                        value={fmtRupiah(summary.saldo)}
-                        accent="dark"
-                        hint="Total masuk dikurangi total keluar"
+                        label={`💰 Uang Masuk — ${periodLabel}`}
+                        value={fmtRupiah(incomeValue)}
+                        accent="emerald"
+                        hint="Otomatis dari transaksi & service"
                         loading={loading}
                     />
                     <StatCard
-                        label="Belum Diaudit"
+                        label={`🔻 Uang Keluar — ${periodLabel}`}
+                        value={fmtRupiah(expenseValue)}
+                        accent="red"
+                        hint="Manual & biaya operasional"
+                        loading={loading}
+                    />
+                    <StatCard
+                        label="⏳ Belum Diaudit"
                         value={`${summary.belum_audit} entry`}
                         accent="amber"
                         hint="Menunggu verifikasi audit"
@@ -431,15 +481,16 @@ export default function CashflowPage() {
                     />
                 </div>
 
-                {/* Tabs + Add */}
+                {/* ── Tabs + Add ── */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
                         {(["IN", "OUT"] as const).map((t) => (
                             <button
                                 key={t}
                                 onClick={() => setTab(t)}
-                                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                    }`}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
+                                    tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                }`}
                             >
                                 {t === "IN" ? `Uang Masuk (${masuk.length})` : `Uang Keluar (${keluar.length})`}
                             </button>
@@ -457,7 +508,7 @@ export default function CashflowPage() {
                     )}
                 </div>
 
-                {/* Info uang masuk otomatis */}
+                {/* ── Info uang masuk otomatis ── */}
                 {tab === "IN" && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-[12px] text-blue-700">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0">
@@ -467,7 +518,7 @@ export default function CashflowPage() {
                     </div>
                 )}
 
-                {/* Table */}
+                {/* ── Table ── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm" style={{ minWidth: 820 }}>
@@ -476,8 +527,9 @@ export default function CashflowPage() {
                                     {["Tanggal", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
                                         <th
                                             key={i}
-                                            className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${h === "Nominal" ? "text-right" : "text-left"
-                                                } first:pl-5`}
+                                            className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${
+                                                h === "Nominal" ? "text-right" : "text-left"
+                                            } first:pl-5`}
                                         >
                                             {h}
                                         </th>
