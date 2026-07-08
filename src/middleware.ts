@@ -72,6 +72,7 @@ const SESSION_COOKIES = [
   "face_verified",
   "attendance_skipped",
   "day_off_today",
+  "fl_check",   
 ];
 
 function clearSessionAndRedirect(url: URL): NextResponse {
@@ -172,7 +173,6 @@ export async function middleware(request: NextRequest) {
   const isPageRoute = !pathname.startsWith("/api/");
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
-  // ✅ throttle cek force_logout: max 1x / 5 menit per sesi
   let shouldRefreshFlCookie = false;
 
   if (isPageRoute) {
@@ -184,11 +184,11 @@ export async function middleware(request: NextRequest) {
       return clearSessionAndRedirect(loginUrl);
     }
 
+    // ✅ throttle cek force_logout: max 1x per 5 menit per sesi
     const nowSec = Math.floor(Date.now() / 1000);
     const lastFlCheck = Number(request.cookies.get("fl_check")?.value ?? 0);
     const FL_CHECK_INTERVAL = 300; // 5 menit
 
-    // hanya query DB kalau sudah lewat interval → hemat invocation & CPU
     if (nowSec - lastFlCheck > FL_CHECK_INTERVAL) {
       shouldRefreshFlCookie = true;
       try {
@@ -270,18 +270,6 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-user-role", user.role);
   response.headers.set("x-user-roles", userRoles.join(","));
   response.headers.set("x-user-name", user.name);
-
-  // ✅ tandai kapan terakhir cek force_logout
-  if (shouldRefreshFlCookie) {
-    response.cookies.set("fl_check", String(Math.floor(Date.now() / 1000)), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 600,
-    });
-  }
-
   return response;
 }
 
