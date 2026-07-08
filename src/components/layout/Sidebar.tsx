@@ -805,6 +805,34 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
+  // ── PURCHASING ─────────────────────────────────────────────────────────────
+  PURCHASING: [
+    {
+      label: "Overview",
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI, ITEM_LEMBUR,
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        ITEM_CASHFLOW,
+        ITEM_USERS,
+        ITEM_MISSIONS,
+      ],
+    },
+    {
+      label: "Inventaris",
+      items: [
+        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+      ],
+    },
+    {
+      label: "Transaksi",
+      items: [
+        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+      ],
+    },
+  ],
+
   // ── PENGELOLA BARANG ───────────────────────────────────────────────────────
   PENGELOLA_BARANG: [
     {
@@ -1111,8 +1139,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
   CREW_SALES: { label: "Crew Sales", className: "bg-sky-50 text-sky-700" },
   ACCOUNTING: { label: "Accounting", className: "bg-amber-50 text-amber-700" },
-  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" },
-  KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
+  PURCHASING: { label: "Purchasing", className: "bg-violet-50 text-violet-600" },
+  PENGELOLA_BARANG: { label: "Pengelola Barang", className: "bg-blue-50 text-blue-700" }, KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola Barang", className: "bg-blue-50 text-blue-800" },
   TEKNISI: { label: "Teknisi", className: "bg-orange-50 text-orange-700" },
   KEPALA_TEKNISI: { label: "Kepala Teknisi", className: "bg-red-50 text-red-700" },
   PENGANTARAN: { label: "Pengantaran", className: "bg-teal-50 text-teal-700" },

@@ -24,13 +24,14 @@ interface User {
 const ALL_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-  "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",    // ← ADD PURCHASING
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",      // ← NEW
+  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
   "PKL_PENGELOLA_BARANG",
   "CUSTOMER_SERVICE",
 ];
@@ -48,7 +49,7 @@ const ROLE_LABEL: Record<string, string> = {
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
   PKL_ONPOINT: "PKL Onpoint", PKL_TEKNISI: "PKL Teknisi", PKL_KONTEN: "PKL Content Creator",
   PKL_PENGANTARAN: "PKL Pengantaran", CUSTOMER_SERVICE: "Customer Service", PKL_CUSTOMER_SERVICE: "PKL Customer Service",     // ← NEW
-  PKL_PENGELOLA_BARANG: "PKL Pengelola Barang",
+  PKL_PENGELOLA_BARANG: "PKL Pengelola Barang", PURCHASING: "Purchasing",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -63,7 +64,7 @@ const ROLE_ICON: Record<string, string> = {
   PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
   PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
   CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",     // ← NEW
-  PKL_PENGELOLA_BARANG: "🎓",
+  PKL_PENGELOLA_BARANG: "🎓", PURCHASING: "🛒",
 };
 
 const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
@@ -97,6 +98,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
   PKL_CUSTOMER_SERVICE: PKL_BADGE,     // ← NEW
   PKL_PENGELOLA_BARANG: PKL_BADGE,
+  PURCHASING: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -113,7 +115,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
   PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
   CUSTOMER_SERVICE: "#0369a1", PKL_CUSTOMER_SERVICE: "#b45309",     // ← NEW
-  PKL_PENGELOLA_BARANG: "#b45309",
+  PKL_PENGELOLA_BARANG: "#b45309", PURCHASING: "#9333ea",
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -179,7 +181,7 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </optgroup>
       <optgroup label="— Operasional —">
-        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
+        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>
@@ -377,16 +379,21 @@ function MultiRoleSelect({
   const ALL_ROLE_GROUPS = [
     { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
     { label: "Management", roles: ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
-    { label: "Operasional", roles: ["CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"] },
+    {
+      label: "Operasional",
+      roles: [
+        "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",    // ← ADD PURCHASING
+        "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN",
+        "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
+      ]
+    },
     { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
     { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
     {
       label: "Magang (PKL)", roles: [
         "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
         "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-        "PKL_PENGANTARAN",
-        "PKL_CUSTOMER_SERVICE",
-        "PKL_PENGELOLA_BARANG",
+        "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
       ]
     },
   ];

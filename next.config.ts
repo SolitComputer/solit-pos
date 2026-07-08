@@ -10,34 +10,35 @@ const withPWA = withPWAInit({
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
 
-  // ✅ FIX cache basi: SW baru langsung gantiin yang lama tiap deploy
   workboxOptions: {
     skipWaiting: true,
     clientsClaim: true,
+    navigateFallback: undefined,
+    // ✅ exclude .rsc & map & build-manifest dari precache (di sini, bukan di atas)
+    exclude: [/\.map$/, /\.rsc$/, /app-build-manifest\.json$/],
     runtimeCaching: [
       {
-        // 1. Halaman (HTML/RSC): SELALU dari network → cegah RSC mentah / versi basi
-        urlPattern: ({ request }: { request: Request }) =>
-          request.mode === "navigate",
+        // Navigasi + request RSC → selalu network
+        urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+          request.mode === "navigate" ||
+          request.headers.get("RSC") === "1" ||
+          url.search.includes("_rsc="),
         handler: "NetworkOnly",
       },
       {
-        // 2. API routes: JANGAN pernah di-cache → data POS selalu real-time
         urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith("/api/"),
         handler: "NetworkOnly",
       },
       {
-        // 3. Aset statis Next.js (JS/CSS build): boleh cache, ambil dari cache dulu
         urlPattern: ({ url }: { url: URL }) =>
           url.pathname.startsWith("/_next/static/"),
         handler: "CacheFirst",
         options: {
           cacheName: "next-static",
-          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 hari
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
         },
       },
       {
-        // 4. Gambar & font: cache biar cepat, tapi tetap update di background
         urlPattern: ({ request }: { request: Request }) =>
           ["image", "font"].includes(request.destination),
         handler: "StaleWhileRevalidate",
