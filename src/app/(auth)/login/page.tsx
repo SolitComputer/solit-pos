@@ -68,7 +68,8 @@ function LoginInner() {
       }
 
       setTimeout(() => {
-        window.location.href = result.redirect ?? "/dashboard";
+        const target = result.redirect ?? "/dashboard";
+        window.location.replace(target + "?_cb=" + Date.now());
       }, 300);
     } catch {
       setError("Terjadi kesalahan koneksi");

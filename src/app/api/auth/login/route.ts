@@ -292,6 +292,9 @@ export async function POST(request: Request) {
             { status: 200 }
         );
 
+        response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.headers.set("Pragma", "no-cache");
+
         // Clear attendance cookies lama
         const attendanceCookiesToClear = [
             "face_attended",
