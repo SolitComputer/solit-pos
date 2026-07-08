@@ -27,10 +27,10 @@ function getJoinedName(joined: any): string | null {
 // ── Sync transaksi & service → cashflow_entries ────────────────────────────
 async function syncDerivedEntries(supabase: SupabaseClient) {
 
-    // ── 1. Sync transaksi PAID ─────────────────────────────────────────────────
+    // ── 1. Sync transaksi PAID ─────────────────────────────────────────────
     const { data: transactions, error: txError } = await supabase
         .from("transactions")
-        .select("invoice_number, customer_name, deal_price, amount, created_at, paid_at, status")
+        .select("invoice_number, customer_name, sales_name, deal_price, amount, created_at, paid_at, status")
         .eq("status", "PAID")
         .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
@@ -57,10 +57,12 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
                 return {
                     direction: "IN",
                     category: "PENJUALAN_LAPTOP",
-                    nama: (t.customer_name as string) || "—",
+                    // ✅ nama = sales yang melakukan transaksi
+                    nama: (t.sales_name as string) || "Sales",
                     nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
                     modal: null,
-                    keterangan: `Penjualan laptop · ${t.invoice_number}`,
+                    // ✅ customer masuk ke keterangan
+                    keterangan: `Penjualan laptop · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
                     tanggal,
                     source_type: "TRANSACTION",
                     source_id: t.invoice_number as string,
@@ -83,39 +85,36 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         }
     }
 
-    // ── 2. Sync service DONE ───────────────────────────────────────────────────
-    // Coba dengan join dulu. Kalau FK-nya tidak match, fallback ke query tanpa join.
+    // ── 2. Sync service DONE / SUDAH_DIAMBIL ──────────────────────────────
     const { data: services, error: svcError } = await supabase
         .from("service_orders")
         .select(`
             id,
-            customer_name,
-            service_fee,
-            total_cost,
-            amount,
+            nama,
+            payment_amount,
+            payment_method,
+            tanggal_selesai,
+            tanggal_diambil,
             created_at,
-            completed_at,
-            done_at,
             status,
-            completed_by,
-            done_by,
-            assigned_to,
-            completed_by_user:users!service_orders_completed_by_fkey(id, name),
-            done_by_user:users!service_orders_done_by_fkey(id, name),
-            assigned_to_user:users!service_orders_assigned_to_fkey(id, name)
+            dikerjakan_by,
+            dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
         `)
-        .eq("status", "DONE")
+        .in("status", ["DONE", "SUDAH_DIAMBIL"])
+        .not("payment_amount", "is", null)
+        .gt("payment_amount", 0)
         .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
     if (svcError) {
-        console.error("[cashflow sync] fetch service (with join) error:", svcError.message);
-        console.log("[cashflow sync] retrying without join...");
+        console.error("[cashflow sync] fetch service error:", svcError.message);
 
-        // Fallback: query tanpa join
+        // Fallback tanpa join
         const { data: servicesFallback, error: svcFbError } = await supabase
             .from("service_orders")
-            .select("id, customer_name, service_fee, total_cost, amount, created_at, completed_at, done_at, status")
-            .eq("status", "DONE")
+            .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, created_at, status, dikerjakan_by")
+            .in("status", ["DONE", "SUDAH_DIAMBIL"])
+            .not("payment_amount", "is", null)
+            .gt("payment_amount", 0)
             .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
         if (svcFbError) {
@@ -124,22 +123,11 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             await syncServiceEntries(supabase, servicesFallback, new Map());
         }
     } else if (services && services.length > 0) {
-        // ✅ FIX: Gunakan helper getJoinedName() agar tidak error saat Supabase
-        // menginfer relasi FK sebagai array ({ id, name }[]) bukan object tunggal.
         const technicianNameMap = new Map<string, string>();
         for (const svc of services as any[]) {
-            const completedName = getJoinedName(svc.completed_by_user);
-            const doneName = getJoinedName(svc.done_by_user);
-            const assignedName = getJoinedName(svc.assigned_to_user);
-
-            if (svc.completed_by && completedName) {
-                technicianNameMap.set(svc.completed_by as string, completedName);
-            }
-            if (svc.done_by && doneName) {
-                technicianNameMap.set(svc.done_by as string, doneName);
-            }
-            if (svc.assigned_to && assignedName) {
-                technicianNameMap.set(svc.assigned_to as string, assignedName);
+            const techName = getJoinedName(svc.dikerjakan_by_user);
+            if (svc.dikerjakan_by && techName) {
+                technicianNameMap.set(svc.dikerjakan_by as string, techName);
             }
         }
         await syncServiceEntries(supabase, services as any[], technicianNameMap);
@@ -164,42 +152,36 @@ async function syncServiceEntries(
     const newSvcEntries = services
         .filter((s: any) => !existingSvcIds.has(String(s.id)))
         .map((s: any) => {
-            // ✅ Nama teknisi: prioritas completed_by > done_by > assigned_to
+            // ✅ Nama teknisi dari map atau fallback joined object
             let techName = "Teknisi";
-            if (s.completed_by && technicianNameMap.has(s.completed_by as string)) {
-                techName = technicianNameMap.get(s.completed_by as string)!;
-            } else if (s.done_by && technicianNameMap.has(s.done_by as string)) {
-                techName = technicianNameMap.get(s.done_by as string)!;
-            } else if (s.assigned_to && technicianNameMap.has(s.assigned_to as string)) {
-                techName = technicianNameMap.get(s.assigned_to as string)!;
+            if (s.dikerjakan_by && technicianNameMap.has(s.dikerjakan_by as string)) {
+                techName = technicianNameMap.get(s.dikerjakan_by as string)!;
             } else {
-                // Fallback langsung dari joined object (sudah di-handle getJoinedName sebelumnya)
-                const completedName = getJoinedName(s.completed_by_user);
-                const doneName = getJoinedName(s.done_by_user);
-                const assignedName = getJoinedName(s.assigned_to_user);
-                techName = completedName ?? doneName ?? assignedName ?? "Teknisi";
+                const joinedName = getJoinedName(s.dikerjakan_by_user);
+                if (joinedName) techName = joinedName;
             }
 
-            const nominal = Math.round(
-                Number(s.service_fee ?? s.total_cost ?? s.amount ?? 0)
-            );
+            const nominal = Math.round(Number(s.payment_amount ?? 0));
 
-            const refDate = (s.completed_at || s.done_at || s.created_at) as string;
+            const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.created_at) as string;
             const tanggal = new Date(refDate).toLocaleDateString("en-CA", {
                 timeZone: "Asia/Jakarta",
             });
 
+            // ✅ nama = teknisi, keterangan = customer + payment method service
             return {
                 direction: "IN",
                 category: "SERVICE",
                 nama: techName,
                 nominal,
                 modal: null,
-                keterangan: `Service · ${(s.customer_name as string) || "—"}`,
+                keterangan: `Service · ${(s.nama as string) || "—"} · ${(s.payment_method as string) || "—"}`,
                 tanggal,
                 source_type: "SERVICE",
                 source_id: String(s.id),
                 is_audited: false,
+                // ✅ payment_method selalu null — cashflow_entries hanya terima CASH/SALDO
+                // method asli disimpan di keterangan
                 payment_method: null,
             };
         })
