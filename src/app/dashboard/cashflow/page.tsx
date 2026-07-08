@@ -457,7 +457,9 @@ export default function CashflowPage() {
     const [keluar, setKeluar] = useState<Entry[]>([]);
     const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0 });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [period, setPeriod] = useState<"today" | "month">("today");
+    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
+    const [customFrom, setCustomFrom] = useState("");
+    const [customTo, setCustomTo] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [showFilter, setShowFilter] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
@@ -579,12 +581,32 @@ export default function CashflowPage() {
     // Reset ke halaman 1 saat ganti tab atau filter berubah
     useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
-    // ── Total uang masuk per periode (client-side, WIB) ──
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
+    // ── Helper: cek apakah tanggal entry masuk dalam periode ──
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const jakartaNow = new Date();
+    const weekDay = jakartaNow.getDay();
+    const weekStart = new Date(jakartaNow);
+    weekStart.setDate(jakartaNow.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
+    const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const monthPrefix = jakartaToday.slice(0, 7);
-    const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
-    const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
-    const incomeValue = period === "today" ? incomeToday : incomeMonth;
+
+    const inPeriod = (tanggal: string) => {
+        if (period === "today") return tanggal === jakartaToday;
+        if (period === "week") return tanggal >= weekStartStr && tanggal <= jakartaToday;
+        if (period === "month") return (tanggal || "").slice(0, 7) === monthPrefix;
+        // custom
+        if (customFrom && tanggal < customFrom) return false;
+        if (customTo && tanggal > customTo) return false;
+        return !!(customFrom || customTo); // at least one must be set
+    };
+
+    const incomeValue = masuk.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
+    const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
+
+    const periodLabel = period === "today" ? "Hari Ini"
+        : period === "week" ? "Minggu Ini"
+            : period === "month" ? "Bulan Ini"
+                : (customFrom || customTo) ? `${customFrom ? fmtTanggal(customFrom) : "..."} — ${customTo ? fmtTanggal(customTo) : "..."}` : "Custom";
 
     return (
         <DashboardLayout>
@@ -625,50 +647,81 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
+                {/* Hero: Saldo Cashflow */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
+                                💰 Saldo Cashflow · Semua Waktu
                             </p>
-                            <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
-                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
+                            <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">
+                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(summary.saldo)}
                             </p>
-                            <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
+                            <p className="text-[11px] text-gray-400 mt-1.5">Total masuk dikurangi keluar · akumulasi semua waktu</p>
                         </div>
-                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-                            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
-                                <button
-                                    key={val}
-                                    onClick={() => setPeriod(val)}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                        }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+                                {([["today", "Hari Ini"], ["week", "Minggu Ini"], ["month", "Bulan Ini"], ["custom", "Filter Tanggal"]] as [typeof period, string][]).map(([val, label]) => (
+                                    <button
+                                        key={val}
+                                        onClick={() => setPeriod(val)}
+                                        className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {period === "custom" && (
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="date"
+                                        value={customFrom}
+                                        onChange={(e) => setCustomFrom(e.target.value)}
+                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition"
+                                    />
+                                    <span className="text-xs text-gray-400">—</span>
+                                    <input
+                                        type="date"
+                                        value={customTo}
+                                        onChange={(e) => setCustomTo(e.target.value)}
+                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
+                    <p className="text-[11px] text-gray-400 mt-2">Berlaku untuk kartu di bawah</p>
                 </div>
 
-                {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
-                    <StatCard
-                        label="Saldo Cashflow"
-                        value={fmtRupiah(summary.saldo)}
-                        accent="dark"
-                        hint="Total masuk dikurangi total keluar"
-                        loading={loading}
-                    />
-                    <StatCard
-                        label="Belum Diaudit"
-                        value={`${summary.belum_audit} entry`}
-                        accent="amber"
-                        hint="Menunggu verifikasi audit"
-                        loading={loading}
-                    />
+                {/* Masuk & Keluar cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Masuk */}
+                    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <div className="absolute top-0 left-0 h-full w-1 bg-emerald-500" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold">↑</div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Masuk · {periodLabel}</p>
+                                <p className="text-xl font-black text-emerald-600 tabular-nums tracking-tight">
+                                    {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Keluar */}
+                    <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <div className="absolute top-0 left-0 h-full w-1 bg-red-500" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-red-50 text-red-600 flex items-center justify-center text-lg font-bold">↓</div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Keluar · {periodLabel}</p>
+                                <p className="text-xl font-black text-red-600 tabular-nums tracking-tight">
+                                    {loading ? <span className="text-gray-300">—</span> : fmtRupiah(expenseValue)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Tabs + Filter + Add */}
