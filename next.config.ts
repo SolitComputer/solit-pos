@@ -5,20 +5,19 @@ console.log("PWA Loaded");
 
 const withPWA = withPWAInit({
   dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  // ✅ MATIKAN cache navigasi/RSC — ini akar 2 bug tadi
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
 
   workboxOptions: {
     skipWaiting: true,
     clientsClaim: true,
-    navigateFallback: undefined,
-    // ✅ exclude .rsc & map & build-manifest dari precache (di sini, bukan di atas)
-    exclude: [/\.map$/, /\.rsc$/, /app-build-manifest\.json$/],
     runtimeCaching: [
       {
-        // Navigasi + request RSC → selalu network
+        // Navigasi + RSC → SELALU network, JANGAN cache
+        // (biar middleware absensi selalu jalan)
         urlPattern: ({ request, url }: { request: Request; url: URL }) =>
           request.mode === "navigate" ||
           request.headers.get("RSC") === "1" ||
