@@ -72,7 +72,7 @@ const SESSION_COOKIES = [
   "face_verified",
   "attendance_skipped",
   "day_off_today",
-  "fl_check",   
+  "fl_check",
 ];
 
 function clearSessionAndRedirect(url: URL): NextResponse {
@@ -105,6 +105,11 @@ function getAutoLogoutThreshold(): number {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const url = request.nextUrl.clone();
+  if (url.searchParams.has("_cb")) {
+    url.searchParams.delete("_cb");
+    return NextResponse.redirect(url);
+  }
   const token = request.cookies.get("token")?.value;
 
   // ── Public routes ──────────────────────────────────────────────────────────

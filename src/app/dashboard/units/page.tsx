@@ -976,11 +976,24 @@ export default function AllUnitsPage() {
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            {/* Total Modal = Sparepart + Modal, reaktif */}
+                                                            {/* Total Modal = Sparepart + Modal, reaktif — merah kalau melebihi harga jual (potensi rugi) */}
                                                             <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                                                                <span className="text-xs font-semibold text-violet-700">
+                                                                <span
+                                                                    className={`text-xs font-semibold ${unit.selling_price > 0 && totalUnitModal > unit.selling_price ? "text-red-600" : "text-violet-700"
+                                                                        }`}
+                                                                    title={
+                                                                        unit.selling_price > 0 && totalUnitModal > unit.selling_price
+                                                                            ? "Total modal melebihi harga jual — unit ini berpotensi rugi"
+                                                                            : undefined
+                                                                    }
+                                                                >
                                                                     {fmt(totalUnitModal)}
                                                                 </span>
+                                                                {unit.selling_price > 0 && totalUnitModal > unit.selling_price && (
+                                                                    <p className="text-[9px] text-red-500 font-semibold leading-tight mt-0.5">
+                                                                        ⚠ Rugi
+                                                                    </p>
+                                                                )}
                                                             </td>
                                                         </>
                                                     )}
