@@ -1,21 +1,131 @@
 export default function Loading() {
   return (
-    <div className="h-screen flex items-center justify-center bg-slate-950">
-      <div className="text-center">
-        <img
-          src="/assets/solit03.jpeg"
-          alt="Solit POS"
-          className="w-24 h-24 rounded-2xl mx-auto animate-pulse"
-        />
+    <div className="h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden">
+      {/* Animated grid background */}
+      <div className="absolute inset-0 bg-grid-pattern animate-grid-move opacity-[0.15]" />
 
-        <h1 className="text-white text-xl font-bold mt-4">
-          Solit POS
-        </h1>
-
-        <p className="text-slate-400 text-sm mt-2">
-          Inventory & Payment System
-        </p>
+      {/* Ambient glow blobs */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl animate-pulse-slow-delayed translate-x-20" />
+        <div className="absolute w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse-slow-delayed -translate-x-20" />
       </div>
+
+      {/* Vignette */}
+      <div className="absolute inset-0 bg-radial-vignette pointer-events-none" />
+
+      <div className="text-center relative z-10 animate-fade-scale-in">
+        {/* Glass card wrapper */}
+        <div className="px-10 py-10 rounded-3xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] shadow-2xl">
+          {/* Logo with rotating gradient ring + orbiting dot */}
+          <div className="relative w-28 h-28 mx-auto mb-2">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500 via-indigo-500 to-cyan-400 animate-spin-slow blur-[3px] opacity-80" />
+            <div className="absolute inset-[3px] rounded-2xl bg-slate-950 flex items-center justify-center overflow-hidden shadow-inner">
+              <img
+                src="/assets/solit03.jpeg"
+                alt="Solit POS"
+                className="w-full h-full object-cover rounded-2xl animate-fade-scale"
+              />
+            </div>
+            {/* Orbiting particle */}
+            <div className="absolute inset-0 animate-orbit">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_2px_rgba(34,211,238,0.8)] absolute -top-1 left-1/2 -translate-x-1/2" />
+            </div>
+          </div>
+
+          <h1 className="text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-200 to-white bg-[length:200%_auto] animate-shimmer text-2xl font-bold mt-6 tracking-tight">
+            Solit POS
+          </h1>
+
+          <p className="text-slate-400 text-sm mt-2 animate-fade-up-delayed">
+            Inventory & Payment System
+          </p>
+
+          {/* Progress bar */}
+          <div className="w-48 h-1 mx-auto mt-6 rounded-full bg-white/[0.06] overflow-hidden animate-fade-up-delayed">
+            <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 animate-progress-slide" />
+          </div>
+
+          {/* Animated dots */}
+          <div className="flex items-center justify-center gap-1.5 mt-4 animate-fade-up-delayed">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce-dot" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce-dot-delay-1" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce-dot-delay-2" />
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        .bg-grid-pattern {
+          background-image:
+            linear-gradient(to right, rgba(255,255,255,0.4) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255,255,255,0.4) 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+        .bg-radial-vignette {
+          background: radial-gradient(circle at center, transparent 0%, rgba(2,6,23,0.6) 100%);
+        }
+
+        @keyframes grid-move {
+          from { background-position: 0 0, 0 0; }
+          to { background-position: 40px 40px, 40px 40px; }
+        }
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes orbit {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.15); }
+        }
+        @keyframes fade-scale {
+          from { opacity: 0; transform: scale(0.85); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fade-scale-in {
+          from { opacity: 0; transform: scale(0.92) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes progress-slide {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(150%); }
+          100% { transform: translateX(320%); }
+        }
+        @keyframes bounce-dot {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+
+        .animate-grid-move { animation: grid-move 3s linear infinite; }
+        .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+        .animate-orbit { animation: orbit 2.5s linear infinite; }
+        .animate-pulse-slow { animation: pulse-slow 5s ease-in-out infinite; }
+        .animate-pulse-slow-delayed { animation: pulse-slow 5s ease-in-out infinite; animation-delay: 1.5s; }
+        .animate-fade-scale { animation: fade-scale 0.6s ease-out forwards; }
+        .animate-fade-scale-in { animation: fade-scale-in 0.5s ease-out forwards; }
+        .animate-fade-up { animation: fade-up 0.6s ease-out 0.2s both; }
+        .animate-fade-up-delayed { animation: fade-up 0.6s ease-out 0.4s both; }
+        .animate-shimmer {
+          background-size: 200% auto;
+          animation: shimmer 3s linear infinite;
+        }
+        .animate-progress-slide { animation: progress-slide 1.8s ease-in-out infinite; }
+        .animate-bounce-dot { animation: bounce-dot 1.2s ease-in-out infinite; }
+        .animate-bounce-dot-delay-1 { animation: bounce-dot 1.2s ease-in-out infinite; animation-delay: 0.15s; }
+        .animate-bounce-dot-delay-2 { animation: bounce-dot 1.2s ease-in-out infinite; animation-delay: 0.3s; }
+      `}</style>
     </div>
   );
 }
