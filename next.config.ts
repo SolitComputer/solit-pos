@@ -9,6 +9,45 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
+
+  // ✅ FIX cache basi: SW baru langsung gantiin yang lama tiap deploy
+  workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
+    runtimeCaching: [
+      {
+        // 1. Halaman (HTML/RSC): SELALU dari network → cegah RSC mentah / versi basi
+        urlPattern: ({ request }: { request: Request }) =>
+          request.mode === "navigate",
+        handler: "NetworkOnly",
+      },
+      {
+        // 2. API routes: JANGAN pernah di-cache → data POS selalu real-time
+        urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith("/api/"),
+        handler: "NetworkOnly",
+      },
+      {
+        // 3. Aset statis Next.js (JS/CSS build): boleh cache, ambil dari cache dulu
+        urlPattern: ({ url }: { url: URL }) =>
+          url.pathname.startsWith("/_next/static/"),
+        handler: "CacheFirst",
+        options: {
+          cacheName: "next-static",
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }, // 30 hari
+        },
+      },
+      {
+        // 4. Gambar & font: cache biar cepat, tapi tetap update di background
+        urlPattern: ({ request }: { request: Request }) =>
+          ["image", "font"].includes(request.destination),
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "assets",
+          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+    ],
+  },
 });
 
 const nextConfig: NextConfig = {
@@ -22,9 +61,7 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
-        // Pertahankan fallback yang sudah ada (kalau ada)
         ...config.resolve.fallback,
-        // Node.js built-ins yang dipakai face-api.js tapi tidak tersedia di browser
         fs: false,
         path: false,
         crypto: false,
