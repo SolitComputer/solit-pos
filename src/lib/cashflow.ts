@@ -1,9 +1,12 @@
+// src/lib/cashflow.ts
+
 export type CashflowDirection = "IN" | "OUT";
 
-export const CASHFLOW_START_DATE = "2026-07-06";
-export const CASHFLOW_CUTOFF_ISO = "2026-07-06T00:00:00+07:00";
+// ── Tanggal mulai cashflow: 08 Jul 2026 ───────────────────────────────────────
+export const CASHFLOW_START_DATE = "2026-07-08";
+export const CASHFLOW_CUTOFF_ISO = "2026-07-08T00:00:00+07:00";
 
-// ── Modal Awal: aktif 07 Jul → 09 Jul 2026 (3 hari, WIB) ──────────────────
+// ── Modal Awal: aktif 08 Jul → 09 Jul 2026 (2 hari, WIB) ──────────────────────
 export const MODAL_AWAL_DEADLINE_ISO = "2026-07-09T23:59:59+07:00";
 
 /** true = masih dalam periode boleh isi modal awal */
@@ -11,7 +14,7 @@ export function isModalAwalActive(): boolean {
   return new Date() <= new Date(MODAL_AWAL_DEADLINE_ISO);
 }
 
-// ── Kategori Uang Masuk ──
+// ── Kategori Uang Masuk ──────────────────────────────────────────────────────
 export const INCOME_CATEGORIES = {
   PENJUALAN_LAPTOP: "Penjualan Laptop",
   SERVICE: "Service",
@@ -21,7 +24,7 @@ export const INCOME_CATEGORIES = {
   PENJUALAN_ASET: "Penjualan Aset",
 } as const;
 
-// ── Kategori Uang Keluar ──
+// ── Kategori Uang Keluar ─────────────────────────────────────────────────────
 export const EXPENSE_CATEGORIES = {
   OPERASIONAL_HARIAN: "Operasional Harian",
   OPERASIONAL_BULANAN: "Operasional Bulanan",
@@ -29,7 +32,7 @@ export const EXPENSE_CATEGORIES = {
   AKSESORIS: "Aksesoris",
   MODAL_SERVICE: "Modal Service",
   PIUTANG: "Piutang",
-  KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",  // ← BARU
+  KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
   BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
 
