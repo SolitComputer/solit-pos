@@ -1,7 +1,7 @@
 "use client";
 // src/app/dashboard/cashflow/page.tsx
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CASHFLOW_ROLES } from "@/lib/permissions";
@@ -34,7 +34,8 @@ type Entry = {
     source_type: "MANUAL" | "TRANSACTION" | "SERVICE" | "MODAL_AWAL";
     source_id: string | null;
     tanggal: string;
-    payment_method: "CASH" | "SALDO" | null; // ← TAMBAH INI
+    payment_method: "CASH" | "SALDO" | null;
+    photo_url: string | null;
     is_audited: boolean;
     audited_at: string | null;
     created_by_user?: { name: string } | null;
@@ -121,7 +122,7 @@ const IconInfo = () => (
     </svg>
 );
 
-// ── Audit cell (one-way: sekali audit → terkunci) ────────────────────────────
+// ── Audit cell ───────────────────────────────────────────────────────────────
 function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
     if (entry.is_audited) {
         return (
@@ -145,7 +146,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
     );
 }
 
-// ── Modal Awal Modal (input dana awal, hanya sekali) ─────────────────────────
+// ── Modal Awal Modal ─────────────────────────────────────────────────────────
 function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
@@ -195,33 +196,22 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
             <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-                {/* Accent strip */}
                 <div className="h-1 bg-gradient-to-r from-violet-400 to-violet-600" />
-
-                {/* Header */}
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base">
-                            💰
-                        </div>
+                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base">💰</div>
                         <div>
                             <p className="text-sm font-bold text-gray-900 leading-tight">Atur Modal Awal</p>
                             <p className="text-[11px] text-amber-600 font-semibold">⚠️ Hanya bisa diisi satu kali</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"
-                    >
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                             <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                     </button>
                 </div>
-
-                {/* Body */}
                 <div className="p-5 space-y-3.5">
-                    {/* Warning */}
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-700 space-y-1.5">
                         <p className="font-bold text-amber-800">⚠️ Baca sebelum mengisi:</p>
                         <ul className="space-y-1">
@@ -230,8 +220,6 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Periode input aktif sampai <strong>09 Jul 2026</strong></li>
                         </ul>
                     </div>
-
-                    {/* Nominal */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
                             Nominal Modal Awal <span className="text-red-500">*</span>
@@ -245,19 +233,13 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             autoFocus
                         />
                         {nominal && Number(nominal) > 0 && (
-                            <p className="text-[11px] text-violet-600 mt-1 font-mono font-semibold">
-                                {fmtRupiah(Number(nominal))}
-                            </p>
+                            <p className="text-[11px] text-violet-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
                         )}
                     </div>
-
-                    {/* Tanggal */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
                         <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
                     </div>
-
-                    {/* Keterangan */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
                             Keterangan <span className="text-gray-400 font-normal">(opsional)</span>
@@ -270,8 +252,6 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             className={`${inputCls.replace("h-10", "")} py-2 resize-none`}
                         />
                     </div>
-
-                    {/* Confirmation checkbox */}
                     <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">
                         <input
                             type="checkbox"
@@ -284,13 +264,10 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             <strong className="text-gray-900">tidak dapat diubah atau dihapus</strong> setelah disimpan.
                         </span>
                     </label>
-
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
                     )}
                 </div>
-
-                {/* Footer */}
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
                         Batal
@@ -308,17 +285,8 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     );
 }
 
-// ── Modal Awal Banner ─────────────────────────────────────────────────────
-function ModalAwalBanner({
-    entry,
-    onSet,
-    isWindowActive,
-}: {
-    entry: Entry | null;
-    onSet: () => void;
-    isWindowActive: boolean;
-}) {
-    // ── Sudah diisi → tampilkan info + lock
+// ── Modal Awal Banner ─────────────────────────────────────────────────────────
+function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null; onSet: () => void; isWindowActive: boolean }) {
     if (entry) {
         return (
             <div className="border-t border-violet-200 bg-violet-50/50 overflow-hidden">
@@ -331,9 +299,7 @@ function ModalAwalBanner({
                             <p className="text-xl font-black tabular-nums text-violet-800">{fmtRupiah(entry.nominal)}</p>
                             <p className="text-[11px] text-violet-500 mt-0.5">
                                 Diisi oleh{" "}
-                                <span className="font-semibold text-violet-700">
-                                    {entry.created_by_user?.name ?? entry.nama}
-                                </span>
+                                <span className="font-semibold text-violet-700">{entry.created_by_user?.name ?? entry.nama}</span>
                                 {entry.tanggal ? ` · ${fmtTanggal(entry.tanggal)}` : ""}
                             </p>
                         </div>
@@ -345,8 +311,6 @@ function ModalAwalBanner({
             </div>
         );
     }
-
-    // ── Deadline lewat, belum diisi
     if (!isWindowActive) {
         return (
             <div className="border-t border-amber-200 bg-amber-50 p-3 flex items-start gap-2.5">
@@ -358,8 +322,6 @@ function ModalAwalBanner({
             </div>
         );
     }
-
-    // ── Belum diisi, masih dalam window
     return (
         <div className="border-t border-gray-100">
             <div className="h-0.5 bg-gradient-to-r from-violet-400 to-violet-600" />
@@ -390,10 +352,8 @@ function ModalAwalBanner({
     );
 }
 
-// ── Filter Panel ─────────────────────────────────────────────────────────────
-function FilterPanel({
-    filter, onChange, onReset, direction,
-}: {
+// ── Filter Panel ──────────────────────────────────────────────────────────────
+function FilterPanel({ filter, onChange, onReset, direction }: {
     filter: CashflowFilter;
     onChange: (f: CashflowFilter) => void;
     onReset: () => void;
@@ -403,10 +363,8 @@ function FilterPanel({
     const catEntries = Object.entries(categories) as [string, string][];
     const count = activeFilterCount(filter);
 
-    const selectCls =
-        "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition appearance-none cursor-pointer";
-    const dateCls =
-        "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const selectCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition appearance-none cursor-pointer";
+    const dateCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
 
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -415,29 +373,20 @@ function FilterPanel({
                     <IconFilter />
                     <span className="text-sm font-bold text-gray-800">Filter</span>
                     {count > 0 && (
-                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
-                            {count}
-                        </span>
+                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{count}</span>
                     )}
                 </div>
                 {isFilterActive(filter) && (
-                    <button
-                        onClick={onReset}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition"
-                    >
+                    <button onClick={onReset} className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition">
                         <IconX /> Reset
                     </button>
                 )}
             </div>
-
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                {/* Search */}
                 <div className="sm:col-span-2 lg:col-span-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Cari</label>
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
-                            <IconSearch />
-                        </div>
+                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
                         <input
                             type="text"
                             value={filter.search}
@@ -446,117 +395,53 @@ function FilterPanel({
                             className={`${dateCls} w-full pl-8`}
                         />
                         {filter.search && (
-                            <button
-                                onClick={() => onChange({ ...filter, search: "" })}
-                                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500"
-                            >
+                            <button onClick={() => onChange({ ...filter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500">
                                 <IconX />
                             </button>
                         )}
                     </div>
                 </div>
-
-                {/* Kategori */}
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori</label>
-                    <select
-                        value={filter.category}
-                        onChange={(e) => onChange({ ...filter, category: e.target.value })}
-                        className={`${selectCls} w-full`}
-                    >
+                    <select value={filter.category} onChange={(e) => onChange({ ...filter, category: e.target.value })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Kategori</option>
-                        {catEntries.map(([k, label]) => (
-                            <option key={k} value={k}>{label}</option>
-                        ))}
+                        {catEntries.map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
                     </select>
                 </div>
-
-                {/* Status Audit */}
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Audit</label>
-                    <select
-                        value={filter.audit}
-                        onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })}
-                        className={`${selectCls} w-full`}
-                    >
+                    <select value={filter.audit} onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Status</option>
                         <option value="AUDITED">✅ Sudah Audit</option>
                         <option value="NOT_AUDITED">⏳ Belum Audit</option>
                     </select>
                 </div>
-
-                {/* Sumber */}
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
-                    <select
-                        value={filter.source}
-                        onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })}
-                        className={`${selectCls} w-full`}
-                    >
+                    <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Sumber</option>
                         <option value="MANUAL">📝 Manual</option>
                         <option value="AUTO">⚡ Otomatis</option>
                     </select>
                 </div>
             </div>
-
-            {/* Date range row */}
             <div className="px-4 pb-4 -mt-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
-                    <input
-                        type="date"
-                        value={filter.dateFrom}
-                        onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })}
-                        className={`${dateCls} w-full`}
-                    />
+                    <input type="date" value={filter.dateFrom} onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })} className={`${dateCls} w-full`} />
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sampai Tanggal</label>
-                    <input
-                        type="date"
-                        value={filter.dateTo}
-                        onChange={(e) => onChange({ ...filter, dateTo: e.target.value })}
-                        className={`${dateCls} w-full`}
-                    />
+                    <input type="date" value={filter.dateTo} onChange={(e) => onChange({ ...filter, dateTo: e.target.value })} className={`${dateCls} w-full`} />
                 </div>
-                {/* Quick date presets */}
                 <div className="col-span-2 sm:col-span-2 lg:col-span-3 flex items-end gap-1.5 flex-wrap pb-0.5">
                     {([
-                        ["Hari Ini", () => {
-                            const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-                            onChange({ ...filter, dateFrom: today, dateTo: today });
-                        }],
-                        ["Minggu Ini", () => {
-                            const now = new Date();
-                            const day = now.getDay();
-                            const start = new Date(now);
-                            start.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-                            onChange({
-                                ...filter,
-                                dateFrom: start.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
-                                dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
-                            });
-                        }],
-                        ["Bulan Ini", () => {
-                            const now = new Date();
-                            const y = now.getFullYear();
-                            const m = String(now.getMonth() + 1).padStart(2, "0");
-                            onChange({
-                                ...filter,
-                                dateFrom: `${y}-${m}-01`,
-                                dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
-                            });
-                        }],
-                        ["Semua", () => {
-                            onChange({ ...filter, dateFrom: "", dateTo: "" });
-                        }],
+                        ["Hari Ini", () => { const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); onChange({ ...filter, dateFrom: today, dateTo: today }); }],
+                        ["Minggu Ini", () => { const now = new Date(); const day = now.getDay(); const start = new Date(now); start.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); onChange({ ...filter, dateFrom: start.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
+                        ["Bulan Ini", () => { const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, "0"); onChange({ ...filter, dateFrom: `${y}-${m}-01`, dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
+                        ["Semua", () => { onChange({ ...filter, dateFrom: "", dateTo: "" }); }],
                     ] as [string, () => void][]).map(([label, fn]) => (
-                        <button
-                            key={label}
-                            onClick={fn}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition"
-                        >
+                        <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition">
                             {label}
                         </button>
                     ))}
@@ -566,7 +451,96 @@ function FilterPanel({
     );
 }
 
-// ── Expense Modal (input manual — uang keluar saja) ──────────────────────────
+// ── Photo Picker ──────────────────────────────────────────────────────────────
+function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: File | null) => void }) {
+    const fileRef = useRef<HTMLInputElement>(null);
+    const cameraRef = useRef<HTMLInputElement>(null);
+    const [preview, setPreview] = useState<string | null>(null);
+
+    const handleFile = (f: File | null) => {
+        onChange(f);
+        if (f) {
+            setPreview(URL.createObjectURL(f));
+        } else {
+            setPreview(null);
+        }
+    };
+
+    const remove = () => {
+        handleFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+        if (cameraRef.current) cameraRef.current.value = "";
+    };
+
+    return (
+        <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
+                Foto Bukti <span className="text-gray-400 font-normal">(opsional)</span>
+            </label>
+            {preview ? (
+                <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                    <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
+                    <button
+                        type="button"
+                        onClick={remove}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition"
+                        title="Hapus foto"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                    <div className="px-3 py-1.5 bg-white/80 backdrop-blur-sm border-t border-gray-100">
+                        <p className="text-[10px] text-gray-500 truncate">{value?.name}</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => cameraRef.current?.click()}
+                        className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-600 transition"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <span className="text-[11px] font-semibold">Kamera</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-600 transition"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span className="text-[11px] font-semibold">Galeri</span>
+                    </button>
+                </div>
+            )}
+            <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)}
+            />
+            <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)}
+            />
+        </div>
+    );
+}
+
+// ── Expense Modal ─────────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const categories = Object.entries(EXPENSE_CATEGORIES);
 
@@ -574,8 +548,10 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH"); // ← BARU
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -589,6 +565,22 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         setSaving(true);
         setError("");
         try {
+            let photoUrl: string | null = null;
+            if (photoFile) {
+                setUploadProgress("uploading");
+                const fd = new FormData();
+                fd.append("file", photoFile);
+                const upRes = await fetch("/api/cashflow/upload", { method: "POST", body: fd });
+                const upJson = await upRes.json();
+                if (!upJson.success) {
+                    setError(upJson.message || "Gagal upload foto");
+                    setSaving(false);
+                    setUploadProgress("idle");
+                    return;
+                }
+                photoUrl = upJson.url;
+                setUploadProgress("done");
+            }
             const res = await fetch("/api/cashflow", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -598,7 +590,8 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     nominal: Number(nominal),
                     keterangan: keterangan.trim() || null,
                     tanggal,
-                    payment_method: paymentMethod, // ← BARU
+                    payment_method: paymentMethod,
+                    photo_url: photoUrl,
                 }),
             });
             const json = await res.json();
@@ -609,11 +602,16 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             setError("Terjadi kesalahan koneksi");
         } finally {
             setSaving(false);
+            setUploadProgress("idle");
         }
     };
 
-    const inputCls =
-        "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+
+    const savingLabel =
+        uploadProgress === "uploading" ? "Mengupload foto..." :
+        uploadProgress === "done" ? "Menyimpan..." :
+        saving ? "Menyimpan..." : "Simpan";
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -636,10 +634,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                         </svg>
                     </button>
                 </div>
-
                 {/* Body */}
-                <div className="p-5 space-y-3.5">
-                    {/* ── BARU: Toggle Cash / Saldo ── */}
+                <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    {/* Metode */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
                             Metode Pembayaran <span className="text-red-500">*</span>
@@ -648,35 +645,27 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             <button
                                 type="button"
                                 onClick={() => setPaymentMethod("CASH")}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "CASH"
-                                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                                    : "text-gray-400 hover:text-gray-600"
-                                    }`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "CASH" ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}
                             >
                                 <span className="text-base">💵</span> Cash
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setPaymentMethod("SALDO")}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "SALDO"
-                                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                                    : "text-gray-400 hover:text-gray-600"
-                                    }`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "SALDO" ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}
                             >
                                 <span className="text-base">🏦</span> Saldo
                             </button>
                         </div>
                     </div>
-
+                    {/* Kategori */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-                            {categories.map(([k, label]) => (
-                                <option key={k} value={k}>{label}</option>
-                            ))}
+                            {categories.map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
                         </select>
                     </div>
-
+                    {/* Nominal + Tanggal */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal</label>
@@ -697,7 +686,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
                         </div>
                     </div>
-
+                    {/* Keterangan */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
                         <textarea
@@ -708,19 +697,19 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                             className={`${inputCls.replace("h-10", "")} py-2 resize-none`}
                         />
                     </div>
-
+                    {/* Foto */}
+                    <PhotoPicker value={photoFile} onChange={setPhotoFile} />
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
                     )}
                 </div>
-
                 {/* Footer */}
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">
+                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">
                         Batal
                     </button>
                     <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-60">
-                        {saving ? "Menyimpan..." : "Simpan"}
+                        {savingLabel}
                     </button>
                 </div>
             </div>
@@ -728,7 +717,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     );
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -766,11 +755,10 @@ export default function CashflowPage() {
             .catch(() => setAllowed(false));
     }, []);
 
-    // silent = refresh background tanpa skeleton (dipakai polling & focus)
     const fetchData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const res = await fetch("/api/cashflow", { cache: "no-store" }); // ✅ hindari data basi
+            const res = await fetch("/api/cashflow", { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMasuk(json.data.masuk ?? []);
@@ -783,22 +771,15 @@ export default function CashflowPage() {
         }
     }, []);
 
-    useEffect(() => {
-        if (allowed) fetchData();
-    }, [allowed, fetchData]);
+    useEffect(() => { if (allowed) fetchData(); }, [allowed, fetchData]);
 
     useEffect(() => {
         if (!allowed) return;
-
-        const interval = setInterval(() => {
-            if (document.visibilityState === "visible") fetchData(true);
-        }, 7000);
-
+        const interval = setInterval(() => { if (document.visibilityState === "visible") fetchData(true); }, 7000);
         const onFocus = () => fetchData(true);
         const onVisible = () => { if (document.visibilityState === "visible") fetchData(true); };
         window.addEventListener("focus", onFocus);
         document.addEventListener("visibilitychange", onVisible);
-
         return () => {
             clearInterval(interval);
             window.removeEventListener("focus", onFocus);
@@ -807,7 +788,7 @@ export default function CashflowPage() {
     }, [allowed, fetchData]);
 
     const toggleAudit = async (entry: Entry) => {
-        if (entry.is_audited) return; // one-way, guard tambahan
+        if (entry.is_audited) return;
         setAuditingId(entry.id);
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -830,7 +811,6 @@ export default function CashflowPage() {
         else alert(json.message || "Gagal menghapus");
     };
 
-    // ── Klik baris uang masuk → nge-link ke sumbernya (modal awal tidak punya sumber) ──
     const openSource = (e: Entry) => {
         if (e.direction !== "IN" || e.source_type === "MODAL_AWAL") return;
         if (e.source_type === "TRANSACTION" && e.source_id) {
@@ -859,15 +839,13 @@ export default function CashflowPage() {
     const colCount = 9;
     const filterCount = activeFilterCount(currentFilter);
 
-    // ── Pagination ──
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
-    // Reset ke halaman 1 saat ganti tab atau filter berubah
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
-    // ── Helper: cek apakah tanggal entry masuk dalam periode ──
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const jakartaNow = new Date();
     const weekDay = jakartaNow.getDay();
@@ -880,23 +858,20 @@ export default function CashflowPage() {
         if (period === "today") return tanggal === jakartaToday;
         if (period === "week") return tanggal >= weekStartStr && tanggal <= jakartaToday;
         if (period === "month") return (tanggal || "").slice(0, 7) === monthPrefix;
-        // custom
         if (customFrom && tanggal < customFrom) return false;
         if (customTo && tanggal > customTo) return false;
-        return !!(customFrom || customTo); // at least one must be set
+        return !!(customFrom || customTo);
     };
 
-    // ✅ Modal awal tidak dihitung sebagai income per-periode (hanya masuk ke saldo total)
     const incomeValue = masuk.reduce(
-        (s, e) => (e.source_type !== "MODAL_AWAL" && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s),
-        0
+        (s, e) => (e.source_type !== "MODAL_AWAL" && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0
     );
     const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
 
     const periodLabel = period === "today" ? "Hari Ini"
         : period === "week" ? "Minggu Ini"
-            : period === "month" ? "Bulan Ini"
-                : (customFrom || customTo) ? `${customFrom ? fmtTanggal(customFrom) : "..."} — ${customTo ? fmtTanggal(customTo) : "..."}` : "Custom";
+        : period === "month" ? "Bulan Ini"
+        : (customFrom || customTo) ? `${customFrom ? fmtTanggal(customFrom) : "..."} — ${customTo ? fmtTanggal(customTo) : "..."}` : "Custom";
 
     return (
         <DashboardLayout>
@@ -914,7 +889,6 @@ export default function CashflowPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Indikator live */}
                         <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -938,21 +912,18 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Saldo Cashflow */}
+                {/* Saldo */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Saldo Cashflow · Semua Waktu
-                            </p>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">💰 Saldo Cashflow · Semua Waktu</p>
                             <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">
                                 {loading ? <span className="text-gray-300">—</span> : fmtRupiah(summary.saldo)}
                             </p>
                             <p className="text-[11px] text-gray-400 mt-1.5">Total masuk dikurangi keluar · akumulasi semua waktu</p>
                             {!loading && summary.modal_awal_entry && (
                                 <p className="text-[11px] text-violet-500 mt-1 font-medium">
-                                    💰 Termasuk modal awal{" "}
-                                    <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span>
+                                    💰 Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span>
                                 </p>
                             )}
                         </div>
@@ -962,8 +933,7 @@ export default function CashflowPage() {
                                     <button
                                         key={val}
                                         onClick={() => setPeriod(val)}
-                                        className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                            }`}
+                                        className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}
                                     >
                                         {label}
                                     </button>
@@ -971,19 +941,9 @@ export default function CashflowPage() {
                             </div>
                             {period === "custom" && (
                                 <div className="flex items-center gap-1.5">
-                                    <input
-                                        type="date"
-                                        value={customFrom}
-                                        onChange={(e) => setCustomFrom(e.target.value)}
-                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition"
-                                    />
+                                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition" />
                                     <span className="text-xs text-gray-400">—</span>
-                                    <input
-                                        type="date"
-                                        value={customTo}
-                                        onChange={(e) => setCustomTo(e.target.value)}
-                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition"
-                                    />
+                                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition" />
                                 </div>
                             )}
                         </div>
@@ -991,9 +951,8 @@ export default function CashflowPage() {
                     <p className="text-[11px] text-gray-400 mt-2">Berlaku untuk kartu di bawah</p>
                 </div>
 
-                {/* Masuk & Keluar cards */}
+                {/* Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Masuk */}
                     <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                         <div className="absolute top-0 left-0 h-full w-1 bg-emerald-500" />
                         <div className="flex items-center gap-3">
@@ -1006,7 +965,6 @@ export default function CashflowPage() {
                             </div>
                         </div>
                     </div>
-                    {/* Keluar */}
                     <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                         <div className="absolute top-0 left-0 h-full w-1 bg-red-500" />
                         <div className="flex items-center gap-3">
@@ -1029,34 +987,25 @@ export default function CashflowPage() {
                                 <button
                                     key={t}
                                     onClick={() => setTab(t)}
-                                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                        }`}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}
                                 >
                                     {t === "IN" ? `Uang Masuk (${masuk.length})` : `Uang Keluar (${keluar.length})`}
                                 </button>
                             ))}
                         </div>
-
                         <button
                             onClick={() => setShowFilter(!showFilter)}
-                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${showFilter
-                                ? "bg-gray-900 text-white border-gray-900"
-                                : filterCount > 0
-                                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                                }`}
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${showFilter ? "bg-gray-900 text-white border-gray-900" : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
                         >
                             <IconFilter />
                             Filter
                             {filterCount > 0 && (
-                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"
-                                    }`}>
+                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>
                                     {filterCount}
                                 </span>
                             )}
                         </button>
                     </div>
-
                     {tab === "OUT" && (
                         <button
                             onClick={() => setShowModal(true)}
@@ -1068,7 +1017,6 @@ export default function CashflowPage() {
                     )}
                 </div>
 
-                {/* Filter Panel */}
                 {showFilter && (
                     <FilterPanel
                         filter={currentFilter}
@@ -1078,7 +1026,6 @@ export default function CashflowPage() {
                     />
                 )}
 
-                {/* Info uang masuk otomatis */}
                 {tab === "IN" && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-[12px] text-blue-700">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0">
@@ -1097,8 +1044,7 @@ export default function CashflowPage() {
                                     {["Tanggal", "Metode", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
                                         <th
                                             key={i}
-                                            className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${h === "Nominal" ? "text-right" : "text-left"
-                                                } first:pl-5`}
+                                            className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${h === "Nominal" ? "text-right" : "text-left"} first:pl-5`}
                                         >
                                             {h}
                                         </th>
@@ -1123,8 +1069,7 @@ export default function CashflowPage() {
                                             <p className="text-sm text-gray-400 font-medium">
                                                 {filterCount > 0
                                                     ? `Tidak ada data yang cocok dengan filter (${allRows.length} entry tersembunyi).`
-                                                    : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`
-                                                }
+                                                    : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
                                             {filterCount > 0 && (
                                                 <button
@@ -1150,7 +1095,7 @@ export default function CashflowPage() {
                                                     {fmtTanggal(e.tanggal)}
                                                 </td>
 
-                                                {/* 2. Metode Cash/Saldo */}
+                                                {/* 2. Metode */}
                                                 <td className="px-3.5 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO" ? (
@@ -1176,15 +1121,11 @@ export default function CashflowPage() {
                                                                 : e.nama}
                                                         </span>
                                                         {e.source_type !== "MANUAL" && e.source_type !== "MODAL_AWAL" && (
-                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
-                                                                AUTO
-                                                            </span>
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">AUTO</span>
                                                         )}
                                                     </div>
                                                     {e.source_type === "MODAL_AWAL" && (
-                                                        <p className="text-[10px] text-violet-500 font-semibold leading-tight mt-0.5">
-                                                            Modal Awal Cashflow
-                                                        </p>
+                                                        <p className="text-[10px] text-violet-500 font-semibold leading-tight mt-0.5">Modal Awal Cashflow</p>
                                                     )}
                                                 </td>
 
@@ -1202,14 +1143,29 @@ export default function CashflowPage() {
                                                 </td>
 
                                                 {/* 5. Nominal */}
-                                                <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"
-                                                    }`}>
+                                                <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                 </td>
 
-                                                {/* 6. Keterangan */}
-                                                <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px] truncate">
-                                                    {e.keterangan || "—"}
+                                                {/* 6. Keterangan + foto */}
+                                                <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px]">
+                                                    <span className="truncate block">{e.keterangan || "—"}</span>
+                                                    {e.photo_url && (
+                                                        <a
+                                                            href={e.photo_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(ev) => ev.stopPropagation()}
+                                                            className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-blue-600 hover:underline"
+                                                        >
+                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                                                <polyline points="21 15 16 10 5 21" />
+                                                            </svg>
+                                                            Lihat Foto
+                                                        </a>
+                                                    )}
                                                 </td>
 
                                                 {/* 7. Audit */}
@@ -1235,9 +1191,7 @@ export default function CashflowPage() {
                                                             <IconTrash />
                                                         </button>
                                                     ) : clickable ? (
-                                                        <span className="inline-flex text-gray-300" title="Buka sumber">
-                                                            <IconExternal />
-                                                        </span>
+                                                        <span className="inline-flex text-gray-300" title="Buka sumber"><IconExternal /></span>
                                                     ) : null}
                                                 </td>
                                             </tr>
@@ -1251,32 +1205,14 @@ export default function CashflowPage() {
                     {!loading && (rows.length > 0 || filterCount > 0) && (
                         <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
                             <p className="text-[11px] text-gray-400 font-medium">
-                                Menampilkan {(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)} dari {rows.length} entry{rows.length !== allRows.length ? ` (total ${allRows.length})` : ""}
+                                Menampilkan {(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)} dari {rows.length} entry
+                                {rows.length !== allRows.length ? ` (total ${allRows.length})` : ""}
                                 {filterCount > 0 && ` · ${filterCount} filter aktif`}
                             </p>
-
                             {totalPages > 1 && (
                                 <div className="flex items-center gap-1">
-                                    {/* First */}
-                                    <button
-                                        onClick={() => setCurrentPage(1)}
-                                        disabled={safePage === 1}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                                        title="Halaman pertama"
-                                    >
-                                        <IconChevronsLeft />
-                                    </button>
-                                    {/* Prev */}
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                        disabled={safePage === 1}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                                        title="Sebelumnya"
-                                    >
-                                        <IconChevronLeft />
-                                    </button>
-
-                                    {/* Page numbers */}
+                                    <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition" title="Halaman pertama"><IconChevronsLeft /></button>
+                                    <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition" title="Sebelumnya"><IconChevronLeft /></button>
                                     {(() => {
                                         const pages: (number | "...")[] = [];
                                         if (totalPages <= 7) {
@@ -1297,41 +1233,20 @@ export default function CashflowPage() {
                                                 <button
                                                     key={p}
                                                     onClick={() => setCurrentPage(p)}
-                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${p === safePage
-                                                        ? "bg-gray-900 text-white shadow-sm"
-                                                        : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
-                                                        }`}
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${p === safePage ? "bg-gray-900 text-white shadow-sm" : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"}`}
                                                 >
                                                     {p}
                                                 </button>
                                             )
                                         );
                                     })()}
-
-                                    {/* Next */}
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                        disabled={safePage === totalPages}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                                        title="Berikutnya"
-                                    >
-                                        <IconChevronRight />
-                                    </button>
-                                    {/* Last */}
-                                    <button
-                                        onClick={() => setCurrentPage(totalPages)}
-                                        disabled={safePage === totalPages}
-                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                                        title="Halaman terakhir"
-                                    >
-                                        <IconChevronsRight />
-                                    </button>
+                                    <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition" title="Berikutnya"><IconChevronRight /></button>
+                                    <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition" title="Halaman terakhir"><IconChevronsRight /></button>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Modal Awal banner — status pengisian dana awal */}
                     {!loading && (
                         <ModalAwalBanner
                             entry={summary.modal_awal_entry}
