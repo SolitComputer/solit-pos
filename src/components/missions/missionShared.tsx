@@ -28,9 +28,9 @@ export const ACTIVE_STATUSES: MissionStatus[] = ["PENDING", "IN_PROGRESS", "SUBM
 export const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 export const STATUS_META: Record<MissionStatus, { label: string; text: string; bg: string; border: string; dot: string }> = {
-  PENDING: { label: "Belum Dikerjakan", text: "#92610a", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },
-  IN_PROGRESS: { label: "Sedang Dikerjakan", text: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe", dot: "#3b82f6" },
-  SUBMITTED: { label: "Menunggu ACC", text: "#6d28d9", bg: "#f5f3ff", border: "#ddd6fe", dot: "#8b5cf6" },
+  PENDING: { label: "Audit", text: "#92610a", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },
+  IN_PROGRESS: { label: "On Progress", text: "#1d4ed8", bg: "#eff6ff", border: "#bfdbfe", dot: "#3b82f6" },
+  SUBMITTED: { label: "Audit", text: "#6d28d9", bg: "#f5f3ff", border: "#ddd6fe", dot: "#8b5cf6" },
   REJECTED: { label: "Perlu Revisi", text: "#be123c", bg: "#fff1f2", border: "#fecdd3", dot: "#f43f5e" },
   APPROVED: { label: "Selesai", text: "#047857", bg: "#ecfdf5", border: "#a7f3d0", dot: "#10b981" },
 };

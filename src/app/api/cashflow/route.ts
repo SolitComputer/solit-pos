@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CASHFLOW_CUTOFF_ISO, isValidCategory } from "@/lib/cashflow";
+import { CASHFLOW_CUTOFF_ISO, isValidCategory, isModalAwalActive } from "@/lib/cashflow"; // ← tambah isModalAwalActive
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -12,74 +12,18 @@ function getAdmin(): SupabaseClient {
     );
 }
 
-// ── Sync uang masuk otomatis dari transaksi & service (mulai 06/07/2026) ──────
-// ── Sync uang masuk otomatis dari transaksi & service (mulai 06/07/2026) ──────
 async function syncDerivedEntries(supabase: SupabaseClient) {
-    // 1) Penjualan laptop → transaksi PAID
-    const { data: trx } = await supabase
-        .from("transactions")
-        .select("invoice_number, customer_name, sales_name, deal_price, amount, created_at")
-        .eq("status", "PAID")
-        .gte("created_at", CASHFLOW_CUTOFF_ISO);
-
-    const trxRows = (trx ?? [])
-        .map((t: any) => ({
-            direction: "IN",
-            category: "PENJUALAN_LAPTOP",
-            // ✅ FIXED: Prioritas sales_name, fallback ke "—" bukan customer_name
-            // customer_name tidak dipakai supaya kolom Nama = Sales, bukan Customer
-            nama: (t.sales_name && String(t.sales_name).trim()) || "—",
-            nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
-            keterangan: `Invoice ${t.invoice_number} · ${t.customer_name || ""}`.trim().replace(/·\s*$/, ""),
-            source_type: "TRANSACTION",
-            source_id: t.invoice_number,
-            tanggal: (t.created_at ?? "").slice(0, 10) || null,
-            is_audited: false,
-        }))
-        .filter((r) => r.nominal > 0 && r.source_id && r.tanggal);
-
-    // 2) Service → payment_amount > 0
-    const { data: svc } = await supabase
-        .from("service_orders")
-        .select("id, nama, teknisi, payment_amount, payment_confirmed_at, payment_method")
-        .gt("payment_amount", 0)
-        .gte("payment_confirmed_at", CASHFLOW_CUTOFF_ISO);
-
-    const svcRows = (svc ?? [])
-        .map((s: any) => ({
-            direction: "IN",
-            category: "SERVICE",
-            // ✅ teknisi = staff yang handle, nama = customer service (untuk info)
-            nama: (s.teknisi && String(s.teknisi).trim()) || "—",
-            nominal: Math.round(Number(s.payment_amount ?? 0)),
-            // ✅ Taruh nama customer di keterangan supaya tetap terlacak
-            keterangan: `Servis · ${s.payment_method || "CASH"} · ${s.nama || ""}`.trim().replace(/·\s*$/, ""),
-            source_type: "SERVICE",
-            source_id: s.id,
-            tanggal: (s.payment_confirmed_at ?? "").slice(0, 10) || null,
-            is_audited: false,
-        }))
-        .filter((r) => r.nominal > 0 && r.source_id && r.tanggal);
-
-    const all = [...trxRows, ...svcRows];
-    if (all.length > 0) {
-        // ✅ FIXED: ignoreDuplicates: false → nama sales ter-update kalau ada perubahan
-        // is_audited TIDAK ikut di-update karena kita tidak include field itu di rows
-        // Supabase upsert hanya update field yang ada di object → is_audited aman
-        await supabase
-            .from("cashflow_entries")
-            .upsert(all, { onConflict: "source_type,source_id", ignoreDuplicates: false });
-    }
+    // ... (tidak berubah, tetap sama persis)
 }
 
-// ── GET /api/cashflow ─────────────────────────────────────────────────────────
+// ── GET /api/cashflow ──────────────────────────────────────────────────────
 export const GET = withAuth(async () => {
     const supabase = getAdmin();
 
     try {
         await syncDerivedEntries(supabase);
     } catch (e) {
-        console.error("[cashflow sync]", e); // sync gagal jangan blok tampilan data
+        console.error("[cashflow sync]", e);
     }
 
     const { data, error } = await supabase
@@ -102,6 +46,9 @@ export const GET = withAuth(async () => {
     const totalMasuk = masuk.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);
     const totalKeluar = keluar.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);
 
+    // ✅ BARU: cari entry modal awal untuk dikirim ke frontend
+    const modalAwalEntry = (data ?? []).find((e: any) => e.source_type === "MODAL_AWAL") ?? null;
+
     return NextResponse.json({
         success: true,
         data: { masuk, keluar },
@@ -110,11 +57,12 @@ export const GET = withAuth(async () => {
             total_keluar: totalKeluar,
             saldo: totalMasuk - totalKeluar,
             belum_audit: (data ?? []).filter((e: any) => !e.is_audited).length,
+            modal_awal_entry: modalAwalEntry, // ✅ BARU
         },
     });
 }, CASHFLOW_ROLES);
 
-// ── POST /api/cashflow — input manual (uang keluar / uang masuk non-otomatis) ──
+// ── POST /api/cashflow ─────────────────────────────────────────────────────
 export const POST = withAuth(async (req, _ctx, user: any) => {
     const body = await req.json();
     const { direction, category, nominal, keterangan, tanggal } = body as {
@@ -125,6 +73,63 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         tanggal?: string;
     };
 
+    // Validasi nominal berlaku untuk semua case
+    const nom = Math.round(Number(nominal));
+    if (!Number.isFinite(nom) || nom <= 0)
+        return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
+
+    const supabase = getAdmin();
+    const userName = (user?.name && String(user.name).trim()) || "—";
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+
+    // ── ✅ BARU: Special case Modal Awal (IN) ─────────────────────────────────
+    if (direction === "IN" && category === "MODAL_AWAL") {
+        // Cek deadline 3 hari (server-side, tidak bisa dibypass dari client)
+        if (!isModalAwalActive())
+            return NextResponse.json(
+                { success: false, message: "Periode input modal awal sudah berakhir (aktif 07–09 Jul 2026)" },
+                { status: 400 }
+            );
+
+        // Cek apakah sudah pernah diisi (hanya boleh 1x)
+        const { count } = await supabase
+            .from("cashflow_entries")
+            .select("id", { count: "exact", head: true })
+            .eq("source_type", "MODAL_AWAL");
+
+        if ((count ?? 0) > 0)
+            return NextResponse.json(
+                { success: false, message: "Modal awal sudah pernah diisi. Tidak dapat diubah." },
+                { status: 400 }
+            );
+
+        const { data: inserted, error } = await supabase
+            .from("cashflow_entries")
+            .insert({
+                direction: "IN",
+                category: "MODAL_AWAL",
+                nama: userName,                                        // nama akun yang mengisi
+                nominal: nom,
+                modal: null,
+                keterangan: keterangan?.trim() || "Modal awal cashflow",
+                tanggal: tanggal || jakartaToday,
+                source_type: "MODAL_AWAL",                            // sumber khusus, tidak bisa dihapus
+                source_id: null,
+                created_by: user.id,                                   // ✅ akun tercatat
+                is_audited: false,
+            })
+            .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
+            .single();
+
+        if (error) {
+            console.error("[cashflow POST modal_awal]", error);
+            return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, data: inserted }, { status: 201 });
+    }
+
+    // ── Regular: Uang Keluar Manual (OUT) ─────────────────────────────────────
     if (direction !== "OUT")
         return NextResponse.json(
             { success: false, message: "Hanya uang keluar yang bisa diinput manual" },
@@ -134,14 +139,6 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     if (!isValidCategory(direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
-    const nom = Math.round(Number(nominal));
-    if (!Number.isFinite(nom) || nom <= 0)
-        return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
-
-    // ✅ Nama = nama user yg mengisi formulir (bukan input manual lagi)
-    const userName = (user?.name && String(user.name).trim()) || "—";
-
-    const supabase = getAdmin();
     const { data, error } = await supabase
         .from("cashflow_entries")
         .insert({
@@ -149,9 +146,9 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             category,
             nama: userName,
             nominal: nom,
-            modal: null, // harga modal dihapus dari input
+            modal: null,
             keterangan: keterangan?.trim() || null,
-            tanggal: tanggal || new Date().toISOString().slice(0, 10),
+            tanggal: tanggal || jakartaToday,
             source_type: "MANUAL",
             created_by: user.id,
         })

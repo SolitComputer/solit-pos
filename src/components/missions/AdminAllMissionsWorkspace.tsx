@@ -15,8 +15,8 @@ interface UserOption { id: string; name: string; role: string; roles: string[]; 
 const STATUS_OPTIONS: { value: MissionStatus | ""; label: string }[] = [
   { value: "", label: "Semua Status" },
   { value: "PENDING", label: "Belum" },
-  { value: "IN_PROGRESS", label: "Berjalan" },
-  { value: "SUBMITTED", label: "Menunggu ACC" },
+  { value: "IN_PROGRESS", label: "On Progress" },
+  { value: "SUBMITTED", label: "Audit" },
   { value: "REJECTED", label: "Revisi" },
   { value: "APPROVED", label: "Selesai" },
 ];

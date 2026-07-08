@@ -1087,7 +1087,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
 
     const proofNote =
         mission.status === "PENDING" ? "Belum dikerjakan penerima" :
-            mission.status === "IN_PROGRESS" ? "Sedang dikerjakan — belum ada bukti" : "Belum ada bukti";
+            mission.status === "IN_PROGRESS" ? "OnProgres — belum ada bukti" : "Belum ada bukti";
 
     return (
         <ModalShell onClose={onClose}>
@@ -1167,6 +1167,329 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
 }
 
 // ── Stat kecil + skeleton ─────────────────────────────────────────────────────
+// ── Mission Stats Panel ───────────────────────────────────────────────────────
+interface MissionStatsData {
+    total: number;
+    statusCounts: Record<string, number>;
+    priorityCounts: Record<string, number>;
+    overdue: number;
+    completionRate: number;
+    leaderboard: { id: string; name: string; role: string; completed: number; total: number; avgMs: number; fastestMs: number; rate: number }[];
+    topAssigners: { id: string; name: string; role: string; count: number }[];
+}
+
+function fmtDuration(ms: number): string {
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}j ${mins % 60}m`;
+    const days = Math.floor(hrs / 24);
+    return `${days}h ${hrs % 24}j`;
+}
+
+function MissionStatsPanel() {
+    const [data, setData] = useState<MissionStatsData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/missions/stats");
+                const json = await res.json();
+                if (json.success) setData(json.data);
+            } catch { /* silent */ }
+            finally { setLoading(false); }
+        })();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="bg-white rounded-2xl p-4 animate-pulse" style={{ border: "1px solid #f0f0f8" }}>
+                            <div className="h-3 w-12 bg-slate-200 rounded mb-2" />
+                            <div className="h-6 w-10 bg-slate-200 rounded mb-1" />
+                            <div className="h-2.5 w-20 bg-slate-100 rounded" />
+                        </div>
+                    ))}
+                </div>
+                <div className="bg-white rounded-2xl p-5 animate-pulse" style={{ border: "1px solid #f0f0f8" }}>
+                    <div className="h-4 w-32 bg-slate-200 rounded mb-4" />
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-200" />
+                            <div className="flex-1 space-y-1.5">
+                                <div className="h-3 w-24 bg-slate-200 rounded" />
+                                <div className="h-1.5 w-full bg-slate-100 rounded-full" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (!data || data.total === 0) return null;
+
+    const MEDAL = ["🥇", "🥈", "🥉"];
+
+    return (
+        <div className="space-y-3">
+            {/* Stat Cards Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                {/* Total Misi */}
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: "linear-gradient(180deg,#6366f1,#8b5cf6)" }} />
+                    <div className="pl-2.5">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Misi</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tabular-nums">{data.total}</p>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "#ecfdf5", color: "#059669" }}>
+                                ✅ {data.statusCounts.APPROVED ?? 0} selesai
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Completion Rate */}
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: "linear-gradient(180deg,#34d399,#059669)" }} />
+                    <div className="pl-2.5">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Tingkat Selesai</p>
+                        <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tabular-nums">{data.completionRate}%</p>
+                        <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${data.completionRate}%`, background: "linear-gradient(90deg,#34d399,#059669)" }} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Overdue */}
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: data.overdue > 0 ? "linear-gradient(180deg,#f43f5e,#dc2626)" : "linear-gradient(180deg,#94a3b8,#64748b)" }} />
+                    <div className="pl-2.5">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Lewat Tenggat</p>
+                        <p className="text-2xl sm:text-3xl font-black mt-0.5 tabular-nums" style={{ color: data.overdue > 0 ? "#dc2626" : "#0f172a" }}>
+                            {data.overdue}
+                        </p>
+                        <p className="text-[9px] font-bold mt-1.5" style={{ color: data.overdue > 0 ? "#f43f5e" : "#94a3b8" }}>
+                            {data.overdue > 0 ? "⚠️ Perlu perhatian" : "✨ Semua aman"}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Prioritas */}
+                <div className="bg-white rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: "linear-gradient(180deg,#fbbf24,#d97706)" }} />
+                    <div className="pl-2.5">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Prioritas</p>
+                        <div className="flex items-end gap-2 mt-1">
+                            {[
+                                { key: "HIGH", label: "🔥", color: "#dc2626" },
+                                { key: "MEDIUM", label: "➡️", color: "#d97706" },
+                                { key: "LOW", label: "⬇️", color: "#059669" },
+                            ].map(p => (
+                                <div key={p.key} className="text-center">
+                                    <span className="text-xs">{p.label}</span>
+                                    <p className="text-sm font-black tabular-nums" style={{ color: p.color }}>{data.priorityCounts[p.key] ?? 0}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Leaderboard + Top Assigner */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Leaderboard: Tercepat Selesai */}
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#f5f3ff)" }}>
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                                style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
+                                🏆
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-slate-800">Leaderboard Tercepat</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Rata-rata waktu penyelesaian misi</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {data.leaderboard.length === 0 ? (
+                            <div className="px-5 py-8 text-center">
+                                <p className="text-3xl mb-2">🏁</p>
+                                <p className="text-xs font-bold text-slate-400">Belum ada misi yang selesai</p>
+                            </div>
+                        ) : data.leaderboard.map((u, i) => {
+                            const maxAvg = data.leaderboard[data.leaderboard.length - 1]?.avgMs ?? 1;
+                            const pct = maxAvg > 0 ? Math.max(8, Math.round(((maxAvg - u.avgMs) / maxAvg) * 100)) : 50;
+                            return (
+                                <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 group hover:bg-slate-50/50 transition-colors"
+                                    style={i === 0 ? { background: "linear-gradient(90deg,#fffbeb 0%,transparent 100%)" } : undefined}>
+                                    {/* Rank */}
+                                    <div className="w-7 text-center flex-shrink-0">
+                                        {i < 3 ? (
+                                            <span className="text-lg">{MEDAL[i]}</span>
+                                        ) : (
+                                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
+                                        )}
+                                    </div>
+
+                                    {/* Avatar */}
+                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                        style={{
+                                            background: i === 0
+                                                ? "linear-gradient(135deg,#f59e0b,#d97706)"
+                                                : i === 1
+                                                    ? "linear-gradient(135deg,#94a3b8,#64748b)"
+                                                    : i === 2
+                                                        ? "linear-gradient(135deg,#d97706,#b45309)"
+                                                        : "linear-gradient(135deg,#cbd5e1,#94a3b8)",
+                                            boxShadow: i < 3 ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                                        }}>
+                                        {u.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{u.name}</p>
+                                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                                {u.role.replace(/_/g, " ")}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-700"
+                                                    style={{
+                                                        width: `${pct}%`,
+                                                        background: i === 0 ? "linear-gradient(90deg,#f59e0b,#eab308)" : i === 1 ? "linear-gradient(90deg,#94a3b8,#64748b)" : "linear-gradient(90deg,#cbd5e1,#94a3b8)"
+                                                    }} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div className="text-right flex-shrink-0">
+                                        <p className="text-xs font-black tabular-nums" style={{ color: i === 0 ? "#d97706" : "#334155" }}>
+                                            ⚡ {fmtDuration(u.avgMs)}
+                                        </p>
+                                        <p className="text-[9px] font-semibold text-slate-400 mt-0.5 tabular-nums">
+                                            {u.completed}/{u.total} ({u.rate}%)
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Top Pemberi Misi */}
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#eff6ff)" }}>
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                                style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
+                                📌
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-slate-800">Top Pemberi Misi</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Siapa yang paling aktif menugaskan</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {data.topAssigners.length === 0 ? (
+                            <div className="px-5 py-8 text-center">
+                                <p className="text-3xl mb-2">📋</p>
+                                <p className="text-xs font-bold text-slate-400">Belum ada data</p>
+                            </div>
+                        ) : data.topAssigners.map((u, i) => {
+                            const maxCount = data.topAssigners[0]?.count ?? 1;
+                            const pct = Math.max(8, Math.round((u.count / maxCount) * 100));
+                            return (
+                                <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50 transition-colors">
+                                    <div className="w-7 text-center flex-shrink-0">
+                                        {i < 3 ? (
+                                            <span className="text-lg">{MEDAL[i]}</span>
+                                        ) : (
+                                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
+                                        )}
+                                    </div>
+                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                        style={{
+                                            background: i === 0 ? "linear-gradient(135deg,#6366f1,#4f46e5)" : "linear-gradient(135deg,#cbd5e1,#94a3b8)",
+                                            boxShadow: i < 3 ? "0 2px 6px rgba(0,0,0,0.12)" : "none",
+                                        }}>
+                                        {u.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{u.name}</p>
+                                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                                {u.role.replace(/_/g, " ")}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }} />
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-black tabular-nums text-slate-700 flex-shrink-0">{u.count} misi</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Status Breakdown Bar */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Distribusi Status</p>
+                <div className="flex h-3 rounded-full overflow-hidden gap-0.5">
+                    {[
+                        { key: "IN_PROGRESS", label: "On Progress", color: "#3b82f6" },
+                        { key: "SUBMITTED", label: "Audit", color: "#8b5cf6" },
+                        { key: "REJECTED", label: "Revisi", color: "#f43f5e" },
+                        { key: "APPROVED", label: "Selesai", color: "#10b981" },
+                        { key: "PENDING", label: "Audit", color: "#f59e0b" },
+                    ].map(s => {
+                        const count = data.statusCounts[s.key] ?? 0;
+                        if (count === 0) return null;
+                        const pct = Math.max(2, (count / data.total) * 100);
+                        return (
+                            <div key={s.key} className="h-full rounded-full transition-all duration-500 relative group/bar cursor-default"
+                                style={{ width: `${pct}%`, background: s.color, minWidth: 4 }}
+                                title={`${s.label}: ${count}`}>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
+                    {[
+                        { key: "IN_PROGRESS", label: "On Progress", color: "#3b82f6" },
+                        { key: "SUBMITTED", label: "Audit", color: "#8b5cf6" },
+                        { key: "REJECTED", label: "Revisi", color: "#f43f5e" },
+                        { key: "APPROVED", label: "Selesai", color: "#10b981" },
+                        { key: "PENDING", label: "Audit", color: "#f59e0b" },
+                    ].map(s => (
+                        <span key={s.key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                            {s.label} <span className="text-slate-800 tabular-nums">{data.statusCounts[s.key] ?? 0}</span>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function MiniStat({ icon, value, label, accent }: { icon: string; value: number; label: string; accent: string }) {
     return (
         <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
@@ -1351,8 +1674,8 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                 (payload: any) => {
                     const st = payload.new?.status; const t = payload.new?.title ?? "Misi";
                     if (st === "SUBMITTED") {
-                        showToast("📤 Ada misi menunggu ACC", "ok");
-                        notifyBrowser("📤 Misi Disubmit", `${t} menunggu persetujuan`);
+                        showToast("🔍 Ada misi menunggu audit", "ok");
+                        notifyBrowser("🔍 Misi Disubmit", `${t} menunggu audit`);
                         try { navigator.vibrate?.(200); } catch { }
                     }
                     fetchMissions(box, true);
@@ -1460,10 +1783,15 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     {/* Stats */}
                     {!showStructure && (
                         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                            <MiniStat icon="⚙️" value={stats.pending} label="Sedang Berjalan" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
-                            <MiniStat icon="📤" value={stats.review} label="Menunggu ACC" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
+                            <MiniStat icon="⚙️" value={stats.pending} label="On Progress" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
+                            <MiniStat icon="🔍" value={stats.review} label="Audit" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
                             <MiniStat icon="✅" value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
                         </div>
+                    )}
+
+                    {/* Statistik & Leaderboard — hanya tampil di dashboard */}
+                    {!showStructure && section === "dashboard" && iCanAssign && (
+                        <MissionStatsPanel />
                     )}
 
                     {/* Tabs */}
