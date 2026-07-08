@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { EXPENSE_CATEGORIES, categoryLabel } from "@/lib/cashflow";
+import { CASHFLOW_ROLES } from "@/lib/permissions";
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
@@ -503,7 +505,7 @@ export default function CashflowPage() {
             .then((r) => r.json())
             .then((r) => {
                 const roles: string[] = r.user?.roles?.length ? r.user.roles : [r.user?.role].filter(Boolean);
-                setAllowed(roles.some((x) => ["ADMIN", "PROGRAMMER"].includes(x)));
+                setAllowed(roles.some((x) => (CASHFLOW_ROLES as string[]).includes(x)));
             })
             .catch(() => setAllowed(false));
     }, []);
