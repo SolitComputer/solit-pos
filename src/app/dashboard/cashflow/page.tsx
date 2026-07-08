@@ -4,7 +4,18 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { EXPENSE_CATEGORIES, categoryLabel } from "@/lib/cashflow";
+import {
+    INCOME_CATEGORIES,
+    EXPENSE_CATEGORIES,
+    categoryLabel,
+    type CashflowFilter,
+    type AuditFilter,
+    type SourceFilter,
+    defaultCashflowFilter,
+    isFilterActive,
+    activeFilterCount,
+    applyFilters,
+} from "@/lib/cashflow";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
@@ -56,6 +67,21 @@ const IconClock = () => (
         <circle cx="12" cy="12" r="10" /><polyline points="12 7 12 12 15 14" />
     </svg>
 );
+const IconFilter = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+);
+const IconSearch = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+);
+const IconX = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+);
 const IconExternal = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
@@ -83,6 +109,182 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
         >
             <IconClock /> {busy ? "Memproses..." : "Belum Audit"}
         </button>
+    );
+}
+
+// ── Filter Panel ─────────────────────────────────────────────────────────────
+function FilterPanel({
+    filter, onChange, onReset, direction,
+}: {
+    filter: CashflowFilter;
+    onChange: (f: CashflowFilter) => void;
+    onReset: () => void;
+    direction: "IN" | "OUT";
+}) {
+    const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const catEntries = Object.entries(categories) as [string, string][];
+    const count = activeFilterCount(filter);
+
+    const selectCls =
+        "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition appearance-none cursor-pointer";
+    const dateCls =
+        "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <IconFilter />
+                    <span className="text-sm font-bold text-gray-800">Filter</span>
+                    {count > 0 && (
+                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">
+                            {count}
+                        </span>
+                    )}
+                </div>
+                {isFilterActive(filter) && (
+                    <button
+                        onClick={onReset}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition"
+                    >
+                        <IconX /> Reset
+                    </button>
+                )}
+            </div>
+
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* Search */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Cari</label>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400">
+                            <IconSearch />
+                        </div>
+                        <input
+                            type="text"
+                            value={filter.search}
+                            onChange={(e) => onChange({ ...filter, search: e.target.value })}
+                            placeholder="Nama / keterangan…"
+                            className={`${dateCls} w-full pl-8`}
+                        />
+                        {filter.search && (
+                            <button
+                                onClick={() => onChange({ ...filter, search: "" })}
+                                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500"
+                            >
+                                <IconX />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Kategori */}
+                <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori</label>
+                    <select
+                        value={filter.category}
+                        onChange={(e) => onChange({ ...filter, category: e.target.value })}
+                        className={`${selectCls} w-full`}
+                    >
+                        <option value="ALL">Semua Kategori</option>
+                        {catEntries.map(([k, label]) => (
+                            <option key={k} value={k}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Status Audit */}
+                <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Audit</label>
+                    <select
+                        value={filter.audit}
+                        onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })}
+                        className={`${selectCls} w-full`}
+                    >
+                        <option value="ALL">Semua Status</option>
+                        <option value="AUDITED">✅ Sudah Audit</option>
+                        <option value="NOT_AUDITED">⏳ Belum Audit</option>
+                    </select>
+                </div>
+
+                {/* Sumber */}
+                <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
+                    <select
+                        value={filter.source}
+                        onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })}
+                        className={`${selectCls} w-full`}
+                    >
+                        <option value="ALL">Semua Sumber</option>
+                        <option value="MANUAL">📝 Manual</option>
+                        <option value="AUTO">⚡ Otomatis</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Date range row */}
+            <div className="px-4 pb-4 -mt-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
+                    <input
+                        type="date"
+                        value={filter.dateFrom}
+                        onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })}
+                        className={`${dateCls} w-full`}
+                    />
+                </div>
+                <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sampai Tanggal</label>
+                    <input
+                        type="date"
+                        value={filter.dateTo}
+                        onChange={(e) => onChange({ ...filter, dateTo: e.target.value })}
+                        className={`${dateCls} w-full`}
+                    />
+                </div>
+                {/* Quick date presets */}
+                <div className="col-span-2 sm:col-span-2 lg:col-span-3 flex items-end gap-1.5 flex-wrap pb-0.5">
+                    {([
+                        ["Hari Ini", () => {
+                            const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+                            onChange({ ...filter, dateFrom: today, dateTo: today });
+                        }],
+                        ["Minggu Ini", () => {
+                            const now = new Date();
+                            const day = now.getDay();
+                            const start = new Date(now);
+                            start.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+                            onChange({
+                                ...filter,
+                                dateFrom: start.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
+                                dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
+                            });
+                        }],
+                        ["Bulan Ini", () => {
+                            const now = new Date();
+                            const y = now.getFullYear();
+                            const m = String(now.getMonth() + 1).padStart(2, "0");
+                            onChange({
+                                ...filter,
+                                dateFrom: `${y}-${m}-01`,
+                                dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
+                            });
+                        }],
+                        ["Semua", () => {
+                            onChange({ ...filter, dateFrom: "", dateTo: "" });
+                        }],
+                    ] as [string, () => void][]).map(([label, fn]) => (
+                        <button
+                            key={label}
+                            onClick={fn}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition"
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -234,8 +436,13 @@ export default function CashflowPage() {
     const [keluar, setKeluar] = useState<Entry[]>([]);
     const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0 });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [period, setPeriod] = useState<"today" | "month">("today");
+    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
+    const [summaryFrom, setSummaryFrom] = useState("");
+    const [summaryTo, setSummaryTo] = useState("");
     const [showModal, setShowModal] = useState(false);
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
+    const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
     const [auditingId, setAuditingId] = useState<string | null>(null);
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -336,15 +543,49 @@ export default function CashflowPage() {
         );
     }
 
-    const rows = tab === "IN" ? masuk : keluar;
+    const currentFilter = tab === "IN" ? filterIn : filterOut;
+    const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
+    const allRows = tab === "IN" ? masuk : keluar;
+    const rows = applyFilters(allRows, currentFilter);
     const colCount = 8;
+    const filterCount = activeFilterCount(currentFilter);
 
-    // ── Total uang masuk per periode (client-side, WIB) ──
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
-    const monthPrefix = jakartaToday.slice(0, 7);
-    const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
-    const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
-    const incomeValue = period === "today" ? incomeToday : incomeMonth;
+    // ── Summary per periode (client-side, WIB) ──
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const getSummaryRange = (): { from: string; to: string } => {
+        if (period === "custom") return { from: summaryFrom, to: summaryTo };
+        if (period === "today") return { from: jakartaToday, to: jakartaToday };
+        if (period === "week") {
+            const now = new Date();
+            const day = now.getDay();
+            const start = new Date(now);
+            start.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+            return { from: start.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), to: jakartaToday };
+        }
+        // month
+        const monthPrefix = jakartaToday.slice(0, 7);
+        return { from: `${monthPrefix}-01`, to: jakartaToday };
+    };
+    const { from: sFrom, to: sTo } = getSummaryRange();
+
+    const inRange = (tanggal?: string) => {
+        if (!tanggal) return false;
+        if (sFrom && tanggal < sFrom) return false;
+        if (sTo && tanggal > sTo) return false;
+        return true;
+    };
+
+    const filteredMasuk = masuk.filter((e) => inRange(e.tanggal));
+    const filteredKeluar = keluar.filter((e) => inRange(e.tanggal));
+    const summaryIncome = filteredMasuk.reduce((s, e) => s + Number(e.nominal || 0), 0);
+    const summaryExpense = filteredKeluar.reduce((s, e) => s + Number(e.nominal || 0), 0);
+    const summarySaldo = summaryIncome - summaryExpense;
+    const summaryUnaudited = [...filteredMasuk, ...filteredKeluar].filter((e) => !e.is_audited).length;
+
+    const periodLabel = period === "today" ? "Hari Ini"
+        : period === "week" ? "Minggu Ini"
+        : period === "month" ? "Bulan Ini"
+        : (sFrom || sTo) ? `${sFrom ? fmtTanggal(sFrom) : "..."} — ${sTo ? fmtTanggal(sTo) : "..."}` : "Custom";
 
     return (
         <DashboardLayout>
@@ -385,65 +626,116 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
+                {/* Hero: Uang Masuk + Periode Selector */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
+                                💰 Uang Masuk · {periodLabel}
                             </p>
                             <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
-                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
+                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(summaryIncome)}
                             </p>
                             <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
                         </div>
-                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-                            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
-                                <button
-                                    key={val}
-                                    onClick={() => setPeriod(val)}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                        }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
+                        <div className="flex flex-col items-end gap-2">
+                            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+                                {([["today", "Hari Ini"], ["week", "Minggu Ini"], ["month", "Bulan Ini"], ["custom", "Custom"]] as const).map(([val, label]) => (
+                                    <button
+                                        key={val}
+                                        onClick={() => setPeriod(val)}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {period === "custom" && (
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="date"
+                                        value={summaryFrom}
+                                        onChange={(e) => setSummaryFrom(e.target.value)}
+                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition"
+                                    />
+                                    <span className="text-xs text-gray-400">—</span>
+                                    <input
+                                        type="date"
+                                        value={summaryTo}
+                                        onChange={(e) => setSummaryTo(e.target.value)}
+                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
+                {/* Summary: Keluar | Saldo | Belum Audit — semua ikut periode */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
+                    <StatCard label={`Total Uang Keluar`} value={fmtRupiah(summaryExpense)} accent="red" hint={periodLabel} loading={loading} />
                     <StatCard
                         label="Saldo Cashflow"
-                        value={fmtRupiah(summary.saldo)}
+                        value={fmtRupiah(summarySaldo)}
                         accent="dark"
-                        hint="Total masuk dikurangi total keluar"
+                        hint={`Masuk − Keluar · ${periodLabel}`}
                         loading={loading}
                     />
                     <StatCard
                         label="Belum Diaudit"
-                        value={`${summary.belum_audit} entry`}
+                        value={`${summaryUnaudited} entry`}
                         accent="amber"
-                        hint="Menunggu verifikasi audit"
+                        hint={periodLabel}
                         loading={loading}
                     />
                 </div>
 
-                {/* Tabs + Add */}
+                {/* Tabs + Filter + Add */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
-                        {(["IN", "OUT"] as const).map((t) => (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+                            {(["IN", "OUT"] as const).map((t) => (
+                                <button
+                                    key={t}
+                                    onClick={() => setTab(t)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                        }`}
+                                >
+                                    {t === "IN" ? `Uang Masuk (${masuk.length})` : `Uang Keluar (${keluar.length})`}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => setShowFilter(!showFilter)}
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${
+                                showFilter
+                                    ? "bg-gray-900 text-white border-gray-900"
+                                    : filterCount > 0
+                                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                            }`}
+                        >
+                            <IconFilter />
+                            Filter
+                            {filterCount > 0 && (
+                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
+                                    showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"
+                                }`}>
+                                    {filterCount}
+                                </span>
+                            )}
+                        </button>
+
+                        {filterCount > 0 && (
                             <button
-                                key={t}
-                                onClick={() => setTab(t)}
-                                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                    }`}
+                                onClick={() => { setCurrentFilter(defaultCashflowFilter()); }}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 transition"
                             >
-                                {t === "IN" ? `Uang Masuk (${masuk.length})` : `Uang Keluar (${keluar.length})`}
+                                <IconX /> Reset Filter
                             </button>
-                        ))}
+                        )}
                     </div>
 
                     {tab === "OUT" && (
@@ -456,6 +748,16 @@ export default function CashflowPage() {
                         </button>
                     )}
                 </div>
+
+                {/* Filter Panel */}
+                {showFilter && (
+                    <FilterPanel
+                        filter={currentFilter}
+                        onChange={setCurrentFilter}
+                        onReset={() => setCurrentFilter(defaultCashflowFilter())}
+                        direction={tab}
+                    />
+                )}
 
                 {/* Info uang masuk otomatis */}
                 {tab === "IN" && (
@@ -498,10 +800,21 @@ export default function CashflowPage() {
                                 ) : rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={colCount} className="px-3.5 py-16 text-center">
-                                            <div className="text-3xl mb-2 opacity-30">📭</div>
+                                            <div className="text-3xl mb-2 opacity-30">{filterCount > 0 ? "🔍" : "📭"}</div>
                                             <p className="text-sm text-gray-400 font-medium">
-                                                Belum ada data {tab === "IN" ? "uang masuk" : "uang keluar"}.
+                                                {filterCount > 0
+                                                    ? `Tidak ada data yang cocok dengan filter (${allRows.length} entry tersembunyi).`
+                                                    : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`
+                                                }
                                             </p>
+                                            {filterCount > 0 && (
+                                                <button
+                                                    onClick={() => setCurrentFilter(defaultCashflowFilter())}
+                                                    className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
+                                                >
+                                                    <IconX /> Reset Filter
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ) : (
@@ -556,10 +869,11 @@ export default function CashflowPage() {
                         </table>
                     </div>
 
-                    {!loading && rows.length > 0 && (
+                    {!loading && (rows.length > 0 || filterCount > 0) && (
                         <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/40">
                             <p className="text-[11px] text-gray-400 font-medium">
-                                Menampilkan {rows.length} entry {tab === "IN" ? "uang masuk" : "uang keluar"}
+                                Menampilkan {rows.length} dari {allRows.length} entry {tab === "IN" ? "uang masuk" : "uang keluar"}
+                                {filterCount > 0 && ` · ${filterCount} filter aktif`}
                             </p>
                         </div>
                     )}

@@ -43,3 +43,89 @@ export function isValidCategory(direction: CashflowDirection, category: string):
 export function isAutoIncomeCategory(category: string): boolean {
   return AUTO_INCOME_CATEGORIES.includes(category);
 }
+
+// ── Filter Types ──────────────────────────────────────────────────────────────
+export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
+export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
+
+export interface CashflowFilter {
+  dateFrom: string;       // yyyy-mm-dd or ""
+  dateTo: string;         // yyyy-mm-dd or ""
+  category: string;       // category key or "ALL"
+  audit: AuditFilter;
+  source: SourceFilter;
+  search: string;         // free text search on nama / keterangan
+}
+
+export function defaultCashflowFilter(): CashflowFilter {
+  return {
+    dateFrom: "",
+    dateTo: "",
+    category: "ALL",
+    audit: "ALL",
+    source: "ALL",
+    search: "",
+  };
+}
+
+export function isFilterActive(f: CashflowFilter): boolean {
+  const d = defaultCashflowFilter();
+  return (
+    f.dateFrom !== d.dateFrom ||
+    f.dateTo !== d.dateTo ||
+    f.category !== d.category ||
+    f.audit !== d.audit ||
+    f.source !== d.source ||
+    f.search !== d.search
+  );
+}
+
+/** Count how many individual filter dimensions are active */
+export function activeFilterCount(f: CashflowFilter): number {
+  let c = 0;
+  if (f.dateFrom || f.dateTo) c++;
+  if (f.category !== "ALL") c++;
+  if (f.audit !== "ALL") c++;
+  if (f.source !== "ALL") c++;
+  if (f.search.trim()) c++;
+  return c;
+}
+
+/**
+ * Apply all filters client-side. Each entry must match ALL active filters.
+ */
+export function applyFilters<T extends {
+  tanggal?: string;
+  category?: string;
+  is_audited?: boolean;
+  source_type?: string;
+  nama?: string;
+  keterangan?: string | null;
+}>(entries: T[], filter: CashflowFilter): T[] {
+  const q = filter.search.trim().toLowerCase();
+
+  return entries.filter((e) => {
+    // Date range
+    if (filter.dateFrom && (e.tanggal || "") < filter.dateFrom) return false;
+    if (filter.dateTo && (e.tanggal || "") > filter.dateTo) return false;
+
+    // Category
+    if (filter.category !== "ALL" && e.category !== filter.category) return false;
+
+    // Audit status
+    if (filter.audit === "AUDITED" && !e.is_audited) return false;
+    if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
+
+    // Source type
+    if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
+    if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
+
+    // Search text
+    if (q) {
+      const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
+    return true;
+  });
+}
