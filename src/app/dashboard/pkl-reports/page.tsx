@@ -51,6 +51,14 @@ const STATUS_CONFIG = {
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
+// ── Shared style tokens (biar konsisten & DRY) ────────────────────────────────
+const CARD_STYLE = {
+    border: "1px solid #eef0f6",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 14px 32px -16px rgba(15,23,42,0.14)",
+} as const;
+const NAVY_GRADIENT = "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)";
+const NAVY_SHADOW = "0 8px 22px -6px rgba(15,12,41,0.45)";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isFullAccess(role?: string) { return !!role && FULL_ACCESS.includes(role); }
 function isKepala(role?: string) { return !!role && KEPALA_ROLES.includes(role); }
@@ -78,23 +86,28 @@ function getDivisionInfo(id: string) {
     return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" };
 }
 
-// ── Stat Card (pola sama dengan halaman Users) ────────────────────────────────
-function StatCard({ icon, value, label, accent, loading }: {
-    icon: string; value: number; label: string; accent: string; loading: boolean;
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+function StatCard({ icon, value, label, gradient, tint, loading }: {
+    icon: string; value: number; label: string; gradient: string; tint: string; loading: boolean;
 }) {
     return (
-        <div className="bg-white rounded-2xl p-4 relative overflow-hidden"
-            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
-            <div className="pl-3">
-                <div className="flex items-start justify-between mb-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">{label}</p>
-                    <span className="text-base">{icon}</span>
+        <div className="group relative bg-white rounded-2xl p-4 overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
+            style={CARD_STYLE}>
+            {/* soft corner glow */}
+            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-[0.10] transition-opacity duration-300 group-hover:opacity-20"
+                style={{ background: gradient }} />
+            <div className="relative flex items-start justify-between mb-3.5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] leading-none"
+                    style={{ background: tint }}>
+                    {icon}
                 </div>
-                <p className="text-2xl font-black text-[#0f172a] tabular-nums">
-                    {loading ? <span className="inline-block w-8 h-6 bg-[#f1f5f9] rounded animate-pulse" /> : value}
-                </p>
             </div>
+            <p className="relative text-[26px] font-black text-[#0f172a] tabular-nums leading-none">
+                {loading
+                    ? <span className="inline-block w-9 h-7 bg-[#f1f5f9] rounded-lg animate-pulse" />
+                    : value}
+            </p>
+            <p className="relative text-[10px] font-bold uppercase tracking-wider text-[#94a3b8] mt-2">{label}</p>
         </div>
     );
 }
@@ -178,19 +191,22 @@ function ReportFormModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
                 {/* Header */}
-                <div className="bg-gradient-to-br from-[#0f0c29] to-[#1a1545] px-6 py-5 flex items-start justify-between flex-shrink-0">
-                    <div>
-                        <p className="font-bold text-white text-base">
+                <div className="relative overflow-hidden px-6 py-5 flex items-start justify-between flex-shrink-0"
+                    style={{ background: NAVY_GRADIENT }}>
+                    <div className="absolute -top-10 -right-6 w-40 h-40 rounded-full blur-3xl opacity-30"
+                        style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
+                    <div className="relative">
+                        <p className="font-black text-white text-base tracking-tight">
                             {isEdit ? "✏️ Edit Laporan Kerja" : isAdminAdd ? "➕ Tambah Laporan (Admin)" : "📝 Buat Laporan Kerja"}
                         </p>
-                        <p className="text-xs text-white/60 mt-1">
+                        <p className="text-xs text-white/55 mt-1">
                             {isEdit ? "Update isi laporan kerja PKL" : "Catat kegiatan kerja harian PKL"}
                         </p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                    <button onClick={onClose} className="relative w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
@@ -234,7 +250,7 @@ function ReportFormModal({
                                         onClick={() => setForm(f => ({ ...f, division: div.id }))}
                                         className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all"
                                         style={form.division === div.id
-                                            ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", borderColor: "transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                                            ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                             : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                     >
                                         <span>{div.emoji}</span>
@@ -313,8 +329,8 @@ function ReportFormModal({
                     <button
                         onClick={save}
                         disabled={saving || !form.description.trim()}
-                        className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}
+                        className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                        style={{ background: NAVY_GRADIENT, boxShadow: NAVY_SHADOW }}
                     >
                         {saving
                             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
@@ -363,14 +379,17 @@ function ReviewModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
-                <div className="bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] px-6 py-5 flex items-start justify-between flex-shrink-0">
-                    <div>
-                        <p className="font-bold text-white text-base">🔍 Review Laporan</p>
+                <div className="relative overflow-hidden px-6 py-5 flex items-start justify-between flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" }}>
+                    <div className="absolute -top-10 -right-6 w-40 h-40 rounded-full blur-3xl opacity-30"
+                        style={{ background: "radial-gradient(circle, #a78bfa, transparent 70%)" }} />
+                    <div className="relative">
+                        <p className="font-black text-white text-base tracking-tight">🔍 Review Laporan</p>
                         <p className="text-xs text-white/70 mt-1">{report.users?.name ?? "—"} · {formatDateShort(report.report_date)}</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                    <button onClick={onClose} className="relative w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
@@ -429,8 +448,8 @@ function ReviewModal({
                 <div className="px-6 py-4 border-t border-[#f1f5f9] flex gap-3 flex-shrink-0">
                     <button onClick={onClose} className="flex-1 h-11 bg-[#f1f5f9] text-[#64748b] rounded-xl text-sm font-semibold hover:bg-[#e2e8f0] transition-all">Batal</button>
                     <button onClick={submit} disabled={saving}
-                        className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-                        style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 4px 14px rgba(124,58,237,0.3)" }}>
+                        className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                        style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 8px 22px -6px rgba(124,58,237,0.5)" }}>
                         {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "✔️ Simpan Review"}
                     </button>
                 </div>
@@ -464,16 +483,19 @@ function ReportDetailModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
-                <div className="bg-gradient-to-br from-[#0f0c29] to-[#1a1545] px-6 py-5 flex items-start justify-between flex-shrink-0">
-                    <div>
-                        <p className="font-bold text-white text-base">📄 Detail Laporan</p>
+                <div className="relative overflow-hidden px-6 py-5 flex items-start justify-between flex-shrink-0"
+                    style={{ background: NAVY_GRADIENT }}>
+                    <div className="absolute -top-10 -right-6 w-40 h-40 rounded-full blur-3xl opacity-30"
+                        style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
+                    <div className="relative">
+                        <p className="font-black text-white text-base tracking-tight">📄 Detail Laporan</p>
                         <p className="text-xs text-white/60 mt-1">
                             {report.users?.name ?? "—"} · {formatDateShort(report.report_date)}
                         </p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                    <button onClick={onClose} className="relative w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
@@ -549,8 +571,8 @@ function ReportDetailModal({
                     )}
                     {canDoReview && (
                         <button onClick={onReview}
-                            className="flex-1 h-10 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all"
-                            style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)" }}>
+                            className="flex-1 h-10 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all active:scale-[0.98]"
+                            style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 6px 18px -6px rgba(124,58,237,0.5)" }}>
                             🔍 Review Laporan
                         </button>
                     )}
@@ -593,7 +615,8 @@ export default function PKLReportsPage() {
         return PKL_ROLE_DIVISION_MAP[role] ?? "ALL";
     }
 
-    const [activeDivision, setActiveDivision] = useState<string>("ALL"); const [filterStatus, setFilterStatus] = useState<string>("ALL");
+    const [activeDivision, setActiveDivision] = useState<string>("ALL");
+    const [filterStatus, setFilterStatus] = useState<string>("ALL");
     const [filterPKL, setFilterPKL] = useState<string>("ALL");
     const [filterMonth, setFilterMonth] = useState<string>(() => getWIBToday().slice(0, 7));
     const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -606,6 +629,7 @@ export default function PKLReportsPage() {
     const [editReport, setEditReport] = useState<PKLReport | null>(null);
     const [prefillDate, setPrefillDate] = useState<string | null>(null);
     const [filterDate, setFilterDate] = useState<string | null>(null);
+
     // ── Fetch ──────────────────────────────────────────────────────────────
     const fetchReports = useCallback(async () => {
         if (!currentUser) return;
@@ -724,50 +748,57 @@ export default function PKLReportsPage() {
             <div className="min-h-screen bg-[#F7F7F8]">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 animate-fadeIn">
 
-                    {/* ── Header ── */}
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
-                            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                                    <path d="M5 11.5V17c0 1.5 3 3 7 3s7-1.5 7-3v-5.5" />
-                                </svg>
+                    {/* ── Hero Header ── */}
+                    <div className="relative overflow-hidden rounded-3xl px-5 sm:px-7 py-6 sm:py-7"
+                        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 55%, #241a5c 100%)" }}>
+                        {/* decorative glows */}
+                        <div className="absolute -top-16 -right-8 w-64 h-64 rounded-full blur-3xl opacity-30 pointer-events-none"
+                            style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
+                        <div className="absolute -bottom-24 left-8 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none"
+                            style={{ background: "radial-gradient(circle, #3b82f6, transparent 70%)" }} />
+
+                        <div className="relative flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/10 backdrop-blur-sm ring-1 ring-white/15">
+                                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                                        <path d="M5 11.5V17c0 1.5 3 3 7 3s7-1.5 7-3v-5.5" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white truncate">
+                                        Laporan Kerja PKL
+                                    </h1>
+                                    <p className="text-xs sm:text-[13px] text-white/55 mt-0.5">
+                                        {isPKLUser
+                                            ? "Buat dan pantau laporan kerja harianmu"
+                                            : isKepalaUser
+                                                ? `Pantau laporan kerja PKL divisi ${getDivisionInfo(activeDivision).label} · ${stats.uniquePKL} PKL aktif`
+                                                : `Pantau laporan kerja ${stats.uniquePKL} PKL aktif`}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="min-w-0">
-                                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#0f172a] truncate">
-                                    Laporan Kerja PKL
-                                </h1>
-                                <p className="text-xs sm:text-[13px] text-[#94a3b8] mt-0.5">
-                                    {isPKLUser
-                                        ? "Buat dan pantau laporan kerja harianmu"
-                                        : isKepalaUser
-                                            ? `Pantau laporan kerja PKL divisi ${getDivisionInfo(activeDivision).label} · ${stats.uniquePKL} PKL aktif`
-                                            : `Pantau laporan kerja ${stats.uniquePKL} PKL aktif`}
-                                </p>
-                            </div>
+                            {(isPKLUser || isAdminUser) && (
+                                <button
+                                    onClick={() => { setEditReport(null); setPrefillDate(null); setShowForm(true); }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-white px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-black/20"
+                                >
+                                    ➕ {isPKLUser ? "Buat Laporan" : "Tambah Manual"}
+                                </button>
+                            )}
                         </div>
-                        {(isPKLUser || isAdminUser) && (
-                            <button
-                                onClick={() => { setEditReport(null); setPrefillDate(null); setShowForm(true); }}
-                                className="flex items-center gap-1.5 text-xs font-bold text-white px-5 py-2.5 rounded-xl hover:opacity-90 transition-all"
-                                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}
-                            >
-                                ➕ {isPKLUser ? "Buat Laporan" : "Tambah Manual"}
-                            </button>
-                        )}
                     </div>
 
                     {/* ── Stat Cards ── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <StatCard icon="📋" value={stats.total} label="Total Laporan" loading={loading} accent="linear-gradient(180deg, #94a3b8, #64748b)" />
-                        <StatCard icon="📤" value={stats.submitted} label="Terkirim" loading={loading} accent="linear-gradient(180deg, #60a5fa, #0369a1)" />
-                        <StatCard icon="✅" value={stats.reviewed} label="Disetujui" loading={loading} accent="linear-gradient(180deg, #34d399, #059669)" />
-                        <StatCard icon="🔄" value={stats.revision} label="Perlu Revisi" loading={loading} accent="linear-gradient(180deg, #fbbf24, #d97706)" />
+                        <StatCard icon="📋" value={stats.total} label="Total Laporan" loading={loading} gradient="linear-gradient(135deg, #94a3b8, #475569)" tint="#f1f5f9" />
+                        <StatCard icon="📤" value={stats.submitted} label="Terkirim" loading={loading} gradient="linear-gradient(135deg, #60a5fa, #2563eb)" tint="#eff6ff" />
+                        <StatCard icon="✅" value={stats.reviewed} label="Disetujui" loading={loading} gradient="linear-gradient(135deg, #34d399, #059669)" tint="#ecfdf5" />
+                        <StatCard icon="🔄" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
                     </div>
 
                     {/* ── Filter Bar ── */}
-                    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
 
                         {/* Header strip — toggle di mobile */}
                         <div className="flex items-center justify-between px-5 sm:px-6 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
@@ -803,7 +834,7 @@ export default function PKLReportsPage() {
                                             onClick={() => setActiveDivision("ALL")}
                                             className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0"
                                             style={activeDivision === "ALL"
-                                                ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", borderColor: "transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                                                ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                 : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                         >
                                             🌐 Semua Divisi
@@ -814,7 +845,7 @@ export default function PKLReportsPage() {
                                                 onClick={() => setActiveDivision(div.id)}
                                                 className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0"
                                                 style={activeDivision === div.id
-                                                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", borderColor: "transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                                                    ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                     : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                             >
                                                 {div.emoji} {div.label}
@@ -905,7 +936,7 @@ export default function PKLReportsPage() {
                         const today = getWIBToday();
 
                         return (
-                            <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                            <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
                                 <div className="px-5 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-2" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
                                     <div>
                                         <p className="text-sm font-bold text-[#0f172a]">📅 Kalender Laporan</p>
@@ -1017,10 +1048,10 @@ export default function PKLReportsPage() {
                                     const topDiv = Object.entries(divCounts).sort((a, b) => b[1] - a[1])[0];
 
                                     return (
-                                        <div key={uid} className="bg-white rounded-2xl p-4 hover:shadow-md transition-all"
-                                            style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                                        <div key={uid} className="group bg-white rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5"
+                                            style={CARD_STYLE}>
                                             <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black flex-shrink-0"
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ring-2 ring-white shadow-sm"
                                                     style={{ background: "linear-gradient(135deg, #fbbf24, #b45309)" }}>
                                                     {initials(pklName)}
                                                 </div>
@@ -1073,7 +1104,7 @@ export default function PKLReportsPage() {
                     )}
 
                     {/* ── Daftar Laporan ── */}
-                    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
                         <div className="px-5 sm:px-6 py-5 flex items-center justify-between flex-wrap gap-3" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
                             <div>
                                 <p className="text-base font-bold text-[#0f172a]">
@@ -1141,7 +1172,7 @@ export default function PKLReportsPage() {
                                         >
                                             <div className="flex items-start gap-3 sm:gap-4">
                                                 {/* Avatar */}
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mt-0.5"
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 mt-0.5 ring-2 ring-white shadow-sm"
                                                     style={{ background: "linear-gradient(135deg, #fbbf24, #b45309)" }}>
                                                     {initials(report.users?.name ?? "?")}
                                                 </div>
@@ -1187,7 +1218,7 @@ export default function PKLReportsPage() {
                                                 </div>
 
                                                 {/* Chevron */}
-                                                <svg className="w-4 h-4 text-[#cbd5e1] group-hover:text-[#64748b] transition-colors flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-4 h-4 text-[#cbd5e1] group-hover:text-[#64748b] group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                                 </svg>
                                             </div>
@@ -1241,6 +1272,9 @@ export default function PKLReportsPage() {
                 .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16,1,0.3,1); }
                 .scrollbar-hide::-webkit-scrollbar { display: none; }
                 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+                @media (prefers-reduced-motion: reduce) {
+                    .animate-fadeIn, .animate-scaleIn { animation: none; }
+                }
             `}</style>
         </DashboardLayout>
     );
