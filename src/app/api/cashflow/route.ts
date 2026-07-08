@@ -147,6 +147,9 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             { status: 400 }
         );
 
+    // Setelah validasi payment_method, tambah:
+    const photoUrl = (body.photo_url as string | undefined) ?? null;
+
     const { data, error } = await supabase
         .from("cashflow_entries")
         .insert({
@@ -158,7 +161,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             keterangan: keterangan?.trim() || null,
             tanggal: tanggal || jakartaToday,
             source_type: "MANUAL",
-            payment_method: pm,     // ← TAMBAH INI
+            payment_method: pm,
+            photo_url: photoUrl,    // ← TAMBAH INI
             created_by: user.id,
         })
         .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
