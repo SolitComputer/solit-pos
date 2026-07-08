@@ -3,6 +3,7 @@ export type UserRole =
   | "KEPALA_SALES"
   | "CREW_SALES"
   | "ACCOUNTING"
+  | "PURCHASING"
   | "PENGELOLA_BARANG"
   | "TEKNISI"
   | "KEPALA_TEKNISI"
@@ -41,6 +42,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   KEPALA_SALES: "/dashboard",
   CREW_SALES: "/dashboard",
   ACCOUNTING: "/dashboard",
+  PURCHASING: "/dashboard/cashflow",
   PENGELOLA_BARANG: "/dashboard/laptops",
   KEPALA_PENGELOLA_BARANG: "/dashboard/laptops",
   TEKNISI: "/dashboard/service/antrian",
@@ -76,7 +78,8 @@ const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-  "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGELOLA_BARANG",
+  "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
+  "PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -193,8 +196,8 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
 ];
 
 // ─── Cashflow Roles ───────────────────────────────────────────────────────────
-// Sesuai permintaan: HANYA Admin & Programmer (ASISTEN_CEO sengaja TIDAK diikutkan)
-export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+// PURCHASING ditambahkan agar bisa akses cashflow
+export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "PURCHASING"];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -203,7 +206,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/units": [...ALL_UNITS_ROLES],
   "/dashboard/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
-    "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
+    "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
@@ -214,7 +217,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard/laptops/ready": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
     "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -223,13 +226,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
 
-  // ✅ FIX: Tambah KEPALA_ONPOINT, KEPALA_SOTECH ke warranty — disamakan KEPALA_SALES
-  // ONPOINT & SOTECH tidak diubah (tetap seperti semula)
   "/dashboard/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_MARKETING",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES",
   ],
 
@@ -241,7 +242,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SALES",
   ],
   "/dashboard": [...ALL_ROLES],
-  "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING"],
+  "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/attendance/overtime": [...ALL_ROLES],
@@ -264,7 +265,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
   "/api/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN",
+    "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PURCHASING", "PENGANTARAN",
     "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
@@ -282,23 +283,21 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
   "/api/transaction": [
-    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
+    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES",
   ],
 
-  // ✅ FIX: Tambah KEPALA_ONPOINT, KEPALA_SOTECH ke api/warranty
-  // ONPOINT tidak diubah
   "/api/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
     "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES",
   ],
 
-  "/api/reports": [...FULL_ACCESS, "ACCOUNTING"],
+  "/api/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
   "/api/units/reserve": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -312,14 +311,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
 
-  // ✅ FIX: KEPALA_ONPOINT & KEPALA_SOTECH disamakan KEPALA_SALES
-  // ONPOINT tidak diubah (tidak ada di sini sebelumnya)
   "/api/units/confirm-payment": [
     ...FULL_ACCESS,
     "KEPALA_SALES",
-    "KEPALA_SOTECH", // sudah ada sebelumnya
-    "SOTECH",        // sudah ada sebelumnya
-    "KEPALA_ONPOINT", // ✅ ADD
+    "KEPALA_SOTECH",
+    "SOTECH",
+    "KEPALA_ONPOINT",
   ],
 
   "/api/users": [...FULL_ACCESS],
@@ -372,6 +369,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
 
+  // ── Cashflow — PURCHASING punya akses penuh ────────────────────────────────
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
   "/api/cashflow": [...CASHFLOW_ROLES],
 
@@ -385,11 +383,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 
-  VIEW_FINANCIALS: [...FULL_ACCESS, "ACCOUNTING"] as UserRole[],
-  VIEW_REPORTS: [...FULL_ACCESS, "ACCOUNTING"] as UserRole[],
+  VIEW_FINANCIALS: [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"] as UserRole[],
+  VIEW_REPORTS: [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"] as UserRole[],
 
   VIEW_TRANSACTIONS: [
-    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "CREW_SALES", "SOTECH",
+    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
     ...TRANSACTION_VIEW,
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -421,8 +419,8 @@ export const PERMISSIONS = {
   ] as UserRole[],
 
   VIEW_LAPTOPS: [
-    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
-    "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING",
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING",
     "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
     "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
@@ -435,12 +433,12 @@ export const PERMISSIONS = {
   VIEW_BARCODE: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ FIX: kepala saja
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
   ] as UserRole[],
 
   VIEW_UNITS: [
-    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
-    "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
     "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -454,18 +452,17 @@ export const PERMISSIONS = {
    *  TETAP pakai EDIT_UNITS/CREATE_UNITS yang sudah ada — bukan permission baru. */
   VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
-  // ✅ FIX: hanya KEPALA_ONPOINT & KEPALA_SOTECH yang ditambah, ONPOINT tidak
   VIEW_WARRANTY: [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
     "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH", // ✅ ADD (bukan ONPOINT)
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES",
   ] as UserRole[],
   EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
   VIEW_READY_LAPTOPS: [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
@@ -499,7 +496,7 @@ export const PERMISSIONS = {
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
   DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[],
 
-  // ── Cashflow ────────────────────────────────────────────────────────────────
+  // ── Cashflow — PURCHASING punya akses penuh ────────────────────────────────
   VIEW_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
@@ -545,7 +542,7 @@ export const LAPTOP_VIEW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
-  "ACCOUNTING", "PENGANTARAN",
+  "ACCOUNTING", "PURCHASING", "PENGANTARAN",
   "MARKETING", "KEPALA_MARKETING",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT",
