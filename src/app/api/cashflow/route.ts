@@ -129,7 +129,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data: inserted }, { status: 201 });
     }
 
-    // ── Regular: Uang Keluar Manual (OUT) ─────────────────────────────────────
+    // ── Regular: Uang Keluar Manual (OUT) ─────────────────────────────────────────
     if (direction !== "OUT")
         return NextResponse.json(
             { success: false, message: "Hanya uang keluar yang bisa diinput manual" },
@@ -138,6 +138,14 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
 
     if (!isValidCategory(direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
+
+    // ← TAMBAH validasi payment_method
+    const pm = body.payment_method as string | undefined;
+    if (!pm || !["CASH", "SALDO"].includes(pm))
+        return NextResponse.json(
+            { success: false, message: "Metode pembayaran harus CASH atau SALDO" },
+            { status: 400 }
+        );
 
     const { data, error } = await supabase
         .from("cashflow_entries")
@@ -150,6 +158,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
             keterangan: keterangan?.trim() || null,
             tanggal: tanggal || jakartaToday,
             source_type: "MANUAL",
+            payment_method: pm,     // ← TAMBAH INI
             created_by: user.id,
         })
         .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)

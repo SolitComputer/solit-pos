@@ -34,6 +34,7 @@ type Entry = {
     source_type: "MANUAL" | "TRANSACTION" | "SERVICE" | "MODAL_AWAL";
     source_id: string | null;
     tanggal: string;
+    payment_method: "CASH" | "SALDO" | null; // ← TAMBAH INI
     is_audited: boolean;
     audited_at: string | null;
     created_by_user?: { name: string } | null;
@@ -573,6 +574,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH"); // ← BARU
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -596,6 +598,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     nominal: Number(nominal),
                     keterangan: keterangan.trim() || null,
                     tanggal,
+                    payment_method: paymentMethod, // ← BARU
                 }),
             });
             const json = await res.json();
@@ -636,6 +639,35 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
                 {/* Body */}
                 <div className="p-5 space-y-3.5">
+                    {/* ── BARU: Toggle Cash / Saldo ── */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
+                            Metode Pembayaran <span className="text-red-500">*</span>
+                        </label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod("CASH")}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "CASH"
+                                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                                    : "text-gray-400 hover:text-gray-600"
+                                    }`}
+                            >
+                                <span className="text-base">💵</span> Cash
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod("SALDO")}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === "SALDO"
+                                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                                    : "text-gray-400 hover:text-gray-600"
+                                    }`}
+                            >
+                                <span className="text-base">🏦</span> Saldo
+                            </button>
+                        </div>
+                    </div>
+
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -648,7 +680,14 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal</label>
-                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            <input
+                                type="number"
+                                value={nominal}
+                                onChange={(e) => setNominal(e.target.value)}
+                                placeholder="0"
+                                className={`${inputCls} font-mono`}
+                                autoFocus
+                            />
                             {nominal && Number(nominal) > 0 && (
                                 <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>
                             )}
@@ -661,10 +700,18 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                        <textarea
+                            value={keterangan}
+                            onChange={(e) => setKeterangan(e.target.value)}
+                            rows={2}
+                            placeholder="Catatan tambahan..."
+                            className={`${inputCls.replace("h-10", "")} py-2 resize-none`}
+                        />
                     </div>
 
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -809,7 +856,7 @@ export default function CashflowPage() {
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
     const allRows = tab === "IN" ? masuk : keluar;
     const rows = applyFilters(allRows, currentFilter);
-    const colCount = 8;
+    const colCount = 9;
     const filterCount = activeFilterCount(currentFilter);
 
     // ── Pagination ──
@@ -1047,7 +1094,7 @@ export default function CashflowPage() {
                         <table className="w-full text-sm" style={{ minWidth: 820 }}>
                             <thead>
                                 <tr className="border-b border-gray-100 bg-gray-50/70">
-                                    {["Tanggal", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
+                                    {["Tanggal", "Metode", "Nama", "Kategori", "Nominal", "Keterangan", "Audit", "Diaudit", ""].map((h, i) => (
                                         <th
                                             key={i}
                                             className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap ${h === "Nominal" ? "text-right" : "text-left"
@@ -1098,7 +1145,29 @@ export default function CashflowPage() {
                                                 onClick={() => clickable && openSource(e)}
                                                 className={`transition-colors ${clickable ? "cursor-pointer hover:bg-blue-50/50" : "hover:bg-gray-50/70"}`}
                                             >
-                                                <td className="pl-5 pr-3.5 py-3 text-[12px] text-gray-500 whitespace-nowrap">{fmtTanggal(e.tanggal)}</td>
+                                                {/* 1. Tanggal */}
+                                                <td className="pl-5 pr-3.5 py-3 text-[12px] text-gray-500 whitespace-nowrap">
+                                                    {fmtTanggal(e.tanggal)}
+                                                </td>
+
+                                                {/* 2. Metode Cash/Saldo */}
+                                                <td className="px-3.5 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                                                    {e.direction === "OUT" && e.source_type === "MANUAL" ? (
+                                                        e.payment_method === "SALDO" ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                                                🏦 Saldo
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                                                                💵 Cash
+                                                            </span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-gray-300 text-[11px]">—</span>
+                                                    )}
+                                                </td>
+
+                                                {/* 3. Nama */}
                                                 <td className="px-3.5 py-3">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-[13px] font-semibold text-gray-800">
@@ -1107,7 +1176,9 @@ export default function CashflowPage() {
                                                                 : e.nama}
                                                         </span>
                                                         {e.source_type !== "MANUAL" && e.source_type !== "MODAL_AWAL" && (
-                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">AUTO</span>
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
+                                                                AUTO
+                                                            </span>
                                                         )}
                                                     </div>
                                                     {e.source_type === "MODAL_AWAL" && (
@@ -1116,6 +1187,8 @@ export default function CashflowPage() {
                                                         </p>
                                                     )}
                                                 </td>
+
+                                                {/* 4. Kategori */}
                                                 <td className="px-3.5 py-3">
                                                     {e.source_type === "MODAL_AWAL" ? (
                                                         <span className="inline-flex text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap">
@@ -1127,25 +1200,44 @@ export default function CashflowPage() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+
+                                                {/* 5. Nominal */}
+                                                <td className={`px-3.5 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"
+                                                    }`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                 </td>
-                                                <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px] truncate">{e.keterangan || "—"}</td>
+
+                                                {/* 6. Keterangan */}
+                                                <td className="px-3.5 py-3 text-[12px] text-gray-500 max-w-[240px] truncate">
+                                                    {e.keterangan || "—"}
+                                                </td>
+
+                                                {/* 7. Audit */}
                                                 <td className="px-3.5 py-3" onClick={(ev) => ev.stopPropagation()}>
                                                     <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} />
                                                 </td>
+
+                                                {/* 8. Diaudit */}
                                                 <td className="px-3.5 py-3 text-[11px] whitespace-nowrap">
                                                     {e.audited_by_user?.name
                                                         ? <span className="text-emerald-600" title="Diaudit oleh">🔍 {e.audited_by_user.name}</span>
                                                         : <span className="text-gray-300">—</span>}
                                                 </td>
+
+                                                {/* 9. Action */}
                                                 <td className="px-3.5 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
-                                                        <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus">
+                                                        <button
+                                                            onClick={() => deleteEntry(e)}
+                                                            className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                            title="Hapus"
+                                                        >
                                                             <IconTrash />
                                                         </button>
                                                     ) : clickable ? (
-                                                        <span className="inline-flex text-gray-300" title="Buka sumber"><IconExternal /></span>
+                                                        <span className="inline-flex text-gray-300" title="Buka sumber">
+                                                            <IconExternal />
+                                                        </span>
                                                     ) : null}
                                                 </td>
                                             </tr>
@@ -1205,11 +1297,10 @@ export default function CashflowPage() {
                                                 <button
                                                     key={p}
                                                     onClick={() => setCurrentPage(p)}
-                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${
-                                                        p === safePage
-                                                            ? "bg-gray-900 text-white shadow-sm"
-                                                            : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
-                                                    }`}
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${p === safePage
+                                                        ? "bg-gray-900 text-white shadow-sm"
+                                                        : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
+                                                        }`}
                                                 >
                                                     {p}
                                                 </button>

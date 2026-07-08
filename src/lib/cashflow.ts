@@ -29,6 +29,8 @@ export const EXPENSE_CATEGORIES = {
   AKSESORIS: "Aksesoris",
   MODAL_SERVICE: "Modal Service",
   PIUTANG: "Piutang",
+  KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",  // ← BARU
+  BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
 
 export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"];
