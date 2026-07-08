@@ -88,6 +88,26 @@ const IconExternal = () => (
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
     </svg>
 );
+const IconChevronLeft = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="15 18 9 12 15 6" />
+    </svg>
+);
+const IconChevronRight = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 6 15 12 9 18" />
+    </svg>
+);
+const IconChevronsLeft = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" />
+    </svg>
+);
+const IconChevronsRight = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" />
+    </svg>
+);
 
 // ── Audit cell (one-way: sekali audit → terkunci) ────────────────────────────
 function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
@@ -437,14 +457,14 @@ export default function CashflowPage() {
     const [keluar, setKeluar] = useState<Entry[]>([]);
     const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0 });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
-    const [summaryFrom, setSummaryFrom] = useState("");
-    const [summaryTo, setSummaryTo] = useState("");
+    const [period, setPeriod] = useState<"today" | "month">("today");
     const [showModal, setShowModal] = useState(false);
     const [showFilter, setShowFilter] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
     const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 70;
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -551,42 +571,20 @@ export default function CashflowPage() {
     const colCount = 8;
     const filterCount = activeFilterCount(currentFilter);
 
-    // ── Summary per periode (client-side, WIB) ──
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const getSummaryRange = (): { from: string; to: string } => {
-        if (period === "custom") return { from: summaryFrom, to: summaryTo };
-        if (period === "today") return { from: jakartaToday, to: jakartaToday };
-        if (period === "week") {
-            const now = new Date();
-            const day = now.getDay();
-            const start = new Date(now);
-            start.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-            return { from: start.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), to: jakartaToday };
-        }
-        // month
-        const monthPrefix = jakartaToday.slice(0, 7);
-        return { from: `${monthPrefix}-01`, to: jakartaToday };
-    };
-    const { from: sFrom, to: sTo } = getSummaryRange();
+    // ── Pagination ──
+    const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
+    const safePage = Math.min(currentPage, totalPages);
+    const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
-    const inRange = (tanggal?: string) => {
-        if (!tanggal) return false;
-        if (sFrom && tanggal < sFrom) return false;
-        if (sTo && tanggal > sTo) return false;
-        return true;
-    };
+    // Reset ke halaman 1 saat ganti tab atau filter berubah
+    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
-    const filteredMasuk = masuk.filter((e) => inRange(e.tanggal));
-    const filteredKeluar = keluar.filter((e) => inRange(e.tanggal));
-    const summaryIncome = filteredMasuk.reduce((s, e) => s + Number(e.nominal || 0), 0);
-    const summaryExpense = filteredKeluar.reduce((s, e) => s + Number(e.nominal || 0), 0);
-    const summarySaldo = summaryIncome - summaryExpense;
-    const summaryUnaudited = [...filteredMasuk, ...filteredKeluar].filter((e) => !e.is_audited).length;
-
-    const periodLabel = period === "today" ? "Hari Ini"
-        : period === "week" ? "Minggu Ini"
-            : period === "month" ? "Bulan Ini"
-                : (sFrom || sTo) ? `${sFrom ? fmtTanggal(sFrom) : "..."} — ${sTo ? fmtTanggal(sTo) : "..."}` : "Custom";
+    // ── Total uang masuk per periode (client-side, WIB) ──
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // yyyy-mm-dd
+    const monthPrefix = jakartaToday.slice(0, 7);
+    const incomeToday = masuk.reduce((s, e) => (e.tanggal === jakartaToday ? s + Number(e.nominal || 0) : s), 0);
+    const incomeMonth = masuk.reduce((s, e) => ((e.tanggal || "").slice(0, 7) === monthPrefix ? s + Number(e.nominal || 0) : s), 0);
+    const incomeValue = period === "today" ? incomeToday : incomeMonth;
 
     return (
         <DashboardLayout>
@@ -627,67 +625,48 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* Hero: Uang Masuk + Periode Selector */}
+                {/* Hero: Uang Masuk (Hari Ini / Bulan Ini) */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
-                                💰 Uang Masuk · {periodLabel}
+                                💰 Uang Masuk {period === "today" ? "Hari Ini" : "Bulan Ini"}
                             </p>
                             <p className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight tabular-nums">
-                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(summaryIncome)}
+                                {loading ? <span className="text-gray-300">—</span> : fmtRupiah(incomeValue)}
                             </p>
                             <p className="text-[11px] text-gray-400 mt-1.5">Cashflow masuk otomatis dari transaksi & service</p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
-                                {([["today", "Hari Ini"], ["week", "Minggu Ini"], ["month", "Bulan Ini"], ["custom", "Custom"]] as const).map(([val, label]) => (
-                                    <button
-                                        key={val}
-                                        onClick={() => setPeriod(val)}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
-                                            }`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                            {period === "custom" && (
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="date"
-                                        value={summaryFrom}
-                                        onChange={(e) => setSummaryFrom(e.target.value)}
-                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition"
-                                    />
-                                    <span className="text-xs text-gray-400">—</span>
-                                    <input
-                                        type="date"
-                                        value={summaryTo}
-                                        onChange={(e) => setSummaryTo(e.target.value)}
-                                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition"
-                                    />
-                                </div>
-                            )}
+                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5">
+                            {([["today", "Hari Ini"], ["month", "Bulan Ini"]] as const).map(([val, label]) => (
+                                <button
+                                    key={val}
+                                    onClick={() => setPeriod(val)}
+                                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition ${period === val ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                                        }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Summary: Keluar | Saldo | Belum Audit — semua ikut periode */}
+                {/* Summary: Keluar | Saldo (tengah) | Belum Audit */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard label={`Total Uang Keluar`} value={fmtRupiah(summaryExpense)} accent="red" hint={periodLabel} loading={loading} />
+                    <StatCard label="Total Uang Keluar" value={fmtRupiah(summary.total_keluar)} accent="red" loading={loading} />
                     <StatCard
                         label="Saldo Cashflow"
-                        value={fmtRupiah(summarySaldo)}
+                        value={fmtRupiah(summary.saldo)}
                         accent="dark"
-                        hint={`Masuk − Keluar · ${periodLabel}`}
+                        hint="Total masuk dikurangi total keluar"
                         loading={loading}
                     />
                     <StatCard
                         label="Belum Diaudit"
-                        value={`${summaryUnaudited} entry`}
+                        value={`${summary.belum_audit} entry`}
                         accent="amber"
-                        hint={periodLabel}
+                        hint="Menunggu verifikasi audit"
                         loading={loading}
                     />
                 </div>
@@ -726,15 +705,6 @@ export default function CashflowPage() {
                                 </span>
                             )}
                         </button>
-
-                        {filterCount > 0 && (
-                            <button
-                                onClick={() => { setCurrentFilter(defaultCashflowFilter()); }}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 transition"
-                            >
-                                <IconX /> Reset Filter
-                            </button>
-                        )}
                     </div>
 
                     {tab === "OUT" && (
@@ -817,7 +787,7 @@ export default function CashflowPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    rows.map((e) => {
+                                    paginatedRows.map((e) => {
                                         const clickable = e.direction === "IN";
                                         return (
                                             <tr
@@ -869,11 +839,86 @@ export default function CashflowPage() {
                     </div>
 
                     {!loading && (rows.length > 0 || filterCount > 0) && (
-                        <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/40">
+                        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
                             <p className="text-[11px] text-gray-400 font-medium">
-                                Menampilkan {rows.length} dari {allRows.length} entry {tab === "IN" ? "uang masuk" : "uang keluar"}
+                                Menampilkan {(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)} dari {rows.length} entry{rows.length !== allRows.length ? ` (total ${allRows.length})` : ""}
                                 {filterCount > 0 && ` · ${filterCount} filter aktif`}
                             </p>
+
+                            {totalPages > 1 && (
+                                <div className="flex items-center gap-1">
+                                    {/* First */}
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={safePage === 1}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                        title="Halaman pertama"
+                                    >
+                                        <IconChevronsLeft />
+                                    </button>
+                                    {/* Prev */}
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={safePage === 1}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                        title="Sebelumnya"
+                                    >
+                                        <IconChevronLeft />
+                                    </button>
+
+                                    {/* Page numbers */}
+                                    {(() => {
+                                        const pages: (number | "...")[] = [];
+                                        if (totalPages <= 7) {
+                                            for (let i = 1; i <= totalPages; i++) pages.push(i);
+                                        } else {
+                                            pages.push(1);
+                                            if (safePage > 3) pages.push("...");
+                                            const start = Math.max(2, safePage - 1);
+                                            const end = Math.min(totalPages - 1, safePage + 1);
+                                            for (let i = start; i <= end; i++) pages.push(i);
+                                            if (safePage < totalPages - 2) pages.push("...");
+                                            pages.push(totalPages);
+                                        }
+                                        return pages.map((p, i) =>
+                                            p === "..." ? (
+                                                <span key={`dots-${i}`} className="w-8 h-8 flex items-center justify-center text-[11px] text-gray-400">…</span>
+                                            ) : (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => setCurrentPage(p)}
+                                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold transition ${
+                                                        p === safePage
+                                                            ? "bg-gray-900 text-white shadow-sm"
+                                                            : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
+                                                    }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            )
+                                        );
+                                    })()}
+
+                                    {/* Next */}
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={safePage === totalPages}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                        title="Berikutnya"
+                                    >
+                                        <IconChevronRight />
+                                    </button>
+                                    {/* Last */}
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={safePage === totalPages}
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                        title="Halaman terakhir"
+                                    >
+                                        <IconChevronsRight />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
