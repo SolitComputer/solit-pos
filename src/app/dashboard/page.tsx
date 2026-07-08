@@ -408,7 +408,7 @@ export default function Page() {
     setNow(d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
     fetchAll(false);
 
-    const interval = setInterval(() => { fetchAll(true); }, 30000);
+    const interval = setInterval(() => { fetchAll(true); }, 60000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 

@@ -9,6 +9,46 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === "development",
+
+  workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
+    navigateFallback: undefined,
+    // ✅ exclude .rsc & map & build-manifest dari precache (di sini, bukan di atas)
+    exclude: [/\.map$/, /\.rsc$/, /app-build-manifest\.json$/],
+    runtimeCaching: [
+      {
+        // Navigasi + request RSC → selalu network
+        urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+          request.mode === "navigate" ||
+          request.headers.get("RSC") === "1" ||
+          url.search.includes("_rsc="),
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith("/api/"),
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: ({ url }: { url: URL }) =>
+          url.pathname.startsWith("/_next/static/"),
+        handler: "CacheFirst",
+        options: {
+          cacheName: "next-static",
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: ({ request }: { request: Request }) =>
+          ["image", "font"].includes(request.destination),
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "assets",
+          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+    ],
+  },
 });
 
 const nextConfig: NextConfig = {
@@ -22,9 +62,7 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
-        // Pertahankan fallback yang sudah ada (kalau ada)
         ...config.resolve.fallback,
-        // Node.js built-ins yang dipakai face-api.js tapi tidak tersedia di browser
         fs: false,
         path: false,
         crypto: false,

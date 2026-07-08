@@ -77,9 +77,9 @@ export const MISSION_STATUS_META: Record<
         icon: string;
     }
 > = {
-    PENDING: { label: "Menunggu", bg: "#f8fafc", text: "#475569", border: "#e2e8f0", icon: "🕒" },
-    IN_PROGRESS: { label: "Dikerjakan", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", icon: "⚙️" },
-    SUBMITTED: { label: "Menunggu ACC", bg: "#fffbeb", text: "#b45309", border: "#fde68a", icon: "📤" },
+    PENDING: { label: "Audit", bg: "#f8fafc", text: "#475569", border: "#e2e8f0", icon: "🕒" },
+    IN_PROGRESS: { label: "On Progress", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", icon: "⚙️" },
+    SUBMITTED: { label: "Audit", bg: "#fffbeb", text: "#b45309", border: "#fde68a", icon: "🔍" },
     APPROVED: { label: "Disetujui", bg: "#ecfdf5", text: "#059669", border: "#a7f3d0", icon: "✅" },
     REJECTED: { label: "Ditolak", bg: "#fff1f2", text: "#be123c", border: "#fecdd3", icon: "❌" },
 };

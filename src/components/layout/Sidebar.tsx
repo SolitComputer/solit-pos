@@ -7,15 +7,20 @@
 //  • Versi C (Ikmal/latest) : + rail mode, resize, collapse group, missions,
 //                              preparation menus, badge notifikasi, alarm,
 //                              multi-role support, usePrepNotify, usePrepAlarm
-// Strategi: UNION. Semua fitur & menu per-role dipertahankan (tidak ada yang hilang).
 //
 // ── UPDATE: Konsolidasi Inventaris ───────────────────────────────────────────
-// "Data Laptop", "Laptop Siap Jual", "Laptop Minus", "Data Aksesori" DIHAPUS
-// sebagai item terpisah → digabung jadi 1 item "Data Barang" yang mengarah ke
-// /dashboard/data-barang?tab=laptops (halaman ber-tab).
-// Item lain di grup Inventaris (Semua Unit, Garansi) TIDAK terpengaruh.
-// Penggantian dilakukan lewat normalization pass di akhir file (lihat bagian
-// "Konsolidasi item inventaris") supaya semua role otomatis kena, termasuk PKL.
+// "Data Barang" (tab gabungan) sekarang hanya berisi:
+//   • Data Laptop   → /dashboard/laptops
+//   • Aksesoris     → /dashboard/accessories
+//
+// "Laptop Siap Jual" dan "Laptop Minus" DIPISAH jadi item sidebar tersendiri:
+//   • Laptop Siap Jual → /dashboard/laptops/ready  (ITEM_LAPTOP_SIAP_JUAL)
+//   • Laptop Minus     → /dashboard/laptops/minus  (ITEM_LAPTOP_MINUS)
+//
+// Normalization pass (DATA_BARANG_LEGACY_HREFS) hanya meng-collapse
+// /dashboard/laptops dan /dashboard/accessories saja.
+// /dashboard/laptops/ready dan /dashboard/laptops/minus TIDAK di-collapse
+// supaya tetap muncul sebagai item terpisah sesuai definisi di ROLE_MENUS.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Link from "next/link";
@@ -43,16 +48,22 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return false;
   if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
 
-  // Data Barang: usePathname() membuang query string, jadi saat berada di
-  // /dashboard/data-barang?tab=laptops, `pathname` = "/dashboard/data-barang".
-  // Sedangkan href-nya mengandung "?tab=laptops". Tanpa branch ini,
-  // pathname === href & startsWith keduanya false → menu tidak pernah active.
-  // Kita cocokkan berdasarkan pathname saja (semua tab tetap meng-highlight menu).
+  // Data Barang: cocokkan berdasarkan pathname saja (semua tab tetap highlight menu)
   if (href.startsWith("/dashboard/data-barang")) {
     return (
       pathname === "/dashboard/data-barang" ||
       pathname.startsWith("/dashboard/data-barang/")
     );
+  }
+
+  // ── Laptop Siap Jual & Minus sebagai route standalone ─────────────────────
+  // Harus di-cek SEBELUM fallback startsWith("/dashboard/laptops")
+  // supaya /dashboard/laptops/ready tidak ikut menghighlight item /dashboard/laptops
+  if (href === "/dashboard/laptops/ready") {
+    return pathname === "/dashboard/laptops/ready";
+  }
+  if (href === "/dashboard/laptops/minus") {
+    return pathname === "/dashboard/laptops/minus";
   }
 
   if (href === "/dashboard/preparation") {
@@ -67,9 +78,6 @@ function isItemActive(href: string, pathname: string): boolean {
         !pathname.startsWith("/dashboard/preparation/siap-kirim"))
     );
   }
-  // NOTE: branch laptops di bawah ini sekarang praktis dead-code (tidak ada item
-  // dengan href /dashboard/laptops lagi), tapi dibiarkan agar deep-link lama
-  // /dashboard/laptops (kalau masih ada) tetap ter-handle dengan benar.
   if (href === "/dashboard/laptops") {
     return (
       pathname === "/dashboard/laptops" ||
@@ -89,21 +97,34 @@ function getCachedUser() {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setCachedUser(user: any) {
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(user)); } catch { }
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(user));
+  } catch {}
 }
 
-interface MenuItem { name: string; href: string; icon: React.ReactNode }
-interface MenuGroup { label: string; items: MenuItem[] }
+interface MenuItem {
+  name: string;
+  href: string;
+  icon: React.ReactNode;
+}
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
 
 const Icons = {
   dashboard: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </svg>
   ),
   attendance: (
@@ -121,13 +142,15 @@ const Icons = {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
     </svg>
   ),
   laptop: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   garansi: (
@@ -143,8 +166,10 @@ const Icons = {
   ),
   scanner: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M4 7V5a1 1 0 011-1h2" /><path d="M20 7V5a1 1 0 00-1-1h-2" />
-      <path d="M4 17v2a1 1 0 001 1h2" /><path d="M20 17v2a1 1 0 01-1 1h-2" />
+      <path d="M4 7V5a1 1 0 011-1h2" />
+      <path d="M20 7V5a1 1 0 00-1-1h-2" />
+      <path d="M4 17v2a1 1 0 001 1h2" />
+      <path d="M20 17v2a1 1 0 01-1 1h-2" />
       <path d="M7 12h10" />
     </svg>
   ),
@@ -170,22 +195,26 @@ const Icons = {
   ),
   reports: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" />
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+      <line x1="2" y1="20" x2="22" y2="20" />
     </svg>
   ),
   laptopReady: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M9 12l2 2 4-4" />
       <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   laptopMinus: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M12 9v4m0 4h.01" />
       <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   ),
   pendingOrders: (
@@ -221,7 +250,8 @@ const Icons = {
   ),
   serviceHistory: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" />
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" />
     </svg>
   ),
   pklReport: (
@@ -237,7 +267,6 @@ const Icons = {
       <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </svg>
   ),
-  // ── Icon baru untuk "Data Barang" (package/box) ─────────────────────────────
   barang: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -274,7 +303,8 @@ const Icons = {
   ),
   deliveryRoute: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" />
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="18" cy="5" r="2" />
       <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
     </svg>
   ),
@@ -286,7 +316,8 @@ const Icons = {
   ),
   missionDashboard: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4" />
       <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
     </svg>
   ),
@@ -297,7 +328,8 @@ const Icons = {
   ),
   missionHistory: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" />
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" />
       <polyline points="12 8 12 12 15 14" />
     </svg>
   ),
@@ -322,11 +354,24 @@ const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/miss
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 
-// ── Item gabungan baru ────────────────────────────────────────────────────────
+// ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
 const ITEM_DATA_BARANG: MenuItem = {
   name: "Data Barang",
   href: "/dashboard/data-barang?tab=laptops",
   icon: Icons.barang,
+};
+
+// ── Item Laptop Siap Jual & Minus sebagai sidebar item standalone ─────────────
+const ITEM_LAPTOP_SIAP_JUAL: MenuItem = {
+  name: "Laptop Siap Jual",
+  href: "/dashboard/laptops/ready",
+  icon: Icons.laptopReady,
+};
+
+const ITEM_LAPTOP_MINUS: MenuItem = {
+  name: "Laptop Minus",
+  href: "/dashboard/laptops/minus",
+  icon: Icons.laptopMinus,
 };
 
 const MISSIONS_MENU: MenuGroup = {
@@ -340,7 +385,11 @@ const MISSIONS_MENU: MenuGroup = {
 
 const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-const ITEM_MISSION_ALL: MenuItem = { name: "Semua Misi", href: "/dashboard/missions/all", icon: Icons.missionAll };
+const ITEM_MISSION_ALL: MenuItem = {
+  name: "Semua Misi",
+  href: "/dashboard/missions/all",
+  icon: Icons.missionAll,
+};
 
 // ── Preparation groups ────────────────────────────────────────────────────────
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
@@ -402,7 +451,9 @@ const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+    ITEM_ABSENSI,
+    ITEM_LEMBUR,
+    ITEM_PKL_REPORT,
     ITEM_MISSIONS,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
@@ -413,17 +464,17 @@ const ADMIN_OVERVIEW: MenuGroup = {
   ],
 };
 
-// NOTE: item laptop/aksesoris di grup Inventaris dibiarkan apa adanya di sini.
-// Nanti di-replace jadi 1 "Data Barang" oleh normalization pass di akhir file.
+// ── ADMIN_INVENTARIS: Data Barang (laptop+aksesoris) + Siap Jual + Minus + Garansi + Semua Unit
+// Legacy href /dashboard/laptops, /dashboard/laptops/ready, /dashboard/laptops/minus,
+// /dashboard/accessories sudah tidak ada di sini — digantikan item baru.
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+    ITEM_DATA_BARANG,
+    ITEM_LAPTOP_SIAP_JUAL,
+    ITEM_LAPTOP_MINUS,
     ITEM_ALL_UNITS,
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-    { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
-    ITEM_ACCESSORIES,
   ],
 };
 
@@ -451,18 +502,21 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+    ITEM_ABSENSI,
+    ITEM_LEMBUR,
+    ITEM_PKL_REPORT,
     ITEM_MISSIONS,
     ...extra,
   ],
 });
 
+// SALES: Data Barang (laptop+aksesoris) + Siap Jual + Garansi
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+    ITEM_DATA_BARANG,
+    ITEM_LAPTOP_SIAP_JUAL,
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-    { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
   ],
 };
 
@@ -486,22 +540,22 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   ],
 };
 
-// ── PKL shared menu — SENGAJA tidak ada ITEM_MISSIONS ────────────────────────
+// ── PKL menus — TIDAK ada ITEM_MISSIONS ──────────────────────────────────────
+const PKL_INVENTARIS_BASIC: MenuGroup = {
+  label: "Inventaris",
+  items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
+};
+
 const PKL_MENU: MenuGroup[] = [
   {
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI, ITEM_PKL_REPORT,
+      ITEM_ABSENSI,
+      ITEM_PKL_REPORT,
     ],
   },
-  {
-    label: "Inventaris",
-    items: [
-      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    ],
-  },
+  PKL_INVENTARIS_BASIC,
   {
     label: "Transaksi",
     items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
@@ -517,16 +571,11 @@ const PKL_SALES_MENU: MenuGroup[] = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI, ITEM_PKL_REPORT,
+      ITEM_ABSENSI,
+      ITEM_PKL_REPORT,
     ],
   },
-  {
-    label: "Inventaris",
-    items: [
-      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    ],
-  },
+  PKL_INVENTARIS_BASIC,
   {
     label: "Transaksi",
     items: [
@@ -545,16 +594,11 @@ const PKL_PENYEDIA_MENU: MenuGroup[] = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI, ITEM_PKL_REPORT,
+      ITEM_ABSENSI,
+      ITEM_PKL_REPORT,
     ],
   },
-  {
-    label: "Inventaris",
-    items: [
-      { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-      { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-    ],
-  },
+  PKL_INVENTARIS_BASIC,
   PREPARATION_PENYEDIA_MENU,
   {
     label: "Transaksi",
@@ -571,7 +615,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   // ── ADMIN & setara ──────────────────────────────────────────────────────────
   ADMIN: [
     ADMIN_OVERVIEW,
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+    ADMIN_INVENTARIS,
+    ADMIN_TRANSAKSI,
+    ADMIN_PENYEDIA_MENU,
+    ADMIN_PENGANTARAN_MENU,
+    SERVICE_MENU,
   ],
 
   PROGRAMMER: [
@@ -579,7 +627,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_PKL_REPORT,
         ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
@@ -589,7 +639,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
     },
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+    ADMIN_INVENTARIS,
+    ADMIN_TRANSAKSI,
+    ADMIN_PENYEDIA_MENU,
+    ADMIN_PENGANTARAN_MENU,
+    SERVICE_MENU,
   ],
 
   ASISTEN_CEO: [
@@ -597,7 +651,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_PKL_REPORT,
         ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
@@ -605,50 +661,71 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
       ],
     },
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+    ADMIN_INVENTARIS,
+    ADMIN_TRANSAKSI,
+    ADMIN_PENYEDIA_MENU,
+    ADMIN_PENGANTARAN_MENU,
+    SERVICE_MENU,
   ],
 
   // ── SALES ──────────────────────────────────────────────────────────────────
   KEPALA_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   CREW_SALES: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   PENGANTARAN: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, PENGANTARAN_TRANSAKSI,
+    SALES_INVENTARIS,
+    PENGANTARAN_TRANSAKSI,
     PREPARATION_PENGANTARAN_MENU,
   ],
 
   KEPALA_ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   ONPOINT: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   KEPALA_SOTECH: [
     SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   // ── TEKNISI ────────────────────────────────────────────────────────────────
@@ -657,16 +734,18 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_DATA_BARANG,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        ITEM_LAPTOP_MINUS,
       ],
     },
     {
@@ -682,19 +761,21 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
+        ITEM_PKL_REPORT,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_DATA_BARANG,
+        ITEM_LAPTOP_SIAP_JUAL,
+        ITEM_LAPTOP_MINUS,
         ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
-        ITEM_ACCESSORIES,
       ],
     },
     SERVICE_MENU,
@@ -710,10 +791,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
-        ITEM_ACCESSORIES,
+        ITEM_DATA_BARANG,
+        ITEM_LAPTOP_SIAP_JUAL,
+        ITEM_LAPTOP_MINUS,
       ],
     },
     {
@@ -759,7 +839,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
         ITEM_MISSIONS,
@@ -768,10 +849,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
-        ITEM_ACCESSORIES,
+        ITEM_DATA_BARANG,
+        ITEM_LAPTOP_SIAP_JUAL,
+        ITEM_LAPTOP_MINUS,
       ],
     },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -782,17 +862,21 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
+        ITEM_PKL_REPORT,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_DATA_BARANG,
+        ITEM_LAPTOP_SIAP_JUAL,
+        ITEM_LAPTOP_MINUS,
         ITEM_ALL_UNITS,
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-        { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus },
+        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
     {
@@ -810,10 +894,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
   ],
 
@@ -822,9 +903,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
+        ITEM_DATA_BARANG,
+        ITEM_LAPTOP_SIAP_JUAL,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     {
@@ -835,7 +916,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   // ── KEBERSIHAN ─────────────────────────────────────────────────────────────
@@ -843,7 +926,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [
-        ITEM_ABSENSI, ITEM_LEMBUR,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_USERS,
@@ -852,10 +936,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
   ],
 
@@ -865,16 +946,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
     PREPARATION_PENYEDIA_MENU,
     {
@@ -888,16 +968,16 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
+        ITEM_PKL_REPORT,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
     PREPARATION_PENYEDIA_MENU,
     {
@@ -914,10 +994,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
     {
       label: "Transaksi",
@@ -931,16 +1008,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS,
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
         ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
-      items: [
-        { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
-      ],
+      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
     },
     {
       label: "Transaksi",
@@ -966,6 +1042,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
 };
 
+// ── Missions normalization pass ───────────────────────────────────────────────
+// Hapus semua item missions dari grup mana pun, lalu tambahkan grup Missions
+// tersendiri di akhir (kecuali role PKL).
 const MISSION_HREFS = new Set([
   ...MISSIONS_MENU.items.map((i) => i.href),
   ITEM_MISSION_ALL.href,
@@ -988,6 +1067,7 @@ const MISSION_HREFS = new Set([
   }
 });
 
+// ── PKL inherit dari parent role ──────────────────────────────────────────────
 const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_MARKETING: "MARKETING",
   PKL_SALES: "CREW_SALES",
@@ -1025,19 +1105,11 @@ const PKL_STRIP_HREFS = new Set<string>([
 });
 
 // ── Konsolidasi item inventaris → satu "Data Barang" ─────────────────────────
-// HARUS jalan PALING AKHIR (setelah mission normalization & PKL inherit) supaya
-// menu PKL yang di-inherit dari parent juga ikut ter-normalisasi.
-//
-// Behaviour:
-//  • "Data Laptop", "Laptop Siap Jual", "Laptop Minus", "Data Aksesori" (4 href
-//    di bawah) di setiap grup → di-collapse jadi 1 entri "Data Barang" yang
-//    disisipkan di posisi item pertama yang match. Item legacy lainnya di-skip.
-//  • Item lain (Semua Unit, Garansi, dll) tidak tersentuh.
-//  • Kalau sebuah grup jadi kosong (isinya cuma item legacy), grup itu di-drop.
+// Hanya meng-collapse /dashboard/laptops dan /dashboard/accessories.
+// /dashboard/laptops/ready dan /dashboard/laptops/minus TIDAK di-collapse
+// karena sudah menjadi ITEM_LAPTOP_SIAP_JUAL & ITEM_LAPTOP_MINUS yang terpisah.
 const DATA_BARANG_LEGACY_HREFS = new Set<string>([
   "/dashboard/laptops",
-  "/dashboard/laptops/ready",
-  "/dashboard/laptops/minus",
   "/dashboard/accessories",
 ]);
 
@@ -1049,10 +1121,10 @@ const DATA_BARANG_LEGACY_HREFS = new Set<string>([
       for (const item of group.items) {
         if (DATA_BARANG_LEGACY_HREFS.has(item.href)) {
           if (!inserted) {
-            items.push(ITEM_DATA_BARANG); // sisipkan sekali
+            items.push(ITEM_DATA_BARANG);
             inserted = true;
           }
-          continue; // skip item laptop/aksesoris lainnya (dedupe jadi 1)
+          continue;
         }
         items.push(item);
       }
@@ -1100,20 +1172,28 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
 };
 
 function getInitials(name: string): string {
-  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 }
 
 function RoleBadges({ user }: { user: any }) {
-  const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
+  const roles: string[] =
+    user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
   if (roles.length === 0) return null;
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
-      {roles.map(role => {
+      {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
           <span
             key={role}
-            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}
+            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${
+              meta?.className ?? "bg-gray-50 text-gray-700"
+            }`}
           >
             {meta?.label ?? role}
           </span>
@@ -1123,8 +1203,18 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-function NavItem({ item, isActive, onClick, badge, rail }: {
-  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean;
+function NavItem({
+  item,
+  isActive,
+  onClick,
+  badge,
+  rail,
+}: {
+  item: MenuItem;
+  isActive: boolean;
+  onClick?: () => void;
+  badge?: number;
+  rail?: boolean;
 }) {
   return (
     <Link
@@ -1134,20 +1224,29 @@ function NavItem({ item, isActive, onClick, badge, rail }: {
       className={`group relative flex items-center rounded-xl text-sm font-medium outline-none
         transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30
         ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"}
-        ${isActive
-          ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
-          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+        ${
+          isActive
+            ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
         }`}
     >
       {!rail && (
         <span
           className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white
-            transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`}
+            transition-all duration-300 ease-out ${
+              isActive ? "h-5 opacity-90" : "h-0 opacity-0"
+            }`}
         />
       )}
       <span
         className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
-          ${isActive ? (rail ? "text-white" : "text-white/80") : "text-gray-400 group-hover:text-gray-600"}`}
+          ${
+            isActive
+              ? rail
+                ? "text-white"
+                : "text-white/80"
+              : "text-gray-400 group-hover:text-gray-600"
+          }`}
       >
         {item.icon}
       </span>
@@ -1157,7 +1256,11 @@ function NavItem({ item, isActive, onClick, badge, rail }: {
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
           className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums
             ${rail ? "absolute top-0.5 right-1" : "ml-auto"}
-            ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+            ${
+              isActive
+                ? "bg-white text-[#1a1a2e]"
+                : "bg-red-500 text-white shadow-sm shadow-red-500/40"
+            }`}
         >
           {badge > 99 ? "99+" : badge}
         </span>
@@ -1167,13 +1270,29 @@ function NavItem({ item, isActive, onClick, badge, rail }: {
 }
 
 function SidebarContent({
-  user, loading, groups, pathname, onClose, onLogout, badges,
-  rail, onToggleRail, openMap, onToggleGroup,
+  user,
+  loading,
+  groups,
+  pathname,
+  onClose,
+  onLogout,
+  badges,
+  rail,
+  onToggleRail,
+  openMap,
+  onToggleGroup,
 }: {
-  user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
-  onClose?: () => void; onLogout: () => void; badges?: Record<string, number>;
-  rail?: boolean; onToggleRail?: () => void;
-  openMap: Record<string, boolean>; onToggleGroup: (label: string) => void;
+  user: any;
+  loading: boolean;
+  groups: MenuGroup[];
+  pathname: string;
+  onClose?: () => void;
+  onLogout: () => void;
+  badges?: Record<string, number>;
+  rail?: boolean;
+  onToggleRail?: () => void;
+  openMap: Record<string, boolean>;
+  onToggleGroup: (label: string) => void;
 }) {
   const initials = user?.name ? getInitials(user.name) : "?";
   const navRef = useRef<HTMLElement>(null);
@@ -1184,7 +1303,10 @@ function SidebarContent({
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
-    if (saved) requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });
+    if (saved)
+      requestAnimationFrame(() => {
+        el.scrollTop = parseInt(saved, 10);
+      });
   }, [loading, scrollKey]);
 
   const handleNavScroll = useCallback(() => {
@@ -1203,19 +1325,32 @@ function SidebarContent({
                 src="/assets/solit03.jpeg"
                 alt="Solit"
                 className="w-full h-full object-cover"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
               />
             </div>
-            {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
+            {!rail && (
+              <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
+            )}
           </div>
           {onToggleRail && !rail && (
             <button
               onClick={onToggleRail}
               className="hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-              title="Perkecil sidebar" aria-label="Perkecil sidebar"
+              title="Perkecil sidebar"
+              aria-label="Perkecil sidebar"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" />
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+              >
+                <polyline points="11 17 6 12 11 7" />
+                <polyline points="18 17 13 12 18 7" />
               </svg>
             </button>
           )}
@@ -1225,8 +1360,16 @@ function SidebarContent({
               className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
               aria-label="Tutup sidebar"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           )}
@@ -1268,10 +1411,19 @@ function SidebarContent({
         <button
           onClick={onToggleRail}
           className="hidden lg:flex mx-auto mb-2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-          title="Perbesar sidebar" aria-label="Perbesar sidebar"
+          title="Perbesar sidebar"
+          aria-label="Perbesar sidebar"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-            <polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" />
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+          >
+            <polyline points="13 17 18 12 13 7" />
+            <polyline points="6 17 11 12 6 7" />
           </svg>
         </button>
       )}
@@ -1282,19 +1434,25 @@ function SidebarContent({
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"}`}
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
+          rail ? "px-2 space-y-1" : "px-3 space-y-2"
+        }`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
       >
         {loading ? (
           <div className="space-y-1 pt-1">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1" style={{ animationDelay: `${i * 40}ms` }} />
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
+                style={{ animationDelay: `${i * 40}ms` }}
+              />
             ))}
           </div>
         ) : rail ? (
           groups.map((group, gi) => (
             <div key={group.label} className="space-y-0.5">
-              {group.items.map(item => (
+              {group.items.map((item) => (
                 <NavItem
                   key={item.href}
                   item={item}
@@ -1310,33 +1468,58 @@ function SidebarContent({
         ) : (
           groups.map((group, gi) => {
             const isOpen = openMap[group.label] ?? true;
-            const hasActive = group.items.some(it => isItemActive(it.href, pathname));
+            const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
             return (
               <div
                 key={group.label}
-                style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}
+                style={{
+                  animation: "solitGroupIn 0.3s ease-out both",
+                  animationDelay: `${gi * 50}ms`,
+                }}
               >
                 <button
                   onClick={() => onToggleGroup(group.label)}
                   className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat"
                 >
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
-                    ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
+                    ${
+                      hasActive
+                        ? "text-[#1a1a2e]"
+                        : "text-gray-400 group-hover/cat:text-gray-600"
+                    }`}
+                  >
                     {group.label}
                   </span>
-                  {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
+                  {hasActive && !isOpen && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />
+                  )}
                   <svg
-                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
                     className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0"
-                    style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}
+                    style={{
+                      transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                      transition: "transform .25s ease",
+                    }}
                   >
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
-                <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
+                <div
+                  className={`grid transition-all duration-300 ease-out ${
+                    isOpen
+                      ? "grid-rows-[1fr] opacity-100 mt-0.5"
+                      : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
                   <div className="overflow-hidden min-h-0">
                     <div className="space-y-0.5">
-                      {group.items.map(item => (
+                      {group.items.map((item) => (
                         <NavItem
                           key={item.href}
                           item={item}
@@ -1401,18 +1584,23 @@ export default function Sidebar() {
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
   const widthRef = useRef(DEFAULT_W);
-  useEffect(() => { widthRef.current = width; }, [width]);
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const cached = getCachedUser();
-    if (cached) { setUser(cached); setLoading(false); }
+    if (cached) {
+      setUser(cached);
+      setLoading(false);
+    }
     try {
       setRail(localStorage.getItem(RAIL_KEY) === "1");
       const w = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
       if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
-    } catch { }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -1421,17 +1609,25 @@ export default function Sidebar() {
     const fetchUser = async () => {
       try {
         const res = await fetch("/api/auth/me");
-        if (!res.ok) { window.location.href = "/login"; return; }
+        if (!res.ok) {
+          window.location.href = "/login";
+          return;
+        }
         const result = await res.json();
         const fresh = result.user ?? null;
         setUser(fresh);
         setCachedUser(fresh);
-      } catch { } finally { setLoading(false); }
+      } catch {}
+      finally {
+        setLoading(false);
+      }
     };
     fetchUser();
   }, []);
 
-  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
@@ -1442,26 +1638,34 @@ export default function Sidebar() {
   const userRoles: string[] =
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
-      : user?.role ? [user.role] : [];
+      : user?.role
+      ? [user.role]
+      : [];
 
   const effectiveRoles = expandRolesWithParents(userRoles);
 
-  const groups: MenuGroup[] = effectiveRoles.length > 0
-    ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
-    : [];
+  const groups: MenuGroup[] =
+    effectiveRoles.length > 0
+      ? dedupeGroups(
+          mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles)
+        )
+      : [];
 
-  const groupsSig = groups.map(g => g.label).join("|");
+  const groupsSig = groups.map((g) => g.label).join("|");
 
   useEffect(() => {
     if (groups.length === 0) return;
     let saved: Record<string, boolean> | null = null;
-    try { saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null"); } catch { }
+    try {
+      saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null");
+    } catch {}
     setOpenMap(() => {
       const next: Record<string, boolean> = {};
       for (const g of groups) {
-        next[g.label] = saved && Object.prototype.hasOwnProperty.call(saved, g.label)
-          ? saved[g.label]
-          : g.items.some(it => isItemActive(it.href, pathname));
+        next[g.label] =
+          saved && Object.prototype.hasOwnProperty.call(saved, g.label)
+            ? saved[g.label]
+            : g.items.some((it) => isItemActive(it.href, pathname));
       }
       return next;
     });
@@ -1469,24 +1673,32 @@ export default function Sidebar() {
   }, [groupsSig]);
 
   useEffect(() => {
-    const active = groups.find(g => g.items.some(it => isItemActive(it.href, pathname)));
+    const active = groups.find((g) =>
+      g.items.some((it) => isItemActive(it.href, pathname))
+    );
     if (!active) return;
-    setOpenMap(prev => (prev[active.label] ? prev : { ...prev, [active.label]: true }));
+    setOpenMap((prev) =>
+      prev[active.label] ? prev : { ...prev, [active.label]: true }
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, groupsSig]);
 
   const toggleGroup = useCallback((label: string) => {
-    setOpenMap(prev => {
+    setOpenMap((prev) => {
       const next = { ...prev, [label]: !(prev[label] ?? true) };
-      try { sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next)); } catch { }
+      try {
+        sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next));
+      } catch {}
       return next;
     });
   }, []);
 
   const toggleRail = useCallback(() => {
-    setRail(v => {
+    setRail((v) => {
       const n = !v;
-      try { localStorage.setItem(RAIL_KEY, n ? "1" : "0"); } catch { }
+      try {
+        localStorage.setItem(RAIL_KEY, n ? "1" : "0");
+      } catch {}
       return n;
     });
   }, []);
@@ -1506,7 +1718,9 @@ export default function Sidebar() {
       setDragging(false);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-      try { localStorage.setItem(WIDTH_KEY, String(widthRef.current)); } catch { }
+      try {
+        localStorage.setItem(WIDTH_KEY, String(widthRef.current));
+      } catch {}
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -1517,7 +1731,10 @@ export default function Sidebar() {
   const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
-    const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
+    const unlock = () => {
+      unlockAudio();
+      window.removeEventListener("pointerdown", unlock);
+    };
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);
   }, []);
@@ -1525,8 +1742,16 @@ export default function Sidebar() {
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
 
-  usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
-  usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
+  usePrepAlarm(
+    onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })),
+    ALARM_KEYS.MENUNGGU,
+    true
+  );
+  usePrepAlarm(
+    onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })),
+    ALARM_KEYS.SIAP_KIRIM,
+    true
+  );
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
@@ -1536,8 +1761,14 @@ export default function Sidebar() {
   };
 
   const sharedContentProps = {
-    user, loading, groups, pathname, onLogout: handleLogout, badges,
-    openMap, onToggleGroup: toggleGroup,
+    user,
+    loading,
+    groups,
+    pathname,
+    onLogout: handleLogout,
+    badges,
+    openMap,
+    onToggleGroup: toggleGroup,
   };
 
   return (
@@ -1562,25 +1793,35 @@ export default function Sidebar() {
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
           <button
-            onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }}
+            onClick={() => {
+              prep.ackMenunggu(prep.menungguUnacked);
+              router.push("/dashboard/preparation/antrian");
+            }}
             className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
+            <span className="text-sm font-black">
+              🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian
+            </span>
           </button>
         </div>
       )}
       {!onSiapKirim && prep.siapKirimUnacked.length > 0 && (
         <div
           className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
-          style={{ top: (!onAntrian && prep.menungguUnacked.length > 0) ? 64 : 12 }}
+          style={{ top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12 }}
         >
           <button
-            onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }}
+            onClick={() => {
+              prep.ackSiapKirim(prep.siapKirimUnacked);
+              router.push("/dashboard/preparation/siap-kirim");
+            }}
             className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
+            <span className="text-sm font-black">
+              📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
+            </span>
           </button>
         </div>
       )}
@@ -1591,28 +1832,44 @@ export default function Sidebar() {
         className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
         aria-label="Buka menu"
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+        >
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
 
       {/* ── Mobile overlay ── */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       {/* ── Mobile sidebar ── */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
       {/* ── Desktop sidebar (resizable) ── */}
       <aside
-        style={{ width: rail ? RAIL_W : width, transition: dragging ? "none" : "width 0.2s ease-out" }}
+        style={{
+          width: rail ? RAIL_W : width,
+          transition: dragging ? "none" : "width 0.2s ease-out",
+        }}
         className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
       >
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />

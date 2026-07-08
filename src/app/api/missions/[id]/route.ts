@@ -88,7 +88,7 @@ async function patchHandler(req: NextRequest, ctx: any, user: AuthUser) {
     }
     case "approve": {
       if (!canReview) return forbidden();
-      if (mission.status !== "SUBMITTED") return badReq("Hanya misi yang sudah disubmit bisa disetujui");
+      if (mission.status !== "SUBMITTED") return badReq("Hanya misi yang sudah disubmit bisa diaudit");
       updates.status = "APPROVED";
       updates.reviewed_by = user.id;
       updates.reviewed_at = new Date().toISOString();
@@ -97,7 +97,7 @@ async function patchHandler(req: NextRequest, ctx: any, user: AuthUser) {
     }
     case "reject": {
       if (!canReview) return forbidden();
-      if (mission.status !== "SUBMITTED") return badReq("Hanya misi yang sudah disubmit bisa ditolak");
+      if (mission.status !== "SUBMITTED") return badReq("Hanya misi yang sudah disubmit bisa ditolak / direvisi");
       updates.status = "REJECTED";
       updates.reviewed_by = user.id;
       updates.reviewed_at = new Date().toISOString();
