@@ -48,6 +48,14 @@ export default function AdminAllMissionsWorkspace() {
   const [to, setTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const [users, setUsers] = useState<UserOption[]>([]);
   useEffect(() => {
@@ -76,6 +84,26 @@ export default function AdminAllMissionsWorkspace() {
   const resetFilters = () => {
     setStatus(""); setPriority(""); setAssignerId(""); setAssigneeId("");
     setFrom(""); setTo("");
+  };
+
+  // Admin verifikasi: setujui (approve) misi yang sudah disubmit — tanpa opsi tolak.
+  const approve = async (id: string) => {
+    setApprovingId(id);
+    try {
+      const res = await fetch(`/api/missions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      });
+      const data = await res.json();
+      if (!data.success) { setToast({ msg: data.message ?? "Gagal menyetujui misi", ok: false }); return; }
+      setToast({ msg: "Misi disetujui ✅", ok: true });
+      await refetch();
+    } catch {
+      setToast({ msg: "Terjadi kesalahan", ok: false });
+    } finally {
+      setApprovingId(null);
+    }
   };
 
   if (!user) {
@@ -115,6 +143,12 @@ export default function AdminAllMissionsWorkspace() {
   return (
     <DashboardLayout>
       <main className="min-h-screen bg-gradient-to-b from-slate-100/70 via-[#f7f8fa] to-[#f7f8fa] p-3 sm:p-6 lg:p-8">
+        {toast && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg flex items-center gap-2"
+            style={{ background: toast.ok ? "linear-gradient(135deg,#059669,#047857)" : "linear-gradient(135deg,#dc2626,#b91c1c)" }}>
+            {toast.msg}
+          </div>
+        )}
         <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
           {/* Header */}
           <WorkspaceHeader
@@ -394,6 +428,24 @@ export default function AdminAllMissionsWorkspace() {
                                         </a>
                                       </div>
                                     )}
+                                    {m.status === "SUBMITTED" && (
+                                      <div className="col-span-2 pt-1">
+                                        <button
+                                          onClick={() => void approve(m.id)}
+                                          disabled={approvingId === m.id}
+                                          className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+                                          style={{ background: "linear-gradient(135deg,#059669,#047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>
+                                          {approvingId === m.id ? (
+                                            <span className="w-3.5 h-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+                                          ) : (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                              <path d="M20 6L9 17l-5-5" />
+                                            </svg>
+                                          )}
+                                          {approvingId === m.id ? "Memproses..." : "Setujui hasil kerja"}
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -500,6 +552,7 @@ export default function AdminAllMissionsWorkspace() {
                           )}
                           {m.proof_photo_url && (
                             <a href={m.proof_photo_url} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
                               className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700">
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -508,6 +561,22 @@ export default function AdminAllMissionsWorkspace() {
                               </svg>
                               Lihat bukti foto
                             </a>
+                          )}
+                          {m.status === "SUBMITTED" && (
+                            <button
+                              onClick={e => { e.stopPropagation(); void approve(m.id); }}
+                              disabled={approvingId === m.id}
+                              className="w-full h-10 rounded-lg text-sm font-bold text-white flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-50"
+                              style={{ background: "linear-gradient(135deg,#059669,#047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>
+                              {approvingId === m.id ? (
+                                <span className="w-4 h-4 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+                              ) : (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                              )}
+                              {approvingId === m.id ? "Memproses..." : "Setujui hasil kerja"}
+                            </button>
                           )}
                         </div>
                       )}
