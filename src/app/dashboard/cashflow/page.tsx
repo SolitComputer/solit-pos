@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { CASHFLOW_ROLES } from "@/lib/permissions";
 import {
     INCOME_CATEGORIES,
     EXPENSE_CATEGORIES,
@@ -452,7 +453,7 @@ export default function CashflowPage() {
             .then((r) => r.json())
             .then((r) => {
                 const roles: string[] = r.user?.roles?.length ? r.user.roles : [r.user?.role].filter(Boolean);
-                setAllowed(roles.some((x) => ["ADMIN", "PROGRAMMER"].includes(x)));
+                setAllowed(roles.some((x) => (CASHFLOW_ROLES as string[]).includes(x)));  // ← FIX
             })
             .catch(() => setAllowed(false));
     }, []);
@@ -584,8 +585,8 @@ export default function CashflowPage() {
 
     const periodLabel = period === "today" ? "Hari Ini"
         : period === "week" ? "Minggu Ini"
-        : period === "month" ? "Bulan Ini"
-        : (sFrom || sTo) ? `${sFrom ? fmtTanggal(sFrom) : "..."} — ${sTo ? fmtTanggal(sTo) : "..."}` : "Custom";
+            : period === "month" ? "Bulan Ini"
+                : (sFrom || sTo) ? `${sFrom ? fmtTanggal(sFrom) : "..."} — ${sTo ? fmtTanggal(sTo) : "..."}` : "Custom";
 
     return (
         <DashboardLayout>
@@ -709,20 +710,18 @@ export default function CashflowPage() {
 
                         <button
                             onClick={() => setShowFilter(!showFilter)}
-                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${
-                                showFilter
-                                    ? "bg-gray-900 text-white border-gray-900"
-                                    : filterCount > 0
-                                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                            }`}
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${showFilter
+                                ? "bg-gray-900 text-white border-gray-900"
+                                : filterCount > 0
+                                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                }`}
                         >
                             <IconFilter />
                             Filter
                             {filterCount > 0 && (
-                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${
-                                    showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"
-                                }`}>
+                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"
+                                    }`}>
                                     {filterCount}
                                 </span>
                             )}
