@@ -25,6 +25,11 @@ export const INCOME_CATEGORIES = {
 export const EXPENSE_CATEGORIES = {
   OPERASIONAL_HARIAN: "Operasional Harian",
   OPERASIONAL_BULANAN: "Operasional Bulanan",
+  OPERASIONAL_MARKETING: "Operasional Marketing",
+  OPERASIONAL_SOTECH: "Operasional Sotech",
+  OPERASIONAL_ONPOINT: "Operasional Onpoint",
+  OPERASIONAL_DAVID: "Operasional David",
+  OPERASIONAL_KONTEN_KREATOR: "Operasional Konten Kreator",
   BELANJA_LAPTOP: "Belanja Laptop",
   AKSESORIS: "Aksesoris",
   MODAL_SERVICE: "Modal Service",
