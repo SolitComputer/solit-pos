@@ -271,6 +271,9 @@ export default function EditTransactionPage() {
       alert("Unit ini sudah ada di transaksi");
       return;
     }
+    // Inherit deal_price dari unit yang diganti supaya total tidak jadi 0
+    const previousDealPrice = activeUnits[idx]?.deal_price ?? 0;
+
     const replacement: ActiveUnit = {
       unit_id: newUnit.id,
       serial_number: newUnit.serial_number,
@@ -279,7 +282,7 @@ export default function EditTransactionPage() {
       selling_price: newUnit.selling_price,
       grade: newUnit.grade,
       purchase_price: Number(newUnit.purchase_price ?? 0),
-      deal_price: 0, // ← tambah: unit pengganti default 0, admin isi manual
+      deal_price: previousDealPrice,
     };
     const updated = activeUnits.map((u, i) => (i === idx ? replacement : u));
     setActiveUnits(updated);
@@ -342,35 +345,50 @@ export default function EditTransactionPage() {
       const unitIds = activeUnits.map((u) => u.unit_id);
       const laptopNames = [...new Set(activeUnits.map((u) => u.laptop_name))];
 
-      // ← BARU: kirim purchase_price per unit ke API
-      const purchasePricesPerUnit = activeUnits.map((u) => ({
-        unit_id: u.unit_id,
-        purchase_price: u.purchase_price,
-      }));
+      // Hanya kirim purchase_price yang benar-benar diisi user (> 0)
+      // Kalau 0 = tidak diubah, skip agar tidak menimpa data existing di DB
+      const purchasePricesPerUnit = activeUnits
+        .filter((u) => u.purchase_price > 0)
+        .map((u) => ({
+          unit_id: u.unit_id,
+          purchase_price: u.purchase_price,
+        }));
 
-      // ← BARU: kirim deal_price per unit
-      const dealPricesPerUnit = activeUnits.map((u) => ({
-        unit_id: u.unit_id,
-        serial_number: u.serial_number,
-        deal_price: u.deal_price,
-      }));
-      const totalDeal = activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0);
+      // Hanya kirim deal_price yang benar-benar diisi user (> 0)
+      const dealPricesPerUnit = activeUnits
+        .filter((u) => u.deal_price > 0)
+        .map((u) => ({
+          unit_id: u.unit_id,
+          serial_number: u.serial_number,
+          deal_price: u.deal_price,
+        }));
+
+      // Total deal: sum dari unit yang ada deal_price,
+      // fallback ke nilai original dari DB jika semua unit deal_price = 0
+      const totalDeal =
+        activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0) ||
+        Number(formData.deal_price || formData.amount || 0);
 
       const res = await fetch(`/api/transaction/${invoice}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          deal_price: totalDeal || Number(formData.deal_price || formData.amount),
-          amount: totalDeal || Number(formData.deal_price || formData.amount),
+          deal_price: totalDeal,
+          amount: totalDeal,
           serial_numbers: sns,
           unit_ids: unitIds,
           serial_number: sns[0] ?? "",
           unit_id: unitIds[0] ?? null,
           laptop_name: laptopNames.join(" + "),
           laptop_id: activeUnits[0]?.laptop_id ?? null,
-          purchase_prices_per_unit: purchasePricesPerUnit,
-          deal_prices_per_unit: dealPricesPerUnit, // ← BARU
+          // Hanya include key-nya kalau ada data yang valid
+          ...(purchasePricesPerUnit.length > 0 && {
+            purchase_prices_per_unit: purchasePricesPerUnit,
+          }),
+          ...(dealPricesPerUnit.length > 0 && {
+            deal_prices_per_unit: dealPricesPerUnit,
+          }),
         }),
       });
       const result = await res.json();
@@ -783,9 +801,6 @@ export default function EditTransactionPage() {
                     canRemove={activeUnits.length > 1}
                     onRemove={() => handleRemoveUnit(idx)}
                     onReplace={(newUnit) => handleReplaceUnit(idx, newUnit)}
-                    onPurchasePriceChange={(price) =>
-                      handleUpdatePurchasePrice(idx, price)
-                    }
                     onDealPriceChange={(price) =>
                       handleUpdateDealPrice(idx, price)
                     }
@@ -1125,20 +1140,19 @@ export default function EditTransactionPage() {
                     Harga Deal Baru
                   </p>
                   <p className="text-2xl font-extrabold text-emerald-700 mt-0.5">
-                    {fmt(Number(formData.deal_price || formData.amount || 0))}
+                    {fmt(dealPrice)}
                   </p>
                 </div>
-                {transaction.deal_price !==
-                  Number(formData.deal_price || formData.amount) && (
-                    <div className="text-right">
-                      <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wider">
-                        Sebelumnya
-                      </p>
-                      <p className="text-sm text-gray-400 line-through mt-0.5">
-                        {fmt(transaction.deal_price)}
-                      </p>
-                    </div>
-                  )}
+                {transaction.deal_price !== dealPrice && (
+                  <div className="text-right">
+                    <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wider">
+                      Sebelumnya
+                    </p>
+                    <p className="text-sm text-gray-400 line-through mt-0.5">
+                      {fmt(transaction.deal_price)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* ← UPDATED: Units preview dengan modal info */}
@@ -1279,7 +1293,6 @@ function UnitEditRow({
   canRemove,
   onRemove,
   onReplace,
-  onPurchasePriceChange,
   onDealPriceChange,
 }: {
   unit: ActiveUnit;
@@ -1289,7 +1302,6 @@ function UnitEditRow({
   canRemove: boolean;
   onRemove: () => void;
   onReplace: (newUnit: ReadyUnit) => void;
-  onPurchasePriceChange: (price: number) => void;
   onDealPriceChange: (price: number) => void;
 }) {
   const [showReplace, setShowReplace] = useState(false);
@@ -1313,10 +1325,6 @@ function UnitEditRow({
   const gradeStyle = unit.grade
     ? gradeColors[unit.grade] ?? { bg: "#F1F5F9", color: "#64748B" }
     : null;
-
-  // Margin unit ini = harga deal − harga modal
-  const unitMargin =
-    unit.purchase_price > 0 ? unit.deal_price - unit.purchase_price : null;
 
   return (
     <div className="unit-row">
@@ -1397,57 +1405,23 @@ function UnitEditRow({
         </div>
       </div>
 
-      {/* ─ Harga Modal & Harga Deal per unit ─ */}
+      {/* ─ Harga Deal per unit ─ */}
       <div
-        className="border-t border-gray-100 px-3.5 py-2.5 grid grid-cols-2 gap-3"
+        className="border-t border-gray-100 px-3.5 py-2.5"
         style={{ background: "#F8FAFC" }}
       >
-        <div>
-          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-            🏷️ Harga Modal
-          </label>
-          <input
-            type="number"
-            value={unit.purchase_price || ""}
-            onChange={(e) => onPurchasePriceChange(Number(e.target.value))}
-            onFocus={(e) => e.target.select()}
-            placeholder="Modal..."
-            className="w-full border border-gray-200 rounded-lg h-8 px-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition placeholder:text-gray-300"
-          />
-        </div>
-        <div>
-          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-            💰 Harga Deal
-          </label>
-          <input
-            type="number"
-            value={unit.deal_price || ""}
-            onChange={(e) => onDealPriceChange(Number(e.target.value))}
-            onFocus={(e) => e.target.select()}
-            placeholder="Deal..."
-            className="w-full border border-gray-200 rounded-lg h-8 px-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition placeholder:text-gray-300"
-          />
-        </div>
+        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+          💰 Harga Deal
+        </label>
+        <input
+          type="number"
+          value={unit.deal_price || ""}
+          onChange={(e) => onDealPriceChange(Number(e.target.value))}
+          onFocus={(e) => e.target.select()}
+          placeholder="Masukkan harga deal..."
+          className="w-full border border-gray-200 rounded-lg h-8 px-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition placeholder:text-gray-300"
+        />
       </div>
-
-      {/* ─ Est. Margin ─ */}
-      {unitMargin !== null && (
-        <div
-          className="border-t border-gray-100 px-3.5 py-1.5 flex items-center justify-end gap-2"
-          style={{ background: "#F8FAFC" }}
-        >
-          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-            Est. Margin
-          </span>
-          <span
-            className={`text-xs font-extrabold font-mono ${unitMargin >= 0 ? "text-emerald-600" : "text-red-500"
-              }`}
-          >
-            {unitMargin >= 0 ? "+" : ""}
-            {fmt(Math.abs(unitMargin))}
-          </span>
-        </div>
-      )}
 
       {/* ─ Replace panel ─ */}
       {showReplace && (
