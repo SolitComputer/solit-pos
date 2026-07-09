@@ -76,7 +76,8 @@ export async function PATCH(
     action,
     alasan,
     hasil_analisa,
-    // Payment fields
+    estimasi_harga,
+    biaya_sparepart,
     payment_amount,
     payment_note,
     payment_method,
@@ -84,6 +85,8 @@ export async function PATCH(
     action: string;
     alasan?: string;
     hasil_analisa?: string;
+    estimasi_harga?: number;
+    biaya_sparepart?: number;
     payment_amount?: number;
     payment_note?: string;
     payment_method?: string;
@@ -111,8 +114,13 @@ export async function PATCH(
       if (oldStatus !== "ANTRIAN" && oldStatus !== "MENUNGGU_SPAREPART")
         return NextResponse.json({ success: false, message: `Status '${oldStatus}' tidak valid` }, { status: 400 });
       newStatus = "SEDANG_DIKERJAKAN";
-      updatePayload = { dikerjakan_by: user.id };
-      logCatatan = "Mulai dikerjakan";
+      updatePayload = {
+        dikerjakan_by: user.id,
+        ...(estimasi_harga !== undefined ? { estimasi_harga: Number(estimasi_harga) } : {}),
+      };
+      logCatatan = estimasi_harga
+        ? `Mulai dikerjakan · Estimasi: Rp ${Number(estimasi_harga).toLocaleString("id-ID")}`
+        : "Mulai dikerjakan";
       break;
 
     case "sparepart":
@@ -121,7 +129,12 @@ export async function PATCH(
       if (oldStatus !== "SEDANG_DIKERJAKAN")
         return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
       newStatus = "MENUNGGU_SPAREPART";
-      logCatatan = alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart";
+      updatePayload = {
+        ...(biaya_sparepart !== undefined ? { biaya_sparepart: Number(biaya_sparepart) } : {}),
+      };
+      logCatatan = biaya_sparepart
+        ? `Menunggu sparepart · Biaya: Rp ${Number(biaya_sparepart).toLocaleString("id-ID")}${alasan ? ` · ${alasan}` : ""}`
+        : (alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart");
       break;
 
     case "done":

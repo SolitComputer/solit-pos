@@ -38,6 +38,9 @@ export interface ServiceOrder {
   tanggal_diambil?: string;
 
   // Payment ✅ NEW
+  estimasi_harga?: number | null;
+  biaya_sparepart?: number | null;
+
   payment_amount?: number;
   payment_note?: string;
   payment_method?: "CASH" | "TRANSFER" | "QRIS";
