@@ -26,7 +26,7 @@ type PKLReport = {
 
 type PKLUser = { id: string; name: string; role: string };
 
-const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 const KEPALA_ROLES = [
     "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",

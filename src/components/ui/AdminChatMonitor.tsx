@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
-const ADMIN_ROLES = ["ADMIN", "PROGRAMMER"];
+const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 const ROLE_LABEL: Record<string, string> = {
     ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",

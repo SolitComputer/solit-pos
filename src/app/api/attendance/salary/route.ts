@@ -7,8 +7,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
-
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
+function hasFullAccess(user: any): boolean {
+  const roles = Array.isArray(user?.roles) && user.roles.length > 0
+    ? user.roles
+    : user?.role ? [user.role] : [];
+  return roles.some((r: string) => FULL_ACCESS_ROLES.includes(r));
+}
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();

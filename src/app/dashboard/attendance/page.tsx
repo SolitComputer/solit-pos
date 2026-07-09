@@ -147,13 +147,30 @@ const OFFICE_LNG = 106.787233;
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as const;
 function isAdminRole(role?: string): boolean {
     return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
-const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as const;
+
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "ACCOUNTING"] as const;
 function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
+}
+
+// ✅ Multi-role aware: baca dari currentUser.role ATAU currentUser.roles[]
+function getUserRoles(user: any): string[] {
+    if (!user) return [];
+    if (Array.isArray(user.roles) && user.roles.length > 0) return user.roles as string[];
+    return user.role ? [user.role] : [];
+}
+function userIsAdmin(user: any): boolean {
+    return getUserRoles(user).some(r => isAdminRole(r));
+}
+function userCanViewSalary(user: any): boolean {
+    return getUserRoles(user).some(r => canViewSalary(r));
+}
+function userIsPKL(user: any): boolean {
+    return getUserRoles(user).some(r => isPKLRole(r));
 }
 const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
@@ -2817,10 +2834,10 @@ export default function AttendanceDashboardPage() {
     ]);
 
     useEffect(() => {
-        if (canViewSalary(currentUser?.role)) {
+        if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
         }
-        if (!isAdminRole(currentUser?.role) && currentUser?.id) {
+        if (!userIsAdmin(currentUser) && currentUser?.id) {
             fetchMySlips();
         }
     }, [selectedSlipMonth, currentUser, fetchSalarySlips]);
@@ -2866,11 +2883,10 @@ export default function AttendanceDashboardPage() {
             fetchLeaveData(year, month), // ✅ FIX: jangan gate ke admin doang, biar perhitungan cuti sama-sama akurat di akun biasa
         ];
         Promise.all(tasks).finally(() => setLoading(false));
-        if (canViewSalary(currentUser?.role)) {
+        if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
-    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser?.role]);
-
+    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
     const dateOffByName = useMemo(() => { const m: Record<string, Set<string>> = {}; allDateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); }); return m; }, [allDateOffs]);
@@ -3498,13 +3514,10 @@ export default function AttendanceDashboardPage() {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [selectedMonth, refreshAll]);
 
-    const isAdmin = isAdminRole(currentUser?.role);
-    const userRoles: string[] =
-        Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
-            ? currentUser.roles
-            : currentUser?.role ? [currentUser.role] : [];
-    const canManage = isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
-    const canSalary = canViewSalary(currentUser?.role);
+    const userRoles: string[] = getUserRoles(currentUser);
+    const isAdmin = userIsAdmin(currentUser);
+    const canManage = isAdmin || isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
+    const canSalary = userCanViewSalary(currentUser);
 
     if (!selectedMonth) return (
         <DashboardLayout>
@@ -3603,22 +3616,21 @@ export default function AttendanceDashboardPage() {
                 {/* ✅ Tab bar — computed di luar JSX */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
                     {(() => {
-                        const role = currentUser?.role;
                         const tabs: { id: typeof activeTab; label: string }[] = [
                             { id: "calendar", label: "📅 Kalender" },
                         ];
                         if (canManage) tabs.push({ id: "summary", label: "📊 Ringkasan" });
-                        if (canViewSalary(role)) {
+                        if (canSalary) {
                             tabs.push({ id: "salary", label: "💰 Rekap Gaji" });
                             tabs.push({ id: "salary-pkl", label: "🎓 Gaji PKL" });
                             tabs.push({ id: "salary-slip", label: "📄 Slip Gaji" });
                             tabs.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
                         }
-                        if (!isAdminRole(role) && !canViewSalary(role) && !isPKLRole(role)) {
+                        if (!isAdmin && !canSalary && !userIsPKL(currentUser)) {
                             tabs.push({ id: "my-salary" as typeof activeTab, label: "💰 Gaji Saya" });
                             tabs.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
                         }
-                        if (isAdminRole(role)) tabs.push({ id: "leave", label: "🌴 Cuti" });
+                        if (isAdmin) tabs.push({ id: "leave", label: "🌴 Cuti" });
                         return tabs.map(t => (
                             <button key={t.id} onClick={() => handleSetActiveTab(t.id)}
                                 className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
