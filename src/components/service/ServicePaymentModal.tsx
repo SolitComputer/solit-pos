@@ -1,7 +1,7 @@
 "use client";
 // src/components/service/ServicePaymentModal.tsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ServiceOrder } from "@/types/service";
 
 interface Props {
@@ -46,8 +46,16 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  if (!open || !order) return null;
+  useEffect(() => {
+    if (!open || !order) return;
+    if (pickupType !== "service") return;
+    const est = Number(order.estimasi_harga ?? 0);
+    const sp = Number(order.biaya_sparepart ?? 0);
+    const total = est + sp;
+    setAmount(prev => (prev ? prev : total > 0 ? fmtRupiah(total) : ""));
+  }, [open, order, pickupType]);
 
+  if (!open || !order) return null;
   const handleAmountChange = (v: string) => {
     const digits = v.replace(/\D/g, "");
     setAmount(digits ? fmtRupiah(parseInt(digits)) : "");
@@ -336,9 +344,15 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition font-mono"
                 />
               </div>
-              {amountNum > 0 && (
+             {amountNum > 0 && (
                 <p className="text-xs text-emerald-600 mt-1 font-medium">
                   {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amountNum)}
+                </p>
+              )}
+              {(Number(order.estimasi_harga ?? 0) > 0 || Number(order.biaya_sparepart ?? 0) > 0) && (
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                  Prefill: estimasi <strong>Rp {Number(order.estimasi_harga ?? 0).toLocaleString("id-ID")}</strong>
+                  {" + "}sparepart <strong>Rp {Number(order.biaya_sparepart ?? 0).toLocaleString("id-ID")}</strong>. Bisa diedit.
                 </p>
               )}
             </div>

@@ -299,6 +299,106 @@ function EditableSparepartCell({
     );
 }
 
+// ─── Editable Modal (Harga Modal) Cell ────────────────────────────────────────
+// Self-contained inline editor untuk purchase_price. Sengaja TIDAK pakai
+// EditablePriceCell karena komponen itu mengunci diri untuk unit SOLD.
+// PATCH purchase_price → route sync otomatis ke transactions.inventory_price & other,
+// jadi profit unit terjual tetap bisa dikoreksi & gross profit dashboard akurat.
+
+function EditableModalCell({
+    unitId,
+    value,
+    onSaved,
+}: {
+    unitId: string;
+    value: number;
+    onSaved: (unitId: string, newValue: number) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [input, setInput] = useState("");
+    const [saving, setSaving] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const startEdit = () => {
+        setInput(String(value || 0));
+        setEditing(true);
+    };
+
+    useEffect(() => {
+        if (editing) inputRef.current?.select();
+    }, [editing]);
+
+    const cancel = () => setEditing(false);
+
+    const save = async () => {
+        const newVal = Math.round(Number(input));
+        if (!Number.isFinite(newVal) || newVal < 0) { cancel(); return; }
+        if (newVal === value) { cancel(); return; }
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/units/${unitId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ purchase_price: newVal }),
+            });
+            const result = await res.json();
+            if (result.success) {
+                onSaved(unitId, newVal);
+                setEditing(false);
+            }
+        } catch {
+            // silent fail — nilai kembali ke semula
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") cancel();
+    };
+
+    if (editing) {
+        return (
+            <div className="flex items-center justify-end gap-1">
+                <input
+                    ref={inputRef}
+                    type="number"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={save}
+                    disabled={saving}
+                    className="w-28 h-7 text-right text-xs border border-violet-400 rounded-md px-2 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 tabular-nums"
+                />
+                {saving && (
+                    <svg className="w-3 h-3 animate-spin text-violet-400 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-gray-800 font-medium tabular-nums">{fmt(value || 0)}</span>
+            <button
+                onClick={startEdit}
+                title="Klik untuk edit harga modal"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition"
+            >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit
+            </button>
+        </div>
+    );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AllUnitsPage() {
@@ -948,10 +1048,10 @@ export default function AllUnitsPage() {
                                                     </td>
                                                     {canSeePriceInfo && (
                                                         <>
-                                                            {/* Harga Sparepart — editable */}
+                                                            {/* Harga Modal — editable (termasuk unit SOLD, biar profit transaksi bisa dikoreksi) */}
                                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                                {canManageUnits && !isSold ? (
-                                                                    <EditablePriceCell
+                                                                {canManageUnits ? (
+                                                                    <EditableModalCell
                                                                         unitId={unit.id}
                                                                         value={unit.purchase_price}
                                                                         onSaved={handlePriceSaved}

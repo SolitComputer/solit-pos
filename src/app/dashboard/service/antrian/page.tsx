@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import ServiceFormModal from "@/components/service/ServiceFormModal";
 import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
+import ServicePriceDialog from "@/components/service/ServicePriceDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
@@ -50,6 +51,26 @@ type DialogState = {
 };
 
 const DIALOG_CLOSED: DialogState = { open: false, orderId: "", action: "", title: "", description: "", confirmLabel: "" };
+
+type PriceDialogState = {
+  open: boolean;
+  orderId: string;
+  action: "mulai" | "sparepart" | "";
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmClass?: string;
+  priceLabel: string;
+  defaultPrice: number;
+  withReason: boolean;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  reasonRequired?: boolean;
+};
+const PRICE_DIALOG_CLOSED: PriceDialogState = {
+  open: false, orderId: "", action: "", title: "", description: "",
+  confirmLabel: "", priceLabel: "", defaultPrice: 0, withReason: false,
+};
 
 function useAntrianRealtime() {
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
@@ -166,9 +187,9 @@ const IconX = () => (
 function StatCard({
   icon, label, count, color, bgColor, borderColor, accentColor
 }: {
-  icon: React.ReactNode; 
-  label: string; 
-  count: number; 
+  icon: React.ReactNode;
+  label: string;
+  count: number;
   color: string;
   bgColor: string;
   borderColor: string;
@@ -199,7 +220,7 @@ function ActionBtn({ label, color, onClick }: { label: string; color: "blue" | "
     rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200",
     purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200",
   };
-  
+
   return (
     <button
       onClick={onClick}
@@ -229,6 +250,7 @@ export default function AntrianPage() {
   const { orders, loading, connected, refresh } = useAntrianRealtime();
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
+  const [priceDialog, setPriceDialog] = useState<PriceDialogState>(PRICE_DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -278,6 +300,58 @@ export default function AntrianPage() {
     setDialog({ open: true, orderId: order.id, action, ...configs[action] });
   };
 
+  const openPriceDialog = (order: ServiceOrder, action: "mulai" | "sparepart") => {
+    if (action === "mulai") {
+      setPriceDialog({
+        open: true,
+        orderId: order.id,
+        action: "mulai",
+        title: "Mulai Pengerjaan",
+        description: `Masukkan estimasi / kisaran biaya servis untuk "${order.nama} — ${order.type_laptop}". Nilai ini masih bisa diubah saat pelanggan mengambil.`,
+        confirmLabel: "Mulai Kerjakan",
+        confirmClass: "bg-blue-600 hover:bg-blue-700",
+        priceLabel: "Estimasi Biaya Servis",
+        defaultPrice: Number(order.estimasi_harga ?? 0),
+        withReason: false,
+      });
+    } else {
+      setPriceDialog({
+        open: true,
+        orderId: order.id,
+        action: "sparepart",
+        title: "Menunggu Sparepart",
+        description: `Masukkan biaya sparepart & keterangan untuk "${order.nama} — ${order.type_laptop}".`,
+        confirmLabel: "Tandai Menunggu Sparepart",
+        confirmClass: "bg-orange-600 hover:bg-orange-700",
+        priceLabel: "Biaya Sparepart",
+        defaultPrice: Number(order.biaya_sparepart ?? 0),
+        withReason: true,
+        reasonLabel: "Keterangan Sparepart",
+        reasonPlaceholder: "Contoh: Butuh baterai 14.8V 4400mAh untuk Acer Aspire",
+        reasonRequired: true,
+      });
+    }
+  };
+
+  const handlePriceConfirm = async (price: number, reason?: string) => {
+    const body: Record<string, unknown> = { action: priceDialog.action };
+    if (priceDialog.action === "mulai") body.estimasi_harga = price;
+    if (priceDialog.action === "sparepart") {
+      body.biaya_sparepart = price;
+      body.alasan = reason;
+    }
+    const res = await fetch(`/api/service/${priceDialog.orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
+    setPriceDialog(PRICE_DIALOG_CLOSED);
+    showToast(priceDialog.action === "mulai" ? "✅ Pengerjaan dimulai!" : "✅ Ditandai menunggu sparepart.");
+    refresh();
+  };
+
   const handleDialogConfirm = async (reason?: string) => {
     const res = await fetch(`/api/service/${dialog.orderId}`, {
       method: "PATCH",
@@ -295,12 +369,15 @@ export default function AntrianPage() {
     refresh();
   };
 
-  const grouped = {
+ const grouped = {
     ANTRIAN: orders.filter(o => o.status === "ANTRIAN"),
     SEDANG_DIKERJAKAN: orders.filter(o => o.status === "SEDANG_DIKERJAKAN"),
     MENUNGGU_SPAREPART: orders.filter(o => o.status === "MENUNGGU_SPAREPART"),
   };
 
+  const queue = [...orders].sort(
+    (a, b) => new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime()
+  );
   const COLUMNS = ["#", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Status", "Aksi"];
 
   return (
@@ -455,7 +532,7 @@ export default function AntrianPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {orders.map((o, idx) => (
+                    {queue.map((o, idx) => (
                       <tr
                         key={o.id}
                         className="hover:bg-blue-50/30 transition-colors duration-150 cursor-pointer group"
@@ -515,22 +592,22 @@ export default function AntrianPage() {
                         <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                           {canAction && (
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {o.status === "ANTRIAN" && (
+                           {o.status === "ANTRIAN" && (
                                 <>
-                                  <ActionBtn label="Mulai" color="blue" onClick={() => openDialog(o, "mulai")} />
+                                  <ActionBtn label="Mulai" color="blue" onClick={() => openPriceDialog(o, "mulai")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                 </>
                               )}
                               {o.status === "SEDANG_DIKERJAKAN" && (
                                 <>
-                                  <ActionBtn label="Sparepart" color="orange" onClick={() => openDialog(o, "sparepart")} />
+                                  <ActionBtn label="Sparepart" color="orange" onClick={() => openPriceDialog(o, "sparepart")} />
                                   <ActionBtn label="Selesai" color="green" onClick={() => openDialog(o, "done")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                 </>
                               )}
                               {o.status === "MENUNGGU_SPAREPART" && (
                                 <>
-                                  <ActionBtn label="Lanjut" color="purple" onClick={() => openDialog(o, "mulai")} />
+                                  <ActionBtn label="Lanjut" color="purple" onClick={() => openPriceDialog(o, "mulai")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
                                 </>
                               )}
@@ -573,6 +650,23 @@ export default function AntrianPage() {
           reasonPlaceholder={dialog.reasonPlaceholder}
           onCancel={() => setDialog(DIALOG_CLOSED)}
           onConfirm={handleDialogConfirm}
+        />
+
+        <ServicePriceDialog
+          open={priceDialog.open}
+          title={priceDialog.title}
+          description={priceDialog.description}
+          confirmLabel={priceDialog.confirmLabel}
+          confirmClass={priceDialog.confirmClass}
+          priceLabel={priceDialog.priceLabel}
+          priceRequired={false}
+          defaultPrice={priceDialog.defaultPrice}
+          withReason={priceDialog.withReason}
+          reasonLabel={priceDialog.reasonLabel}
+          reasonPlaceholder={priceDialog.reasonPlaceholder}
+          reasonRequired={priceDialog.reasonRequired}
+          onCancel={() => setPriceDialog(PRICE_DIALOG_CLOSED)}
+          onConfirm={handlePriceConfirm}
         />
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />
