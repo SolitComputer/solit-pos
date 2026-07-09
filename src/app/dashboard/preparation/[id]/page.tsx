@@ -932,17 +932,10 @@ export default function PreparationDetailPage() {
                             )}
 
                             {isAssignedDriver && (
-                                <div className="flex gap-2">
-                                    {/* Tombol Tolak (sekunder) — pengaman anti-nyangkut. Hapus blok ini kalau mau strict cuma Setuju */}
-                                    <button onClick={handleDecline} disabled={actionLoading}
-                                        className="h-11 px-4 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition disabled:opacity-50">
-                                        Tolak
-                                    </button>
-                                    <button onClick={handleAccept} disabled={actionLoading}
-                                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                        {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
-                                    </button>
-                                </div>
+                                <button onClick={handleAccept} disabled={actionLoading}
+                                    className="w-full h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                    {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
+                                </button>
                             )}
                         </div>
                     )}

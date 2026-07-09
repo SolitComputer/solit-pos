@@ -12,6 +12,7 @@ interface MyDelivery {
   id: string; order_number: string; customer_name: string; customer_phone: string | null;
   status: string; delivery_method: string | null; notes: string | null;
   delivery_address: string | null;
+  delivery_accepted_at: string | null;
   delivery_started_at: string | null; delivered_at: string | null;
   return_started_at: string | null; returned_at: string | null;
   delivery_distance_m: number | null; delivery_duration_s: number | null;
@@ -38,6 +39,34 @@ const PHASE_META: Record<Phase, { label: string; badge: string; dot: string; cta
 
 const fmtSched = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" });
+
+function DeliveryTimer({ start, end }: { start: string; end?: string | null }) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    const update = () => {
+      const endTime = end ? new Date(end).getTime() : Date.now();
+      const diff = endTime - new Date(start).getTime();
+      if (diff < 0) { setElapsed("0m 0s"); return; }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+      let text = "";
+      if (h > 0) text += `${h}j `;
+      text += `${m}m ${s}d`;
+      setElapsed(text);
+    };
+    update();
+    if (end) return;
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [start, end]);
+
+  return (
+    <span className={`text-[10px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 ${end ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-orange-50 text-orange-700 border-orange-100"}`}>
+      ⏱️ Aktual: <span className="font-mono tabular-nums">{elapsed}</span>
+    </span>
+  );
+}
 
 function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
   const phase = getPhase(o);
@@ -100,10 +129,13 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
         </div>
       </div>
 
-      {(o.delivery_distance_m || o.delivery_duration_s) && (
-        <div className="flex gap-2 mb-2">
+      {(o.delivery_distance_m || o.delivery_duration_s || o.delivery_accepted_at) && (
+        <div className="flex flex-wrap gap-2 mb-2">
           {o.delivery_distance_m != null && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded">📏 {(o.delivery_distance_m / 1000).toFixed(1)} km</span>}
-          {o.delivery_duration_s != null && <span className="text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-100 px-2 py-0.5 rounded">⏱️ {Math.round(o.delivery_duration_s / 60)} mnt</span>}
+          {o.delivery_duration_s != null && <span className="text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-100 px-2 py-0.5 rounded flex items-center gap-1">Estimasi: <span className="font-mono tabular-nums">{Math.round(o.delivery_duration_s / 60)} mnt</span></span>}
+          {o.delivery_accepted_at && (
+            <DeliveryTimer start={o.delivery_accepted_at} end={o.delivered_at} />
+          )}
         </div>
       )}
 

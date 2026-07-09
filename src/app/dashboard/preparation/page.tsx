@@ -598,6 +598,13 @@ const fmtRange = (s: string) =>
     year: "numeric",
   });
 
+const fmtDur = (ms: number) => {
+  const h = Math.floor(ms / (1000 * 60 * 60));
+  const m = Math.floor((ms / 1000 / 60) % 60);
+  if (h > 0) return `${h}j ${m}m`;
+  return `${m} mnt`;
+};
+
 // Tambah setelah fmtRange
 function fmtMinShort(min: number | null): string {
   if (min === null) return "—";
@@ -650,6 +657,7 @@ export default function PreparationPage() {
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const knownIdsRef = useRef<Set<string>>(new Set());
   const notifiedDoneRef = useRef<Set<string>>(new Set());
+  const [delivLb, setDelivLb] = useState<{ respon: any[]; selesai: any[] } | null>(null);
 
   const canCreate = userRole ? hasPermission(userRole, PERMISSIONS.CREATE_PREPARATION) : false;
   const canDone = userRole ? hasPermission(userRole, PERMISSIONS.DONE_PREPARATION) : false;
@@ -739,12 +747,17 @@ export default function PreparationPage() {
       const res = await fetch(`/api/preparation/leaderboard?${qs.toString()}`);
       const r = await res.json();
       if (r.success) setStats(r);
+
+      const dQs = allTime ? "scope=all" : `month=${fromDate.slice(0, 7)}`;
+      const dlb = await fetch(`/api/preparation/delivery-leaderboard?${dQs}`);
+      const dr = await dlb.json();
+      if (dr.success) setDelivLb({ respon: dr.respon, selesai: dr.selesai });
     } catch {
       /* keep last */
     } finally {
       setStatsLoading(false);
     }
-  }, [allTime, periodParams]);
+  }, [allTime, periodParams, fromDate]);
 
   useEffect(() => {
     fetchList();
@@ -1276,59 +1289,94 @@ export default function PreparationPage() {
                 )
               )}
 
-              {/* ── Speed Leaderboard: Paling Cepat Menyiapkan ──────────────────────── */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">⚡</span>
-                  <div>
-                    <h3 className="text-sm font-black text-gray-800 leading-tight">
-                      Paling Cepat Menyiapkan
-                    </h3>
-                    <p className="text-[11px] text-gray-400">Rata-rata waktu diterima → siap kirim</p>
+              {/* ── Speed Leaderboards (3 kolom) ──────────────────────── */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* 1. Menyiapkan */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">⚡</span>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 leading-tight">Paling Cepat Menyiapkan</h3>
+                      <p className="text-[11px] text-gray-400">Diterima → siap kirim</p>
+                    </div>
                   </div>
-                </div>
-                {statsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />
-                    ))}
-                  </div>
-                ) : speedRows.length === 0 ? (
-                  <div className="py-10 text-center text-xs text-gray-400">
-                    Belum ada data di periode ini
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {speedRows.slice(0, 10).map((r, i) => (
-                      <div
-                        key={r.name + i}
-                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0
-                          ? "bg-emerald-50 border-emerald-200"
-                          : "bg-gray-50 border-gray-100"
-                          }`}
-                      >
-                        <span
-                          className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""
-                            }`}
-                        >
-                          {medal(i)}
-                        </span>
-                        <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">
-                          {r.name}
-                        </span>
-                        <div className="text-right flex-shrink-0">
-                          <p
-                            className={`text-sm font-black tabular-nums ${i === 0 ? "text-emerald-700" : "text-gray-900"
-                              }`}
-                          >
-                            {r.label}
-                          </p>
-                          <p className="text-[10px] text-gray-400">{r.total}× order</p>
+                  {statsLoading ? (
+                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                  ) : speedRows.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {speedRows.slice(0, 10).map((r, i) => (
+                        <div key={r.name + i} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100"}`}>
+                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
+                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
+                          <div className="text-right flex-shrink-0">
+                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-emerald-700" : "text-gray-900"}`}>{r.label}</p>
+                            <p className="text-[10px] text-gray-400">{r.total}× order</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Respon Pengantar */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">🏃</span>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 leading-tight">Respon Tercepat</h3>
+                      <p className="text-[11px] text-gray-400">Ditugaskan → terima tugas</p>
+                    </div>
                   </div>
-                )}
+                  {statsLoading ? (
+                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                  ) : !delivLb || delivLb.respon.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {delivLb.respon.slice(0, 10).map((r, i) => (
+                        <div key={r.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"}`}>
+                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
+                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
+                          <div className="text-right flex-shrink-0">
+                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-amber-700" : "text-gray-900"}`}>{fmtDur(r.avgMs)}</p>
+                            <p className="text-[10px] text-gray-400">{r.count}× order</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Selesai Pengantar */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">🏁</span>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 leading-tight">Selesai Tercepat</h3>
+                      <p className="text-[11px] text-gray-400">Mulai jalan → sampai tujuan</p>
+                    </div>
+                  </div>
+                  {statsLoading ? (
+                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+                  ) : !delivLb || delivLb.selesai.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {delivLb.selesai.slice(0, 10).map((r, i) => (
+                        <div key={r.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-100"}`}>
+                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
+                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
+                          <div className="text-right flex-shrink-0">
+                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-blue-700" : "text-gray-900"}`}>{fmtDur(r.avgMs)}</p>
+                            <p className="text-[10px] text-gray-400">{r.count}× order</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* ── Count Leaderboards (3 kolom) ────────────────────────────────────── */}
