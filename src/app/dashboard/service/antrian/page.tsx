@@ -37,6 +37,12 @@ function formatDate(iso?: string) {
   });
 }
 
+function fmtRupiah(n?: number | null) {
+  const num = Number(n ?? 0);
+  if (!num) return null;
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
+}
+
 type DialogState = {
   open: boolean;
   orderId: string;
@@ -235,7 +241,7 @@ function ActionBtn({ label, color, onClick }: { label: string; color: "blue" | "
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[40, 80, 70, 140, 60, 50, 60, 60, 90].map((w, i) => (
+      {[40, 80, 70, 140, 60, 50, 60, 70, 60, 90].map((w, i) => (
         <td key={i} className="px-4 py-4">
           <div className="h-3 rounded-full bg-gray-100 animate-pulse" style={{ width: w }} />
         </td>
@@ -369,7 +375,7 @@ export default function AntrianPage() {
     refresh();
   };
 
- const grouped = {
+  const grouped = {
     ANTRIAN: orders.filter(o => o.status === "ANTRIAN"),
     SEDANG_DIKERJAKAN: orders.filter(o => o.status === "SEDANG_DIKERJAKAN"),
     MENUNGGU_SPAREPART: orders.filter(o => o.status === "MENUNGGU_SPAREPART"),
@@ -378,7 +384,7 @@ export default function AntrianPage() {
   const queue = [...orders].sort(
     (a, b) => new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime()
   );
-  const COLUMNS = ["#", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Status", "Aksi"];
+  const COLUMNS = ["#", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi", "Status", "Aksi"];
 
   return (
     <DashboardLayout>
@@ -570,7 +576,7 @@ export default function AntrianPage() {
                           </span>
                         </td>
 
-                        <td className="px-4 py-4">
+<td className="px-4 py-4">
                           {o.dikerjakan_by_user?.name ? (
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shrink-0">
@@ -585,6 +591,26 @@ export default function AntrianPage() {
                           )}
                         </td>
 
+                        {/* Estimasi = estimasi_harga + biaya_sparepart (running total sebelum payment final) */}
+                        <td className="px-4 py-4 whitespace-nowrap min-w-[120px]">
+                          {(() => {
+                            const est = Number(o.estimasi_harga ?? 0);
+                            const sp = Number(o.biaya_sparepart ?? 0);
+                            const total = est + sp;
+                            if (total <= 0) return <span className="text-xs text-gray-300 font-medium">—</span>;
+                            return (
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-indigo-600 tabular-nums">{fmtRupiah(total)}</span>
+                                {sp > 0 && (
+                                  <span className="text-[10px] text-gray-400 mt-0.5">
+                                    jasa {fmtRupiah(est) ?? "Rp 0"} + part {fmtRupiah(sp)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </td>
+
                         <td className="px-4 py-4">
                           <ServiceStatusBadge status={o.status} />
                         </td>
@@ -592,7 +618,7 @@ export default function AntrianPage() {
                         <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                           {canAction && (
                             <div className="flex items-center gap-1.5 flex-wrap">
-                           {o.status === "ANTRIAN" && (
+                              {o.status === "ANTRIAN" && (
                                 <>
                                   <ActionBtn label="Mulai" color="blue" onClick={() => openPriceDialog(o, "mulai")} />
                                   <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
