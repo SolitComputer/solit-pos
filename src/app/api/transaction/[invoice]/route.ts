@@ -365,7 +365,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           typeof p.unit_id === "string" &&
           p.unit_id.trim().length > 0 &&
           Number.isFinite(Number(p.purchase_price)) &&
-          Number(p.purchase_price) >= 0
+          Number(p.purchase_price) > 0  // ← ganti >= 0 jadi > 0
       );
 
       if (validUpdates.length > 0) {
@@ -388,7 +388,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         });
       }
 
-      newInventoryPrice = purchasePricesPerUnit.reduce(
+      newInventoryPrice = validUpdates.reduce(
         (sum, p) => sum + Math.round(Number(p.purchase_price) || 0),
         0
       );
@@ -404,7 +404,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (dealPricesPerUnit.length > 0) {
       const validDeal = dealPricesPerUnit.filter(
-        (p) => Number.isFinite(Number(p.deal_price)) && Number(p.deal_price) >= 0
+        (p) => Number.isFinite(Number(p.deal_price)) && Number(p.deal_price) > 0  // ← ganti >= 0 jadi > 0
       );
 
       await Promise.allSettled(
@@ -419,7 +419,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         })
       );
 
-      newDealTotal = dealPricesPerUnit.reduce(
+      newDealTotal = validDeal.reduce(
         (s, p) => s + Math.round(Number(p.deal_price) || 0),
         0
       );
