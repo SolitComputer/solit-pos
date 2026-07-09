@@ -73,7 +73,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
-const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -197,7 +197,7 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
 
 // ─── Cashflow Roles ───────────────────────────────────────────────────────────
 // PURCHASING ditambahkan agar bisa akses cashflow
-export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "PURCHASING"];
+export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -606,7 +606,7 @@ export function isPKLRole(role?: string): boolean {
 }
 
 export function isFullAccess(role: string): boolean {
-  return (["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as string[]).includes(role);
+  return (["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as string[]).includes(role);
 }
 export function isDivisionHead(role: string): boolean {
   return Object.keys(DIVISION_MAP).includes(role);

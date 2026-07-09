@@ -105,7 +105,7 @@ function getCachedUser() {
 function setCachedUser(user: any) {
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(user));
-  } catch {}
+  } catch { }
 }
 
 interface MenuItem {
@@ -383,7 +383,7 @@ const MISSIONS_MENU: MenuGroup = {
   ],
 };
 
-const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 const ITEM_MISSION_ALL: MenuItem = {
   name: "Semua Misi",
@@ -784,25 +784,27 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   // ── ACCOUNTING ─────────────────────────────────────────────────────────────
   ACCOUNTING: [
-    SALES_OVERVIEW([
-      { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-      ITEM_USERS,
-    ]),
     {
-      label: "Inventaris",
+      label: "Overview",
       items: [
-        ITEM_DATA_BARANG,
-        ITEM_LAPTOP_SIAP_JUAL,
-        ITEM_LAPTOP_MINUS,
+        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_PKL_REPORT,
+        ITEM_MISSIONS,
+        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
+        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
+        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
+        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
       ],
     },
-    {
-      label: "Transaksi",
-      items: [
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
-      ],
-    },
+    ADMIN_INVENTARIS,
+    ADMIN_TRANSAKSI,
+    ADMIN_PENYEDIA_MENU,
+    ADMIN_PENGANTARAN_MENU,
+    SERVICE_MENU,
   ],
 
   // ── PURCHASING ─────────────────────────────────────────────────────────────
@@ -1191,9 +1193,8 @@ function RoleBadges({ user }: { user: any }) {
         return (
           <span
             key={role}
-            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${
-              meta?.className ?? "bg-gray-50 text-gray-700"
-            }`}
+            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"
+              }`}
           >
             {meta?.label ?? role}
           </span>
@@ -1224,28 +1225,25 @@ function NavItem({
       className={`group relative flex items-center rounded-xl text-sm font-medium outline-none
         transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30
         ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"}
-        ${
-          isActive
-            ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
-            : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+        ${isActive
+          ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
+          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
         }`}
     >
       {!rail && (
         <span
           className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white
-            transition-all duration-300 ease-out ${
-              isActive ? "h-5 opacity-90" : "h-0 opacity-0"
+            transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"
             }`}
         />
       )}
       <span
         className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
-          ${
-            isActive
-              ? rail
-                ? "text-white"
-                : "text-white/80"
-              : "text-gray-400 group-hover:text-gray-600"
+          ${isActive
+            ? rail
+              ? "text-white"
+              : "text-white/80"
+            : "text-gray-400 group-hover:text-gray-600"
           }`}
       >
         {item.icon}
@@ -1256,10 +1254,9 @@ function NavItem({
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
           className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums
             ${rail ? "absolute top-0.5 right-1" : "ml-auto"}
-            ${
-              isActive
-                ? "bg-white text-[#1a1a2e]"
-                : "bg-red-500 text-white shadow-sm shadow-red-500/40"
+            ${isActive
+              ? "bg-white text-[#1a1a2e]"
+              : "bg-red-500 text-white shadow-sm shadow-red-500/40"
             }`}
         >
           {badge > 99 ? "99+" : badge}
@@ -1434,9 +1431,8 @@ function SidebarContent({
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
-          rail ? "px-2 space-y-1" : "px-3 space-y-2"
-        }`}
+        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"
+          }`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
       >
         {loading ? (
@@ -1483,11 +1479,10 @@ function SidebarContent({
                 >
                   <span
                     className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
-                    ${
-                      hasActive
+                    ${hasActive
                         ? "text-[#1a1a2e]"
                         : "text-gray-400 group-hover/cat:text-gray-600"
-                    }`}
+                      }`}
                   >
                     {group.label}
                   </span>
@@ -1511,11 +1506,10 @@ function SidebarContent({
                   </svg>
                 </button>
                 <div
-                  className={`grid transition-all duration-300 ease-out ${
-                    isOpen
+                  className={`grid transition-all duration-300 ease-out ${isOpen
                       ? "grid-rows-[1fr] opacity-100 mt-0.5"
                       : "grid-rows-[0fr] opacity-0"
-                  }`}
+                    }`}
                 >
                   <div className="overflow-hidden min-h-0">
                     <div className="space-y-0.5">
@@ -1600,7 +1594,7 @@ export default function Sidebar() {
       setRail(localStorage.getItem(RAIL_KEY) === "1");
       const w = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
       if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -1617,7 +1611,7 @@ export default function Sidebar() {
         const fresh = result.user ?? null;
         setUser(fresh);
         setCachedUser(fresh);
-      } catch {}
+      } catch { }
       finally {
         setLoading(false);
       }
@@ -1639,16 +1633,16 @@ export default function Sidebar() {
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
       : user?.role
-      ? [user.role]
-      : [];
+        ? [user.role]
+        : [];
 
   const effectiveRoles = expandRolesWithParents(userRoles);
 
   const groups: MenuGroup[] =
     effectiveRoles.length > 0
       ? dedupeGroups(
-          mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles)
-        )
+        mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles)
+      )
       : [];
 
   const groupsSig = groups.map((g) => g.label).join("|");
@@ -1658,7 +1652,7 @@ export default function Sidebar() {
     let saved: Record<string, boolean> | null = null;
     try {
       saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null");
-    } catch {}
+    } catch { }
     setOpenMap(() => {
       const next: Record<string, boolean> = {};
       for (const g of groups) {
@@ -1688,7 +1682,7 @@ export default function Sidebar() {
       const next = { ...prev, [label]: !(prev[label] ?? true) };
       try {
         sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next));
-      } catch {}
+      } catch { }
       return next;
     });
   }, []);
@@ -1698,7 +1692,7 @@ export default function Sidebar() {
       const n = !v;
       try {
         localStorage.setItem(RAIL_KEY, n ? "1" : "0");
-      } catch {}
+      } catch { }
       return n;
     });
   }, []);
@@ -1720,7 +1714,7 @@ export default function Sidebar() {
       document.body.style.cursor = "";
       try {
         localStorage.setItem(WIDTH_KEY, String(widthRef.current));
-      } catch {}
+      } catch { }
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -1848,18 +1842,16 @@ export default function Sidebar() {
 
       {/* ── Mobile overlay ── */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
+        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
       {/* ── Mobile sidebar ── */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
