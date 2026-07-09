@@ -407,8 +407,13 @@ export const PERMISSIONS = {
     "PKL_SALES",
   ] as UserRole[],
 
-  RESTORE_TRANSACTION: [...FULL_ACCESS, "KEPALA_SALES"] as UserRole[],
-
+  RESTORE_TRANSACTION: [
+    ...FULL_ACCESS,
+    "KEPALA_SALES",
+    "KEPALA_SOTECH",
+    "KEPALA_ONPOINT",
+  ] as UserRole[],
+  
   RESERVE_UNIT: [
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH",

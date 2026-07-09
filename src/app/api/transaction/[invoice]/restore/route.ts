@@ -211,4 +211,4 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const POST = withAuth(restoreHandler, PERMISSIONS.EDIT_TRANSACTION);
+export const POST = withAuth(restoreHandler, PERMISSIONS.RESTORE_TRANSACTION);
