@@ -7,6 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+
 async function ensureLeaveBalance(userId: string, year: number, month: number) {
   const { data: existing } = await supabase
     .from("user_leave_balance")

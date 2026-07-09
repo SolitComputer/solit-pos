@@ -34,6 +34,6 @@ export const GET = withAuth(
 
     return NextResponse.json({ logs: data, total: count, page, limit });
   },
-  ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] // ADMIN, PROGRAMMER, ASISTEN_CEO bisa akses full log
+  ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]
 
 );

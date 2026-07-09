@@ -25,7 +25,7 @@ export interface Mission {
 }
 
 export const ACTIVE_STATUSES: MissionStatus[] = ["PENDING", "IN_PROGRESS", "SUBMITTED", "REJECTED"];
-export const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+export const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 export const STATUS_META: Record<MissionStatus, { label: string; text: string; bg: string; border: string; dot: string }> = {
   PENDING: { label: "Audit", text: "#92610a", bg: "#fffbeb", border: "#fde68a", dot: "#f59e0b" },

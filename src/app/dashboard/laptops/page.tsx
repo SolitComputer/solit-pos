@@ -302,8 +302,8 @@ export function LaptopsContent() {
     ] as UserRole[]);
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
     const canViewTotalStok = hasAnyRole(userRoles, [
-        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING",
+        "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
     ] as UserRole[]);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
 
@@ -788,497 +788,497 @@ export function LaptopsContent() {
     `}</style>
 
             <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-                    <div className="max-w-full mx-auto space-y-5">
+                <div className="max-w-full mx-auto space-y-5">
 
-                        {/* ── HEADER ───────────────────────────────────────── */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 animate-slideDown">
-                            <div className="flex items-center gap-3.5">
-                                <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                        <rect x="2" y="3" width="20" height="14" rx="2" />
-                                        <line x1="8" y1="21" x2="16" y2="21" />
-                                        <line x1="12" y1="17" x2="12" y2="21" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Data Laptop</h1>
-                                    <p className="text-xs text-gray-400 mt-0.5 font-medium">Kelola inventaris laptop Solit 03</p>
-                                </div>
+                    {/* ── HEADER ───────────────────────────────────────── */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 animate-slideDown">
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                {canExport && (
-                                    <button onClick={exportToExcel}
-                                        className="inline-flex items-center gap-2 h-9 px-4 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm active:scale-[0.97] transition-all duration-150">
-                                        <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Export Excel
-                                    </button>
-                                )}
-                                {canCreateLaptop && (
-                                    <button onClick={openCreate}
-                                        className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        Tambah Laptop
-                                    </button>
-                                )}
+                            <div>
+                                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Data Laptop</h1>
+                                <p className="text-xs text-gray-400 mt-0.5 font-medium">Kelola inventaris laptop Solit 03</p>
                             </div>
                         </div>
 
-                        {/* ── STAT CARDS ───────────────────────────────────── */}
-                        <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
-                            {canViewTotalStok && (
-                                <StatCard label="Stok Tersisa" value={`${totalSisa} unit`} accent="bg-gray-700"
-                                    icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                                />
-                            )}
-                            <StatCard label="Siap Jual" value={`${totalSiapJual} unit`} accent="bg-green-500"
-                                icon={<svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                            />
-                            {canViewTotalStok && (
-                                <StatCard label="Minus" value={`${totalMinus} unit`} accent="bg-red-500"
-                                    icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
-                                />
-                            )}
-                            {canViewTotalStok && (
-                                <StatCard label="Terjual" value={`${totalTerjual} unit`} accent="bg-blue-500"
-                                    icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
-                                />
-                            )}
-                        </div>
-
-                        {/* ── FILTER PANEL ─────────────────────────────────── */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                                <SearchInput placeholder="Cari nama, brand, CPU..." value={search} onChange={e => setSearch(e.target.value)} icon="search" />
-                                <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
-                                <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                                    <option value="ALL">Semua Status</option>
-                                    <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                    <option value="BELUM_SIAP">⚠️ Minus</option>
-                                    <option value="TERJUAL">💰 Terjual</option>
-                                </FilterSelect>
-                                <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
-                                    {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
-                                </FilterSelect>
-                                <button
-                                    onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT"); }}
-                                    className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <div className="flex items-center gap-2">
+                            {canExport && (
+                                <button onClick={exportToExcel}
+                                    className="inline-flex items-center gap-2 h-9 px-4 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm active:scale-[0.97] transition-all duration-150">
+                                    <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
-                                    Reset
+                                    Export Excel
                                 </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
-                                    {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
-                                </FilterSelect>
-                                <FilterSelect value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)}>
-                                    <option value="ALL">Semua Harga</option>
-                                    <option value="1-2">Rp 1 jt – 2 jt</option>
-                                    <option value="2-3">Rp 2 jt – 3 jt</option>
-                                    <option value="3-4">Rp 3 jt – 4 jt</option>
-                                    <option value="4+">Rp 4 jt ke atas</option>
-                                </FilterSelect>
-                                <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                                    <option value="DEFAULT">Urutan Default</option>
-                                    <option value="AZ">Nama: A → Z</option>
-                                    <option value="ZA">Nama: Z → A</option>
-                                    <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                    <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
-                                    <option value="SN">Urut SN</option>
-                                </FilterSelect>
-                            </div>
-
-                            {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
-                                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                    {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
-                                    {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
-                                    {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
-                                    {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
-                                </div>
+                            )}
+                            {canCreateLaptop && (
+                                <button onClick={openCreate}
+                                    className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Tambah Laptop
+                                </button>
                             )}
                         </div>
+                    </div>
 
-                        {/* ── TABLE ────────────────────────────────────────── */}
-                        {isLoading ? (
-                            <SkeletonTable />
-                        ) : filteredLaptops.length === 0 ? (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
-                                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <p className="text-gray-700 font-bold text-base">Tidak ada laptop ditemukan</p>
-                                <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
-                                <div className="overflow-x-auto table-scroll">
-                                    <table className="w-full text-sm border-collapse">
-                                        <thead>
-                                            <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                                <Th center>No</Th>
-                                                <Th>Nama Laptop</Th>
-                                                <Th>Brand</Th>
-                                                <Th>CPU</Th>
-                                                <Th>RAM</Th>
-                                                <Th>Storage</Th>
-                                                <Th right>Harga Jual</Th>
-                                                {canViewTotalStok && <Th right>Stok Tersisa</Th>}
-                                                <Th right>Siap Jual</Th>
-                                                {canViewTotalStok && <Th right>Minus</Th>}
-                                                {canViewTotalStok && <Th right>Terjual</Th>}
-                                                <Th right>Aksi</Th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredLaptops.map((item, idx) => (
-                                                <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => openDetail(item)}>
-                                                    <td className="px-4 py-3.5 text-center w-10">
-                                                        <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 max-w-[200px]">
-                                                        <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 max-w-[160px]">
-                                                        <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <span className="text-xs font-medium text-gray-600">{item.ram || <span className="text-gray-200">—</span>}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <span className="text-xs font-medium text-gray-600">{item.storage || <span className="text-gray-200">—</span>}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(item.selling_price)}</span>
-                                                    </td>
-                                                    {canViewTotalStok && (
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
-                                                                {item.stok_tersedia ?? 0}
-                                                            </span>
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : "bg-green-50 text-green-700 ring-1 ring-green-200"}`}>
-                                                            {item.siap_jual ?? 0}
-                                                        </span>
-                                                    </td>
-                                                    {canViewTotalStok && (
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
-                                                                {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
-                                                            </span>
-                                                        </td>
-                                                    )}
-                                                    {canViewTotalStok && (
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0 ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "text-gray-200"}`}>
-                                                                {item.terjual ?? 0}
-                                                            </span>
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {canViewBarcode && (
-                                                                <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
-                                                                    title="Lihat Barcode">
-                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
-                                                                    </svg>
-                                                                </button>
-                                                            )}
-                                                            {canViewUnits && (
-                                                                <Link href={`/dashboard/laptops/${item.id}/units`} onClick={e => e.stopPropagation()}
-                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center">
-                                                                    Units
-                                                                </Link>
-                                                            )}
-                                                            {canEditLaptop && (
-                                                                <>
-                                                                    <button onClick={() => openEdit(item)}
-                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150">
-                                                                        Edit
-                                                                    </button>
-                                                                    <button onClick={() => handleDelete(item.id)}
-                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150">
-                                                                        Hapus
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    {/* ── STAT CARDS ───────────────────────────────────── */}
+                    <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
+                        {canViewTotalStok && (
+                            <StatCard label="Stok Tersisa" value={`${totalSisa} unit`} accent="bg-gray-700"
+                                icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
+                            />
+                        )}
+                        <StatCard label="Siap Jual" value={`${totalSiapJual} unit`} accent="bg-green-500"
+                            icon={<svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                        />
+                        {canViewTotalStok && (
+                            <StatCard label="Minus" value={`${totalMinus} unit`} accent="bg-red-500"
+                                icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
+                            />
+                        )}
+                        {canViewTotalStok && (
+                            <StatCard label="Terjual" value={`${totalTerjual} unit`} accent="bg-blue-500"
+                                icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+                            />
+                        )}
+                    </div>
 
-                                {/* Table Footer */}
-                                <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
-                                    <p className="text-xs text-gray-400 font-medium">
-                                        <span className="text-gray-700 font-bold">{filteredLaptops.length}</span> laptop
-                                        {laptops.length !== filteredLaptops.length && (
-                                            <span className="text-gray-400 ml-1">dari {laptops.length}</span>
-                                        )}
-                                    </p>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
-                                        <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
-                                        {canViewTotalStok && (
-                                            <>
-                                                <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
-                                                <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500" color="text-blue-600" />
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                    {/* ── FILTER PANEL ─────────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <SearchInput placeholder="Cari nama, brand, CPU..." value={search} onChange={e => setSearch(e.target.value)} icon="search" />
+                            <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
+                            <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="ALL">Semua Status</option>
+                                <option value="SIAP_JUAL">✅ Siap Jual</option>
+                                <option value="BELUM_SIAP">⚠️ Minus</option>
+                                <option value="TERJUAL">💰 Terjual</option>
+                            </FilterSelect>
+                            <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+                                {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
+                            </FilterSelect>
+                            <button
+                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT"); }}
+                                className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Reset
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
+                                {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
+                            </FilterSelect>
+                            <FilterSelect value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)}>
+                                <option value="ALL">Semua Harga</option>
+                                <option value="1-2">Rp 1 jt – 2 jt</option>
+                                <option value="2-3">Rp 2 jt – 3 jt</option>
+                                <option value="3-4">Rp 3 jt – 4 jt</option>
+                                <option value="4+">Rp 4 jt ke atas</option>
+                            </FilterSelect>
+                            <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                <option value="DEFAULT">Urutan Default</option>
+                                <option value="AZ">Nama: A → Z</option>
+                                <option value="ZA">Nama: Z → A</option>
+                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                <option value="SN">Urut SN</option>
+                            </FilterSelect>
+                        </div>
+
+                        {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
+                                {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
+                                {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
                             </div>
                         )}
                     </div>
-                </main>
 
-                {/* ── MODALS ───────────────────────────────────────────── */}
-
-                {/* Create Modal */}
-                <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="lg">
-                    <form onSubmit={handleCreate} className="space-y-5">
-                        <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5">
-                            <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <p className="text-xs text-blue-700 leading-relaxed">
-                                Setiap unit laptop memiliki SN, grade, dan harga modal sendiri.
-                                Data unit ditambahkan setelah laptop berhasil dibuat.
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField label="Nama Laptop" required>
-                                <input name="laptop_name" placeholder="Contoh: MacBook Air M2 2023" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
-                            </FormField>
-                            <FormField label="Brand">
-                                <input name="brand" placeholder="Apple, Lenovo, Dell, ASUS..." value={formData.brand} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="CPU / Processor">
-                                <input name="cpu" placeholder="Intel Core i7-13700H, Apple M2..." value={formData.cpu} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="RAM">
-                                <input name="ram" placeholder="8GB, 16GB, 32GB" value={formData.ram} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Storage">
-                                <input name="storage" placeholder="256GB SSD, 512GB NVMe" value={formData.storage} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="GPU / VGA">
-                                <input name="gpu" placeholder="NVIDIA RTX 4060, Intel Iris Xe" value={formData.gpu} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Display / Layar">
-                                <input name="display" placeholder='14" FHD IPS, 120Hz' value={formData.display} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Harga Jual (Default)" required>
-                                <input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
-                            </FormField>
-                        </div>
-                        <FormField label="Kondisi Umum">
-                            <input name="condition_note" placeholder="Mulus, bekas pemakaian normal, ada goresan tipis..." value={formData.condition_note} onChange={handleFormChange} className={inputCls} />
-                        </FormField>
-                        <FormField label="Catatan Tambahan">
-                            <textarea name="notes" placeholder="Informasi tambahan tentang laptop ini..." value={formData.notes} onChange={handleFormChange} rows={3} className={textareaCls} />
-                        </FormField>
-                        <ModalActions onCancel={closeModal} loading={formLoading} submitLabel="Buat Laptop" />
-                    </form>
-                </Modal>
-
-                {/* Edit Modal */}
-                <Modal open={modalMode === "edit"} onClose={closeModal} title="Edit Laptop" size="lg">
-                    <form onSubmit={handleEdit} className="space-y-5">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField label="Nama Laptop" required>
-                                <input name="laptop_name" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
-                            </FormField>
-                            <FormField label="Brand">
-                                <input name="brand" value={formData.brand} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="CPU / Processor">
-                                <input name="cpu" value={formData.cpu} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="RAM">
-                                <input name="ram" value={formData.ram} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Storage">
-                                <input name="storage" value={formData.storage} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="GPU / VGA">
-                                <input name="gpu" value={formData.gpu} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Display / Layar">
-                                <input name="display" value={formData.display} onChange={handleFormChange} className={inputCls} />
-                            </FormField>
-                            <FormField label="Harga Jual (Default)" required>
-                                <input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
-                            </FormField>
-                        </div>
-                        <FormField label="Kondisi Umum">
-                            <input name="condition_note" value={formData.condition_note} onChange={handleFormChange} className={inputCls} />
-                        </FormField>
-                        <FormField label="Catatan Tambahan">
-                            <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={3} className={textareaCls} />
-                        </FormField>
-                        <ModalActions onCancel={closeModal} loading={formLoading} submitLabel="Simpan Perubahan" />
-                    </form>
-                </Modal>
-
-                {/* Detail Modal */}
-                <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
-                    {detailLoading ? (
-                        <ModalDetailSkeleton />
-                    ) : selectedLaptop ? (
-                        <div className="space-y-5">
-                            <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                                <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">💻</div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug">{selectedLaptop.laptop_name}</h3>
-                                    <p className="text-sm text-gray-400 mt-0.5 font-medium">{selectedLaptop.brand || "—"}</p>
-                                    <div className="flex flex-wrap gap-2 mt-3">
-                                        {(() => {
-                                            const s = STATUS_STYLE[selectedLaptop.status]; return s ? (
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${s.badge}`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
-                                                </span>
-                                            ) : null;
-                                        })()}
-                                        {selectedLaptop.ready_to_sell && (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                                ✓ Ready to Sell
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="sm:text-right flex-shrink-0">
-                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
-                                    <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">{fmt(selectedLaptop.selling_price)}</p>
-                                    <p className="text-xs text-gray-400 mt-1.5">Stok:{" "}
-                                        <span className={`font-bold ${(selectedLaptop.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>{selectedLaptop.qty ?? 0}</span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spesifikasi Teknis</p>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                                    {[
-                                        { label: "CPU", value: selectedLaptop.cpu },
-                                        { label: "RAM", value: selectedLaptop.ram },
-                                        { label: "Storage", value: selectedLaptop.storage },
-                                        { label: "GPU", value: selectedLaptop.gpu },
-                                        { label: "Display", value: selectedLaptop.display },
-                                    ].map(({ label, value }) => (
-                                        <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-                                            <p className="text-sm font-semibold text-gray-800 break-all leading-tight">
-                                                {value || <span className="text-gray-300 font-normal">—</span>}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-                                <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    {/* ── TABLE ────────────────────────────────────────── */}
+                    {isLoading ? (
+                        <SkeletonTable />
+                    ) : filteredLaptops.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <p className="text-xs text-gray-600 leading-relaxed">
-                                    Stok & harga modal dikelola per-unit. Klik <span className="font-bold text-gray-800">Lihat Units</span> untuk mengelola SN, grade, dan harga modal masing-masing unit.
-                                </p>
+                            </div>
+                            <p className="text-gray-700 font-bold text-base">Tidak ada laptop ditemukan</p>
+                            <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                            <div className="overflow-x-auto table-scroll">
+                                <table className="w-full text-sm border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b-2 border-gray-100">
+                                            <Th center>No</Th>
+                                            <Th>Nama Laptop</Th>
+                                            <Th>Brand</Th>
+                                            <Th>CPU</Th>
+                                            <Th>RAM</Th>
+                                            <Th>Storage</Th>
+                                            <Th right>Harga Jual</Th>
+                                            {canViewTotalStok && <Th right>Stok Tersisa</Th>}
+                                            <Th right>Siap Jual</Th>
+                                            {canViewTotalStok && <Th right>Minus</Th>}
+                                            {canViewTotalStok && <Th right>Terjual</Th>}
+                                            <Th right>Aksi</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLaptops.map((item, idx) => (
+                                            <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => openDetail(item)}>
+                                                <td className="px-4 py-3.5 text-center w-10">
+                                                    <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 max-w-[200px]">
+                                                    <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                                    <span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 max-w-[160px]">
+                                                    <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                                    <span className="text-xs font-medium text-gray-600">{item.ram || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                                    <span className="text-xs font-medium text-gray-600">{item.storage || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(item.selling_price)}</span>
+                                                </td>
+                                                {canViewTotalStok && (
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
+                                                            {item.stok_tersedia ?? 0}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : "bg-green-50 text-green-700 ring-1 ring-green-200"}`}>
+                                                        {item.siap_jual ?? 0}
+                                                    </span>
+                                                </td>
+                                                {canViewTotalStok && (
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
+                                                            {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                {canViewTotalStok && (
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0 ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "text-gray-200"}`}>
+                                                            {item.terjual ?? 0}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {canViewBarcode && (
+                                                            <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
+                                                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
+                                                                title="Lihat Barcode">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        {canViewUnits && (
+                                                            <Link href={`/dashboard/laptops/${item.id}/units`} onClick={e => e.stopPropagation()}
+                                                                className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center">
+                                                                Units
+                                                            </Link>
+                                                        )}
+                                                        {canEditLaptop && (
+                                                            <>
+                                                                <button onClick={() => openEdit(item)}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150">
+                                                                    Edit
+                                                                </button>
+                                                                <button onClick={() => handleDelete(item.id)}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150">
+                                                                    Hapus
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            {(selectedLaptop.condition_note || selectedLaptop.notes) && (
-                                <div className="space-y-2.5">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catatan</p>
-                                    {selectedLaptop.condition_note && (
-                                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5">
-                                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Kondisi Umum</p>
-                                            <p className="text-sm text-amber-900">{selectedLaptop.condition_note}</p>
-                                        </div>
+                            {/* Table Footer */}
+                            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-xs text-gray-400 font-medium">
+                                    <span className="text-gray-700 font-bold">{filteredLaptops.length}</span> laptop
+                                    {laptops.length !== filteredLaptops.length && (
+                                        <span className="text-gray-400 ml-1">dari {laptops.length}</span>
                                     )}
-                                    {selectedLaptop.notes && (
-                                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Catatan Tambahan</p>
-                                            <p className="text-sm text-gray-700">{selectedLaptop.notes}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                <p className="text-xs text-gray-400">
-                                    {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}
                                 </p>
-                                <div className="flex gap-2">
-                                    {canViewUnits && (
-                                        <Link href={`/dashboard/laptops/${selectedLaptop.id}/units`}
-                                            className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center">
-                                            Lihat Units
-                                        </Link>
-                                    )}
-                                    {canEditLaptop && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
+                                    <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
+                                    {canViewTotalStok && (
                                         <>
-                                            <button onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
-                                                className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">
-                                                Edit
-                                            </button>
-                                            <button onClick={() => handleDelete(selectedLaptop.id)}
-                                                className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">
-                                                Hapus
-                                            </button>
+                                            <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
+                                            <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500" color="text-blue-600" />
                                         </>
                                     )}
                                 </div>
                             </div>
                         </div>
-                    ) : null}
-                </Modal>
+                    )}
+                </div>
+            </main>
 
-                {barcodeTarget && (
-                    <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
-                )}
-                {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
-                {confirmModal && (
-                    <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
-                )}
-                {deleteConfirmModal && (
-                    <DeleteConfirmModal
-                        laptop={deleteConfirmModal.laptop}
-                        unitCount={deleteConfirmModal.unitCount}
-                        onCancel={() => setDeleteConfirmModal(null)}
-                        onConfirm={async () => {
-                            const id = deleteConfirmModal.laptop.id;
-                            setDeleteConfirmModal(null);
-                            try {
-                                const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
-                                const result = await res.json();
-                                if (!result.success) { showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`); return; }
-                                if (modalMode === "detail") closeModal();
-                                fetchLaptops();
-                                showAlert("Laptop berhasil dihapus ✅");
-                            } catch {
-                                showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
-                            }
-                        }}
-                    />
-                )}
-   </>
+            {/* ── MODALS ───────────────────────────────────────────── */}
+
+            {/* Create Modal */}
+            <Modal open={modalMode === "create"} onClose={closeModal} title="Tambah Laptop Baru" size="lg">
+                <form onSubmit={handleCreate} className="space-y-5">
+                    <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5">
+                        <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                            Setiap unit laptop memiliki SN, grade, dan harga modal sendiri.
+                            Data unit ditambahkan setelah laptop berhasil dibuat.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField label="Nama Laptop" required>
+                            <input name="laptop_name" placeholder="Contoh: MacBook Air M2 2023" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
+                        </FormField>
+                        <FormField label="Brand">
+                            <input name="brand" placeholder="Apple, Lenovo, Dell, ASUS..." value={formData.brand} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="CPU / Processor">
+                            <input name="cpu" placeholder="Intel Core i7-13700H, Apple M2..." value={formData.cpu} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="RAM">
+                            <input name="ram" placeholder="8GB, 16GB, 32GB" value={formData.ram} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Storage">
+                            <input name="storage" placeholder="256GB SSD, 512GB NVMe" value={formData.storage} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="GPU / VGA">
+                            <input name="gpu" placeholder="NVIDIA RTX 4060, Intel Iris Xe" value={formData.gpu} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Display / Layar">
+                            <input name="display" placeholder='14" FHD IPS, 120Hz' value={formData.display} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Harga Jual (Default)" required>
+                            <input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
+                        </FormField>
+                    </div>
+                    <FormField label="Kondisi Umum">
+                        <input name="condition_note" placeholder="Mulus, bekas pemakaian normal, ada goresan tipis..." value={formData.condition_note} onChange={handleFormChange} className={inputCls} />
+                    </FormField>
+                    <FormField label="Catatan Tambahan">
+                        <textarea name="notes" placeholder="Informasi tambahan tentang laptop ini..." value={formData.notes} onChange={handleFormChange} rows={3} className={textareaCls} />
+                    </FormField>
+                    <ModalActions onCancel={closeModal} loading={formLoading} submitLabel="Buat Laptop" />
+                </form>
+            </Modal>
+
+            {/* Edit Modal */}
+            <Modal open={modalMode === "edit"} onClose={closeModal} title="Edit Laptop" size="lg">
+                <form onSubmit={handleEdit} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField label="Nama Laptop" required>
+                            <input name="laptop_name" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
+                        </FormField>
+                        <FormField label="Brand">
+                            <input name="brand" value={formData.brand} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="CPU / Processor">
+                            <input name="cpu" value={formData.cpu} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="RAM">
+                            <input name="ram" value={formData.ram} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Storage">
+                            <input name="storage" value={formData.storage} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="GPU / VGA">
+                            <input name="gpu" value={formData.gpu} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Display / Layar">
+                            <input name="display" value={formData.display} onChange={handleFormChange} className={inputCls} />
+                        </FormField>
+                        <FormField label="Harga Jual (Default)" required>
+                            <input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
+                        </FormField>
+                    </div>
+                    <FormField label="Kondisi Umum">
+                        <input name="condition_note" value={formData.condition_note} onChange={handleFormChange} className={inputCls} />
+                    </FormField>
+                    <FormField label="Catatan Tambahan">
+                        <textarea name="notes" value={formData.notes} onChange={handleFormChange} rows={3} className={textareaCls} />
+                    </FormField>
+                    <ModalActions onCancel={closeModal} loading={formLoading} submitLabel="Simpan Perubahan" />
+                </form>
+            </Modal>
+
+            {/* Detail Modal */}
+            <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
+                {detailLoading ? (
+                    <ModalDetailSkeleton />
+                ) : selectedLaptop ? (
+                    <div className="space-y-5">
+                        <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">💻</div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug">{selectedLaptop.laptop_name}</h3>
+                                <p className="text-sm text-gray-400 mt-0.5 font-medium">{selectedLaptop.brand || "—"}</p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {(() => {
+                                        const s = STATUS_STYLE[selectedLaptop.status]; return s ? (
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${s.badge}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
+                                            </span>
+                                        ) : null;
+                                    })()}
+                                    {selectedLaptop.ready_to_sell && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                                            ✓ Ready to Sell
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="sm:text-right flex-shrink-0">
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
+                                <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">{fmt(selectedLaptop.selling_price)}</p>
+                                <p className="text-xs text-gray-400 mt-1.5">Stok:{" "}
+                                    <span className={`font-bold ${(selectedLaptop.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>{selectedLaptop.qty ?? 0}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spesifikasi Teknis</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                {[
+                                    { label: "CPU", value: selectedLaptop.cpu },
+                                    { label: "RAM", value: selectedLaptop.ram },
+                                    { label: "Storage", value: selectedLaptop.storage },
+                                    { label: "GPU", value: selectedLaptop.gpu },
+                                    { label: "Display", value: selectedLaptop.display },
+                                ].map(({ label, value }) => (
+                                    <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+                                        <p className="text-sm font-semibold text-gray-800 break-all leading-tight">
+                                            {value || <span className="text-gray-300 font-normal">—</span>}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3.5">
+                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                                Stok & harga modal dikelola per-unit. Klik <span className="font-bold text-gray-800">Lihat Units</span> untuk mengelola SN, grade, dan harga modal masing-masing unit.
+                            </p>
+                        </div>
+
+                        {(selectedLaptop.condition_note || selectedLaptop.notes) && (
+                            <div className="space-y-2.5">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catatan</p>
+                                {selectedLaptop.condition_note && (
+                                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5">
+                                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Kondisi Umum</p>
+                                        <p className="text-sm text-amber-900">{selectedLaptop.condition_note}</p>
+                                    </div>
+                                )}
+                                {selectedLaptop.notes && (
+                                    <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Catatan Tambahan</p>
+                                        <p className="text-sm text-gray-700">{selectedLaptop.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <p className="text-xs text-gray-400">
+                                {new Date(selectedLaptop.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}
+                            </p>
+                            <div className="flex gap-2">
+                                {canViewUnits && (
+                                    <Link href={`/dashboard/laptops/${selectedLaptop.id}/units`}
+                                        className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center">
+                                        Lihat Units
+                                    </Link>
+                                )}
+                                {canEditLaptop && (
+                                    <>
+                                        <button onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
+                                            className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">
+                                            Edit
+                                        </button>
+                                        <button onClick={() => handleDelete(selectedLaptop.id)}
+                                            className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">
+                                            Hapus
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+            </Modal>
+
+            {barcodeTarget && (
+                <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+            )}
+            {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+            {confirmModal && (
+                <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
+            )}
+            {deleteConfirmModal && (
+                <DeleteConfirmModal
+                    laptop={deleteConfirmModal.laptop}
+                    unitCount={deleteConfirmModal.unitCount}
+                    onCancel={() => setDeleteConfirmModal(null)}
+                    onConfirm={async () => {
+                        const id = deleteConfirmModal.laptop.id;
+                        setDeleteConfirmModal(null);
+                        try {
+                            const res = await fetch(`/api/laptops/${id}`, { method: "DELETE" });
+                            const result = await res.json();
+                            if (!result.success) { showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`); return; }
+                            if (modalMode === "detail") closeModal();
+                            fetchLaptops();
+                            showAlert("Laptop berhasil dihapus ✅");
+                        } catch {
+                            showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
+                        }
+                    }}
+                />
+            )}
+        </>
     );
 }
 

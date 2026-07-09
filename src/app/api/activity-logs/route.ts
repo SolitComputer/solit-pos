@@ -35,5 +35,5 @@ export const GET = withAuth(
 
     return NextResponse.json({ logs: data, total: count, page, limit });
   },
-  ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] // hanya ADMIN yang bisa akses
+  ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] // ✅ tambah ACCOUNTING
 );

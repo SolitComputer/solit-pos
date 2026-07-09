@@ -13,7 +13,7 @@ export type MissionStatus =
 
 export type MissionPriority = "LOW" | "MEDIUM" | "HIGH";
 
-const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 
 export const MISSION_ASSIGN_MAP: Record<string, UserRole[]> = {
