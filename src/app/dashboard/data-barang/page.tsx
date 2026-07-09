@@ -1,8 +1,5 @@
 "use client";
 // src/app/dashboard/data-barang/page.tsx
-// ── Halaman gabungan "Data Barang" ────────────────────────────────────────────
-// Tab: Data Laptop + Aksesoris saja.
-// Laptop Siap Jual & Laptop Minus sudah pindah jadi item sidebar tersendiri.
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -16,7 +13,7 @@ interface TabDef {
   key: TabKey;
   label: string;
   roles: UserRole[];
-  icon: React.ReactNode;
+  icon: string; // Tabler icon name
 }
 
 const TABS: TabDef[] = [
@@ -24,24 +21,13 @@ const TABS: TabDef[] = [
     key: "laptops",
     label: "Data Laptop",
     roles: [],
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <line x1="8" y1="21" x2="16" y2="21" />
-        <line x1="12" y1="17" x2="12" y2="21" />
-      </svg>
-    ),
+    icon: "ti-device-laptop",
   },
   {
     key: "accessories",
     label: "Aksesoris",
     roles: [],
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-        <path d="M8 12h.01M12 12h.01M16 12h.01" />
-      </svg>
-    ),
+    icon: "ti-devices",
   },
 ];
 
@@ -50,39 +36,46 @@ export default function DataBarangPage() {
   const [rolesLoaded, setRolesLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("laptops");
 
+  // ── Load roles
   useEffect(() => {
     const controller = new AbortController();
-    const loadRoles = async () => {
+    (async () => {
       try {
         const res = await fetch("/api/auth/me", { signal: controller.signal });
         const data = await res.json();
         const roles: string[] =
           Array.isArray(data.user?.roles) && data.user.roles.length > 0
             ? data.user.roles
-            : data.user?.role ? [data.user.role] : [];
+            : data.user?.role
+            ? [data.user.role]
+            : [];
         setUserRoles(roles as UserRole[]);
       } catch {
         setUserRoles([]);
       } finally {
         setRolesLoaded(true);
       }
-    };
-    loadRoles();
+    })();
     return () => controller.abort();
   }, []);
 
-  // Baca ?tab= dari URL saat mount → deep-link / tidak reset pas refresh
+  // ── Deep-link: baca ?tab= dari URL
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tab") as TabKey | null;
+    const t = new URLSearchParams(window.location.search).get(
+      "tab"
+    ) as TabKey | null;
     if (t && TABS.some((tab) => tab.key === t)) setActiveTab(t);
   }, []);
 
   const visibleTabs = useMemo(
-    () => TABS.filter((t) => t.roles.length === 0 || hasAnyRole(userRoles, t.roles)),
+    () =>
+      TABS.filter(
+        (t) => t.roles.length === 0 || hasAnyRole(userRoles, t.roles)
+      ),
     [userRoles]
   );
 
-  // Kalau tab aktif tidak boleh dilihat user → lompat ke tab valid pertama
+  // ── Fallback ke tab pertama kalau tab aktif tidak visible
   useEffect(() => {
     if (!rolesLoaded || visibleTabs.length === 0) return;
     if (!visibleTabs.some((t) => t.key === activeTab)) {
@@ -99,40 +92,91 @@ export default function DataBarangPage() {
 
   return (
     <DashboardLayout>
-      {/* ── TAB BAR ─────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[#F7F7F8]/90 backdrop-blur border-b border-gray-100 px-4 sm:px-6 lg:px-8 pt-4 pb-3">
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+      {/* ── STICKY HEADER ─────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200">
+
+        {/* Top row: identity + badge */}
+        <div className="flex items-center justify-between px-5 sm:px-7 pt-5 pb-4">
+          <div className="flex items-center gap-3">
+            {/* Icon */}
+            <div className="w-9 h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0">
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+            </div>
+
+            {/* Title + subtitle */}
+            <div>
+              <h1 className="text-[14.5px] font-semibold text-gray-900 tracking-tight leading-none">
+                Data Barang
+              </h1>
+              <p className="text-[11.5px] text-gray-400 mt-[3px] font-normal">
+                Laptop &amp; aksesoris dalam satu tempat
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
-              Data Barang
-            </h1>
-            <p className="text-[11px] text-gray-400 mt-0.5 font-medium">
-              Data laptop &amp; aksesoris dalam satu tempat
-            </p>
-          </div>
+
+          {/* Kategori badge */}
+          <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-3 py-1 font-normal tabular-nums">
+            {visibleTabs.length} kategori
+          </span>
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+        {/* ── Tab strip — underline style ─────────────────────── */}
+        <div className="flex overflow-x-auto scrollbar-hide px-5 sm:px-7 border-t border-gray-100">
           {visibleTabs.map((tab) => {
             const isActive = tab.key === activeTab;
             return (
               <button
                 key={tab.key}
                 onClick={() => changeTab(tab.key)}
-                className={`flex-shrink-0 flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                className={[
+                  "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
+                  "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 rounded-sm",
                   isActive
-                    ? "bg-gray-900 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
-                }`}
+                    ? "border-gray-900 text-gray-900 font-medium"
+                    : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
+                ]
+                  .join(" ")}
               >
-                <span className={isActive ? "text-white/90" : "text-gray-400"}>
-                  {tab.icon}
-                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={isActive ? "opacity-80" : "opacity-40"}
+                >
+                  {tab.icon === "ti-device-laptop" ? (
+                    <>
+                      <rect x="2" y="3" width="20" height="14" rx="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+                      <circle cx="8" cy="12" r="0.5" fill="currentColor" />
+                      <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+                      <circle cx="16" cy="12" r="0.5" fill="currentColor" />
+                    </>
+                  )}
+                </svg>
                 {tab.label}
               </button>
             );
@@ -140,18 +184,13 @@ export default function DataBarangPage() {
         </div>
       </div>
 
-      {/* ── ISI TAB AKTIF ───────────────────────────────────── */}
+      {/* ── KONTEN TAB ────────────────────────────────────────── */}
       {activeTab === "laptops" && <LaptopsContent />}
       {activeTab === "accessories" && <AccessoriesContent />}
 
       <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </DashboardLayout>
   );
