@@ -124,7 +124,7 @@ function BarcodeScanModal({
       cancelAnimationFrame(animId);
       try {
         zxingControls?.stop();
-      } catch {}
+      } catch { }
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -540,6 +540,12 @@ interface LeaderRow {
   name: string;
   total: number;
 }
+interface SpeedRow {
+  name: string;
+  avg_minutes: number;
+  total: number;
+  label: string;
+}
 interface StatusCounts {
   menunggu: number;
   diproses: number;
@@ -557,6 +563,23 @@ interface DashboardStats {
   formats: LeaderRow[];
   prepared: LeaderRow[];
   delivered: LeaderRow[];
+  speed: SpeedRow[];
+  global_avg_minutes: number | null;
+  avg_wait_minutes: number | null;
+}
+interface PersonStatRow {
+  name: string;
+  role: "sales" | "penyedia";
+  total_orders: number;
+  earliest_time: string;  // "HH:MM" WIB
+  latest_time: string;  // "HH:MM" WIB
+  avg_per_week: number;
+  avg_prep_min: number | null; // khusus penyedia
+  week_count: number;
+}
+interface PersonStats {
+  sales: PersonStatRow[];
+  penyedia: PersonStatRow[];
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -574,6 +597,15 @@ const fmtRange = (s: string) =>
     month: "short",
     year: "numeric",
   });
+
+// Tambah setelah fmtRange
+function fmtMinShort(min: number | null): string {
+  if (min === null) return "—";
+  if (min < 60) return `${min} mnt`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}j ${m}m` : `${h} jam`;
+}
 
 export default function PreparationPage() {
   // ── View & data ──
@@ -601,6 +633,9 @@ export default function PreparationPage() {
   // ── Leaderboard / stats ──
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [personStats, setPersonStats] = useState<PersonStats | null>(null);
+  const [personStatsLoading, setPersonStatsLoading] = useState(true);
+  const [personTab, setPersonTab] = useState<"sales" | "penyedia">("sales");
 
   const [showCreate, setShowCreate] = useState(false);
   const [receivingId, setReceivingId] = useState<string | null>(null);
@@ -622,6 +657,7 @@ export default function PreparationPage() {
   useEffect(() => {
     soundOnRef.current = soundOn;
   }, [soundOn]);
+
 
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
@@ -717,12 +753,35 @@ export default function PreparationPage() {
     fetchStats();
   }, [fetchStats]);
 
+  const fetchPersonStats = useCallback(async () => {
+    setPersonStatsLoading(true);
+    try {
+      const qs = allTime
+        ? new URLSearchParams({ scope: "all" })
+        : periodParams(new URLSearchParams());
+      const res = await fetch(`/api/preparation/person-stats?${qs.toString()}`);
+      const r = await res.json();
+      if (r.success) setPersonStats(r);
+    } catch {
+      /* keep last */
+    } finally {
+      setPersonStatsLoading(false);
+    }
+  }, [allTime, periodParams]);
+
+  // Tambah setelah useEffect fetchStats
+  useEffect(() => {
+    fetchPersonStats();
+  }, [fetchPersonStats]);
+
   // ref biar realtime nggak resubscribe tiap fetcher berubah
   const fetchListRef = useRef(fetchList);
   const fetchStatsRef = useRef(fetchStats);
+  const fetchPersonStatsRef = useRef(fetchPersonStats);
   useEffect(() => {
     fetchListRef.current = fetchList;
     fetchStatsRef.current = fetchStats;
+    fetchPersonStatsRef.current = fetchPersonStats;
   });
 
   useEffect(() => {
@@ -881,6 +940,7 @@ export default function PreparationPage() {
     emerald: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
   };
 
+  // Letakkan tepat setelah penutup boardGroups array
   const boardGroups = [
     {
       key: "formats",
@@ -888,6 +948,7 @@ export default function PreparationPage() {
       sub: "Sales input penyiapan",
       icon: "📝",
       rows: stats?.formats ?? [],
+      type: "count" as const,
     },
     {
       key: "prepared",
@@ -895,6 +956,7 @@ export default function PreparationPage() {
       sub: "Penyedia cek → siap kirim",
       icon: "📦",
       rows: stats?.prepared ?? [],
+      type: "count" as const,
     },
     {
       key: "delivered",
@@ -902,8 +964,12 @@ export default function PreparationPage() {
       sub: "Pengantar selesai antar",
       icon: "🛵",
       rows: stats?.delivered ?? [],
+      type: "count" as const,
     },
   ];
+
+  const speedRows: SpeedRow[] = stats?.speed ?? [];
+
   const medal = (i: number) =>
     i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
 
@@ -987,11 +1053,10 @@ export default function PreparationPage() {
               <button
                 onClick={() => setSoundOn((v) => !v)}
                 title={soundOn ? "Suara notif aktif" : "Suara notif mati"}
-                className={`w-9 h-9 flex items-center justify-center rounded-xl border transition ${
-                  soundOn
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                    : "bg-gray-100 border-gray-200 text-gray-400"
-                }`}
+                className={`w-9 h-9 flex items-center justify-center rounded-xl border transition ${soundOn
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                  : "bg-gray-100 border-gray-200 text-gray-400"
+                  }`}
               >
                 {soundOn ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1041,11 +1106,10 @@ export default function PreparationPage() {
               <button
                 key={t.v}
                 onClick={() => setViewMode(t.v as "list" | "board")}
-                className={`px-4 h-9 rounded-lg text-sm font-bold transition ${
-                  viewMode === t.v
-                    ? "bg-[#1a1a2e] text-white shadow-sm"
-                    : "text-gray-500 hover:bg-gray-50"
-                }`}
+                className={`px-4 h-9 rounded-lg text-sm font-bold transition ${viewMode === t.v
+                  ? "bg-[#1a1a2e] text-white shadow-sm"
+                  : "text-gray-500 hover:bg-gray-50"
+                  }`}
               >
                 {t.label}
               </button>
@@ -1059,11 +1123,10 @@ export default function PreparationPage() {
                 <button
                   key={p.key}
                   onClick={() => applyPreset(p.key)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                    activePreset === p.key
-                      ? "bg-[#1a1a2e] text-white shadow-sm"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activePreset === p.key
+                    ? "bg-[#1a1a2e] text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   {p.label}
                 </button>
@@ -1151,6 +1214,7 @@ export default function PreparationPage() {
           {/* ── BOARD ── */}
           {viewMode === "board" ? (
             <>
+              {/* Header banner */}
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl px-5 py-4 flex items-center gap-4">
                 <span className="text-3xl">🏆</span>
                 <div>
@@ -1163,6 +1227,111 @@ export default function PreparationPage() {
                   </p>
                 </div>
               </div>
+
+              {/* ── Avg Stats Cards ─────────────────────────────────────────────────── */}
+              {!statsLoading && (
+                (stats?.global_avg_minutes != null || stats?.avg_wait_minutes != null) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {stats?.avg_wait_minutes != null && (
+                      <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">⏳</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wide">
+                              Rata-rata Tunggu Diterima
+                            </p>
+                            <p className="text-xl font-black text-amber-800 mt-0.5 tabular-nums">
+                              {stats.avg_wait_minutes < 60
+                                ? `${stats.avg_wait_minutes} mnt`
+                                : `${Math.floor(stats.avg_wait_minutes / 60)}j ${stats.avg_wait_minutes % 60}m`}
+                            </p>
+                            <p className="text-[11px] text-amber-600 mt-0.5">Dibuat → diterima penyedia</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {stats?.global_avg_minutes != null && (
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <span className="text-xl">📦</span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">
+                              Rata-rata Durasi Penyiapan
+                            </p>
+                            <p className="text-xl font-black text-blue-800 mt-0.5 tabular-nums">
+                              {stats.global_avg_minutes < 60
+                                ? `${stats.global_avg_minutes} mnt`
+                                : `${Math.floor(stats.global_avg_minutes / 60)}j ${stats.global_avg_minutes % 60}m`}
+                            </p>
+                            <p className="text-[11px] text-blue-600 mt-0.5">Diterima → siap kirim</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+
+              {/* ── Speed Leaderboard: Paling Cepat Menyiapkan ──────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">⚡</span>
+                  <div>
+                    <h3 className="text-sm font-black text-gray-800 leading-tight">
+                      Paling Cepat Menyiapkan
+                    </h3>
+                    <p className="text-[11px] text-gray-400">Rata-rata waktu diterima → siap kirim</p>
+                  </div>
+                </div>
+                {statsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : speedRows.length === 0 ? (
+                  <div className="py-10 text-center text-xs text-gray-400">
+                    Belum ada data di periode ini
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {speedRows.slice(0, 10).map((r, i) => (
+                      <div
+                        key={r.name + i}
+                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0
+                          ? "bg-emerald-50 border-emerald-200"
+                          : "bg-gray-50 border-gray-100"
+                          }`}
+                      >
+                        <span
+                          className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""
+                            }`}
+                        >
+                          {medal(i)}
+                        </span>
+                        <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">
+                          {r.name}
+                        </span>
+                        <div className="text-right flex-shrink-0">
+                          <p
+                            className={`text-sm font-black tabular-nums ${i === 0 ? "text-emerald-700" : "text-gray-900"
+                              }`}
+                          >
+                            {r.label}
+                          </p>
+                          <p className="text-[10px] text-gray-400">{r.total}× order</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Count Leaderboards (3 kolom) ────────────────────────────────────── */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {boardGroups.map((g) => (
                   <div
@@ -1193,16 +1362,14 @@ export default function PreparationPage() {
                         {g.rows.slice(0, 10).map((r, i) => (
                           <div
                             key={r.name + i}
-                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${
-                              i === 0
-                                ? "bg-amber-50 border-amber-200"
-                                : "bg-gray-50 border-gray-100"
-                            }`}
+                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${i === 0
+                              ? "bg-amber-50 border-amber-200"
+                              : "bg-gray-50 border-gray-100"
+                              }`}
                           >
                             <span
-                              className={`w-7 text-center text-sm font-black ${
-                                i > 2 ? "text-gray-400" : ""
-                              }`}
+                              className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""
+                                }`}
                             >
                               {medal(i)}
                             </span>
@@ -1219,8 +1386,137 @@ export default function PreparationPage() {
                   </div>
                 ))}
               </div>
+              {/* ── Ringkasan Per Orang ─────────────────────────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">👤</span>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 leading-tight">
+                        Ringkasan Per Orang
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Jam mulai · selesai · rata-rata order/minggu
+                      </p>
+                    </div>
+                  </div>
+                  {/* Tab toggle */}
+                  <div className="inline-flex bg-gray-100 rounded-xl p-1 gap-1">
+                    {(["sales", "penyedia"] as const).map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setPersonTab(tab)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${personTab === tab
+                          ? "bg-white text-gray-800 shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                          }`}
+                      >
+                        {tab === "sales" ? "📝 Sales" : "📦 Penyedia"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {personStatsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : (personStats?.[personTab] ?? []).length === 0 ? (
+                  <div className="py-10 text-center text-xs text-gray-400">
+                    Belum ada data di periode ini
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Header */}
+                    <div className="grid grid-cols-12 gap-2 px-3 py-1.5">
+                      <span className="col-span-3 text-[10px] font-bold text-gray-400 uppercase">Nama</span>
+                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Mulai</span>
+                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Selesai</span>
+                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Avg/Minggu</span>
+                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">
+                        {personTab === "penyedia" ? "Avg Durasi" : "Total"}
+                      </span>
+                      <span className="col-span-1 text-[10px] font-bold text-gray-400 uppercase text-center">Total</span>
+                    </div>
+                    {(personStats?.[personTab] ?? []).slice(0, 15).map((r, i) => (
+                      <div
+                        key={r.name + i}
+                        className={`grid grid-cols-12 gap-2 items-center rounded-xl px-3 py-3 border ${i === 0 ? "bg-indigo-50 border-indigo-200" : "bg-gray-50 border-gray-100"
+                          }`}
+                      >
+                        {/* Nama */}
+                        <div className="col-span-3 flex items-center gap-2 min-w-0">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 ${i === 0 ? "bg-indigo-500 text-white" : "bg-gray-200 text-gray-600"
+                            }`}>
+                            {r.name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="text-xs font-bold text-gray-700 truncate">{r.name}</span>
+                        </div>
+
+                        {/* Jam mulai */}
+                        <div className="col-span-2 text-center">
+                          <span className="text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg tabular-nums">
+                            {r.earliest_time}
+                          </span>
+                        </div>
+
+                        {/* Jam selesai */}
+                        <div className="col-span-2 text-center">
+                          <span className="text-xs font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg tabular-nums">
+                            {r.latest_time}
+                          </span>
+                        </div>
+
+                        {/* Avg per minggu */}
+                        <div className="col-span-2 text-center">
+                          <span className="text-xs font-black text-gray-700 tabular-nums">
+                            {r.avg_per_week}×
+                          </span>
+                          <p className="text-[9px] text-gray-400">{r.week_count} minggu</p>
+                        </div>
+
+                        {/* Avg durasi (penyedia) atau kosong (sales) */}
+                        <div className="col-span-2 text-center">
+                          {personTab === "penyedia" ? (
+                            <span className={`text-xs font-black tabular-nums ${r.avg_prep_min !== null && r.avg_prep_min < 30
+                              ? "text-emerald-700"
+                              : r.avg_prep_min !== null && r.avg_prep_min < 60
+                                ? "text-blue-700"
+                                : "text-orange-700"
+                              }`}>
+                              {fmtMinShort(r.avg_prep_min)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </div>
+
+                        {/* Total order */}
+                        <div className="col-span-1 text-center">
+                          <span className="text-xs font-black text-gray-900 tabular-nums">{r.total_orders}</span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-3 pt-2 px-1">
+                      <span className="text-[10px] text-gray-400">
+                        💡 Jam mulai/selesai = persentil 10%/90% dari semua order di periode ini (WIB)
+                      </span>
+                      {personTab === "penyedia" && (
+                        <span className="text-[10px] text-gray-400">
+                          · Avg Durasi = rata-rata waktu diterima → siap kirim
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
+
             /* ── LIST ── */
             <>
               {canDone && (sc?.menunggu ?? 0) > 0 && (
@@ -1243,11 +1539,10 @@ export default function PreparationPage() {
                     <button
                       key={t.value}
                       onClick={() => setStatusFilter(t.value)}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        statusFilter === t.value
-                          ? "bg-[#1a1a2e] text-white shadow-sm"
-                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-                      }`}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${statusFilter === t.value
+                        ? "bg-[#1a1a2e] text-white shadow-sm"
+                        : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                        }`}
                     >
                       {t.label}
                     </button>
