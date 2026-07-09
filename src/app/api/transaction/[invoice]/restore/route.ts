@@ -1,3 +1,4 @@
+// src/app/api/transaction/[invoice]/restore/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
@@ -7,7 +8,6 @@ interface Props {
   params: Promise<{ invoice: string }>;
 }
 
-// Status yang boleh di-restore
 const RESTORABLE_STATUSES = ["PAID", "RESERVED", "HELD", "PACKING"] as const;
 type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 
@@ -41,47 +41,61 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // ── 2. Kumpulkan semua unit_ids yang terlibat ─────────────────────────
-    // Priority: unit_ids array → unit_id → serial_number lookup → transaction_items
-    const unitIds: string[] = [];
+    // ── 2. Kumpulkan SEMUA unit_id dari SEMUA sumber (MERGE, bukan prioritas) ──
+    // FIX BUG: dulu pakai priority chain, jadi kalau unit_ids stale (mis. setelah
+    // "Tukar SN") unit yang benar-benar TERJUAL tidak ikut ter-restore.
+    // Sekarang: gabung unit_ids + unit_id + transaction_items + lookup serial_number,
+    // dedupe, lalu SEMUA di-set SIAP_JUAL.
+    const unitIdSet = new Set<string>();
 
-    if (Array.isArray(transaction.unit_ids) && transaction.unit_ids.length > 0) {
-      // Transaksi modern: pakai unit_ids array
-      unitIds.push(...transaction.unit_ids.filter(Boolean));
-    } else if (transaction.unit_id) {
-      // Transaksi dengan single unit_id
-      unitIds.push(transaction.unit_id);
-    } else if (transaction.serial_number) {
-      // Legacy: lookup by serial_number
-      const { data: legacyUnit } = await supabase
+    // (a) unit_ids array modern
+    if (Array.isArray(transaction.unit_ids)) {
+      for (const uid of transaction.unit_ids) if (uid) unitIdSet.add(uid);
+    }
+    // (b) single unit_id (legacy single-unit)
+    if (transaction.unit_id) unitIdSet.add(transaction.unit_id);
+
+    // (c) transaction_items — sumber per-unit paling reliable
+    const { data: txItems } = await supabase
+      .from("transaction_items")
+      .select("unit_id, serial_number")
+      .eq("invoice_number", invoice);
+
+    const snCandidates: string[] = [];
+    for (const item of txItems ?? []) {
+      if (item.unit_id) unitIdSet.add(item.unit_id);
+      if (item.serial_number) snCandidates.push(item.serial_number);
+    }
+
+    // (d) resolusi via serial_number (legacy + backfill kalau unit_id item kosong)
+    if (Array.isArray(transaction.serial_numbers)) {
+      snCandidates.push(...transaction.serial_numbers);
+    }
+    if (transaction.serial_number) snCandidates.push(transaction.serial_number);
+
+    const cleanSNs = [
+      ...new Set(
+        snCandidates.map((s) => (s ?? "").toString().trim()).filter(Boolean)
+      ),
+    ];
+
+    if (cleanSNs.length > 0) {
+      const { data: unitsBySN, error: snErr } = await supabase
         .from("laptop_units")
         .select("id")
-        .eq("serial_number", transaction.serial_number)
-        .single();
-
-      if (legacyUnit?.id) unitIds.push(legacyUnit.id);
+        .in("serial_number", cleanSNs);
+      if (snErr) console.error("[RESTORE] lookup SN → id gagal:", snErr.message);
+      for (const u of unitsBySN ?? []) if (u.id) unitIdSet.add(u.id);
     }
 
-    // Fallback tambahan: cek transaction_items jika unit_ids masih kosong
-    if (unitIds.length === 0) {
-      const { data: txItems } = await supabase
-        .from("transaction_items")
-        .select("unit_id")
-        .eq("invoice_number", invoice);
-
-      for (const item of txItems ?? []) {
-        if (item.unit_id && !unitIds.includes(item.unit_id)) {
-          unitIds.push(item.unit_id);
-        }
-      }
-    }
+    const unitIds = [...unitIdSet];
 
     // ── 3. Kembalikan semua unit ke SIAP_JUAL ─────────────────────────────
     const restoredUnitIds: string[] = [];
     const affectedLaptopIds = new Set<string>();
 
     if (unitIds.length > 0) {
-      // Ambil data unit sebelum diupdate (untuk dapat laptop_id-nya)
+      // Ambil laptop_id sebelum update (untuk recalc parent)
       const { data: unitsData } = await supabase
         .from("laptop_units")
         .select("id, laptop_id, status")
@@ -91,12 +105,9 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         if (unit.laptop_id) affectedLaptopIds.add(unit.laptop_id);
       }
 
-      // Update semua unit sekaligus
       const { error: unitErr } = await supabase
         .from("laptop_units")
-        .update({
-          status: "SIAP_JUAL",
-        })
+        .update({ status: "SIAP_JUAL" })
         .in("id", unitIds);
 
       if (unitErr) {
@@ -111,7 +122,6 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // ── 4. Sync qty & status laptop parent ───────────────────────────────
-    // Hitung ulang qty SIAP_JUAL per laptop_id yang terdampak
     for (const laptopId of affectedLaptopIds) {
       const { data: siapUnits } = await supabase
         .from("laptop_units")
@@ -151,9 +161,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // ── 6. Void warranty jika ada (hanya untuk PAID) ──────────────────────
-    // RESERVED/HELD/PACKING seharusnya belum punya warranty aktif,
-    // tapi tetap cek untuk jaga-jaga
+    // ── 6. Void warranty jika ada ─────────────────────────────────────────
     let warrantyVoided = false;
     const { data: warranty } = await supabase
       .from("warranties")
