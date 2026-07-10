@@ -1,27 +1,5 @@
 "use client";
-// src/components/layout/Sidebar.tsx
-// ── MERGE NOTES ──────────────────────────────────────────────────────────────
-// Gabungan tiga versi Sidebar:
-//  • Versi A (teman lama)   : basic sidebar
-//  • Versi B (update teman) : + Data Aksesori, KEPALA_PENGELOLA_BARANG fix
-//  • Versi C (Ikmal/latest) : + rail mode, resize, collapse group, missions,
-//                              preparation menus, badge notifikasi, alarm,
-//                              multi-role support, usePrepNotify, usePrepAlarm
-//
-// ── UPDATE: Konsolidasi Inventaris ───────────────────────────────────────────
-// "Data Barang" (tab gabungan) sekarang hanya berisi:
-//   • Data Laptop   → /dashboard/laptops
-//   • Aksesoris     → /dashboard/accessories
-//
-// "Laptop Siap Jual" dan "Laptop Minus" DIPISAH jadi item sidebar tersendiri:
-//   • Laptop Siap Jual → /dashboard/laptops/ready  (ITEM_LAPTOP_SIAP_JUAL)
-//   • Laptop Minus     → /dashboard/laptops/minus  (ITEM_LAPTOP_MINUS)
-//
-// Normalization pass (DATA_BARANG_LEGACY_HREFS) hanya meng-collapse
-// /dashboard/laptops dan /dashboard/accessories saja.
-// /dashboard/laptops/ready dan /dashboard/laptops/minus TIDAK di-collapse
-// supaya tetap muncul sebagai item terpisah sesuai definisi di ROLE_MENUS.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -333,6 +311,13 @@ const Icons = {
       <polyline points="12 8 12 12 15 14" />
     </svg>
   ),
+  customerBirthday: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" />
+      <path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" />
+      <path d="M12 17v4M10 21h4" />
+    </svg>
+  ),
   missionAll: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="M3 9l9-6 9 6-9 6-9-6z" />
@@ -352,6 +337,7 @@ const ITEM_ALL_UNITS: MenuItem = { name: "Semua Unit", href: "/dashboard/units",
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
 const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
+const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
@@ -461,6 +447,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
+    ITEM_CUSTOMER_BIRTHDAY,
   ],
 };
 
@@ -506,6 +493,7 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
     ITEM_LEMBUR,
     ITEM_PKL_REPORT,
     ITEM_MISSIONS,
+    ITEM_CUSTOMER_BIRTHDAY,
     ...extra,
   ],
 });
@@ -1507,8 +1495,8 @@ function SidebarContent({
                 </button>
                 <div
                   className={`grid transition-all duration-300 ease-out ${isOpen
-                      ? "grid-rows-[1fr] opacity-100 mt-0.5"
-                      : "grid-rows-[0fr] opacity-0"
+                    ? "grid-rows-[1fr] opacity-100 mt-0.5"
+                    : "grid-rows-[0fr] opacity-0"
                     }`}
                 >
                   <div className="overflow-hidden min-h-0">

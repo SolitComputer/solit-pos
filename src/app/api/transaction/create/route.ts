@@ -279,6 +279,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 ecommerce_order_id: body.ecommerce_order_id || null,
 
                 // Status
+                customer_birth_date: body.customer_birth_date || null,
                 status: txStatus,
                 paid_at: isEcommerce ? null : new Date().toISOString(),
             })
