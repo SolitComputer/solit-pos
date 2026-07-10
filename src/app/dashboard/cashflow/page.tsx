@@ -1197,9 +1197,8 @@ export default function CashflowPage() {
         total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null,
     });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
-    const [customFrom, setCustomFrom] = useState("");
-    const [customTo, setCustomTo] = useState("");
+    const [customFrom, setCustomFrom] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
+    const [customTo, setCustomTo] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
     const [showIncomeModal, setShowIncomeModal] = useState(false);
@@ -1323,32 +1322,20 @@ export default function CashflowPage() {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
-    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const jakartaNow = new Date();
-    const weekDay = jakartaNow.getDay();
-    const weekStart = new Date(jakartaNow);
-    weekStart.setDate(jakartaNow.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
-    const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const monthPrefix = jakartaToday.slice(0, 7);
-
     const inPeriod = (tanggal: string) => {
-        if (period === "today") return tanggal === jakartaToday;
-        if (period === "week") return tanggal >= weekStartStr && tanggal <= jakartaToday;
-        if (period === "month") return (tanggal || "").slice(0, 7) === monthPrefix;
         if (customFrom && tanggal < customFrom) return false;
         if (customTo && tanggal > customTo) return false;
-        return !!(customFrom || customTo);
+        return true;
     };
 
     const incomeValue = masuk.reduce((s, e) => (e.source_type !== "MODAL_AWAL" && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
     const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
 
-    const periodLabel = period === "today" ? "Hari Ini"
-        : period === "week" ? "Minggu Ini"
-            : period === "month" ? "Bulan Ini"
-                : (customFrom || customTo)
-                    ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}`
-                    : "Custom";
+    const periodLabel = (customFrom || customTo)
+        ? (customFrom === customTo) 
+            ? fmtTanggalShort(customFrom) 
+            : `${customFrom ? fmtTanggalShort(customFrom) : "Awal"} — ${customTo ? fmtTanggalShort(customTo) : "Sekarang"}`
+        : "Semua Waktu";
 
     const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", {
         day: "numeric", month: "long", year: "numeric",
@@ -1441,24 +1428,20 @@ export default function CashflowPage() {
                                 )}
                             </div>
                             {/* Period selector */}
-                            <div className="flex flex-col items-end gap-2">
-                                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5">
-                                    {([["today", "Hari Ini"], ["week", "Minggu"], ["month", "Bulan"], ["custom", "Kustom"]] as [typeof period, string][]).map(([val, label]) => (
-                                        <button
-                                            key={val}
-                                            onClick={() => setPeriod(val)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-white/60"}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1.5">
+                                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border-none bg-transparent rounded-lg px-2 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" title="Dari Tanggal" />
+                                    <span className="text-xs text-gray-400 font-medium">—</span>
+                                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border-none bg-transparent rounded-lg px-2 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" title="Sampai Tanggal" />
                                 </div>
-                                {period === "custom" && (
-                                    <div className="flex items-center gap-1.5">
-                                        <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
-                                        <span className="text-xs text-gray-400">—</span>
-                                        <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
-                                    </div>
+                                {(customFrom || customTo) && (
+                                    <button
+                                        onClick={() => { setCustomFrom(""); setCustomTo(""); }}
+                                        className="inline-flex items-center justify-center h-9 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-100 transition"
+                                        title="Reset Filter Tanggal"
+                                    >
+                                        Reset
+                                    </button>
                                 )}
                             </div>
                         </div>
