@@ -1,3 +1,4 @@
+// src/components/preparation/DeliveryAlertListener.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -7,33 +8,41 @@ import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 
 interface Alert { id: string; order_number: string; customer_name: string }
 
+// Guard global: cegah lebih dari satu subscription aktif walau komponen
+// ter-mount ganda (layout dobel / StrictMode / re-render bersamaan).
+let ACTIVE_SUB = false;
+
 export default function DeliveryAlertListener() {
   const [userId, setUserId] = useState<string | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ambil user id
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((r) => setUserId(r.user?.id ?? null)).catch(() => {});
   }, []);
 
-  // unlock audio di gesture pertama
   useEffect(() => {
     const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);
   }, []);
 
-  // dedupe lintas refresh
   useEffect(() => {
     try { seenRef.current = new Set(JSON.parse(localStorage.getItem("deliv_alert_seen") || "[]")); } catch {}
   }, []);
 
   useEffect(() => {
     if (!userId) return;
+
+    // Kalau sudah ada subscription aktif dari instance lain, jangan bikin lagi.
+    if (ACTIVE_SUB) return;
+    ACTIVE_SUB = true;
+
+    const channelName = `delivery-assign-alert-${userId}`;
+
     const ch = supabase
-      .channel("delivery-assign-alert")
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "preparation_orders" },
@@ -56,7 +65,11 @@ export default function DeliveryAlertListener() {
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => {
+      ACTIVE_SUB = false;
+      supabase.removeChannel(ch);
+    };
   }, [userId]);
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
