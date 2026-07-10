@@ -151,6 +151,21 @@ export default function CreatePaymentPage() {
     const [tradeInValue, setTradeInValue] = useState<number>(0);
     const [tradeInCash, setTradeInCash] = useState<number>(0);
 
+    // ── Aksesori (quantity-based, tanpa SN) ─────────────────────────────────
+    interface AccessoryOption {
+        id: string; name: string; category: string;
+        brand?: string; spec?: string; sell_price: number; stock: number;
+    }
+    interface SelectedAccessory {
+        accessory_id: string; name: string; category: string;
+        sell_price: number; stock: number;
+        quantity: number; unit_price: number; is_bonus: boolean;
+    }
+    const [selectedAccessories, setSelectedAccessories] = useState<SelectedAccessory[]>([]);
+    const [accSearch, setAccSearch] = useState("");
+    const [accResults, setAccResults] = useState<AccessoryOption[]>([]);
+    const [accLoading, setAccLoading] = useState(false);
+
     // ── E-commerce ────────────────────────────────────────────────────────────
     const [isEcommerce, setIsEcommerce] = useState(false);
     const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
@@ -208,13 +223,14 @@ export default function CreatePaymentPage() {
         : false;
 
     useEffect(() => {
-        const total = selectedUnits.reduce(
-            (sum, u) => sum + (unitPrices[u.unit_id] || 0),
-            0
+        const laptopTotal = selectedUnits.reduce((sum, u) => sum + (unitPrices[u.unit_id] || 0), 0);
+        const accTotal = selectedAccessories.reduce(
+            (sum, a) => sum + (a.is_bonus ? 0 : a.unit_price * a.quantity), 0
         );
+        const total = laptopTotal + accTotal;
         setRawDealPrice(total);
         setValue("amount", total);
-    }, [unitPrices, selectedUnits, setValue]);
+    }, [unitPrices, selectedUnits, selectedAccessories, setValue]);
 
     useEffect(() => {
         if (fromScan || fromPrep) return;
@@ -370,6 +386,31 @@ export default function CreatePaymentPage() {
         }
     }, [selectedUnits]);
 
+    const handleAccSearch = useCallback(async (q: string) => {
+        if (q.length < 2) { setAccResults([]); return; }
+        setAccLoading(true);
+        try {
+            const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
+            const result = await res.json();
+            const selectedIds = new Set(selectedAccessories.map(a => a.accessory_id));
+            setAccResults((result.data || []).filter((a: AccessoryOption) => !selectedIds.has(a.id)));
+        } catch { setAccResults([]); }
+        finally { setAccLoading(false); }
+    }, [selectedAccessories]);
+
+    const handleAddAccessory = (a: AccessoryOption) => {
+        setSelectedAccessories(prev => [...prev, {
+            accessory_id: a.id, name: a.name, category: a.category,
+            sell_price: a.sell_price, stock: a.stock,
+            quantity: 1, unit_price: a.sell_price, is_bonus: false,
+        }]);
+        setAccSearch(""); setAccResults([]);
+    };
+    const updateAccessory = (idx: number, patch: Partial<SelectedAccessory>) =>
+        setSelectedAccessories(prev => prev.map((a, i) => i === idx ? { ...a, ...patch } : a));
+    const removeAccessory = (idx: number) =>
+        setSelectedAccessories(prev => prev.filter((_, i) => i !== idx));
+
     const handleSelectSnResult = (u: UnitOption) => {
         const item: UnitItem & {
             grade?: string | null;
@@ -429,7 +470,14 @@ export default function CreatePaymentPage() {
     };
 
     const onSubmit = async (data: CreatePaymentType) => {
-        if (!selectedUnits.length) { alert("Pilih minimal 1 unit"); return; }
+        const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
+        if (!selectedUnits.length && selectedAccessories.length === 0) {
+            alert("Pilih minimal 1 unit atau aksesori"); return;
+        }
+        // Aksesori bonus tanpa laptop = transaksi Rp0 → tolak
+        if (!selectedUnits.length && paidAcc === 0) {
+            alert("Transaksi hanya berisi bonus. Tambahkan laptop atau aksesori berbayar."); return;
+        }
 
         if (!rawDealPrice || rawDealPrice < 1000) {
             alert("Harga deal minimal Rp1.000");
@@ -505,7 +553,13 @@ export default function CreatePaymentPage() {
                         unit_id: u.unit_id,
                         deal_price: unitPrices[u.unit_id] || 0,
                     })),
-                    customer_birth_date: customerBirthDate || null,
+                    accessories: selectedAccessories.map(a => ({
+                        accessory_id: a.accessory_id,
+                        name: a.name,
+                        quantity: a.quantity,
+                        unit_price: a.is_bonus ? 0 : a.unit_price,
+                        is_bonus: a.is_bonus,
+                    })),
 
                 }),
             });
@@ -903,6 +957,100 @@ export default function CreatePaymentPage() {
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* ── Aksesori (opsional, tanpa SN) ── */}
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">
+                                    Aksesori (opsional)
+                                    {selectedAccessories.length > 0 && (
+                                        <span className="ml-1.5 text-gray-700 font-semibold">({selectedAccessories.length} item)</span>
+                                    )}
+                                </label>
+                                <div className="relative">
+                                    <input type="text" placeholder="Cari aksesori (nama/kategori)..." className={inputClass}
+                                        value={accSearch}
+                                        onChange={e => { setAccSearch(e.target.value); handleAccSearch(e.target.value); }} />
+                                    {accLoading && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {accResults.length > 0 && (
+                                    <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                                        {accResults.map(a => (
+                                            <button key={a.id} type="button" onClick={() => handleAddAccessory(a)}
+                                                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-semibold text-gray-800">{a.name}</p>
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-600">{a.category}</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    Stok: {a.stock} · {fmt(a.sell_price)}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {accSearch.length >= 2 && accResults.length === 0 && !accLoading && (
+                                    <p className="text-xs text-gray-400 mt-1.5 px-1">Aksesori tidak ditemukan / stok habis</p>
+                                )}
+                            </div>
+
+                            {selectedAccessories.length > 0 && (
+                                <div className="space-y-2">
+                                    {selectedAccessories.map((a, i) => (
+                                        <div key={a.accessory_id} className="bg-gray-50 rounded-xl border border-gray-200 p-3 space-y-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-semibold text-gray-800 truncate">{a.name}</p>
+                                                    <p className="text-[10px] text-gray-400">Stok tersedia: {a.stock}</p>
+                                                </div>
+                                                <button type="button" onClick={() => removeAccessory(i)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* Qty */}
+                                                <div className="flex items-center border border-gray-200 rounded-lg bg-white">
+                                                    <button type="button" onClick={() => updateAccessory(i, { quantity: Math.max(1, a.quantity - 1) })}
+                                                        className="w-8 h-9 text-gray-500 hover:bg-gray-50">−</button>
+                                                    <span className="w-8 text-center text-sm font-semibold text-gray-800">{a.quantity}</span>
+                                                    <button type="button" onClick={() => updateAccessory(i, { quantity: Math.min(a.stock, a.quantity + 1) })}
+                                                        className="w-8 h-9 text-gray-500 hover:bg-gray-50">+</button>
+                                                </div>
+
+                                                {/* Toggle Bonus */}
+                                                <button type="button" onClick={() => updateAccessory(i, { is_bonus: !a.is_bonus })}
+                                                    className={`h-9 px-3 rounded-lg text-xs font-semibold border transition ${a.is_bonus ? "bg-amber-500 text-white border-amber-500" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                                    🎁 Bonus
+                                                </button>
+
+                                                {/* Harga (disembunyikan kalau bonus) */}
+                                                {!a.is_bonus && (
+                                                    <input type="text" inputMode="numeric" className={`${inputClass} flex-1`}
+                                                        defaultValue={a.unit_price ? a.unit_price.toLocaleString("id-ID") : ""}
+                                                        onChange={e => {
+                                                            const raw = e.target.value.replace(/\D/g, "");
+                                                            updateAccessory(i, { unit_price: raw ? Number(raw) : 0 });
+                                                        }}
+                                                        onBlur={e => { const raw = e.target.value.replace(/\D/g, ""); if (raw) e.target.value = Number(raw).toLocaleString("id-ID"); }}
+                                                        onFocus={e => { e.target.value = e.target.value.replace(/\D/g, ""); }} />
+                                                )}
+                                            </div>
+
+                                            <div className="flex justify-between text-[11px] pt-1 border-t border-gray-200">
+                                                <span className="text-gray-400">Subtotal</span>
+                                                <span className={`font-semibold ${a.is_bonus ? "text-amber-600" : "text-gray-700"}`}>
+                                                    {a.is_bonus ? "GRATIS (bonus)" : fmt(a.unit_price * a.quantity)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 

@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────── ──
 interface LaptopUnit {
     id: string;
     laptop_id: string;
