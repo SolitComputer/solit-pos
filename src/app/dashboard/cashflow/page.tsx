@@ -115,6 +115,11 @@ const IconExternal = () => (
         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
     </svg>
 );
+const IconEye = () => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+    </svg>
+);
 const IconChevronLeft = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="15 18 9 12 15 6" />
@@ -804,6 +809,139 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
     );
 }
 
+// ── Detail Row (baris label : value) ──────────────────────────────────────────
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex items-start justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0">
+            <span className="text-xs font-semibold text-gray-400 shrink-0">{label}</span>
+            <div className="text-right text-sm text-gray-800 font-medium min-w-0 break-words">{children}</div>
+        </div>
+    );
+}
+
+// ── Detail Modal (uang keluar / uang masuk manual) ────────────────────────────
+function DetailModal({ entry, onClose, onDelete }: {
+    entry: Entry;
+    onClose: () => void;
+    onDelete: (e: Entry) => void;
+}) {
+    const [zoom, setZoom] = useState(false);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => {
+            if (e.key === "Escape") { if (zoom) setZoom(false); else onClose(); }
+        };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose, zoom]);
+
+    const isOut = entry.direction === "OUT";
+    const gradient = isOut ? "from-red-400 to-rose-500" : "from-emerald-400 to-green-500";
+    const nominalColor = isOut ? "text-red-600" : "text-emerald-600";
+    const pengisi = entry.created_by_user?.name ?? entry.nama;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+                <div className={`h-1 bg-gradient-to-r ${gradient}`} />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>
+                            {isOut ? "💸" : "💰"}
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-900">Detail {isOut ? "Uang Keluar" : "Uang Masuk"}</p>
+                            <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                </div>
+
+                <div className="p-5 space-y-1 max-h-[75vh] overflow-y-auto">
+                    <div className="text-center py-3 mb-1">
+                        <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>
+                            {isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}
+                        </p>
+                    </div>
+
+                    <DetailRow label="Kategori">
+                        <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
+                            {categoryLabel(entry.direction, entry.category)}
+                        </span>
+                    </DetailRow>
+
+                    {isOut && entry.source_type === "MANUAL" && (
+                        <DetailRow label="Metode">
+                            {entry.payment_method === "SALDO"
+                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">🏦 Saldo</span>
+                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100">💵 Cash</span>}
+                        </DetailRow>
+                    )}
+
+                    <DetailRow label="Diinput oleh">{pengisi}</DetailRow>
+
+                    <DetailRow label="Status Audit">
+                        {entry.is_audited
+                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><IconCheck /> Sudah Audit</span>
+                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><IconClock /> Belum Audit</span>}
+                    </DetailRow>
+
+                    {entry.is_audited && entry.audited_by_user?.name && (
+                        <DetailRow label="Diaudit oleh">
+                            <span className="text-emerald-600 font-semibold">✓ {entry.audited_by_user.name}</span>
+                        </DetailRow>
+                    )}
+
+                    {/* Keterangan lengkap — nggak dipotong */}
+                    <div className="pt-3">
+                        <p className="text-xs font-semibold text-gray-400 mb-1.5">Keterangan</p>
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-3 min-h-[44px] leading-relaxed">
+                            {entry.keterangan?.trim() || <span className="text-gray-300 italic">Tidak ada keterangan</span>}
+                        </div>
+                    </div>
+
+                    {/* Foto bukti inline — tanpa tab baru */}
+                    {entry.photo_url && (
+                        <div className="pt-3">
+                            <p className="text-xs font-semibold text-gray-400 mb-1.5">Foto Bukti</p>
+                            <button
+                                type="button"
+                                onClick={() => setZoom(true)}
+                                className="block w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group"
+                                title="Ketuk untuk perbesar"
+                            >
+                                <img src={entry.photo_url} alt="Bukti" className="w-full max-h-72 object-contain bg-gray-900/5 group-hover:opacity-90 transition" />
+                            </button>
+                            <p className="text-[10px] text-gray-400 mt-1 text-center">Ketuk gambar untuk memperbesar</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
+                    {entry.source_type === "MANUAL" && (
+                        <button
+                            onClick={() => { onClose(); onDelete(entry); }}
+                            className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
+                        >
+                            <IconTrash /> Hapus
+                        </button>
+                    )}
+                    <button onClick={onClose} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition">Tutup</button>
+                </div>
+            </div>
+
+            {/* Zoom overlay — foto full di dalam app, bukan tab baru */}
+            {zoom && entry.photo_url && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setZoom(false)}>
+                    <img src={entry.photo_url} alt="Bukti" className="max-w-full max-h-full object-contain" />
+                    <button onClick={() => setZoom(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"><IconX /></button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Expense Modal ─────────────────────────────────────────────────────────────
 function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const categories = Object.entries(EXPENSE_CATEGORIES);
@@ -920,6 +1058,100 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     );
 }
 
+// ── Income Modal (uang masuk manual — hanya Biaya Lain-lain) ───────────────────
+function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+    const [nominal, setNominal] = useState("");
+    const [keterangan, setKeterangan] = useState("");
+    const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const submit = async () => {
+        if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch("/api/cashflow", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    direction: "IN",
+                    category: "BIAYA_LAIN",
+                    nominal: Number(nominal),
+                    keterangan: keterangan.trim() || null,
+                    tanggal,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) return setError(json.message || "Gagal menyimpan");
+            onSaved();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+                <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-500" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">💰</div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-900">Tambah Uang Masuk</p>
+                            <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                </div>
+                <div className="p-5 space-y-3.5">
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
+                        <div className="w-full min-h-10 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 flex items-center gap-2 flex-wrap text-gray-700">
+                            <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">Biaya Lain-lain</span>
+                            <span className="text-[11px] text-gray-400">satu-satunya kategori uang masuk manual</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
+                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            {nominal && Number(nominal) > 0 && (
+                                <p className="text-[11px] text-emerald-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
+                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Catatan</label>
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
+                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan"}</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ── Summary Cards ─────────────────────────────────────────────────────────────
 function SummaryCard({
     label, value, sublabel, color, icon, loading,
@@ -965,10 +1197,13 @@ export default function CashflowPage() {
         total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null,
     });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [customFrom, setCustomFrom] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
-    const [customTo, setCustomTo] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }));
+    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
+    const [customFrom, setCustomFrom] = useState("");
+    const [customTo, setCustomTo] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
+    const [showIncomeModal, setShowIncomeModal] = useState(false);
+    const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
@@ -1050,8 +1285,12 @@ export default function CashflowPage() {
         else alert(json.message || "Gagal menghapus");
     };
 
-    const openSource = (e: Entry) => {
-        if (e.direction !== "IN" || e.source_type === "MODAL_AWAL") return;
+    const isDetailRow = (e: Entry) =>
+        e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
+
+    const handleRowClick = (e: Entry) => {
+        if (e.source_type === "MODAL_AWAL") return;
+        if (isDetailRow(e)) { setDetailEntry(e); return; }
         if (e.source_type === "TRANSACTION" && e.source_id) {
             router.push(`/dashboard/transactions?highlight=${e.source_id}&nama=${encodeURIComponent(e.nama || "")}`);
         } else if (e.source_type === "SERVICE") {
@@ -1070,6 +1309,7 @@ export default function CashflowPage() {
         );
     }
 
+    // ── Derived values ────────────────────────────────────────────────────────
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
     const allRows = tab === "IN" ? masuk : keluar;
@@ -1083,31 +1323,45 @@ export default function CashflowPage() {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
+    const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const jakartaNow = new Date();
+    const weekDay = jakartaNow.getDay();
+    const weekStart = new Date(jakartaNow);
+    weekStart.setDate(jakartaNow.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
+    const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const monthPrefix = jakartaToday.slice(0, 7);
+
     const inPeriod = (tanggal: string) => {
+        if (period === "today") return tanggal === jakartaToday;
+        if (period === "week") return tanggal >= weekStartStr && tanggal <= jakartaToday;
+        if (period === "month") return (tanggal || "").slice(0, 7) === monthPrefix;
         if (customFrom && tanggal < customFrom) return false;
         if (customTo && tanggal > customTo) return false;
-        return true;
+        return !!(customFrom || customTo);
     };
 
     const incomeValue = masuk.reduce((s, e) => (e.source_type !== "MODAL_AWAL" && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
     const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
 
-    const periodLabel = (customFrom || customTo)
-        ? (customFrom === customTo)
-            ? fmtTanggalShort(customFrom)
-            : `${customFrom ? fmtTanggalShort(customFrom) : "Awal"} — ${customTo ? fmtTanggalShort(customTo) : "Sekarang"}`
-        : "Semua Waktu";
+    const periodLabel = period === "today" ? "Hari Ini"
+        : period === "week" ? "Minggu Ini"
+            : period === "month" ? "Bulan Ini"
+                : (customFrom || customTo)
+                    ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}`
+                    : "Custom";
 
     const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", {
         day: "numeric", month: "long", year: "numeric",
     });
 
-    const clickable = (e: Entry) => e.direction === "IN" && e.source_type !== "MODAL_AWAL";
+    const clickable = (e: Entry) => e.source_type !== "MODAL_AWAL";
 
     return (
         <DashboardLayout>
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} />}
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
+            {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
+            {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} />}
 
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
@@ -1187,20 +1441,24 @@ export default function CashflowPage() {
                                 )}
                             </div>
                             {/* Period selector */}
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1.5">
-                                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border-none bg-transparent rounded-lg px-2 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" title="Dari Tanggal" />
-                                    <span className="text-xs text-gray-400 font-medium">—</span>
-                                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border-none bg-transparent rounded-lg px-2 text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" title="Sampai Tanggal" />
+                            <div className="flex flex-col items-end gap-2">
+                                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5">
+                                    {([["today", "Hari Ini"], ["week", "Minggu"], ["month", "Bulan"], ["custom", "Kustom"]] as [typeof period, string][]).map(([val, label]) => (
+                                        <button
+                                            key={val}
+                                            onClick={() => setPeriod(val)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-white/60"}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
                                 </div>
-                                {(customFrom || customTo) && (
-                                    <button
-                                        onClick={() => { setCustomFrom(""); setCustomTo(""); }}
-                                        className="inline-flex items-center justify-center h-9 px-3 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 hover:border-red-100 transition"
-                                        title="Reset Filter Tanggal"
-                                    >
-                                        Reset
-                                    </button>
+                                {period === "custom" && (
+                                    <div className="flex items-center gap-1.5">
+                                        <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
+                                        <span className="text-xs text-gray-400">—</span>
+                                        <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1251,6 +1509,14 @@ export default function CashflowPage() {
                             )}
                         </button>
                     </div>
+                    {tab === "IN" && (
+                        <button
+                            onClick={() => setShowIncomeModal(true)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition shadow-sm"
+                        >
+                            <IconPlus /> Tambah Uang Masuk
+                        </button>
+                    )}
                     {tab === "OUT" && (
                         <button
                             onClick={() => setShowModal(true)}
@@ -1338,7 +1604,7 @@ export default function CashflowPage() {
                                         return (
                                             <tr
                                                 key={e.id}
-                                                onClick={() => isClickable && openSource(e)}
+                                                onClick={() => isClickable && handleRowClick(e)}
                                                 className={`transition-colors group ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}
                                             >
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
@@ -1381,10 +1647,14 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[200px]">
                                                     <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
-                                                    {e.photo_url && (
-                                                        <a href={e.photo_url} target="_blank" rel="noopener noreferrer" onClick={(ev) => ev.stopPropagation()} className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline">
+                                                   {e.photo_url && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(ev) => { ev.stopPropagation(); setDetailEntry(e); }}
+                                                            className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline"
+                                                        >
                                                             📷 Foto
-                                                        </a>
+                                                        </button>
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
@@ -1397,15 +1667,15 @@ export default function CashflowPage() {
                                                     }
                                                 </td>
                                                 <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {e.direction === "OUT" && e.source_type === "MANUAL" && (
+                                                  <div className="flex items-center justify-end gap-1">
+                                                        {e.source_type === "MANUAL" && (
                                                             <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Hapus">
                                                                 <IconTrash />
                                                             </button>
                                                         )}
                                                         {isClickable && (
-                                                            <span className="p-1.5 text-gray-300 group-hover:text-blue-400 rounded-lg transition">
-                                                                <IconExternal />
+                                                            <span className="p-1.5 text-gray-300 group-hover:text-blue-400 rounded-lg transition" title={isDetailRow(e) ? "Lihat detail" : "Buka sumber"}>
+                                                                {isDetailRow(e) ? <IconEye /> : <IconExternal />}
                                                             </span>
                                                         )}
                                                     </div>
