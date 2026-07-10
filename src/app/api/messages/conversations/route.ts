@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 export const runtime = "nodejs";
 
-const ADMIN_ROLES = ["ADMIN", "PROGRAMMER"];
+const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 const MESSAGE_SELECT =
     "id, sender_id, receiver_id, content, is_read, is_deleted, edited_at, created_at, attachment_url, attachment_type, attachment_name, attachment_size";
