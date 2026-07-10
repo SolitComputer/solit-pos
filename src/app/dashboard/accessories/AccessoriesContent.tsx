@@ -820,9 +820,7 @@ function AccessoriesContent() {
 
 export default function AccessoriesPage() {
     return (
-        <DashboardLayout>
             <AccessoriesContent />
-        </DashboardLayout>
     );
 }
 
