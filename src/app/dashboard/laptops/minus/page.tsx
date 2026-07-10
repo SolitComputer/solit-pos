@@ -336,7 +336,7 @@ function EditRepairModal({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export function MinusContent() {
+function MinusContent() {
   const [units, setUnits] = useState<MinusUnit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);

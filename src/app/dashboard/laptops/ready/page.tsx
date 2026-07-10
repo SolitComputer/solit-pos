@@ -168,7 +168,7 @@ function TotalBar({ totals, count }: {
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export function ReadyContent() {
+function ReadyContent() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
