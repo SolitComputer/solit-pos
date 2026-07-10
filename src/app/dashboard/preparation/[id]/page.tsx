@@ -51,6 +51,19 @@ const todayLocal = (): string => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// TAMBAH setelah fmtDate function
+function fmtDuration(from: string | null, to: string | null): string | null {
+    if (!from || !to) return null;
+    const diffMs = new Date(to).getTime() - new Date(from).getTime();
+    if (diffMs <= 0) return null;
+    const totalMin = Math.floor(diffMs / 60000);
+    if (totalMin < 1) return "< 1 mnt";
+    if (totalMin < 60) return `${totalMin} mnt`;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h} jam ${m} mnt` : `${h} jam`;
+}
+
 const addDaysLocal = (n: number): string => {
     const d = new Date();
     d.setDate(d.getDate() + n);
@@ -773,20 +786,69 @@ export default function PreparationDetailPage() {
                             )}
                         </div>
 
+                        {/* GANTI grid info dibuat/diterima/dll */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                             {[
-                                { label: "Dibuat", name: order.created_by_name, time: order.created_at },
-                                { label: "Diterima", name: order.received_by_name, time: order.received_at },
-                                { label: "Dicek Penyedia", name: order.done_by_name, time: order.done_at },
+                                { label: "Dibuat oleh", name: order.created_by_name, time: order.created_at },
+                                { label: "Diterima oleh", name: order.received_by_name, time: order.received_at },
+                                { label: "Diselesaikan Penyedia", name: order.done_by_name, time: order.done_at },
                                 { label: "Dispatch Sales", name: order.dispatched_by_name ?? null, time: order.dispatched_at ?? null },
                             ].map(x => (
                                 <div key={x.label} className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                                    <p className="text-[10px] text-gray-400 font-semibold uppercase">{x.label}</p>
+                                    <p className="text-[10px] text-gray-400 font-semibold uppercase leading-tight">{x.label}</p>
                                     <p className="font-bold text-gray-700 mt-0.5 truncate">{x.name || "—"}</p>
                                     <p className="text-[9px] text-gray-400 mt-0.5">{x.time ? fmtFull(x.time) : "—"}</p>
                                 </div>
                             ))}
                         </div>
+
+                        {/* ── Ringkasan Waktu ── */}
+                        {/* ── Ringkasan Waktu ── */}
+                        {(order.received_at || order.done_at || order.dispatched_at) && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+
+                                {/* 1. Tunggu diterima: created → received */}
+                                {(() => {
+                                    const dur = fmtDuration(order.created_at, order.received_at);
+                                    return dur ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg">
+                                            ⏳ Tunggu diterima: <span className="font-black">{dur}</span>
+                                        </span>
+                                    ) : null;
+                                })()}
+
+                                {/* 2. Durasi penyiapan: received → done */}
+                                {(() => {
+                                    const dur = fmtDuration(order.received_at, order.done_at);
+                                    return dur ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg">
+                                            📦 Durasi penyiapan: <span className="font-black">{dur}</span>
+                                        </span>
+                                    ) : null;
+                                })()}
+
+                                {/* 3. Dispatch: done → dispatched (penyedia → sales konfirmasi) */}
+                                {(() => {
+                                    const dur = fmtDuration(order.done_at, order.dispatched_at ?? null);
+                                    return dur ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg">
+                                            🚀 Siap → dispatch: <span className="font-black">{dur}</span>
+                                        </span>
+                                    ) : null;
+                                })()}
+
+                                {/* 4. Total dari dibuat sampai selesai penyiapan (done) */}
+                                {(() => {
+                                    const dur = fmtDuration(order.created_at, order.done_at);
+                                    return dur ? (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                                            ✅ Total hingga siap: <span className="font-black">{dur}</span>
+                                        </span>
+                                    ) : null;
+                                })()}
+
+                            </div>
+                        )}
 
                         {(order.delivery_distance_m || order.delivery_duration_s) && (
                             <div className="mt-3 flex gap-2">
@@ -870,17 +932,10 @@ export default function PreparationDetailPage() {
                             )}
 
                             {isAssignedDriver && (
-                                <div className="flex gap-2">
-                                    {/* Tombol Tolak (sekunder) — pengaman anti-nyangkut. Hapus blok ini kalau mau strict cuma Setuju */}
-                                    <button onClick={handleDecline} disabled={actionLoading}
-                                        className="h-11 px-4 bg-white border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition disabled:opacity-50">
-                                        Tolak
-                                    </button>
-                                    <button onClick={handleAccept} disabled={actionLoading}
-                                        className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                        {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
-                                    </button>
-                                </div>
+                                <button onClick={handleAccept} disabled={actionLoading}
+                                    className="w-full h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                    {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
+                                </button>
                             )}
                         </div>
                     )}

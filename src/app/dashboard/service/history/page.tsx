@@ -24,9 +24,10 @@ function getDuration(masuk: string, selesai?: string): string {
   return `${Math.floor(h / 24)} hr ${h % 24} j`;
 }
 
-function fmtRupiah(n?: number) {
-  if (!n) return null;
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+function fmtRupiah(n?: number | null) {
+  const num = Number(n ?? 0);
+  if (!num) return null;
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
 }
 
 const HISTORY_STATUSES: ServiceStatus[] = ["SUDAH_DIAMBIL", "TIDAK_JADI"];
@@ -724,12 +725,18 @@ export default function HistoryPage() {
                             </span>
                           </td>
 
-                          {/* Payment */}
+                        {/* Payment + breakdown estimasi/sparepart */}
                           <td className="px-4 py-3.5 whitespace-nowrap min-w-[110px]">
                             {fmtRupiah(o.payment_amount) ? (
                               <div>
                                 <p className="text-[12px] font-bold text-emerald-700">{fmtRupiah(o.payment_amount)}</p>
                                 <p className="text-[10px] text-gray-400 mt-0.5 font-medium">{o.payment_method || "CASH"}</p>
+                                {(Number(o.estimasi_harga ?? 0) > 0 || Number(o.biaya_sparepart ?? 0) > 0) && (
+                                  <p className="text-[10px] text-gray-300 mt-0.5">
+                                    jasa {fmtRupiah(o.estimasi_harga) ?? "Rp 0"}
+                                    {Number(o.biaya_sparepart ?? 0) > 0 && ` + part ${fmtRupiah(o.biaya_sparepart)}`}
+                                  </p>
+                                )}
                               </div>
                             ) : isFromGagal ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold">

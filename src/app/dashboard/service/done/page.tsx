@@ -476,18 +476,30 @@ export default function DonePage() {
                           )}
                         </td>
 
-                        {/* Payment */}
-                        <td className="px-4 py-4 min-w-[120px]">
+                     {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
+                        <td className="px-4 py-4 min-w-[130px]">
                           {o.payment_amount ? (
                             <div className="flex flex-col">
                               <p className="text-xs font-bold text-emerald-600">{fmtRupiah(o.payment_amount)}</p>
                               <p className="text-[10px] text-gray-400 mt-0.5 font-medium">{o.payment_method || "CASH"}</p>
                             </div>
-                          ) : (
-                            <span className={`text-xs font-medium ${o.status === "GAGAL_DIPERBAIKI" ? "text-gray-300" : "text-amber-500"}`}>
-                              {o.status === "GAGAL_DIPERBAIKI" ? "—" : "Konfirmasi saat diambil"}
-                            </span>
-                          )}
+                          ) : (() => {
+                            const est = Number(o.estimasi_harga ?? 0);
+                            const sp = Number(o.biaya_sparepart ?? 0);
+                            const total = est + sp;
+                            if (o.status === "GAGAL_DIPERBAIKI") {
+                              return <span className="text-xs font-medium text-gray-300">—</span>;
+                            }
+                            if (total > 0) {
+                              return (
+                                <div className="flex flex-col">
+                                  <p className="text-xs font-bold text-indigo-600 tabular-nums">{fmtRupiah(total)}</p>
+                                  <p className="text-[10px] text-amber-500 mt-0.5 font-medium">estimasi · belum dibayar</p>
+                                </div>
+                              );
+                            }
+                            return <span className="text-xs font-medium text-amber-500">Konfirmasi saat diambil</span>;
+                          })()}
                         </td>
 
                         {/* Status */}
