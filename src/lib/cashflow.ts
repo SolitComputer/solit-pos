@@ -22,7 +22,15 @@ export const INCOME_CATEGORIES = {
   UTANG: "Utang",
   SEWA: "Sewa",
   PENJUALAN_ASET: "Penjualan Aset",
+  BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
+
+// Kategori uang masuk yang boleh diinput MANUAL (di luar MODAL_AWAL)
+export const MANUAL_INCOME_CATEGORIES = ["BIAYA_LAIN"] as const;
+
+export function isManualIncomeCategory(category: string): boolean {
+  return (MANUAL_INCOME_CATEGORIES as readonly string[]).includes(category);
+}
 
 // ── Kategori Uang Keluar ─────────────────────────────────────────────────────
 export const EXPENSE_CATEGORIES = {

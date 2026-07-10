@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CASHFLOW_START_DATE, isValidCategory, isModalAwalActive } from "@/lib/cashflow";
+import { CASHFLOW_START_DATE, isValidCategory, isModalAwalActive, isManualIncomeCategory } from "@/lib/cashflow";
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -311,10 +311,42 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data: inserted }, { status: 201 });
     }
 
-    // ── Regular: Uang Keluar Manual ───────────────────────────────────────────
+    // ── Regular: Uang Masuk Manual (hanya kategori Biaya Lain-lain) ────────────
+    if (direction === "IN") {
+        if (!isManualIncomeCategory(category))
+            return NextResponse.json(
+                { success: false, message: "Uang masuk manual hanya untuk kategori Biaya Lain-lain" },
+                { status: 400 }
+            );
+
+        const { data, error } = await supabase
+            .from("cashflow_entries")
+            .insert({
+                direction: "IN",
+                category,
+                nama: userName,
+                nominal: nom,
+                modal: null,
+                keterangan: keterangan?.trim() || null,
+                tanggal: tanggal || jakartaToday,
+                source_type: "MANUAL",
+                payment_method: null,
+                created_by: user.id,
+            })
+            .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
+            .single();
+
+        if (error) {
+            console.error("[cashflow POST income]", error);
+            return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, data }, { status: 201 });
+    }
+
     if (direction !== "OUT")
         return NextResponse.json(
-            { success: false, message: "Hanya uang keluar yang bisa diinput manual" },
+            { success: false, message: "Direction tidak valid" },
             { status: 400 }
         );
 
