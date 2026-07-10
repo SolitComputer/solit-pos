@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 import { HTCallProvider } from "@/contexts/HTCallContext";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
+
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -52,6 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <main className="flex-1">
+            <BirthdayBanner />
             <div className="p-4 lg:p-5 max-w-[1280px]">
               {children}
             </div>

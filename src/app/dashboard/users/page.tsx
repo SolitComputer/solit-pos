@@ -19,6 +19,7 @@ interface User {
   face_enrolled_at: string | null;
   face_embedding: boolean;
   force_logout_at: string | null;
+  birth_date: string | null;
 }
 
 const ALL_ROLES = [
@@ -138,6 +139,28 @@ function getInitials(name: string) {
 }
 function getAvatarColor(role: string) {
   return ROLE_AVATAR_COLOR[role] ?? "#6b7280";
+}
+function isBirthdayToday(birthDate: string | null): boolean {
+  if (!birthDate) return false;
+  const today = new Date();
+  const bd = new Date(birthDate + "T00:00:00");
+  return bd.getDate() === today.getDate() && bd.getMonth() === today.getMonth();
+}
+
+function formatBirthDate(birthDate: string | null): string {
+  if (!birthDate) return "-";
+  const d = new Date(birthDate + "T00:00:00");
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function getAge(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const today = new Date();
+  const bd = new Date(birthDate + "T00:00:00");
+  let age = today.getFullYear() - bd.getFullYear();
+  const m = today.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+  return age;
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -285,6 +308,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [roles, setRoles] = useState<string[]>(["CREW_SALES"]);
   const [shift, setShift] = useState<"PAGI" | "SORE">("PAGI");
   const [saving, setSaving] = useState(false);
@@ -297,7 +321,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
     try {
       const res = await fetch("/api/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), roles, shift }),
+        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), roles, shift, birth_date: birthDate || null }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -328,6 +352,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         )}
         <Field label="Nama Lengkap">
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
+        </Field>
+        <Field label="Tanggal Lahir">
+          <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
         </Field>
         <Field label="Nomor WhatsApp">
           <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
@@ -505,6 +532,7 @@ function MultiRoleSelect({
 function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
+  const [birthDate, setBirthDate] = useState(user.birth_date ?? "");
   const [roles, setRoles] = useState<string[]>(
     Array.isArray(user.roles) && user.roles.length > 0
       ? user.roles
@@ -519,7 +547,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
     try {
       const res = await fetch("/api/users", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: user.id, name, phone_number: phone, roles, shift }),
+        body: JSON.stringify({ id: user.id, name, phone_number: phone, roles, shift, birth_date: birthDate || null }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -549,6 +577,9 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           </div>
         )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
+        <Field label="Tanggal Lahir">
+          <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+        </Field>
         <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
         <Field label="Role (bisa pilih lebih dari 1)">
           <MultiRoleSelect values={roles} onChange={setRoles} />
@@ -889,6 +920,10 @@ export default function UsersPage() {
     [users, activeTab]
   );
 
+  const birthdayUsers = useMemo(
+    () => users.filter(u => isBirthdayToday(u.birth_date)),
+    [users]
+  );
   const enrolled = users.filter(u => u.face_embedding).length;
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
@@ -1213,9 +1248,23 @@ export default function UsersPage() {
                                     🚪 Forced Out
                                   </span>
                                 )}
+                                {isBirthdayToday(user.birth_date) && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 animate-pulse"
+                                    style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                                    🎂 Ultah!
+                                  </span>
+                                )}
                               </div>
                               {(isAdmin || isKepala) && user.phone_number && (
                                 <p className="text-[11px] text-gray-400 font-medium mt-0.5">{user.phone_number}</p>
+                              )}
+                              {user.birth_date && (
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  🎂 {formatBirthDate(user.birth_date)}
+                                  {isBirthdayToday(user.birth_date) && (
+                                    <span className="ml-1 text-amber-600 font-bold">— Hari ini! 🎉</span>
+                                  )}
+                                </p>
                               )}
                             </div>
 
