@@ -407,7 +407,6 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                     .select("id, purchase_count")
                     .eq("customer_phone", body.customer_phone)
                     .maybeSingle();
-
                 if (existing) {
                     await supabase
                         .from("seller_followups")
@@ -419,6 +418,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                             last_purchase_at: nowISO,
                             next_followup_at: nextISO,
                             purchase_count: (existing.purchase_count ?? 1) + 1,
+                            closed_by: user.name,
                             is_active: true,
                             updated_at: nowISO,
                         })
@@ -433,6 +433,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                         last_purchase_at: nowISO,
                         next_followup_at: nextISO,
                         purchase_count: 1,
+                        closed_by: user.name,
                         is_active: true,
                     });
                 }

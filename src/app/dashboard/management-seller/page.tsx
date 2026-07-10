@@ -18,6 +18,7 @@ interface Followup {
   followup_count: number;
   purchase_count: number;
   last_followup_by: string | null;
+  closed_by: string | null;   // ← TAMBAH
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -204,8 +205,8 @@ function TandaiFuButton({
       disabled={processing}
       title="Tandai sudah follow-up (catat ke sistem)"
       className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
-          ? "bg-blue-400 opacity-70 cursor-not-allowed"
-          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+        ? "bg-blue-400 opacity-70 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
         }`}
     >
       {processing ? <Spinner /> : <PhoneIcon />}
@@ -266,11 +267,11 @@ function FollowupCard({
             </div>
           </div>
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5">
+        <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
           <span
             className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${isPedagang
-                ? "bg-amber-50 text-amber-700 border-amber-200"
-                : "bg-blue-50 text-blue-700 border-blue-200"
+              ? "bg-amber-50 text-amber-700 border-amber-200"
+              : "bg-blue-50 text-blue-700 border-blue-200"
               }`}
           >
             {isPedagang ? "🏷️ Pedagang" : "🙋 User"}
@@ -283,7 +284,23 @@ function FollowupCard({
       </div>
 
       {/* ── Card Body ─────────────────────────────────── */}
+      {/* ── Card Body ─────────────────────────────────── */}
       <div className="px-4 py-3.5 flex-1 space-y-3">
+        {/* PIC Follow-up — karyawan yang closing = yang wajib follow-up */}
+        <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+            {(f.closed_by ?? "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
+              PIC Follow-up
+            </p>
+            <p className="text-xs font-black text-violet-800 leading-tight truncate">
+              {f.closed_by ?? "Belum tercatat"}
+            </p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <InfoCell
             label="Beli terakhir"
@@ -299,7 +316,7 @@ function FollowupCard({
           <StatPill>🛒 {f.purchase_count}× beli</StatPill>
           <StatPill>📞 {f.followup_count}× FU</StatPill>
           {f.last_followup_by && (
-            <StatPill>👤 {f.last_followup_by}</StatPill>
+            <StatPill>👤 FU terakhir: {f.last_followup_by}</StatPill>
           )}
         </div>
       </div>
@@ -623,8 +640,8 @@ export default function ManagementSellerPage() {
                 key={s}
                 onClick={() => setScope(s)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
                   }`}
               >
                 {s === "ACTIVE" ? "Aktif" : "Arsip"}
@@ -650,8 +667,8 @@ export default function ManagementSellerPage() {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
-                    ? "bg-gray-900 border-gray-900 shadow-md"
-                    : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  ? "bg-gray-900 border-gray-900 shadow-md"
+                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                   }`}
               >
                 <div className="flex items-center gap-3">
