@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/page";
-import { AccessoriesContent } from "../accessories/page";
+import AccessoriesContent from "../accessories/AccessoriesContent";
 
 type TabKey = "laptops" | "accessories";
 
