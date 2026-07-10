@@ -17,6 +17,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     const action: string | undefined = body.action;
 
     // ── Double-lock: hanya Closing (CREW_SALES) & Admin yang boleh action "followup" ──
+    // ── Double-lock: hanya Closing (CREW_SALES) & Admin yang boleh action "followup" ──
     if (action === "followup") {
       if (!hasPermission(user.role as UserRole, PERMS.FOLLOWUP_SELLER)) {
         return NextResponse.json(
@@ -37,6 +38,24 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         { success: false, message: "Data follow-up tidak ditemukan" },
         { status: 404 }
       );
+    }
+
+    // ── Triple-lock: FU cuma boleh oleh PIC (closed_by) atau Kepala Sales/Admin ──
+    if (action === "followup") {
+      const isPIC =
+        !!existing.closed_by &&
+        existing.closed_by.trim().toLowerCase() === (user.name ?? "").trim().toLowerCase();
+      const isManager = hasPermission(user.role as UserRole, PERMS.MANAGE_SELLER_FOLLOWUP);
+
+      if (!isPIC && !isManager) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Hanya ${existing.closed_by ?? "PIC"} atau Kepala Sales yang bisa follow-up customer ini`,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const nowISO = new Date().toISOString();
