@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     const { data: current, error: fetchErr } = await supabase
         .from("cashflow_entries")
-        .select("id, is_audited")
+        .select("id, is_audited, source_type, source_id")
         .eq("id", id)
         .single();
 
@@ -71,6 +71,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             { success: false, message: "Entry sudah diaudit dan tidak dapat dibatalkan" },
             { status: 400 }
         );
+
+    // ✅ Guard: transaksi asli sudah di-restore/dibatalkan → tidak bisa diaudit
+    if (current.source_type === "TRANSACTION" && current.source_id) {
+        const { data: linkedTx } = await supabase
+            .from("transactions")
+            .select("status")
+            .eq("invoice_number", current.source_id)
+            .single();
+
+        if (linkedTx && linkedTx.status !== "PAID")
+            return NextResponse.json(
+                { success: false, message: "Transaksi ini sudah dibatalkan (restore) dan tidak bisa diaudit" },
+                { status: 400 }
+            );
+    }
 
     const { data, error } = await supabase
         .from("cashflow_entries")

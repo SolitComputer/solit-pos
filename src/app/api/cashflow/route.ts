@@ -221,7 +221,38 @@ export const GET = withAuth(async () => {
         return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
-    const all = data ?? [];
+    const rawAll = data ?? [];
+
+    // ── Cek status transaksi asli untuk entry bersumber TRANSACTION ─────────
+    // Kalau transaksi sudah di-restore (status ≠ PAID), entry cashflow-nya
+    // ditandai voided: tampil abu-abu & tidak bisa diaudit di halaman Cashflow.
+    const txSourceIds = Array.from(
+        new Set(
+            rawAll
+                .filter((e: any) => e.source_type === "TRANSACTION" && e.source_id)
+                .map((e: any) => e.source_id as string)
+        )
+    );
+
+    let voidedInvoiceSet = new Set<string>();
+    if (txSourceIds.length > 0) {
+        const { data: linkedTx } = await supabase
+            .from("transactions")
+            .select("invoice_number, status")
+            .in("invoice_number", txSourceIds);
+
+        voidedInvoiceSet = new Set(
+            (linkedTx ?? [])
+                .filter((t: any) => t.status !== "PAID")
+                .map((t: any) => t.invoice_number as string)
+        );
+    }
+
+    const all = rawAll.map((e: any) => ({
+        ...e,
+        is_voided: e.source_type === "TRANSACTION" && voidedInvoiceSet.has(e.source_id),
+    }));
+
     const masuk = all.filter((e: any) => e.direction === "IN");
     const keluar = all.filter((e: any) => e.direction === "OUT");
 
