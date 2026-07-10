@@ -857,7 +857,6 @@ function DetailModal({ entry, onClose, onDelete }: {
                     </div>
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
-
                 <div className="p-5 space-y-1 max-h-[75vh] overflow-y-auto">
                     <div className="text-center py-3 mb-1">
                         <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>
@@ -919,7 +918,7 @@ function DetailModal({ entry, onClose, onDelete }: {
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    {entry.source_type === "MANUAL" && (
+                    {entry.source_type === "MANUAL" && !entry.is_audited && (
                         <button
                             onClick={() => { onClose(); onDelete(entry); }}
                             className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
