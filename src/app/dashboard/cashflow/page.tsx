@@ -20,23 +20,26 @@ import {
     CASHFLOW_START_DATE,
 } from "@/lib/cashflow";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const fmtRupiah = (n: number) =>
+    `Rp${Number(n || 0).toLocaleString("id-ID")}`;
 
 const fmtTanggal = (d?: string) =>
-    d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+    d
+        ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        })
+        : "—";
 
 const fmtTanggalShort = (d?: string) =>
-    d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "—";
-
-const fmtAuditTime = (dt?: string | null) => {
-    if (!dt) return null;
-    return new Date(dt).toLocaleString("id-ID", {
-        timeZone: "Asia/Jakarta",
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-    });
-};
+    d
+        ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "short",
+        })
+        : "—";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Entry = {
@@ -66,7 +69,7 @@ type Summary = {
     modal_awal_entry: Entry | null;
 };
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// ── Icons ────────────────────────────────────────────────────────────────────
 const IconRefresh = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
@@ -78,14 +81,8 @@ const IconPlus = () => (
     </svg>
 );
 const IconTrash = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-    </svg>
-);
-const IconEdit = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
 );
 const IconCheck = () => (
@@ -114,13 +111,8 @@ const IconX = () => (
     </svg>
 );
 const IconExternal = () => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-);
-const IconEye = () => (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
     </svg>
 );
 const IconChevronLeft = () => (
@@ -175,19 +167,20 @@ const IconDownload = () => (
         <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
 );
-const IconLock = () => (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-        <path d="M7 11V7a5 5 0 0110 0v4" />
-    </svg>
-);
 
-// ── Export Excel ──────────────────────────────────────────────────────────────
+// ── Export Excel (ExcelJS — styled table) ─────────────────────────────────────
+// Install: npm install exceljs
 async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const ExcelJS = await import("exceljs");
 
     const fmtDateExcel = (d?: string) =>
-        d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+        d
+            ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+            })
+            : "—";
 
     const sourceLabel = (s: Entry["source_type"]) =>
         ({ TRANSACTION: "Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", MANUAL: "Manual" }[s] ?? s);
@@ -195,29 +188,22 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const methodLabel = (m: Entry["payment_method"]) =>
         m === "CASH" ? "Cash" : m === "SALDO" ? "Saldo" : "—";
 
-    const auditLabel = (e: Entry) => {
-        if (!e.is_audited) return "Belum Audit";
-        const parts: string[] = ["Sudah Audit"];
-        if (e.audited_by_user?.name) parts.push(`oleh ${e.audited_by_user.name}`);
-        if (e.audited_at) {
-            const t = new Date(e.audited_at).toLocaleString("id-ID", {
-                timeZone: "Asia/Jakarta",
-                day: "2-digit", month: "short", year: "numeric",
-                hour: "2-digit", minute: "2-digit",
-            });
-            parts.push(`· ${t}`);
-        }
-        return parts.join(" ");
-    };
+    const auditLabel = (e: Entry) =>
+        e.is_audited
+            ? `Sudah Audit${e.audited_by_user?.name ? ` (${e.audited_by_user.name})` : ""}`
+            : "Belum Audit";
 
+    const exportDate = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
+    // ── Shared style helpers ─────────────────────────────────────────────────
     const borderThin: Partial<ExcelJS.Borders> = {
         top: { style: "thin", color: { argb: "FFD1D5DB" } },
         left: { style: "thin", color: { argb: "FFD1D5DB" } },
         bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
         right: { style: "thin", color: { argb: "FFD1D5DB" } },
     };
+
     const applyBorder = (cell: ExcelJS.Cell) => { cell.border = borderThin; };
 
     const applyHeaderStyle = (cell: ExcelJS.Cell, bgArgb: string) => {
@@ -234,7 +220,10 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
 
     const applyDataCell = (cell: ExcelJS.Cell, rowIdx: number, isNumber = false) => {
         const isEven = rowIdx % 2 === 0;
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isEven ? "FFF9FAFB" : "FFFFFFFF" } };
+        cell.fill = {
+            type: "pattern", pattern: "solid",
+            fgColor: { argb: isEven ? "FFF9FAFB" : "FFFFFFFF" },
+        };
         cell.font = { size: 9.5, name: "Arial" };
         cell.alignment = { vertical: "middle", horizontal: isNumber ? "right" : "left", wrapText: false };
         applyBorder(cell);
@@ -252,9 +241,22 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
         };
     };
 
-    const buildSheet = (wb: ExcelJS.Workbook, sheetName: string, direction: "IN" | "OUT", entries: Entry[]) => {
-        const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: 4 }] });
+    // ── Builder: 1 sheet ─────────────────────────────────────────────────────
+    const buildSheet = (
+        wb: ExcelJS.Workbook,
+        sheetName: string,
+        direction: "IN" | "OUT",
+        entries: Entry[],
+    ) => {
+        const ws = wb.addWorksheet(sheetName, {
+            views: [{ state: "frozen", ySplit: 4 }], // freeze header rows
+        });
+
         const isMasuk = direction === "IN";
+
+        // ── Column definitions (no Foto Bukti) ──────────────────────────────
+        // Masuk  : No | Tanggal | Sumber | Nama/Customer | Kategori | Nominal | Keterangan | Status Audit
+        // Keluar : No | Tanggal | Sumber | Pengisi | Kategori | Metode Bayar | Nominal | Keterangan | Status Audit
 
         type ColDef = { header: string; key: string; width: number; numFmt?: string };
 
@@ -264,9 +266,9 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
             { header: "Sumber", key: "sumber", width: 13 },
             { header: "Nama / Customer", key: "nama", width: 26 },
             { header: "Kategori", key: "kategori", width: 22 },
-            { header: "Nominal (Rp)", key: "nominal", width: 20, numFmt: "#,##0" },
+            { header: "Nominal (Rp)", key: "nominal", width: 20, numFmt: '#,##0' },
             { header: "Keterangan", key: "ket", width: 55 },
-            { header: "Status Audit", key: "audit", width: 36 },
+            { header: "Status Audit", key: "audit", width: 26 },
         ];
 
         const keluarCols: ColDef[] = [
@@ -276,18 +278,20 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
             { header: "Pengisi", key: "nama", width: 22 },
             { header: "Kategori", key: "kategori", width: 22 },
             { header: "Metode Bayar", key: "metode", width: 14 },
-            { header: "Nominal (Rp)", key: "nominal", width: 20, numFmt: "#,##0" },
+            { header: "Nominal (Rp)", key: "nominal", width: 20, numFmt: '#,##0' },
             { header: "Keterangan", key: "ket", width: 55 },
-            { header: "Status Audit", key: "audit", width: 36 },
+            { header: "Status Audit", key: "audit", width: 26 },
         ];
 
         const cols = isMasuk ? masukCols : keluarCols;
         const totalCols = cols.length;
-        const nominalColIdx = cols.findIndex((c) => c.key === "nominal") + 1;
+        const nominalColIdx = cols.findIndex((c) => c.key === "nominal") + 1; // 1-based
 
+        // Set column widths
         ws.columns = cols.map((c) => ({ width: c.width }));
 
-        const titleColor = isMasuk ? "FF059669" : "FFDC2626";
+        // ── Row 1: Judul sheet ───────────────────────────────────────────────
+        const titleColor = isMasuk ? "FF059669" : "FFDC2626"; // emerald-600 / red-600
         const titleRow = ws.addRow([`CASHFLOW SOLIT03 — ${isMasuk ? "UANG MASUK" : "UANG KELUAR"}`]);
         ws.mergeCells(1, 1, 1, totalCols);
         const titleCell = titleRow.getCell(1);
@@ -296,7 +300,10 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
         titleCell.alignment = { vertical: "middle", horizontal: "center" };
         titleRow.height = 28;
 
-        const infoRow = ws.addRow([]);
+        // ── Row 2: Sub-info ──────────────────────────────────────────────────
+        const total = entries.reduce((s, e) => s + Number(e.nominal || 0), 0);
+        const infoRow = ws.addRow([
+        ]);
         ws.mergeCells(2, 1, 2, totalCols);
         const infoCell = infoRow.getCell(1);
         infoCell.font = { size: 9, italic: true, color: { argb: "FF6B7280" }, name: "Arial" };
@@ -304,16 +311,19 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
         infoCell.alignment = { vertical: "middle", horizontal: "center" };
         infoRow.height = 16;
 
+        // ── Row 3: Spacer kosong ─────────────────────────────────────────────
         const spacerRow = ws.addRow([""]);
         ws.mergeCells(3, 1, 3, totalCols);
         spacerRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } };
         spacerRow.height = 6;
 
-        const headerBg = isMasuk ? "FF065F46" : "FF991B1B";
+        // ── Row 4: Header tabel ──────────────────────────────────────────────
+        const headerBg = isMasuk ? "FF065F46" : "FF991B1B"; // emerald-900 / red-800
         const headerRow = ws.addRow(cols.map((c) => c.header));
         headerRow.height = 22;
         headerRow.eachCell((cell) => applyHeaderStyle(cell, headerBg));
 
+        // ── Rows 5+: Data ────────────────────────────────────────────────────
         if (entries.length === 0) {
             const emptyRow = ws.addRow(["Belum ada data"]);
             ws.mergeCells(5, 1, 5, totalCols);
@@ -327,62 +337,108 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
             entries.forEach((e, i) => {
                 const rowValues = isMasuk
                     ? [
-                        i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
-                        e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama,
+                        i + 1,
+                        fmtDateExcel(e.tanggal),
+                        sourceLabel(e.source_type),
+                        e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL"
+                            ? (e.created_by_user?.name ?? e.nama)
+                            : e.nama,
                         e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel("IN", e.category),
-                        Number(e.nominal || 0), e.keterangan ?? "", auditLabel(e),
+                        Number(e.nominal || 0),
+                        e.keterangan ?? "",
+                        auditLabel(e),
                     ]
                     : [
-                        i + 1, fmtDateExcel(e.tanggal), sourceLabel(e.source_type),
+                        i + 1,
+                        fmtDateExcel(e.tanggal),
+                        sourceLabel(e.source_type),
                         e.created_by_user?.name ?? e.nama,
-                        categoryLabel("OUT", e.category), methodLabel(e.payment_method),
-                        Number(e.nominal || 0), e.keterangan ?? "", auditLabel(e),
+                        categoryLabel("OUT", e.category),
+                        methodLabel(e.payment_method),
+                        Number(e.nominal || 0),
+                        e.keterangan ?? "",
+                        auditLabel(e),
                     ];
 
                 const row = ws.addRow(rowValues);
                 row.height = 18;
+
                 row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                     const isNum = colNumber === nominalColIdx;
                     applyDataCell(cell, i, isNum);
-                    if (isNum && cols[colNumber - 1]?.numFmt) cell.numFmt = cols[colNumber - 1].numFmt!;
+                    if (isNum && cols[colNumber - 1]?.numFmt) {
+                        cell.numFmt = cols[colNumber - 1].numFmt!;
+                    }
                 });
 
+                // Warna kolom Status Audit
                 const auditColIdx = cols.findIndex((c) => c.key === "audit") + 1;
                 const auditCell = row.getCell(auditColIdx);
+                const isAudited = e.is_audited;
                 auditCell.font = {
-                    bold: e.is_audited, size: 9.5, name: "Arial",
-                    color: { argb: e.is_audited ? "FF065F46" : "FFB45309" },
+                    bold: isAudited,
+                    size: 9.5,
+                    name: "Arial",
+                    color: { argb: isAudited ? "FF065F46" : "FFB45309" }, // emerald-900 / amber-700
                 };
             });
 
+            // ── Baris TOTAL ──────────────────────────────────────────────────
             const totalRow = ws.addRow([]);
             totalRow.height = 22;
+
+            // Isi cell kosong dengan style total
             for (let c = 1; c <= totalCols; c++) {
                 const cell = totalRow.getCell(c);
                 const isNum = c === nominalColIdx;
                 applyTotalStyle(cell, isNum);
-                if (c === nominalColIdx - 1) { cell.value = "TOTAL"; }
-                else if (isNum) {
+
+                if (c === nominalColIdx - 1) {
+                    cell.value = "TOTAL";
+                } else if (isNum) {
+                    // SUM formula — data mulai row 5, sampai row sebelum total
+                    const dataStart = 5;
+                    const dataEnd = 4 + entries.length;
                     const colLetter = ws.getColumn(nominalColIdx).letter;
-                    cell.value = { formula: `SUM(${colLetter}5:${colLetter}${4 + entries.length})` };
-                    cell.numFmt = "#,##0";
-                } else { cell.value = ""; }
+                    cell.value = { formula: `SUM(${colLetter}${dataStart}:${colLetter}${dataEnd})` };
+                    cell.numFmt = '#,##0';
+                } else {
+                    cell.value = "";
+                }
             }
         }
 
-        ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: totalCols } };
-        ws.pageSetup = { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "4:4" };
+        // ── Auto-filter pada row header ──────────────────────────────────────
+        ws.autoFilter = {
+            from: { row: 4, column: 1 },
+            to: { row: 4, column: totalCols },
+        };
+
+        // ── Print setup ──────────────────────────────────────────────────────
+        ws.pageSetup = {
+            paperSize: 9, // A4
+            orientation: "landscape",
+            fitToPage: true,
+            fitToWidth: 1,
+            fitToHeight: 0,
+            printTitlesRow: "4:4",
+        };
     };
 
+    // ── Build workbook ───────────────────────────────────────────────────────
     const wb = new ExcelJS.Workbook();
     wb.creator = "Solit POS";
     wb.created = new Date();
     wb.modified = new Date();
+
     buildSheet(wb, "Uang Masuk", "IN", masuk);
     buildSheet(wb, "Uang Keluar", "OUT", keluar);
 
+    // ── Download ─────────────────────────────────────────────────────────────
     const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -391,38 +447,46 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     URL.revokeObjectURL(url);
 }
 
-// ── Source Badge ──────────────────────────────────────────────────────────────
+// ── Source type badge config ──────────────────────────────────────────────────
 function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
-    if (sourceType === "TRANSACTION")
-        return <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">🛒 TRX</span>;
-    if (sourceType === "SERVICE")
-        return <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap">🔧 SVC</span>;
-    if (sourceType === "MODAL_AWAL")
-        return <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap">💰 MODAL</span>;
-    return <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">✏️ MANUAL</span>;
+    if (sourceType === "TRANSACTION") {
+        return (
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
+                🛒 TRX
+            </span>
+        );
+    }
+    if (sourceType === "SERVICE") {
+        return (
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap">
+                🔧 SVC
+            </span>
+        );
+    }
+    if (sourceType === "MODAL_AWAL") {
+        return (
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap">
+                💰 MODAL
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
+            ✏️ MANUAL
+        </span>
+    );
 }
 
-// ── Audit Cell ────────────────────────────────────────────────────────────────
+// ── Audit cell ───────────────────────────────────────────────────────────────
 function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
     if (entry.is_audited) {
-        const auditTime = fmtAuditTime(entry.audited_at);
         return (
-            <div className="flex flex-col gap-0.5">
-                <span
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default whitespace-nowrap"
-                    title={[
-                        entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Sudah diaudit",
-                        auditTime ?? "",
-                    ].filter(Boolean).join(" · ")}
-                >
-                    <IconCheck /> Sudah Audit
-                </span>
-                {auditTime && (
-                    <span className="text-[9px] text-emerald-500 font-mono leading-tight pl-0.5 whitespace-nowrap">
-                        {auditTime}
-                    </span>
-                )}
-            </div>
+            <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default whitespace-nowrap"
+                title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Sudah diaudit"}
+            >
+                <IconCheck /> Sudah Audit
+            </span>
         );
     }
     return (
@@ -437,77 +501,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
     );
 }
 
-// ── Delete Confirm Modal ──────────────────────────────────────────────────────
-function DeleteConfirmModal({ entry, onClose, onConfirm, busy }: {
-    entry: Entry;
-    onClose: () => void;
-    onConfirm: () => void;
-    busy: boolean;
-}) {
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); };
-        window.addEventListener("keydown", h);
-        return () => window.removeEventListener("keydown", h);
-    }, [onClose, busy]);
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => !busy && onClose()} />
-            <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-                <div className="h-1 bg-gradient-to-r from-red-500 to-rose-600" />
-                <div className="p-6">
-                    <div className="flex items-start gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0 text-xl">🗑️</div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900">Hapus Pengeluaran?</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Tindakan ini tidak bisa dibatalkan.</p>
-                        </div>
-                    </div>
-                    <div className="mt-4 p-3.5 rounded-xl bg-gray-50 border border-gray-100 space-y-1.5">
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Entry yang dihapus</p>
-                        <p className="text-sm font-semibold text-gray-800 truncate">
-                            {entry.keterangan || entry.created_by_user?.name || entry.nama || "—"}
-                        </p>
-                        <div className="flex items-center justify-between">
-                            <p className="text-[12px] font-bold text-red-600 font-mono">−{fmtRupiah(entry.nominal)}</p>
-                            <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
-                        </div>
-                        {entry.payment_method && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${entry.payment_method === "SALDO" ? "bg-blue-50 text-blue-700" : "bg-green-50 text-green-700"}`}>
-                                {entry.payment_method === "SALDO" ? "🏦 Saldo" : "💵 Cash"}
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className="px-6 pb-6 flex gap-3">
-                    <button
-                        onClick={onClose}
-                        disabled={busy}
-                        className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        disabled={busy}
-                        className="flex-1 h-10 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
-                    >
-                        {busy ? (
-                            <>
-                                <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                                Menghapus...
-                            </>
-                        ) : (
-                            <><IconTrash /> Hapus</>
-                        )}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ── Modal Awal Modal ──────────────────────────────────────────────────────────
+// ── Modal Awal Modal ─────────────────────────────────────────────────────────
 function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
@@ -525,18 +519,29 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     const submit = async () => {
         if (!confirmed) return setError("Centang pernyataan di bawah untuk melanjutkan");
         if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
-        setSaving(true); setError("");
+        setSaving(true);
+        setError("");
         try {
             const res = await fetch("/api/cashflow", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ direction: "IN", category: "MODAL_AWAL", nominal: Number(nominal), keterangan: keterangan.trim() || null, tanggal }),
+                body: JSON.stringify({
+                    direction: "IN",
+                    category: "MODAL_AWAL",
+                    nominal: Number(nominal),
+                    keterangan: keterangan.trim() || null,
+                    tanggal,
+                }),
             });
             const json = await res.json();
             if (!json.success) return setError(json.message || "Gagal menyimpan");
-            onSaved(); onClose();
-        } catch { setError("Terjadi kesalahan koneksi"); }
-        finally { setSaving(false); }
+            onSaved();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition";
@@ -554,7 +559,9 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             <p className="text-[11px] text-amber-600 font-semibold">⚠️ Hanya bisa diisi satu kali</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
+                        <IconX />
+                    </button>
                 </div>
                 <div className="p-5 space-y-3.5">
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-700 space-y-1.5">
@@ -562,12 +569,15 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                         <ul className="space-y-1">
                             <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Modal awal <strong>tidak dapat diubah atau dihapus</strong> setelah disimpan</li>
                             <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Akun Anda akan tercatat sebagai yang mengisi</li>
+                            <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Periode input aktif sampai <strong>09 Jul 2026</strong></li>
                         </ul>
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal Modal Awal <span className="text-red-500">*</span></label>
                         <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
-                        {nominal && Number(nominal) > 0 && <p className="text-[11px] text-violet-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>}
+                        {nominal && Number(nominal) > 0 && (
+                            <p className="text-[11px] text-violet-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
+                        )}
                     </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
@@ -595,7 +605,11 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 }
 
 // ── Modal Awal Banner ─────────────────────────────────────────────────────────
-function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null; onSet: () => void; isWindowActive: boolean }) {
+function ModalAwalBanner({ entry, onSet, isWindowActive }: {
+    entry: Entry | null;
+    onSet: () => void;
+    isWindowActive: boolean;
+}) {
     if (entry) {
         return (
             <div className="border-t border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 overflow-hidden">
@@ -612,7 +626,9 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
                             </p>
                         </div>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-200 shrink-0">🔒 Terkunci</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-200 shrink-0">
+                        🔒 Terkunci
+                    </span>
                 </div>
             </div>
         );
@@ -621,7 +637,10 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
         return (
             <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 flex items-start gap-2.5">
                 <IconInfo />
-                <p className="text-xs text-amber-700"><span className="font-bold">Modal awal belum diatur.</span> Periode input sudah berakhir. Saldo tidak termasuk modal awal.</p>
+                <p className="text-xs text-amber-700">
+                    <span className="font-bold">Modal awal belum diatur.</span>{" "}
+                    Periode input sudah berakhir. Saldo tidak termasuk modal awal.
+                </p>
             </div>
         );
     }
@@ -634,6 +653,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
                     <div>
                         <p className="text-sm font-bold text-gray-900">Modal Awal Cashflow</p>
                         <p className="text-xs text-gray-500 mt-0.5">Uang yang sudah ada sebelum cashflow dimulai. <span className="font-semibold text-amber-600">Hanya bisa diisi sekali.</span></p>
+                        <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1"><IconClock /> Batas waktu: <span className="font-semibold text-gray-600 ml-0.5">09 Jul 2026</span></p>
                     </div>
                 </div>
                 <button onClick={onSet} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition shadow-sm active:scale-95 shrink-0">
@@ -646,12 +666,17 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
 
 // ── Filter Panel ──────────────────────────────────────────────────────────────
 function FilterPanel({ filter, onChange, onReset, direction }: {
-    filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT";
+    filter: CashflowFilter;
+    onChange: (f: CashflowFilter) => void;
+    onReset: () => void;
+    direction: "IN" | "OUT";
 }) {
     const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
     const catEntries = Object.entries(categories) as [string, string][];
     const count = activeFilterCount(filter);
-    const cls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+
+    const selectCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const dateCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
 
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -659,10 +684,14 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                 <div className="flex items-center gap-2">
                     <IconFilter />
                     <span className="text-sm font-bold text-gray-800">Filter</span>
-                    {count > 0 && <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{count}</span>}
+                    {count > 0 && (
+                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{count}</span>
+                    )}
                 </div>
                 {isFilterActive(filter) && (
-                    <button onClick={onReset} className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition"><IconX /> Reset</button>
+                    <button onClick={onReset} className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition">
+                        <IconX /> Reset
+                    </button>
                 )}
             </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -670,20 +699,22 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Cari</label>
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
-                        <input type="text" value={filter.search} onChange={(e) => onChange({ ...filter, search: e.target.value })} placeholder="Nama / keterangan…" className={`${cls} w-full pl-8`} />
-                        {filter.search && <button onClick={() => onChange({ ...filter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500"><IconX /></button>}
+                        <input type="text" value={filter.search} onChange={(e) => onChange({ ...filter, search: e.target.value })} placeholder="Nama / keterangan…" className={`${dateCls} w-full pl-8`} />
+                        {filter.search && (
+                            <button onClick={() => onChange({ ...filter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500"><IconX /></button>
+                        )}
                     </div>
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori</label>
-                    <select value={filter.category} onChange={(e) => onChange({ ...filter, category: e.target.value })} className={`${cls} w-full`}>
+                    <select value={filter.category} onChange={(e) => onChange({ ...filter, category: e.target.value })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Kategori</option>
-                        {catEntries.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                        {catEntries.map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
                     </select>
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Audit</label>
-                    <select value={filter.audit} onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })} className={`${cls} w-full`}>
+                    <select value={filter.audit} onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Status</option>
                         <option value="AUDITED">✅ Sudah Audit</option>
                         <option value="NOT_AUDITED">⏳ Belum Audit</option>
@@ -691,7 +722,7 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
-                    <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${cls} w-full`}>
+                    <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Sumber</option>
                         <option value="MANUAL">✏️ Manual</option>
                         <option value="AUTO">⚡ Otomatis</option>
@@ -701,11 +732,11 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
             <div className="px-4 pb-4 -mt-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
-                    <input type="date" value={filter.dateFrom} onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })} className={`${cls} w-full`} />
+                    <input type="date" value={filter.dateFrom} onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })} className={`${dateCls} w-full`} />
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sampai Tanggal</label>
-                    <input type="date" value={filter.dateTo} onChange={(e) => onChange({ ...filter, dateTo: e.target.value })} className={`${cls} w-full`} />
+                    <input type="date" value={filter.dateTo} onChange={(e) => onChange({ ...filter, dateTo: e.target.value })} className={`${dateCls} w-full`} />
                 </div>
                 <div className="col-span-2 sm:col-span-2 lg:col-span-3 flex items-end gap-1.5 flex-wrap pb-0.5">
                     {([
@@ -714,7 +745,9 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                         ["Bulan Ini", () => { const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, "0"); onChange({ ...filter, dateFrom: `${y}-${m}-01`, dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
                         ["Semua", () => { onChange({ ...filter, dateFrom: "", dateTo: "" }); }],
                     ] as [string, () => void][]).map(([label, fn]) => (
-                        <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition">{label}</button>
+                        <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition">
+                            {label}
+                        </button>
                     ))}
                 </div>
             </div>
@@ -728,8 +761,16 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
     const cameraRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
 
-    const handleFile = (f: File | null) => { onChange(f); setPreview(f ? URL.createObjectURL(f) : null); };
-    const remove = () => { handleFile(null); if (fileRef.current) fileRef.current.value = ""; if (cameraRef.current) cameraRef.current.value = ""; };
+    const handleFile = (f: File | null) => {
+        onChange(f);
+        setPreview(f ? URL.createObjectURL(f) : null);
+    };
+
+    const remove = () => {
+        handleFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+        if (cameraRef.current) cameraRef.current.value = "";
+    };
 
     return (
         <div>
@@ -737,12 +778,19 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
             {preview ? (
                 <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
                     <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
-                    <button type="button" onClick={remove} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition"><IconX /></button>
-                    <div className="px-3 py-1.5 bg-white/90 border-t border-gray-100"><p className="text-[10px] text-gray-500 truncate">{value?.name}</p></div>
+                    <button type="button" onClick={remove} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition" title="Hapus foto">
+                        <IconX />
+                    </button>
+                    <div className="px-3 py-1.5 bg-white/90 border-t border-gray-100">
+                        <p className="text-[10px] text-gray-500 truncate">{value?.name}</p>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-2">
-                    {[{ ref: cameraRef, icon: "📷", label: "Kamera" }, { ref: fileRef, icon: "🖼️", label: "Galeri" }].map(({ ref, icon, label }) => (
+                    {[
+                        { ref: cameraRef, icon: "📷", label: "Kamera" },
+                        { ref: fileRef, icon: "🖼️", label: "Galeri" },
+                    ].map(({ ref, icon, label }) => (
                         <button key={label} type="button" onClick={() => (ref as any).current?.click()} className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-600 transition">
                             <span className="text-2xl">{icon}</span>
                             <span className="text-[11px] font-semibold">{label}</span>
@@ -752,139 +800,6 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
             )}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
-        </div>
-    );
-}
-
-// ── Detail Row (baris label : value) ──────────────────────────────────────────
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex items-start justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0">
-            <span className="text-xs font-semibold text-gray-400 shrink-0">{label}</span>
-            <div className="text-right text-sm text-gray-800 font-medium min-w-0 break-words">{children}</div>
-        </div>
-    );
-}
-
-// ── Detail Modal (uang keluar / uang masuk manual) ────────────────────────────
-function DetailModal({ entry, onClose, onDelete }: {
-    entry: Entry;
-    onClose: () => void;
-    onDelete: (e: Entry) => void;
-}) {
-    const [zoom, setZoom] = useState(false);
-
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => {
-            if (e.key === "Escape") { if (zoom) setZoom(false); else onClose(); }
-        };
-        window.addEventListener("keydown", h);
-        return () => window.removeEventListener("keydown", h);
-    }, [onClose, zoom]);
-
-    const isOut = entry.direction === "OUT";
-    const gradient = isOut ? "from-red-400 to-rose-500" : "from-emerald-400 to-green-500";
-    const nominalColor = isOut ? "text-red-600" : "text-emerald-600";
-    const pengisi = entry.created_by_user?.name ?? entry.nama;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-                <div className={`h-1 bg-gradient-to-r ${gradient}`} />
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>
-                            {isOut ? "💸" : "💰"}
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900">Detail {isOut ? "Uang Keluar" : "Uang Masuk"}</p>
-                            <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
-                </div>
-
-                <div className="p-5 space-y-1 max-h-[75vh] overflow-y-auto">
-                    <div className="text-center py-3 mb-1">
-                        <p className={`text-3xl font-black tabular-nums ${nominalColor}`}>
-                            {isOut ? "−" : "+"}{fmtRupiah(entry.nominal)}
-                        </p>
-                    </div>
-
-                    <DetailRow label="Kategori">
-                        <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">
-                            {categoryLabel(entry.direction, entry.category)}
-                        </span>
-                    </DetailRow>
-
-                    {isOut && entry.source_type === "MANUAL" && (
-                        <DetailRow label="Metode">
-                            {entry.payment_method === "SALDO"
-                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">🏦 Saldo</span>
-                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100">💵 Cash</span>}
-                        </DetailRow>
-                    )}
-
-                    <DetailRow label="Diinput oleh">{pengisi}</DetailRow>
-
-                    <DetailRow label="Status Audit">
-                        {entry.is_audited
-                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><IconCheck /> Sudah Audit</span>
-                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><IconClock /> Belum Audit</span>}
-                    </DetailRow>
-
-                    {entry.is_audited && entry.audited_by_user?.name && (
-                        <DetailRow label="Diaudit oleh">
-                            <span className="text-emerald-600 font-semibold">✓ {entry.audited_by_user.name}</span>
-                        </DetailRow>
-                    )}
-
-                    {/* Keterangan lengkap — nggak dipotong */}
-                    <div className="pt-3">
-                        <p className="text-xs font-semibold text-gray-400 mb-1.5">Keterangan</p>
-                        <div className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-3 min-h-[44px] leading-relaxed">
-                            {entry.keterangan?.trim() || <span className="text-gray-300 italic">Tidak ada keterangan</span>}
-                        </div>
-                    </div>
-
-                    {/* Foto bukti inline — tanpa tab baru */}
-                    {entry.photo_url && (
-                        <div className="pt-3">
-                            <p className="text-xs font-semibold text-gray-400 mb-1.5">Foto Bukti</p>
-                            <button
-                                type="button"
-                                onClick={() => setZoom(true)}
-                                className="block w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group"
-                                title="Ketuk untuk perbesar"
-                            >
-                                <img src={entry.photo_url} alt="Bukti" className="w-full max-h-72 object-contain bg-gray-900/5 group-hover:opacity-90 transition" />
-                            </button>
-                            <p className="text-[10px] text-gray-400 mt-1 text-center">Ketuk gambar untuk memperbesar</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    {entry.source_type === "MANUAL" && (
-                        <button
-                            onClick={() => { onClose(); onDelete(entry); }}
-                            className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
-                        >
-                            <IconTrash /> Hapus
-                        </button>
-                    )}
-                    <button onClick={onClose} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition">Tutup</button>
-                </div>
-            </div>
-
-            {/* Zoom overlay — foto full di dalam app, bukan tab baru */}
-            {zoom && entry.photo_url && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setZoom(false)}>
-                    <img src={entry.photo_url} alt="Bukti" className="max-w-full max-h-full object-contain" />
-                    <button onClick={() => setZoom(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"><IconX /></button>
-                </div>
-            )}
         </div>
     );
 }
@@ -910,7 +825,8 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
     const submit = async () => {
         if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
-        setSaving(true); setError("");
+        setSaving(true);
+        setError("");
         try {
             let photoUrl: string | null = null;
             if (photoFile) {
@@ -930,9 +846,14 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             });
             const json = await res.json();
             if (!json.success) return setError(json.message || "Gagal menyimpan");
-            onSaved(); onClose();
-        } catch { setError("Terjadi kesalahan koneksi"); }
-        finally { setSaving(false); setUploadProgress("idle"); }
+            onSaved();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setSaving(false);
+            setUploadProgress("idle");
+        }
     };
 
     const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
@@ -967,14 +888,16 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-                            {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                            {categories.map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
                         </select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
                             <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
-                            {nominal && Number(nominal) > 0 && <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>}
+                            {nominal && Number(nominal) > 0 && (
+                                <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>
+                            )}
                         </div>
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
@@ -997,106 +920,13 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     );
 }
 
-// ── Income Modal (uang masuk manual — hanya Biaya Lain-lain) ───────────────────
-function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-    const [nominal, setNominal] = useState("");
-    const [keterangan, setKeterangan] = useState("");
-    const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", h);
-        return () => window.removeEventListener("keydown", h);
-    }, [onClose]);
-
-    const submit = async () => {
-        if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
-        setSaving(true);
-        setError("");
-        try {
-            const res = await fetch("/api/cashflow", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    direction: "IN",
-                    category: "BIAYA_LAIN",
-                    nominal: Number(nominal),
-                    keterangan: keterangan.trim() || null,
-                    tanggal,
-                }),
-            });
-            const json = await res.json();
-            if (!json.success) return setError(json.message || "Gagal menyimpan");
-            onSaved();
-            onClose();
-        } catch {
-            setError("Terjadi kesalahan koneksi");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition";
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-                <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-500" />
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">💰</div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900">Tambah Uang Masuk</p>
-                            <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
-                </div>
-                <div className="p-5 space-y-3.5">
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
-                        <div className="w-full min-h-10 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 flex items-center gap-2 flex-wrap text-gray-700">
-                            <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">Biaya Lain-lain</span>
-                            <span className="text-[11px] text-gray-400">satu-satunya kategori uang masuk manual</span>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
-                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
-                            {nominal && Number(nominal) > 0 && (
-                                <p className="text-[11px] text-emerald-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
-                            )}
-                        </div>
-                        <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
-                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Catatan</label>
-                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
-                    </div>
-                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
-                </div>
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan"}</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ── Summary Cards ─────────────────────────────────────────────────────────────
 function SummaryCard({
     label, value, sublabel, color, icon, loading,
 }: {
     label: string; value: string; sublabel?: string;
-    color: "emerald" | "red" | "blue" | "violet"; icon: React.ReactNode; loading: boolean;
+    color: "emerald" | "red" | "blue" | "violet";
+    icon: React.ReactNode; loading: boolean;
 }) {
     const colorMap = {
         emerald: { bar: "bg-emerald-500", icon: "bg-emerald-50 text-emerald-600", value: "text-emerald-700", sub: "text-emerald-500" },
@@ -1109,10 +939,15 @@ function SummaryCard({
         <div className="relative bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className={`absolute top-0 left-0 h-full w-1 ${c.bar}`} />
             <div className="pl-5 pr-4 py-4 flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>{icon}</div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
+                    {icon}
+                </div>
                 <div className="min-w-0">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
-                    {loading ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" /> : <p className={`text-lg font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>}
+                    {loading
+                        ? <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mt-1" />
+                        : <p className={`text-lg font-black tabular-nums tracking-tight ${c.value}`}>{value}</p>
+                    }
                     {sublabel && !loading && <p className={`text-[10px] ${c.sub} mt-0.5 font-medium`}>{sublabel}</p>}
                 </div>
             </div>
@@ -1126,15 +961,15 @@ export default function CashflowPage() {
     const [loading, setLoading] = useState(true);
     const [masuk, setMasuk] = useState<Entry[]>([]);
     const [keluar, setKeluar] = useState<Entry[]>([]);
-    const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null });
+    const [summary, setSummary] = useState<Summary>({
+        total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null,
+    });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
     const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
     const [customFrom, setCustomFrom] = useState("");
     const [customTo, setCustomTo] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
-    const [showIncomeModal, setShowIncomeModal] = useState(false);
-    const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
@@ -1143,9 +978,6 @@ export default function CashflowPage() {
     const [exporting, setExporting] = useState(false);
     const [allowed, setAllowed] = useState<boolean | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
-    const [deletingEntry, setDeletingEntry] = useState<Entry | null>(null);
-    const [deleteLoading, setDeleteLoading] = useState(false);
     const ITEMS_PER_PAGE = 70;
 
     useEffect(() => {
@@ -1188,7 +1020,11 @@ export default function CashflowPage() {
 
     const handleExport = async () => {
         setExporting(true);
-        try { await exportCashflowExcel(masuk, keluar); } finally { setExporting(false); }
+        try {
+            await exportCashflowExcel(masuk, keluar);
+        } finally {
+            setExporting(false);
+        }
     };
 
     const toggleAudit = async (entry: Entry) => {
@@ -1202,26 +1038,21 @@ export default function CashflowPage() {
             });
             const json = await res.json();
             if (json.success) fetchData(true);
-        } finally { setAuditingId(null); }
+        } finally {
+            setAuditingId(null);
+        }
     };
 
-    const confirmDelete = async () => {
-        if (!deletingEntry) return;
-        setDeleteLoading(true);
-        try {
-            const res = await fetch(`/api/cashflow/${deletingEntry.id}`, { method: "DELETE" });
-            const json = await res.json();
-            if (json.success) { fetchData(true); setDeletingEntry(null); }
-            else alert(json.message || "Gagal menghapus");
-        } finally { setDeleteLoading(false); }
+    const deleteEntry = async (entry: Entry) => {
+        if (!confirm(`Hapus pengeluaran "${entry.keterangan || entry.nama}"?`)) return;
+        const res = await fetch(`/api/cashflow/${entry.id}`, { method: "DELETE" });
+        const json = await res.json();
+        if (json.success) fetchData(true);
+        else alert(json.message || "Gagal menghapus");
     };
 
-    const isDetailRow = (e: Entry) =>
-        e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
-
-    const handleRowClick = (e: Entry) => {
-        if (e.source_type === "MODAL_AWAL") return;
-        if (isDetailRow(e)) { setDetailEntry(e); return; }
+    const openSource = (e: Entry) => {
+        if (e.direction !== "IN" || e.source_type === "MODAL_AWAL") return;
         if (e.source_type === "TRANSACTION" && e.source_id) {
             router.push(`/dashboard/transactions?highlight=${e.source_id}&nama=${encodeURIComponent(e.nama || "")}`);
         } else if (e.source_type === "SERVICE") {
@@ -1240,12 +1071,13 @@ export default function CashflowPage() {
         );
     }
 
-    // ── Derived ───────────────────────────────────────────────────────────────
+    // ── Derived values ────────────────────────────────────────────────────────
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
     const allRows = tab === "IN" ? masuk : keluar;
     const rows = applyFilters(allRows, currentFilter);
     const filterCount = activeFilterCount(currentFilter);
+
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
@@ -1280,20 +1112,20 @@ export default function CashflowPage() {
                     ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}`
                     : "Custom";
 
-    const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", {
+        day: "numeric", month: "long", year: "numeric",
+    });
 
-    const clickable = (e: Entry) => e.source_type !== "MODAL_AWAL";
+    const clickable = (e: Entry) => e.direction === "IN" && e.source_type !== "MODAL_AWAL";
 
     return (
         <DashboardLayout>
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} />}
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
-            {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
-            {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} />}
 
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-                {/* ── Header ─────────────────────────────────────────────── */}
+                {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <div className="w-1.5 h-9 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
@@ -1303,6 +1135,7 @@ export default function CashflowPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* Live indicator */}
                         <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -1315,31 +1148,50 @@ export default function CashflowPage() {
                                 {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                             </span>
                         )}
-                        <button onClick={handleExport} disabled={loading || exporting} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        {/* Export Excel */}
+                        <button
+                            onClick={handleExport}
+                            disabled={loading || exporting}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Export semua data cashflow ke Excel (2 sheet)"
+                        >
                             <IconDownload />
-                            <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
+                            <span className="hidden sm:inline text-sm">
+                                {exporting ? "Mengekspor..." : "Export Excel"}
+                            </span>
                         </button>
-                        <button onClick={() => fetchData()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 active:scale-95 transition">
+                        {/* Segarkan */}
+                        <button
+                            onClick={() => fetchData()}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 active:scale-95 transition"
+                        >
                             <IconRefresh />
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
                 </div>
 
-                {/* ── Saldo utama ───────────────────────────────────────── */}
+                {/* ── Saldo utama ───────────────────────────────────────────── */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                     <div className="h-1 bg-gradient-to-r from-gray-700 via-gray-800 to-gray-900" />
                     <div className="p-5 sm:p-6">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center"><IconWallet /></div>
+                                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                                        <IconWallet />
+                                    </div>
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Saldo Cashflow · Semua Waktu</span>
                                 </div>
-                                {loading ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" /> : <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(summary.saldo)}</p>}
+                                {loading
+                                    ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" />
+                                    : <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(summary.saldo)}</p>
+                                }
                                 <p className="text-[11px] text-gray-400 mt-1.5">Total masuk dikurangi keluar · akumulasi semua waktu</p>
                                 {!loading && summary.modal_awal_entry && (
-                                    <p className="text-[11px] text-violet-500 mt-1 font-medium">💰 Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
+                                    <p className="text-[11px] text-violet-500 mt-1 font-medium">
+                                        💰 Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span>
+                                    </p>
                                 )}
                                 {!loading && summary.belum_audit > 0 && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200">
@@ -1348,10 +1200,17 @@ export default function CashflowPage() {
                                     </div>
                                 )}
                             </div>
+                            {/* Period selector */}
                             <div className="flex flex-col items-end gap-2">
                                 <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5">
                                     {([["today", "Hari Ini"], ["week", "Minggu"], ["month", "Bulan"], ["custom", "Kustom"]] as [typeof period, string][]).map(([val, label]) => (
-                                        <button key={val} onClick={() => setPeriod(val)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-white/60"}`}>{label}</button>
+                                        <button
+                                            key={val}
+                                            onClick={() => setPeriod(val)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-white/60"}`}
+                                        >
+                                            {label}
+                                        </button>
                                     ))}
                                 </div>
                                 {period === "custom" && (
@@ -1366,69 +1225,84 @@ export default function CashflowPage() {
                     </div>
                 </div>
 
-                {/* ── Summary cards ─────────────────────────────────────── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* ── Summary cards ─────────────────────────────────────────── */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <SummaryCard label={`Masuk · ${periodLabel}`} value={fmtRupiah(incomeValue)} color="emerald" icon={<IconTrendUp />} loading={loading} />
                     <SummaryCard label={`Keluar · ${periodLabel}`} value={fmtRupiah(expenseValue)} color="red" icon={<IconTrendDown />} loading={loading} />
                 </div>
 
-                {/* ── Tab + Filter + CTA ───────────────────────────────── */}
+                {/* ── Tab + Filter + CTA ───────────────────────────────────── */}
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 gap-0.5">
                             {(["IN", "OUT"] as const).map((t) => (
-                                <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
-                                    {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
+                                <button
+                                    key={t}
+                                    onClick={() => setTab(t)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t
+                                        ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm"
+                                        : "text-gray-500 hover:bg-gray-50"
+                                        }`}
+                                >
+                                    {t === "IN"
+                                        ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}`
+                                        : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`
+                                    }
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setShowFilter(!showFilter)} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition ${showFilter ? "bg-gray-900 text-white border-gray-900" : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                        <button
+                            onClick={() => setShowFilter(!showFilter)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition ${showFilter
+                                ? "bg-gray-900 text-white border-gray-900"
+                                : filterCount > 0
+                                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                                }`}
+                        >
                             <IconFilter />
                             Filter
-                            {filterCount > 0 && <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>{filterCount}</span>}
+                            {filterCount > 0 && (
+                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>
+                                    {filterCount}
+                                </span>
+                            )}
                         </button>
                     </div>
-                    {tab === "IN" && (
-                        <button
-                            onClick={() => setShowIncomeModal(true)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition shadow-sm"
-                        >
-                            <IconPlus /> Tambah Uang Masuk
-                        </button>
-                    )}
                     {tab === "OUT" && (
                         <button
                             onClick={() => setShowModal(true)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 active:scale-95 transition shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 active:scale-95 transition shadow-sm"
                         >
                             <IconPlus /> Tambah Pengeluaran
                         </button>
-                    ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 cursor-default" title="Uang masuk hanya dari transaksi & service (otomatis)">
-                            <IconInfo /> Masuk otomatis dari transaksi
-                        </span>
                     )}
                 </div>
 
-                {showFilter && <FilterPanel filter={currentFilter} onChange={setCurrentFilter} onReset={() => setCurrentFilter(defaultCashflowFilter())} direction={tab} />}
+                {showFilter && (
+                    <FilterPanel
+                        filter={currentFilter}
+                        onChange={setCurrentFilter}
+                        onReset={() => setCurrentFilter(defaultCashflowFilter())}
+                        direction={tab}
+                    />
+                )}
 
                 {tab === "IN" && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[12px] text-blue-700">
                         <IconInfo />
-                        <span>Klik <b>Buka</b> di kolom Aksi untuk membuka sumbernya di <b>Riwayat Transaksi</b> atau <b>Service</b>. Uang masuk sync otomatis sejak <b>{startDateFormatted}</b>.</span>
-                    </div>
-                )}
-                {tab === "OUT" && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-500">
-                        <IconInfo />
-                        <span>Entry <b>Manual yang belum diaudit</b> → tombol <span className="text-blue-600 font-semibold">Edit</span> &amp; <span className="text-red-600 font-semibold">Hapus</span> aktif. Setelah diaudit → terkunci permanen.</span>
+                        <span>
+                            Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> atau <b>Service</b>.
+                            Uang masuk otomatis sync dari transaksi PAID & service DONE sejak{" "}
+                            <b>{startDateFormatted}</b>.
+                        </span>
                     </div>
                 )}
 
-                {/* ── Table ─────────────────────────────────────────────── */}
+                {/* ── Table ───────────────────────────────────────────────── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm" style={{ minWidth: 960 }}>
+                        <table className="w-full text-sm" style={{ minWidth: 860 }}>
                             <thead>
                                 <tr className="bg-gray-50/80 border-b border-gray-100">
                                     {[
@@ -1441,7 +1315,7 @@ export default function CashflowPage() {
                                         { label: "Keterangan", align: "left" },
                                         { label: "Audit", align: "left" },
                                         { label: "Diaudit oleh", align: "left" },
-                                        { label: "Aksi", align: "center" },
+                                        { label: "", align: "center" },
                                     ].map((h, i) => (
                                         <th key={i} className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>
                                             {h.label}
@@ -1465,7 +1339,9 @@ export default function CashflowPage() {
                                         <td colSpan={10} className="px-3.5 py-16 text-center">
                                             <div className="text-4xl mb-2.5 opacity-25">{filterCount > 0 ? "🔍" : "📭"}</div>
                                             <p className="text-sm text-gray-400 font-medium">
-                                                {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
+                                                {filterCount > 0
+                                                    ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).`
+                                                    : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
                                             {filterCount > 0 && (
                                                 <button onClick={() => setCurrentFilter(defaultCashflowFilter())} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
@@ -1477,31 +1353,33 @@ export default function CashflowPage() {
                                 ) : (
                                     paginatedRows.map((e) => {
                                         const isClickable = clickable(e);
-                                        const isEditable = editable(e);
-                                        const isDeletable = deletable(e);
-                                        const isManual = isManualOut(e);
-
                                         return (
                                             <tr
                                                 key={e.id}
-                                                onClick={() => isClickable && handleRowClick(e)}
+                                                onClick={() => isClickable && openSource(e)}
                                                 className={`transition-colors group ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}
                                             >
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">{fmtTanggalShort(e.tanggal)}</span>
                                                     <p className="text-[9px] text-gray-300 font-mono mt-0.5">{e.tanggal}</p>
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
                                                 <td className="px-3 py-3 whitespace-nowrap">
+                                                    <SourceBadge sourceType={e.source_type} />
+                                                </td>
+                                                <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">🏦 Saldo</span>
                                                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100">💵 Cash</span>
-                                                    ) : <span className="text-gray-300 text-[11px]">—</span>}
+                                                    ) : (
+                                                        <span className="text-gray-300 text-[11px]">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[140px]">
                                                     <p className="text-[12px] font-semibold text-gray-800 truncate">
-                                                        {e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama}
+                                                        {e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL"
+                                                            ? (e.created_by_user?.name ?? e.nama)
+                                                            : e.nama}
                                                     </p>
                                                     {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold mt-0.5">Teknisi</p>}
                                                     {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold mt-0.5">Customer</p>}
@@ -1511,22 +1389,20 @@ export default function CashflowPage() {
                                                     {e.source_type === "MODAL_AWAL" ? (
                                                         <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-50 text-violet-600 border border-violet-100">💰 Modal Awal</span>
                                                     ) : (
-                                                        <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{categoryLabel(e.direction, e.category)}</span>
+                                                        <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
+                                                            {categoryLabel(e.direction, e.category)}
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                 </td>
-                                                <td className="px-3 py-3 max-w-[180px]">
+                                                <td className="px-3 py-3 max-w-[200px]">
                                                     <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
-                                                   {e.photo_url && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(ev) => { ev.stopPropagation(); setDetailEntry(e); }}
-                                                            className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline"
-                                                        >
+                                                    {e.photo_url && (
+                                                        <a href={e.photo_url} target="_blank" rel="noopener noreferrer" onClick={(ev) => ev.stopPropagation()} className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline">
                                                             📷 Foto
-                                                        </button>
+                                                        </a>
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
@@ -1535,18 +1411,19 @@ export default function CashflowPage() {
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.audited_by_user?.name
                                                         ? <span className="text-[11px] text-emerald-600 font-semibold">✓ {e.audited_by_user.name}</span>
-                                                        : <span className="text-gray-300 text-[11px]">—</span>}
+                                                        : <span className="text-gray-300 text-[11px]">—</span>
+                                                    }
                                                 </td>
                                                 <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                  <div className="flex items-center justify-end gap-1">
-                                                        {e.source_type === "MANUAL" && (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {e.direction === "OUT" && e.source_type === "MANUAL" && (
                                                             <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Hapus">
                                                                 <IconTrash />
                                                             </button>
                                                         )}
                                                         {isClickable && (
-                                                            <span className="p-1.5 text-gray-300 group-hover:text-blue-400 rounded-lg transition" title={isDetailRow(e) ? "Lihat detail" : "Buka sumber"}>
-                                                                {isDetailRow(e) ? <IconEye /> : <IconExternal />}
+                                                            <span className="p-1.5 text-gray-300 group-hover:text-blue-400 rounded-lg transition">
+                                                                <IconExternal />
                                                             </span>
                                                         )}
                                                     </div>
@@ -1563,7 +1440,9 @@ export default function CashflowPage() {
                     {!loading && rows.length > 0 && (
                         <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
                             <p className="text-[11px] text-gray-400 font-medium">
-                                Menampilkan <span className="font-bold text-gray-600">{(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)}</span> dari <span className="font-bold text-gray-600">{rows.length}</span> entry
+                                Menampilkan{" "}
+                                <span className="font-bold text-gray-600">{(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)}</span>
+                                {" "}dari <span className="font-bold text-gray-600">{rows.length}</span> entry
                                 {rows.length !== allRows.length && <span className="text-gray-300"> (total {allRows.length})</span>}
                                 {filterCount > 0 && <span className="text-amber-500"> · {filterCount} filter aktif</span>}
                             </p>
@@ -1598,7 +1477,14 @@ export default function CashflowPage() {
                         </div>
                     )}
 
-                    {!loading && <ModalAwalBanner entry={summary.modal_awal_entry} onSet={() => setShowModalAwal(true)} isWindowActive={new Date() <= new Date("2026-07-09T23:59:59+07:00")} />}
+                    {/* Modal Awal Banner */}
+                    {!loading && (
+                        <ModalAwalBanner
+                            entry={summary.modal_awal_entry}
+                            onSet={() => setShowModalAwal(true)}
+                            isWindowActive={new Date() <= new Date("2026-07-09T23:59:59+07:00")}
+                        />
+                    )}
                 </div>
             </div>
         </DashboardLayout>
