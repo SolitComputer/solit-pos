@@ -31,10 +31,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const isKepala = !isAdmin && userRoles.some(r => KEPALA_SET.has(r));
 
   const selectFields = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at"
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift"
-      : "id, name, role, roles";
+      ? "id, name, phone_number, role, roles, shift, birth_date"
+      : "id, name, role, roles, birth_date";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -60,6 +60,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
     phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
     email: isAdmin ? (u.email ?? null) : null,
+    birth_date: u.birth_date ?? null,
   }));
 
   return NextResponse.json({ success: true, users });
@@ -73,7 +74,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 
   const body = await req.json();
-  const { name, phone_number, roles: inputRoles, role: inputRole, shift = "PAGI" } = body;
+  const { name, phone_number, roles: inputRoles, role: inputRole, shift = "PAGI", birth_date } = body;
 
   // Support input roles array ATAU role tunggal (backward compat)
   const rolesArray: string[] = Array.isArray(inputRoles) && inputRoles.length > 0
@@ -118,8 +119,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       password: tempPassword,
       password_set: false,
       created_by: user.id,
+      birth_date: birth_date || null,
     })
-    .select("id, name, phone_number, role, roles, shift, password_set")
+    .select("id, name, phone_number, role, roles, shift, password_set, birth_date")
     .single();
 
   if (error) {
@@ -150,6 +152,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     roles: inputRoles,
     role: inputRole,
     shift,
+    birth_date,
     _resetPassword,
     _forceLogout,
   } = body;
@@ -213,6 +216,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     updates.role = rolesArray[0]; // sync primary role
   }
 
+  if (birth_date !== undefined) updates.birth_date = birth_date || null;
   if (phone_number !== undefined && phone_number !== null && phone_number !== "") {
     updates.phone_number = normalizePhone(String(phone_number));
   }
@@ -228,7 +232,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     .from("users")
     .update(updates)
     .eq("id", id)
-    .select("id, name, phone_number, role, roles, shift")
+    .select("id, name, phone_number, role, roles, shift, birth_date")
     .single();
 
   if (error) {
