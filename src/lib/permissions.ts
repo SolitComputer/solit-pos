@@ -195,9 +195,15 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
   ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
 ];
 
-// ─── Cashflow Roles ───────────────────────────────────────────────────────────
-// PURCHASING ditambahkan agar bisa akses cashflow
 export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
+
+export const CC_REPORT_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
+];
+// Hapus report/posting: hanya head + full access
+export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING",
+];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -377,6 +383,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/missions/progress": [...ALL_ROLES],
   "/dashboard/missions/history": [...ALL_ROLES],
   "/api/missions": [...ALL_ROLES],
+  
+  // ── Content Creator ────────────────────────────────────────────────────────
+  "/dashboard/cc-reports": [...CC_REPORT_ROLES],
+  "/api/cc-reports": [...CC_REPORT_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
@@ -505,6 +515,11 @@ export const PERMISSIONS = {
   VIEW_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
+
+  // ── Content Creator ─────────────────────────────────────────────────────────
+  VIEW_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
+  MANAGE_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
+  DELETE_CC_REPORT: [...CC_REPORT_MANAGE_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(

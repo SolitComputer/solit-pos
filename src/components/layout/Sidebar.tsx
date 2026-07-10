@@ -314,6 +314,12 @@ const Icons = {
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
+  ccReport: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M23 7l-7 5 7 5V7z" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+    </svg>
+  ),
   missionDashboard: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <circle cx="12" cy="12" r="9" />
@@ -352,6 +358,7 @@ const ITEM_ALL_UNITS: MenuItem = { name: "Semua Unit", href: "/dashboard/units",
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
 const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
+const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboard/cc-reports", icon: Icons.ccReport };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
@@ -485,6 +492,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
+    ITEM_CC_REPORT,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -888,11 +896,14 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
-  // ── MARKETING ──────────────────────────────────────────────────────────────
   MARKETING: [
     {
       label: "Overview",
       items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
+    },
+    {
+      label: "Konten",
+      items: [ITEM_CC_REPORT],
     },
     {
       label: "Inventaris",
@@ -900,8 +911,12 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  KEPALA_MARKETING: [
+ KEPALA_MARKETING: [
     SALES_OVERVIEW([ITEM_USERS]),
+    {
+      label: "Konten",
+      items: [ITEM_CC_REPORT],
+    },
     {
       label: "Inventaris",
       items: [
@@ -993,6 +1008,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Overview",
       items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
+    },
+    {
+      label: "Konten",
+      items: [ITEM_CC_REPORT],
     },
     {
       label: "Inventaris",
@@ -1507,8 +1526,8 @@ function SidebarContent({
                 </button>
                 <div
                   className={`grid transition-all duration-300 ease-out ${isOpen
-                      ? "grid-rows-[1fr] opacity-100 mt-0.5"
-                      : "grid-rows-[0fr] opacity-0"
+                    ? "grid-rows-[1fr] opacity-100 mt-0.5"
+                    : "grid-rows-[0fr] opacity-0"
                     }`}
                 >
                   <div className="overflow-hidden min-h-0">

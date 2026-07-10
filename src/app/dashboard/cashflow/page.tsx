@@ -1309,7 +1309,6 @@ export default function CashflowPage() {
         );
     }
 
-    // ── Derived values ────────────────────────────────────────────────────────
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
     const allRows = tab === "IN" ? masuk : keluar;

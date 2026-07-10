@@ -307,5 +307,7 @@ export const config = {
     "/dashboard/preparation/:path*",
     "/api/preparation/:path*",
     "/api/missions/:path*",
+    "/dashboard/cc-reports/:path*",
+    "/api/cc-reports/:path*",
   ],
 };
