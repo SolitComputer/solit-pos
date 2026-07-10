@@ -85,7 +85,6 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         }
     }
 
-    // ── 2. Sync service DONE / SUDAH_DIAMBIL ──────────────────────────────
     const { data: services, error: svcError } = await supabase
         .from("service_orders")
         .select(`
@@ -95,15 +94,14 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             payment_method,
             tanggal_selesai,
             tanggal_diambil,
-            created_at,
+            tanggal_masuk,
             status,
             dikerjakan_by,
             dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
         `)
         .in("status", ["DONE", "SUDAH_DIAMBIL"])
         .not("payment_amount", "is", null)
-        .gt("payment_amount", 0)
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
+        .gt("payment_amount", 0);
 
     if (svcError) {
         console.error("[cashflow sync] fetch service error:", svcError.message);
@@ -111,12 +109,10 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         // Fallback tanpa join
         const { data: servicesFallback, error: svcFbError } = await supabase
             .from("service_orders")
-            .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, created_at, status, dikerjakan_by")
+            .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
             .in("status", ["DONE", "SUDAH_DIAMBIL"])
             .not("payment_amount", "is", null)
-            .gt("payment_amount", 0)
-            .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
-
+            .gt("payment_amount", 0);
         if (svcFbError) {
             console.error("[cashflow sync] fetch service fallback error:", svcFbError.message);
         } else if (servicesFallback && servicesFallback.length > 0) {
@@ -163,7 +159,7 @@ async function syncServiceEntries(
 
             const nominal = Math.round(Number(s.payment_amount ?? 0));
 
-            const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.created_at) as string;
+            const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
             const tanggal = new Date(refDate).toLocaleDateString("en-CA", {
                 timeZone: "Asia/Jakarta",
             });

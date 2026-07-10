@@ -24,7 +24,7 @@ function wibMonthRange(month?: string | null): { from: string; to: string; label
 }
 
 // Format menit → label "X mnt" atau "Xj Ym"
-export function fmtDurLabel(minutes: number): string {
+function fmtDurLabel(minutes: number): string {
   if (minutes < 60) return `${minutes} mnt`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
