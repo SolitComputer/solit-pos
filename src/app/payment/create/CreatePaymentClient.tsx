@@ -159,6 +159,8 @@ export default function CreatePaymentPage() {
     const [customerType, setCustomerType] = useState<"UMUM" | "RESELLER" | "MITRA">("UMUM");
 
     const [sellerType, setSellerType] = useState<"USER" | "PEDAGANG">("USER");
+    const [customerBirthDate, setCustomerBirthDate] = useState("");
+
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } =
         useForm<CreatePaymentType, any, CreatePaymentType>({
@@ -238,6 +240,8 @@ export default function CreatePaymentPage() {
         if (draft._tradeInCash) setTradeInCash(draft._tradeInCash);
         if (draft._splitTF) setSplitTF(draft._splitTF);
         if (draft._splitCash) setSplitCash(draft._splitCash);
+        if (draft._customerBirthDate) setCustomerBirthDate(draft._customerBirthDate);
+
 
         setDraftRestored(true);
     }, []);
@@ -254,6 +258,7 @@ export default function CreatePaymentPage() {
             _isTradeIn: isTradeIn, _tradeInItem: tradeInItem,
             _tradeInValue: tradeInValue, _tradeInCash: tradeInCash,
             _splitTF: splitTF, _splitCash: splitCash,
+            _customerBirthDate: customerBirthDate,
             _savedAt: new Date().toISOString(),
         });
     }, [watchedFields, step, customerType, sellerType, selectedUnits, rawDealPrice,
@@ -500,6 +505,8 @@ export default function CreatePaymentPage() {
                         unit_id: u.unit_id,
                         deal_price: unitPrices[u.unit_id] || 0,
                     })),
+                    customer_birth_date: customerBirthDate || null,
+
                 }),
             });
             const result = await res.json();
@@ -611,6 +618,12 @@ export default function CreatePaymentPage() {
                     {step === 1 && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
+                            <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tanggal Lahir Customer (opsional)</label>
+                                <input type="date" className={inputClass}
+                                    value={customerBirthDate}
+                                    onChange={e => setCustomerBirthDate(e.target.value)} />
+                            </div>
 
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tipe Customer *</label>
@@ -662,7 +675,6 @@ export default function CreatePaymentPage() {
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tahu Solit dari mana?</label>
                                 <select className={selectClass} {...register("source_platform")}>
-                                    // AFTER
                                     {[
                                         "Ads Facebook",
                                         "Ads Instagram",
@@ -1220,6 +1232,9 @@ export default function CreatePaymentPage() {
                                 <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                                     <ConfirmRow icon="👤" label="Pembeli" value={watch("customer_name") || "—"} />
                                     <ConfirmRow icon="📱" label="WhatsApp" value={watch("customer_phone") || "—"} />
+                                    {customerBirthDate && (
+                                        <ConfirmRow icon="🎂" label="Tgl Lahir" value={new Date(customerBirthDate + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })} />
+                                    )}
                                     <div className="h-px bg-gray-200" />
 
                                     {/* Unit list */}

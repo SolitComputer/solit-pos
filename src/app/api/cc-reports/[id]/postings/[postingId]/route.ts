@@ -1,15 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+// src/app/api/cc-reports/[id]/postings/[postingId]/route.ts
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// Field yang boleh di-update via PATCH posting (whitelist)
 const FIELDS = ["platform", "post_url", "posted_at", "views", "likes", "comments"] as const;
 
-// PATCH — update statistik / link posting
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; postingId: string } }
+  { params }: { params: Promise<{ id: string; postingId: string }> }
 ) {
+  const { id, postingId } = await params;
+
   let body: any;
   try {
     body = await req.json();
@@ -28,8 +31,8 @@ export async function PATCH(
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .update(patch)
-    .eq("id", params.postingId)
-    .eq("report_id", params.id)
+    .eq("id", postingId)
+    .eq("report_id", id)
     .select("*")
     .single();
 
@@ -37,16 +40,17 @@ export async function PATCH(
   return NextResponse.json({ success: true, posting: data });
 }
 
-// DELETE posting
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string; postingId: string } }
+  { params }: { params: Promise<{ id: string; postingId: string }> }
 ) {
+  const { id, postingId } = await params;
+
   const { error } = await supabaseAdmin
     .from("cc_postings")
     .delete()
-    .eq("id", params.postingId)
-    .eq("report_id", params.id);
+    .eq("id", postingId)
+    .eq("report_id", id);
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

@@ -383,6 +383,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   // ── Cashflow — PURCHASING punya akses penuh ────────────────────────────────
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
+  "/dashboard/customer-birthdays": [...ALL_ROLES],
+  "/api/transaction/customer-birthdays": [...ALL_ROLES],
   "/api/cashflow": [...CASHFLOW_ROLES],
 
   "/dashboard/missions": [...ALL_ROLES],
@@ -429,7 +431,7 @@ export const PERMISSIONS = {
     "KEPALA_SOTECH",
     "KEPALA_ONPOINT",
   ] as UserRole[],
-  
+
   RESERVE_UNIT: [
     ...FULL_ACCESS,
     "KEPALA_SALES", "CREW_SALES", "SOTECH",

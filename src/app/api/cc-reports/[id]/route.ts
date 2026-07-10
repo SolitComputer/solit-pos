@@ -2,8 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { computeStatus, type CCReport } from "@/lib/ccReports";
-import { hasAnyRole } from "@/lib/permissions";
-import { CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
+import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 import type { UserRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -20,21 +19,34 @@ const EDIT_FIELDS = [
 const ALLOWED = new Set<string>([...TAKE_FIELDS, ...EDIT_FIELDS, "title"]);
 
 // GET satu konten
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const { data, error } = await supabaseAdmin
     .from("cc_reports")
     .select("*, postings:cc_postings(*)")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 404 });
   }
-  return NextResponse.json({ success: true, report: { ...(data as CCReport), status: computeStatus(data as CCReport) } });
+  return NextResponse.json({
+    success: true,
+    report: { ...(data as CCReport), status: computeStatus(data as CCReport) },
+  });
 }
 
 // PATCH — update section take / edit / judul
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   let body: any;
   try {
     body = await req.json();
@@ -53,24 +65,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data, error } = await supabaseAdmin
     .from("cc_reports")
     .update(patch)
-    .eq("id", params.id)
+    .eq("id", id)
     .select("*, postings:cc_postings(*)")
     .single();
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true, report: { ...(data as CCReport), status: computeStatus(data as CCReport) } });
+  return NextResponse.json({
+    success: true,
+    report: { ...(data as CCReport), status: computeStatus(data as CCReport) },
+  });
 }
 
 // DELETE — hanya head + full access (postings ikut kehapus via ON DELETE CASCADE)
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const roles = (req.headers.get("x-user-roles") ?? "").split(",").filter(Boolean);
   if (!hasAnyRole(roles, CC_REPORT_MANAGE_ROLES as UserRole[])) {
     return NextResponse.json({ success: false, error: "Tidak punya izin menghapus" }, { status: 403 });
   }
 
-  const { error } = await supabaseAdmin.from("cc_reports").delete().eq("id", params.id);
+  const { error } = await supabaseAdmin.from("cc_reports").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

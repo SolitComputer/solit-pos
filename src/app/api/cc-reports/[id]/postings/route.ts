@@ -1,23 +1,28 @@
-// src/app/api/cc-reports/[id]/postings/route.ts
-import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
 
-// GET postings satu konten
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .select("*")
-    .eq("report_id", params.id)
+    .eq("report_id", id)
     .order("posted_at", { ascending: false });
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true, postings: data ?? [] });
 }
 
-// POST — tambah posting platform baru
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   let body: any;
   try {
     body = await req.json();
@@ -33,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .insert({
-      report_id: params.id,
+      report_id: id,
       platform,
       post_url: body?.post_url?.trim() || null,
       posted_at: body?.posted_at || null,
