@@ -171,6 +171,12 @@ export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
 
 export const PREPARATION_DELIVERY_PERSON_ROLES: UserRole[] = ["PENGANTARAN", "PKL_PENGANTARAN"];
 
+export const DELIVERY_LEADERBOARD_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...FULL_ACCESS,
+  ...PREPARATION_SALES_ROLES,
+  "PENGANTARAN", "PKL_PENGANTARAN"
+]));
+
 // ─── Voice / HT Roles ────────────────────────────────────────────────────────
 export const DELIVERY_VOICE_ROLES: UserRole[] = [
   ...FULL_ACCESS, ...SALES_ACCESS,
