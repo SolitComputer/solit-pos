@@ -44,16 +44,36 @@ export default function CustomerBirthdaysPage() {
         if (!phone || sending) return;
         setSending(phone);
         try {
-            // Kirim via WhatsApp API (test-whatsapp endpoint)
-            const msg = `🎂 Selamat Ulang Tahun, ${name}!\n\nDari kami Solit 03, semoga sehat & sukses selalu! 🎉🎈\n\nTerima kasih sudah menjadi pelanggan setia kami. 💙`;
-            await fetch("/api/test-whatsapp", {
+            const msg = [
+                `🎂 Selamat Ulang Tahun, ${name}!`,
+                ``,
+                `Dari kami Solit 03, semoga sehat & sukses selalu! 🎉🎈`,
+                ``,
+                `Terima kasih sudah menjadi pelanggan setia kami. 💙`,
+            ].join("\n");
+
+            const payload = { target: phone, message: msg };
+            console.log("[Birthday WA] Sending:", payload);
+
+            const res = await fetch("/api/test-whatsapp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone, message: msg }),
+                body: JSON.stringify(payload),
             });
-            setSentSet(prev => new Set(prev).add(phone));
-        } catch { /* silent */ }
-        finally { setSending(null); }
+            const data = await res.json();
+            console.log("[Birthday WA] Response:", data);
+
+            if (data.success) {
+                setSentSet(prev => new Set(prev).add(phone));
+            } else {
+                alert(`Gagal kirim WA: ${data.message || "Unknown error"}`);
+            }
+        } catch (err) {
+            console.error("[Birthday WA] Error:", err);
+            alert("Gagal mengirim pesan WhatsApp");
+        } finally {
+            setSending(null);
+        }
     };
 
     const todayStr = new Date().toLocaleDateString("id-ID", {
@@ -145,38 +165,23 @@ export default function CustomerBirthdaysPage() {
 
                                             {/* Action */}
                                             <div className="flex flex-col gap-1.5 flex-shrink-0">
-                                                {c.customer_phone && (
-                                                    <>
-                                                        {sentSet.has(c.customer_phone) ? (
-                                                            <span className="text-[10px] font-bold text-emerald-600 px-3 py-1.5 rounded-xl"
-                                                                style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
-                                                                ✅ Terkirim
-                                                            </span>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => sendWish(c.customer_phone!, c.customer_name)}
-                                                                disabled={sending === c.customer_phone}
-                                                                className="text-[10px] font-bold text-white px-3 py-1.5 rounded-xl transition hover:scale-[1.02] active:scale-95 disabled:opacity-50 flex items-center gap-1"
-                                                                style={{
-                                                                    background: "linear-gradient(135deg, #059669, #047857)",
-                                                                    boxShadow: "0 2px 8px rgba(5,150,105,0.3)",
-                                                                }}>
-                                                                {sending === c.customer_phone ? (
-                                                                    <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                                                                ) : (
-                                                                    <>💬 Kirim WA</>
-                                                                )}
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
-                                                {c.customer_phone && (
-                                                    <a href={`https://wa.me/${c.customer_phone}`} target="_blank" rel="noopener noreferrer"
-                                                        className="text-[10px] font-bold text-slate-600 px-3 py-1.5 rounded-xl text-center transition hover:bg-slate-100"
-                                                        style={{ background: "#f1f5f9", border: "1px solid #e2e8f0" }}>
-                                                        📱 Buka WA
-                                                    </a>
-                                                )}
+                                                {c.customer_phone && (() => {
+                                                    const phone = c.customer_phone!.replace(/\D/g, "");
+                                                    const normalized = phone.startsWith("0") ? "62" + phone.slice(1) : phone.startsWith("62") ? phone : "62" + phone;
+                                                    const msg = encodeURIComponent(
+                                                        `🎂 Selamat Ulang Tahun, ${c.customer_name}!\n\nDari kami Solit 03, semoga sehat & sukses selalu! 🎉🎈\n\nTerima kasih sudah menjadi pelanggan setia kami. 💙`
+                                                    );
+                                                    return (
+                                                        <a href={`https://wa.me/${normalized}?text=${msg}`} target="_blank" rel="noopener noreferrer"
+                                                            className="text-[10px] font-bold text-white px-3 py-1.5 rounded-xl text-center transition hover:scale-[1.02] active:scale-95 flex items-center gap-1"
+                                                            style={{
+                                                                background: "linear-gradient(135deg, #25D366, #128C7E)",
+                                                                boxShadow: "0 2px 8px rgba(37,211,102,0.3)",
+                                                            }}>
+                                                            💬 Kirim Ucapan WA
+                                                        </a>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     </div>
