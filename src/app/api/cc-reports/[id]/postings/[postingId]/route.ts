@@ -1,11 +1,12 @@
 // src/app/api/cc-reports/[id]/postings/[postingId]/route.ts
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
+import { parsePostUrl } from "@/lib/ccMetrics";
+import { syncPosting } from "@/lib/ccSync";   // ✅ tambah import
 
 export const dynamic = "force-dynamic";
 
-// Field yang boleh di-update via PATCH posting (whitelist)
-const FIELDS = ["platform", "post_url", "posted_at", "views", "likes", "comments"] as const;
+const FIELDS = ["platform", "post_url", "posted_at", "views", "likes", "comments", "auto_sync"] as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -28,6 +29,39 @@ export async function PATCH(
     }
   }
 
+  let syncMessage: string | null = null;
+  let synced = false;
+
+  // ✅ FIX: link berubah → deteksi platform + LANGSUNG SYNC (bukan cuma tandai PENDING)
+  if ("post_url" in patch) {
+    const url: string | null = patch.post_url;
+    const parsed = url ? parsePostUrl(url) : null;
+
+    patch.external_id = parsed?.externalId ?? null;
+    if (parsed && !("platform" in body)) patch.platform = parsed.platform;
+
+    if (url) {
+      const out = await syncPosting(url);
+      patch.sync_status = out.status;
+      patch.sync_error = out.error;
+      patch.last_synced_at = new Date().toISOString();
+      patch.external_id = out.externalId ?? patch.external_id;
+
+      if (out.status === "OK") {
+        patch.views = out.views;
+        patch.likes = out.likes;
+        patch.comments = out.comments;
+        synced = true;
+      } else {
+        syncMessage = out.error;
+      }
+    } else {
+      patch.sync_status = "PENDING";
+      patch.sync_error = null;
+      patch.last_synced_at = null;
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .update(patch)
@@ -37,7 +71,8 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, posting: data });
+
+  return NextResponse.json({ success: true, posting: data, synced, message: syncMessage });
 }
 
 export async function DELETE(

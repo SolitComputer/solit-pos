@@ -16,7 +16,15 @@ const EDIT_FIELDS = [
   "editor_name", "editor_work", "edit_start", "edit_end",
   "ready_folder_link", "edit_done",
 ] as const;
-const ALLOWED = new Set<string>([...TAKE_FIELDS, ...EDIT_FIELDS, "title"]);
+const POSTING_FIELDS = ["posting_done"] as const;
+
+// ✅ FIX: POSTING_FIELDS ikut masuk whitelist
+const ALLOWED = new Set<string>([
+  ...TAKE_FIELDS,
+  ...EDIT_FIELDS,
+  ...POSTING_FIELDS,
+  "title",
+]);
 
 // GET satu konten
 export async function GET(
@@ -34,13 +42,14 @@ export async function GET(
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 404 });
   }
+
   return NextResponse.json({
     success: true,
     report: { ...(data as CCReport), status: computeStatus(data as CCReport) },
   });
 }
 
-// PATCH — update section take / edit / judul
+// PATCH — update section take / edit / posting / judul
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -58,8 +67,45 @@ export async function PATCH(
   for (const [k, v] of Object.entries(body ?? {})) {
     if (ALLOWED.has(k)) patch[k] = v === "" ? null : v;
   }
+
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ success: false, error: "Tidak ada field yang diupdate" }, { status: 400 });
+    return NextResponse.json(
+      { success: false, error: "Tidak ada field yang diupdate" },
+      { status: 400 }
+    );
+  }
+
+  // Timestamp otomatis saat ditandai / dibatalkan selesai
+  if ("posting_done" in patch) {
+    patch.posting_done_at = patch.posting_done ? new Date().toISOString() : null;
+  }
+
+  // Guard alur: edit_done + minimal 1 posting wajib sebelum posting_done
+  if (patch.posting_done === true) {
+    const { data: cur, error: curErr } = await supabaseAdmin
+      .from("cc_reports")
+      .select("edit_done, postings:cc_postings(id)")
+      .eq("id", id)
+      .single();
+
+    if (curErr || !cur) {
+      return NextResponse.json(
+        { success: false, error: "Konten tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+    if (!cur.edit_done) {
+      return NextResponse.json(
+        { success: false, error: "Tahap Editing belum selesai" },
+        { status: 400 }
+      );
+    }
+    if ((cur.postings?.length ?? 0) === 0) {
+      return NextResponse.json(
+        { success: false, error: "Belum ada posting — tambahkan minimal satu platform" },
+        { status: 400 }
+      );
+    }
   }
 
   const { data, error } = await supabaseAdmin
@@ -72,6 +118,7 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
   return NextResponse.json({
     success: true,
     report: { ...(data as CCReport), status: computeStatus(data as CCReport) },
@@ -94,5 +141,6 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
   return NextResponse.json({ success: true });
 }

@@ -23,6 +23,8 @@ const PUBLIC_API_ROUTES = [
   "/api/public/catalog",
 ];
 
+const CRON_ROUTES = ["/api/cc-reports/sync"];
+
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -156,6 +158,20 @@ export async function middleware(request: NextRequest) {
   if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
     if (!token) return NextResponse.json({ success: false }, { status: 401 });
     return NextResponse.next();
+  }
+
+  if (CRON_ROUTES.includes(pathname)) {
+    const cronSecret = request.headers.get("x-cron-secret");
+    if (cronSecret) {
+      if (cronSecret === process.env.CRON_SECRET) {
+        return NextResponse.next();
+      }
+      return NextResponse.json(
+        { success: false, error: "Invalid cron secret" },
+        { status: 401 }
+      );
+    }
+    // tanpa header → lanjut ke cek token di bawah
   }
 
   if (!token) {

@@ -1,5 +1,10 @@
+// src/app/api/cc-reports/[id]/postings/route.ts
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
+import { parsePostUrl } from "@/lib/ccMetrics";
+import { syncPosting } from "@/lib/ccSync";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: NextRequest,
@@ -30,25 +35,46 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 });
   }
 
-  const platform = String(body?.platform ?? "").trim();
+  const postUrl =
+    typeof body?.post_url === "string" ? body.post_url.trim() || null : null;
+
+  const parsed = postUrl ? parsePostUrl(postUrl) : null;
+  const platform = String(body?.platform ?? parsed?.platform ?? "").trim();
+
   if (!platform) {
     return NextResponse.json({ success: false, error: "Platform wajib dipilih" }, { status: 400 });
   }
+
+  // ✅ Sync langsung saat insert — tidak perlu round-trip kedua
+  const out = postUrl ? await syncPosting(postUrl) : null;
 
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .insert({
       report_id: id,
       platform,
-      post_url: body?.post_url?.trim() || null,
+      post_url: postUrl,
       posted_at: body?.posted_at || null,
-      views: Number(body?.views) || 0,
-      likes: Number(body?.likes) || 0,
-      comments: Number(body?.comments) || 0,
+      external_id: out?.externalId ?? parsed?.externalId ?? null,
+      views: out?.status === "OK" ? out.views : Number(body?.views) || 0,
+      likes: out?.status === "OK" ? out.likes : Number(body?.likes) || 0,
+      comments: out?.status === "OK" ? out.comments : Number(body?.comments) || 0,
+      sync_status: out?.status ?? "PENDING",
+      sync_error: out?.error ?? null,
+      last_synced_at: out ? new Date().toISOString() : null,
     })
     .select("*")
     .single();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, posting: data }, { status: 201 });
+
+  return NextResponse.json(
+    {
+      success: true,
+      posting: data,
+      synced: out?.status === "OK",
+      message: out?.error ?? null,
+    },
+    { status: 201 }
+  );
 }

@@ -16,9 +16,10 @@ type Filter = "ALL" | CCStatus;
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "ALL", label: "Semua" },
   { key: "BELUM_SELESAI", label: "Belum Mulai" },
-  { key: "PROSES", label: "Bisa Posting" },
+  { key: "PROSES", label: "Menunggu Edit" },
   { key: "SIAP_POSTING", label: "Siap Posting" },
   { key: "POSTED", label: "Sudah Posting" },
+  { key: "SELESAI", label: "Selesai" },   // ✅ BARU
 ];
 
 export default function CCLaporanPage() {
@@ -89,8 +90,8 @@ export default function CCLaporanPage() {
 
   const stats = useMemo(() => ({
     total: withStatus.length,
-    canPost: withStatus.filter((r) => canStartPosting(r) && r.status !== "POSTED").length,
-    posted: withStatus.filter((r) => r.status === "POSTED").length,
+    canPost: withStatus.filter((r) => canStartPosting(r) && r.status !== "SELESAI").length,
+    done: withStatus.filter((r) => r.status === "SELESAI").length,   // ✅ ganti dari 'posted'
   }), [withStatus]);
 
   const activeReport = reports.find((r) => r.id === activeId) ?? null;
@@ -119,8 +120,8 @@ export default function CCLaporanPage() {
           <div className="mb-5 grid grid-cols-3 gap-3">
             {[
               { label: "Total Konten", value: stats.total, color: "text-gray-900" },
-              { label: "Bisa Posting", value: stats.canPost, color: "text-amber-600" },
-              { label: "Sudah Posting", value: stats.posted, color: "text-emerald-600" },
+              { label: "Siap Posting", value: stats.canPost, color: "text-blue-600" },
+              { label: "Selesai", value: stats.done, color: "text-emerald-600" },
             ].map((s) => (
               <div key={s.label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">{s.label}</p>
@@ -155,9 +156,8 @@ export default function CCLaporanPage() {
             <div className="flex flex-wrap gap-1 rounded-xl border border-gray-200 p-1">
               {FILTERS.map((f) => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    filter === f.key ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
-                  }`}>
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${filter === f.key ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
+                    }`}>
                   {f.label}
                 </button>
               ))}
@@ -181,6 +181,7 @@ export default function CCLaporanPage() {
                     <th className="px-4 py-3 text-center">Take</th>
                     <th className="px-4 py-3 text-center">Edit</th>
                     <th className="px-4 py-3 text-center">Platform</th>
+                    <th className="px-4 py-3 text-center">Selesai</th>
                     <th className="px-5 py-3">Dibuat</th>
                   </tr>
                 </thead>
@@ -224,6 +225,9 @@ export default function CCLaporanPage() {
                           </td>
                           <td className="px-4 py-3.5 text-center font-bold tabular-nums text-gray-700">
                             {r.postings?.length ?? 0}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <Dot done={Boolean(r.posting_done)} />
                           </td>
                           <td className="whitespace-nowrap px-5 py-3.5 text-gray-400">{fmtDateTime(r.created_at)}</td>
                         </tr>
