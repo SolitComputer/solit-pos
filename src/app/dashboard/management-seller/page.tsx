@@ -39,10 +39,10 @@ type Scope = "ACTIVE" | "ARCHIVED";
 const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : "—";
 
 const daysDiff = (nextISO: string) =>
@@ -162,9 +162,8 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   const isPedagang = type === "PEDAGANG";
   return (
     <div
-      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${
-        isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
-      }`}
+      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+        }`}
     >
       {initials || "?"}
     </div>
@@ -224,27 +223,29 @@ function InfoCell({ label, value, sub }: { label: string; value: string; sub?: s
 }
 
 // ── Tombol Chat WA ────────────────────────────────────────────────────────────
-// Hanya bisa diklik oleh PIC (orang yang closing = closed_by).
-// Role ADMIN/KEPALA bisa override lihat tapi tidak bisa klik untuk non-PIC.
+// Hanya bisa diklik oleh PIC (orang yang closing = closed_by) ATAU Kepala Sales.
+// Admin/role lain hanya lihat versi terkunci.
 function WaChatButton({
   f,
   authUser,
+  isKepalaSales = false,
   fullWidth = false,
 }: {
   f: Followup;
   authUser: AuthUser | null;
+  isKepalaSales?: boolean;
   fullWidth?: boolean;
 }) {
   const isUserPIC = isPIC(authUser, f.closed_by);
+  const canClickWa = isUserPIC || isKepalaSales;
 
-  // Jika bukan PIC: tampilkan tombol disabled dengan tooltip jelas
-  if (!isUserPIC) {
+  // Jika bukan PIC & bukan Kepala Sales: tampilkan tombol disabled dengan tooltip jelas
+  if (!canClickWa) {
     return (
       <div
-        title={`Hanya ${f.closed_by ?? "PIC"} yang bisa mengirim pesan WA ke customer ini`}
-        className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${
-          fullWidth ? "flex-1 text-xs font-semibold" : "w-9"
-        }`}
+        title={`Hanya ${f.closed_by ?? "PIC"} atau Kepala Sales yang bisa mengirim pesan WA ke customer ini`}
+        className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-semibold" : "w-9"
+          }`}
       >
         <LockIcon />
         {fullWidth && <span>Chat WA (Terkunci)</span>}
@@ -258,9 +259,8 @@ function WaChatButton({
       target="_blank"
       rel="noopener noreferrer"
       title="Buka WhatsApp"
-      className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${
-        fullWidth ? "flex-1 text-xs font-bold" : "w-9"
-      }`}
+      className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-bold" : "w-9"
+        }`}
     >
       <WaIcon />
       {fullWidth && <span>Chat WA</span>}
@@ -283,11 +283,10 @@ function TandaiFuButton({
       onClick={() => onFollowup(f.id)}
       disabled={processing}
       title="Tandai sudah follow-up — akan minta bukti & konfirmasi"
-      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${
-        processing
-          ? "bg-blue-400 opacity-70 cursor-not-allowed"
-          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
-      }`}
+      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
+        ? "bg-blue-400 opacity-70 cursor-not-allowed"
+        : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+        }`}
     >
       {processing ? <Spinner /> : <PhoneIcon />}
       Follow-up
@@ -453,9 +452,8 @@ function ConfirmFollowupModal({
         {/* Progress bar */}
         <div className="flex h-1 bg-gray-100">
           <div
-            className={`h-full bg-blue-600 transition-all duration-300 ${
-              step === 1 ? "w-1/2" : "w-full"
-            }`}
+            className={`h-full bg-blue-600 transition-all duration-300 ${step === 1 ? "w-1/2" : "w-full"
+              }`}
           />
         </div>
 
@@ -516,11 +514,10 @@ function ConfirmFollowupModal({
                   onClick={() => setStep(2)}
                   disabled={!canProceedStep1}
                   title={!canProceedStep1 ? "Upload bukti FU terlebih dahulu" : ""}
-                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5 ${
-                    canProceedStep1
-                      ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
-                      : "bg-blue-200 cursor-not-allowed"
-                  }`}
+                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5 ${canProceedStep1
+                    ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+                    : "bg-blue-200 cursor-not-allowed"
+                    }`}
                 >
                   Lanjut
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
@@ -648,11 +645,10 @@ function ConfirmFollowupModal({
                 <button
                   onClick={() => buktiFu && onConfirm(buktiFu)}
                   disabled={processing || !buktiFu}
-                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${
-                    processing
-                      ? "bg-blue-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
+                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing
+                    ? "bg-blue-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                    }`}
                 >
                   {processing ? <Spinner /> : <CheckIcon />}
                   {processing ? "Menyimpan..." : "Ya, Sudah FU — Simpan"}
@@ -673,6 +669,7 @@ function FollowupCard({
   processing,
   canManage,
   canFollowup,
+  isKepalaSales,
   authUser,
   onFollowup,
   onArchive,
@@ -683,6 +680,7 @@ function FollowupCard({
   processing: boolean;
   canManage: boolean;
   canFollowup: boolean;
+  isKepalaSales: boolean;
   authUser: AuthUser | null;
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
@@ -693,11 +691,14 @@ function FollowupCard({
   const isDue = f.is_due && scope === "ACTIVE";
   const showActions = canManage || canFollowup;
 
+  // FU & WA cuma boleh diakses oleh PIC (closed_by) atau Kepala Sales — role lain (termasuk Admin) TIDAK bisa
+  const isUserPIC = isPIC(authUser, f.closed_by);
+  const canDoFollowup = canFollowup && (isUserPIC || isKepalaSales);
+
   return (
     <div
-      className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${
-        isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
-      }`}
+      className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
+        }`}
     >
       {isDue && (
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />
@@ -723,11 +724,10 @@ function FollowupCard({
         </div>
         <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
           <span
-            className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-              isPedagang
-                ? "bg-amber-50 text-amber-700 border-amber-200"
-                : "bg-blue-50 text-blue-700 border-blue-200"
-            }`}
+            className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${isPedagang
+              ? "bg-amber-50 text-amber-700 border-amber-200"
+              : "bg-blue-50 text-blue-700 border-blue-200"
+              }`}
           >
             {isPedagang ? "🏷️ Pedagang" : "🙋 User"}
           </span>
@@ -782,24 +782,34 @@ function FollowupCard({
           {scope === "ACTIVE" ? (
             <>
               {/*
-               * Tombol WA: hanya PIC (closed_by) yang bisa klik.
-               * User lain lihat tombol locked.
-               */}
-              <WaChatButton f={f} authUser={authUser} />
+                * Tombol WA: hanya PIC (closed_by) atau Kepala Sales yang bisa klik.
+                * Role lain (termasuk Admin) lihat tombol locked.
+                */}
+              <WaChatButton f={f} authUser={authUser} isKepalaSales={isKepalaSales} />
 
               {/* Tombol Tandai FU: hanya canFollowup */}
               {canFollowup ? (
-                f.is_due ? (
-                  <TandaiFuButton f={f} processing={processing} onFollowup={onFollowup} />
+                canDoFollowup ? (
+                  f.is_due ? (
+                    <TandaiFuButton f={f} processing={processing} onFollowup={onFollowup} />
+                  ) : (
+                    <button
+                      disabled
+                      title={`Sudah FU. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
+                      className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                    >
+                      <CheckIcon />
+                      Sudah FU · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
+                    </button>
+                  )
                 ) : (
-                  <button
-                    disabled
-                    title={`Sudah FU. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
-                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                  <div
+                    title={`Hanya ${f.closed_by ?? "PIC"} atau Kepala Sales yang bisa follow-up customer ini`}
+                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
                   >
-                    <CheckIcon />
-                    Sudah FU · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
-                  </button>
+                    <LockIcon />
+                    FU Terkunci
+                  </div>
                 )
               ) : (
                 <div className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-semibold border border-gray-100 cursor-default select-none">
@@ -814,7 +824,7 @@ function FollowupCard({
                 </div>
               )}
 
-              {/* Tombol Archive: hanya canManage */}
+              {/* Tombol Archive: hanya canManage (Admin/Kepala Marketing tetap bisa) */}
               {canManage && (
                 <button
                   onClick={() => onArchive(f.id)}
@@ -829,7 +839,12 @@ function FollowupCard({
           ) : (
             /* ── Scope ARCHIVED ── */
             <>
-              <WaChatButton f={f} authUser={authUser} fullWidth={!canManage} />
+              <WaChatButton
+                f={f}
+                authUser={authUser}
+                isKepalaSales={isKepalaSales}
+                fullWidth={!canManage}
+              />
               {canManage && (
                 <button
                   onClick={() => onReactivate(f.id)}
@@ -857,43 +872,39 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-          { emoji: "🗂️", label: "Total Arsip", value: total, danger: false },
-          { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-        ]
+        { emoji: "🗂️", label: "Total Arsip", value: total, danger: false },
+        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
+      ]
       : [
-          { emoji: "👥", label: "Customer", value: total, danger: false },
-          { emoji: "🔴", label: "Perlu Follow-up", value: totalDue, danger: totalDue > 0 },
-          { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-        ];
+        { emoji: "👥", label: "Customer", value: total, danger: false },
+        { emoji: "🔴", label: "Perlu Follow-up", value: totalDue, danger: totalDue > 0 },
+        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
+      ];
 
   return (
     <div className={`grid gap-2 ${scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3"}`}>
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${
-            c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
-          }`}
+          className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+            }`}
         >
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${
-              c.danger ? "bg-red-100" : "bg-gray-100"
-            }`}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${c.danger ? "bg-red-100" : "bg-gray-100"
+              }`}
           >
             {c.emoji}
           </div>
           <div className="min-w-0">
             <p
-              className={`text-[9px] font-bold uppercase tracking-widest leading-none mb-1 truncate ${
-                c.danger ? "text-red-400" : "text-gray-400"
-              }`}
+              className={`text-[9px] font-bold uppercase tracking-widest leading-none mb-1 truncate ${c.danger ? "text-red-400" : "text-gray-400"
+                }`}
             >
               {c.label}
             </p>
             <p
-              className={`text-lg font-black leading-none ${
-                c.danger ? "text-red-600" : "text-gray-900"
-              }`}
+              className={`text-lg font-black leading-none ${c.danger ? "text-red-600" : "text-gray-900"
+                }`}
             >
               {c.value}
             </p>
@@ -982,6 +993,11 @@ export default function ManagementSellerPage() {
   const canFollowup = userRole
     ? hasPermission(userRole, PERMISSIONS.FOLLOWUP_SELLER)
     : false;
+
+  // Khusus WA & FU: HANYA role Kepala Sales yang boleh override PIC.
+  // Admin/Kepala Marketing (canManage) TIDAK termasuk di sini.
+  // PENTING: ganti "KEPALA_SALES" sesuai nama constant role yang ada di src/lib/permissions.ts
+  const isKepalaSales = userRole === "KEPALA_SALES";
 
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1145,11 +1161,10 @@ export default function ManagementSellerPage() {
               <button
                 key={s}
                 onClick={() => setScope(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                  scope === s
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 {s === "ACTIVE" ? "Aktif" : "Arsip"}
               </button>
@@ -1173,25 +1188,22 @@ export default function ManagementSellerPage() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${
-                  isActive
-                    ? "bg-gray-900 border-gray-900 shadow-md"
-                    : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                }`}
+                className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
+                  ? "bg-gray-900 border-gray-900 shadow-md"
+                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-                      isActive ? "bg-white/10" : "bg-gray-100"
-                    }`}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${isActive ? "bg-white/10" : "bg-gray-100"
+                      }`}
                   >
                     {t.icon}
                   </div>
                   <div>
                     <p
-                      className={`text-sm font-bold leading-tight ${
-                        isActive ? "text-white" : "text-gray-900"
-                      }`}
+                      className={`text-sm font-bold leading-tight ${isActive ? "text-white" : "text-gray-900"
+                        }`}
                     >
                       {t.label}
                     </p>
@@ -1270,8 +1282,8 @@ export default function ManagementSellerPage() {
               {search.trim()
                 ? "Tidak ada hasil pencarian"
                 : scope === "ARCHIVED"
-                ? "Belum ada yang diarsipkan"
-                : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
+                  ? "Belum ada yang diarsipkan"
+                  : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
             </p>
             {search.trim() && (
               <button
@@ -1301,6 +1313,7 @@ export default function ManagementSellerPage() {
                   processing={processingId === f.id}
                   canManage={canManage}
                   canFollowup={canFollowup}
+                  isKepalaSales={isKepalaSales}
                   authUser={authUser}
                   onFollowup={onFollowup}
                   onArchive={onArchive}
