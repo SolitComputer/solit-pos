@@ -1827,7 +1827,7 @@ export default function CashflowPage() {
                                                     <div className="flex items-center justify-end gap-1">
                                                         {/* ✅ Uang Keluar manual → tombol Edit (bukan Hapus) */}
                                                         {e.source_type === "MANUAL" && e.direction === "OUT" && (
-                                                            <button onClick={() => setEditEntry(e)} className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Edit">
+                                                            <button onClick={() => setEditEntry(e)} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Edit">
                                                                 <IconEdit />
                                                             </button>
                                                         )}

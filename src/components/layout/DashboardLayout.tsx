@@ -33,7 +33,7 @@ function ScrollRestorer() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [pathname]);
 
-  return null;
+  return null; 
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
