@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PERMISSIONS, UserRole, hasPermission } from "@/lib/permissions";
@@ -94,6 +95,11 @@ const AVATAR_COLORS = [
 ];
 const getAvatarColor = (name: string) =>
   AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+const formatRole = (role: string) => {
+  if (!role) return "Lainnya";
+  return role.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+};
 
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 const Shimmer = ({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) => (
@@ -356,7 +362,6 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
 export default function Page() {
   const [stats, setStats] = useState<Stats>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [delivLb, setDelivLb] = useState<{ respon: any[]; selesai: any[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState("");
@@ -387,18 +392,16 @@ export default function Page() {
     }
 
     try {
-      const [statsRes, transRes, meRes, lbRes] = await Promise.all([
+      const [statsRes, transRes, meRes] = await Promise.all([
         fetch("/api/dashboard/stats"),
         fetch("/api/dashboard/transactions"),
         fetch("/api/auth/me"),
-        fetch("/api/preparation/delivery-leaderboard?scope=all"),
       ]);
-      const [statsResult, transResult, meResult, lbResult] = await Promise.all([
-        statsRes.json(), transRes.json(), meRes.json(), lbRes.json()
+      const [statsResult, transResult, meResult] = await Promise.all([
+        statsRes.json(), transRes.json(), meRes.json()
       ]);
 
       if (statsResult.success) setStats(statsResult.data);
-      if (lbResult.success) setDelivLb({ respon: lbResult.respon, selesai: lbResult.selesai });
       setTransactions(transResult?.data || []);
       setUserRole(meResult.user?.role ?? null);
       setLastUpdated(new Date());
@@ -853,9 +856,11 @@ export default function Page() {
           )}
 
           {/* Top Sales */}
-          <button
+          <div
             onClick={() => setShowSalesModal(true)}
-            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
+            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%] cursor-pointer"
+            role="button"
+            tabIndex={0}
           >
             <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
               <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
@@ -897,12 +902,14 @@ export default function Page() {
                 )}
               </div>
             </div>
-          </button>
+          </div>
 
           {/* Top Laptop */}
-          <button
+          <div
             onClick={() => setShowLaptopModal(true)}
-            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%]"
+            className="text-left w-full hover:shadow-lg transition-shadow duration-300 active:scale-[99%] cursor-pointer"
+            role="button"
+            tabIndex={0}
           >
             <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -936,69 +943,10 @@ export default function Page() {
                 </div>
               )}
             </div>
-          </button>
-        </div>
-
-        {/* ── Delivery Leaderboards ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 fade-up" style={{ animationDelay: "0.12s" }}>
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                <span className="text-base sm:text-lg">🏃</span> Respon Tercepat (Pengantar)
-              </h2>
-              <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">Bulan Ini</span>
-            </div>
-            {isLoading ? (
-              <Shimmer className="w-full h-24" />
-            ) : !delivLb || delivLb.respon.length === 0 ? (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {delivLb.respon.slice(0, 5).map((r, i) => (
-                  <TopListItem
-                    key={r.id}
-                    rank={i + 1}
-                    name={r.name}
-                    total={r.count}
-                    maxTotal={delivLb.respon[0]?.count || 1}
-                    extra={<span className="text-[10px] sm:text-xs text-amber-600 font-semibold truncate flex-shrink-0 w-16 text-right mr-2">{fmtDur(r.avgMs)}</span>}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                <span className="text-base sm:text-lg">🏁</span> Selesai Tercepat (Pengantar)
-              </h2>
-              <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">Bulan Ini</span>
-            </div>
-            {isLoading ? (
-              <Shimmer className="w-full h-24" />
-            ) : !delivLb || delivLb.selesai.length === 0 ? (
-              <div className="text-center py-6 sm:py-8">
-                <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {delivLb.selesai.slice(0, 5).map((r, i) => (
-                  <TopListItem
-                    key={r.id}
-                    rank={i + 1}
-                    name={r.name}
-                    total={r.count}
-                    maxTotal={delivLb.selesai[0]?.count || 1}
-                    extra={<span className="text-[10px] sm:text-xs text-blue-600 font-semibold truncate flex-shrink-0 w-16 text-right mr-2">{fmtDur(r.avgMs)}</span>}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         </div>
+
+
 
         {/* ── Bar Chart (finansial only) ── */}
         {canSeeFinancials && (
