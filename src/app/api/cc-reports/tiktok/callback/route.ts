@@ -5,13 +5,26 @@ import { exchangeCode } from "@/lib/ccTikTok";
 export const dynamic = "force-dynamic";
 
 /**
- * Redirect balik ke halaman Analisa.
- * ✅ Origin diambil dari request (req.nextUrl.origin), BUKAN dari
- *    NEXT_PUBLIC_APP_URL — env NEXT_PUBLIC_* di-inline saat build, jadi
- *    kalau di-set setelah build nilainya undefined → URL invalid → 500.
+ * Origin publik yang benar.
+ *
+ * Kenapa tidak pakai req.nextUrl.origin?
+ * Di Hostinger, Next.js jalan di belakang reverse proxy dan bind ke 0.0.0.0:3000,
+ * sehingga origin-nya "https://0.0.0.0:3000" → ERR_ADDRESS_INVALID di browser.
+ * Domain publik yang sebenarnya dikirim proxy lewat header x-forwarded-*.
  */
+function publicOrigin(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+
+  if (host && !host.startsWith("0.0.0.0") && !host.startsWith("127.0.0.1")) {
+    return `${proto}://${host}`;
+  }
+  // Fallback terakhir kalau header tidak ada
+  return process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin;
+}
+
 function back(req: NextRequest, msg: string, ok: boolean): NextResponse {
-  const url = new URL("/dashboard/cc-reports/analisa", req.nextUrl.origin);
+  const url = new URL("/dashboard/cc-reports/analisa", publicOrigin(req));
   url.searchParams.set("tiktok", ok ? "ok" : "error");
   url.searchParams.set("msg", msg);
   return NextResponse.redirect(url);
@@ -24,13 +37,11 @@ export async function GET(req: NextRequest) {
     const state = sp.get("state");
     const err = sp.get("error_description") ?? sp.get("error");
 
-    // ✅ Log semua param mentah dari TikTok — biar penyebabnya kelihatan
     console.log("[tiktok/callback] params:", Object.fromEntries(sp.entries()));
 
     if (err) return back(req, err, false);
 
     if (!code) {
-      // Callback tanpa code = user batal, TikTok error, atau URL dibuka langsung
       return back(
         req,
         `TikTok tidak mengirim code. Param diterima: ${sp.toString() || "(kosong)"}`,
@@ -40,10 +51,9 @@ export async function GET(req: NextRequest) {
 
     const saved = req.cookies.get("tiktok_oauth_state")?.value;
     if (!saved) {
-      // ✅ Penyebab paling umum: alur dimulai dari domain berbeda (localhost)
       return back(
         req,
-        "Cookie state hilang — mulai proses 'Hubungkan TikTok' dari domain yang sama (https://solit-pos.store), bukan localhost",
+        "Cookie state hilang — mulai dari https://solit-pos.store, bukan localhost",
         false
       );
     }
