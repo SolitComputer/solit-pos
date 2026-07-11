@@ -15,21 +15,24 @@ export function isModalAwalActive(): boolean {
 }
 
 // ── Kategori Uang Masuk ──────────────────────────────────────────────────────
+// PENJUALAN_LAPTOP & SERVICE → auto-sync dari sistem, tidak bisa diinput manual
+// UTANG & AKSESORIS          → bisa diinput manual
 export const INCOME_CATEGORIES = {
   PENJUALAN_LAPTOP: "Penjualan Laptop",
   SERVICE: "Service",
-  AKSESORIS: "Aksesoris",
   UTANG: "Utang",
-  SEWA: "Sewa",
-  PENJUALAN_ASET: "Penjualan Aset",
-  BIAYA_LAIN: "Biaya Lain-lain",
+  AKSESORIS: "Aksesoris",
 } as const;
 
-// Kategori uang masuk yang boleh diinput MANUAL (di luar MODAL_AWAL)
-export const MANUAL_INCOME_CATEGORIES = ["BIAYA_LAIN"] as const;
+// ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
+export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
 
+/** true = kategori ini boleh diinput manual oleh user */
 export function isManualIncomeCategory(category: string): boolean {
-  return (MANUAL_INCOME_CATEGORIES as readonly string[]).includes(category);
+  return (
+    Object.prototype.hasOwnProperty.call(INCOME_CATEGORIES, category) &&
+    !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(category)
+  );
 }
 
 // ── Kategori Uang Keluar ─────────────────────────────────────────────────────
@@ -49,8 +52,6 @@ export const EXPENSE_CATEGORIES = {
   BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
 
-export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"];
-
 export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
 export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES;
 
@@ -66,7 +67,7 @@ export function isValidCategory(direction: CashflowDirection, category: string):
 }
 
 export function isAutoIncomeCategory(category: string): boolean {
-  return AUTO_INCOME_CATEGORIES.includes(category);
+  return (AUTO_INCOME_CATEGORIES as readonly string[]).includes(category);
 }
 
 // ── Filter Types ──────────────────────────────────────────────────────────────
@@ -74,12 +75,12 @@ export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
 export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
 
 export interface CashflowFilter {
-  dateFrom: string;       // yyyy-mm-dd or ""
-  dateTo: string;         // yyyy-mm-dd or ""
-  category: string;       // category key or "ALL"
+  dateFrom: string;
+  dateTo: string;
+  category: string;
   audit: AuditFilter;
   source: SourceFilter;
-  search: string;         // free text search on nama / keterangan
+  search: string;
 }
 
 export function defaultCashflowFilter(): CashflowFilter {
@@ -105,7 +106,6 @@ export function isFilterActive(f: CashflowFilter): boolean {
   );
 }
 
-/** Count how many individual filter dimensions are active */
 export function activeFilterCount(f: CashflowFilter): number {
   let c = 0;
   if (f.dateFrom || f.dateTo) c++;
@@ -116,9 +116,6 @@ export function activeFilterCount(f: CashflowFilter): number {
   return c;
 }
 
-/**
- * Apply all filters client-side. Each entry must match ALL active filters.
- */
 export function applyFilters<T extends {
   tanggal?: string;
   category?: string;
@@ -130,27 +127,17 @@ export function applyFilters<T extends {
   const q = filter.search.trim().toLowerCase();
 
   return entries.filter((e) => {
-    // Date range
     if (filter.dateFrom && (e.tanggal || "") < filter.dateFrom) return false;
     if (filter.dateTo && (e.tanggal || "") > filter.dateTo) return false;
-
-    // Category
     if (filter.category !== "ALL" && e.category !== filter.category) return false;
-
-    // Audit status
     if (filter.audit === "AUDITED" && !e.is_audited) return false;
     if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
-
-    // Source type
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
     if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
-
-    // Search text
     if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
-
     return true;
   });
 }
