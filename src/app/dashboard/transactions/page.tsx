@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
 
@@ -1246,6 +1246,7 @@ export default function Page() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
   const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
 
@@ -1257,19 +1258,31 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(r => {
+        const role = r.user?.role ?? null;
+        const roles: UserRole[] =
+          Array.isArray(r.user?.roles) && r.user.roles.length > 0
+            ? r.user.roles
+            : role ? [role] : [];
+        setUserRole(role);
+        setUserRoles(roles);
+      })
+      .catch(() => {
+        setUserRole(null);
+        setUserRoles([]);
+      });
   }, []);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    // `invoice` = param baru (exact). `highlight` = param lama, tetap didukung
-    // agar link/bookmark lama tidak rusak.
     const inv = p.get("invoice") ?? p.get("highlight");
     if (inv) setFocusInvoice(inv.trim());
   }, []);
 
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
-  const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
+  const canSeeFinancials = hasAnyRole(userRoles, PERMISSIONS.VIEW_FINANCIALS);
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
   useEffect(() => { fetchTransactions(); }, []);
@@ -1331,7 +1344,8 @@ export default function Page() {
       filtered = filtered.filter((item) => {
         const cn = (item.company_name ?? "").toLowerCase();
         if (q === "sotech") return cn.includes("sotech");
-        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech");
+        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech") && !cn.includes("onpoint") && !cn.includes("on point");
+        if (q === "onpoint") return cn.includes("onpoint") || cn.includes("on point");
         return cn === q;
       });
     }
@@ -1781,6 +1795,7 @@ export default function Page() {
                     { value: "ALL", label: "Semua", icon: "🏢", desc: null },
                     { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
                     { value: "sotech", label: "Sotech", icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
+                    { value: "onpoint", label: "On Point", icon: "🎯", desc: "On Point, Onpoint, dll" },
                   ].map((c) => (
                     <button
                       key={c.value}
@@ -1800,7 +1815,7 @@ export default function Page() {
                   <p className="text-[10px] text-gray-400 mt-1.5">
                     Menampilkan transaksi toko:{" "}
                     <span className="font-semibold text-gray-600">
-                      {companyName === "solit" ? "Solit 03" : "Sotech"}
+                      {companyName === "solit" ? "Solit 03" : companyName === "sotech" ? "Sotech" : "On Point"}
                     </span>
                     {" "}<span className="text-gray-300">·</span>{" "}
                     <span className="text-gray-400">termasuk semua variasi penulisan nama</span>

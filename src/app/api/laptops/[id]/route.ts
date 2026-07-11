@@ -97,6 +97,40 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
+    // Ambil semua unit_id milik laptop ini
+    const { data: unitRows } = await supabase
+      .from("laptop_units")
+      .select("id")
+      .eq("laptop_id", id);
+
+    const unitIds = (unitRows ?? []).map((u: { id: string }) => u.id);
+
+    // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
+    // FK ON DELETE SET NULL hanya handle transactions.unit_id (single).
+    // unit_ids array harus dibersihkan manual.
+    if (unitIds.length > 0) {
+      const { data: txWithArray } = await supabase
+        .from("transactions")
+        .select("invoice_number, unit_ids")
+        .overlaps("unit_ids", unitIds);
+
+      if (txWithArray && txWithArray.length > 0) {
+        await Promise.allSettled(
+          txWithArray.map((tx) =>
+            supabase
+              .from("transactions")
+              .update({
+                unit_ids: (tx.unit_ids as string[]).filter(
+                  (uid: string) => !unitIds.includes(uid)
+                ),
+              })
+              .eq("invoice_number", tx.invoice_number)
+          )
+        );
+      }
+    }
+
+    // Hapus semua units (transactions.unit_id auto SET NULL via FK)
     const { error: unitsError } = await supabase
       .from("laptop_units")
       .delete()
