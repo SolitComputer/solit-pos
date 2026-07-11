@@ -1366,7 +1366,6 @@ export default function CashflowPage() {
     const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [editEntry, setEditEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
-    const [showVoided, setShowVoided] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
     const [auditingId, setAuditingId] = useState<string | null>(null);
@@ -1416,23 +1415,20 @@ export default function CashflowPage() {
         return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVisible); };
     }, [allowed, fetchData]);
 
-    // ✅ Dipindah ke SINI — sebelum early-return `allowed === false`.
-    // Sebelumnya hook ini ada di bawah return, melanggar rules-of-hooks:
-    // saat `allowed` berubah null → false, jumlah hook yang dijalankan berkurang
-    // dan React bisa salah memetakan state antar-hook.
-    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut, showVoided]);
+
+    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
 
     const handleExport = async () => {
         setExporting(true);
         try {
-            const m = showVoided ? masuk : masuk.filter((e) => !e.is_voided);
-            const k = showVoided ? keluar : keluar.filter((e) => !e.is_voided);
-            await exportCashflowExcel(m, k);
+            await exportCashflowExcel(
+                masuk.filter((e) => !e.is_voided),
+                keluar.filter((e) => !e.is_voided)
+            );
         } finally {
             setExporting(false);
         }
     };
-
     const toggleAudit = async (entry: Entry) => {
         if (entry.is_audited) return;
         setAuditingId(entry.id);
@@ -1484,18 +1480,11 @@ export default function CashflowPage() {
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
 
-    const notVoided = (e: Entry) => !e.is_voided;
-
-    const visibleMasuk = showVoided ? masuk : masuk.filter(notVoided);
-    const visibleKeluar = showVoided ? keluar : keluar.filter(notVoided);
-
-    const voidedCount =
-        masuk.filter((e) => e.is_voided).length + keluar.filter((e) => e.is_voided).length;
-
-    const allRows = tab === "IN" ? visibleMasuk : visibleKeluar;
+    const allRows = tab === "IN" ? masuk : keluar;
     const rows = applyFilters(allRows, currentFilter);
     const filterCount = activeFilterCount(currentFilter);
 
+    const voidedCount = allRows.filter((e) => e.is_voided).length;
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
@@ -1692,8 +1681,8 @@ export default function CashflowPage() {
                                         }`}
                                 >
                                     {t === "IN"
-                                        ? `↑ Masuk ${!loading ? `(${visibleMasuk.length})` : ""}`
-                                        : `↓ Keluar ${!loading ? `(${visibleKeluar.length})` : ""}`
+                                        ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}`
+                                        : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`
                                     }
                                 </button>
                             ))}
@@ -1715,27 +1704,6 @@ export default function CashflowPage() {
                                 </span>
                             )}
                         </button>
-
-                        {/* ✅ Toggle entry dibatalkan/restore — hanya muncul kalau memang ada */}
-                        {!loading && voidedCount > 0 && (
-                            <button
-                                onClick={() => setShowVoided((v) => !v)}
-                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition ${showVoided
-                                    ? "bg-gray-100 text-gray-700 border-gray-300"
-                                    : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:text-gray-600"
-                                    }`}
-                                title={
-                                    showVoided
-                                        ? "Sembunyikan entry dari transaksi yang dibatalkan/di-restore"
-                                        : "Tampilkan entry dari transaksi yang dibatalkan/di-restore (tidak dihitung ke saldo)"
-                                }
-                            >
-                                🚫 {showVoided ? "Sembunyikan" : "Dibatalkan"}
-                                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">
-                                    {voidedCount}
-                                </span>
-                            </button>
-                        )}
                     </div>
                     {tab === "IN" && (
                         <button
@@ -1764,12 +1732,13 @@ export default function CashflowPage() {
                     />
                 )}
 
-                {showVoided && voidedCount > 0 && (
+                {!loading && voidedCount > 0 && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">
                         <IconInfo />
                         <span>
-                            Menampilkan <b>{voidedCount} entry dibatalkan</b> (transaksi sumbernya sudah di-restore).
-                            Entry ini <b>tidak dihitung</b> ke saldo maupun total periode, dan tidak bisa diaudit.
+                            Ada <b>{voidedCount} entry dibatalkan</b> di tab ini (transaksi sumbernya sudah di-restore) —
+                            ditandai abu-abu &amp; nominalnya dicoret. Entry ini <b>tidak dihitung</b> ke saldo maupun
+                            total periode, dan tidak bisa diaudit.
                         </span>
                     </div>
                 )}
@@ -1880,7 +1849,7 @@ export default function CashflowPage() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                                                <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                     {e.is_stale && e.source_nominal != null && (
                                                         <p
