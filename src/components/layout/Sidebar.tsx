@@ -211,6 +211,14 @@ const Icons = {
       <path d="M16 3.13a4 4 0 010 7.75" />
     </svg>
   ),
+  leaderboard: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="M7 4h10l1 7H6l1-7z" />
+      <path d="M6 11v6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6" />
+    </svg>
+  ),
   code: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
       <polyline points="16 18 22 12 16 6" />
@@ -375,6 +383,8 @@ const ITEM_LAPTOP_MINUS: MenuItem = {
   icon: Icons.laptopMinus,
 };
 
+const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
+
 const MISSIONS_MENU: MenuGroup = {
   label: "Misi Pekerjaan",
   items: [
@@ -466,6 +476,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
     ITEM_CUSTOMER_BIRTHDAY,
     ITEM_CC_REPORT,
+    ITEM_LEADERBOARD_PEKERJAAN,
     ITEM_TODOS,
   ],
 };
@@ -1096,6 +1107,9 @@ const MISSION_HREFS = new Set([
       label: MISSIONS_MENU.label,
       items: [...MISSIONS_MENU.items],
     };
+    if (role !== "ADMIN") {
+      missionsForRole.items = missionsForRole.items.filter((it) => it.href !== "/dashboard/missions/leaderboard");
+    }
     if (MISSION_FULL_ACCESS_ROLES.includes(role)) {
       missionsForRole.items.push(ITEM_MISSION_ALL);
     }
