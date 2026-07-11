@@ -63,7 +63,7 @@ async function postToken(body: Record<string, string>): Promise<TikTokTokenRespo
 
 async function saveTokens(t: TikTokTokenResponse, accountName?: string | null): Promise<void> {
   const now = Date.now();
-  await supabaseAdmin.from("cc_integrations").upsert(
+  const { error } = await supabaseAdmin.from("cc_integrations").upsert(
     {
       provider: "tiktok",
       access_token: t.access_token!,
@@ -77,8 +77,9 @@ async function saveTokens(t: TikTokTokenResponse, accountName?: string | null): 
     },
     { onConflict: "provider" }
   );
-}
 
+  if (error) throw new Error(`Gagal simpan token: ${error.message}`);
+}
 /** Tukar `code` dari callback → token, lalu simpan. */
 export async function exchangeCode(code: string): Promise<{ ok: boolean; error?: string }> {
   const t = await postToken({
