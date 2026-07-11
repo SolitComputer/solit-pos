@@ -41,6 +41,19 @@ const fmtTanggalShort = (d?: string) =>
         })
         : "—";
 
+
+const compareEntries = (a: Entry, b: Entry): number => {
+    if (a.tanggal !== b.tanggal) return a.tanggal < b.tanggal ? 1 : -1;
+
+    const ca = a.created_at ?? "";
+    const cb = b.created_at ?? "";
+    if (ca !== cb) return ca < cb ? 1 : -1;
+
+    return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+};
+
+const sortEntries = (list: Entry[]): Entry[] => [...list].sort(compareEntries);
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Entry = {
     id: string;
@@ -57,6 +70,7 @@ type Entry = {
     photo_url: string | null;
     is_audited: boolean;
     audited_at: string | null;
+    created_at?: string;
     is_voided?: boolean;
     is_stale?: boolean;
     source_nominal?: number | null;
@@ -1378,8 +1392,10 @@ export default function CashflowPage() {
             const res = await fetch("/api/cashflow", { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
-                setMasuk(json.data.masuk ?? []);
-                setKeluar(json.data.keluar ?? []);
+                // ✅ Sortir ulang di client — jaminan urutan stabil tiap poll (10 detik),
+                // tidak bergantung pada urutan yang kebetulan dikembalikan Postgres.
+                setMasuk(sortEntries(json.data.masuk ?? []));
+                setKeluar(sortEntries(json.data.keluar ?? []));
                 setSummary(json.summary);
                 setLastUpdated(new Date());
             }
@@ -1399,6 +1415,12 @@ export default function CashflowPage() {
         document.addEventListener("visibilitychange", onVisible);
         return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVisible); };
     }, [allowed, fetchData]);
+
+    // ✅ Dipindah ke SINI — sebelum early-return `allowed === false`.
+    // Sebelumnya hook ini ada di bawah return, melanggar rules-of-hooks:
+    // saat `allowed` berubah null → false, jumlah hook yang dijalankan berkurang
+    // dan React bisa salah memetakan state antar-hook.
+    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut, showVoided]);
 
     const handleExport = async () => {
         setExporting(true);
@@ -1478,9 +1500,6 @@ export default function CashflowPage() {
     const safePage = Math.min(currentPage, totalPages);
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut, showVoided]);
-
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const jakartaNow = new Date();
     const weekDay = jakartaNow.getDay();
@@ -1504,8 +1523,12 @@ export default function CashflowPage() {
                 ? s + Number(e.nominal || 0)
                 : s,
         0
-    ); const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
+    );
 
+    const expenseValue = keluar.reduce(
+        (s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s),
+        0
+    );
     const periodLabel = period === "today" ? "Hari Ini"
         : period === "week" ? "Minggu Ini"
             : period === "month" ? "Bulan Ini"

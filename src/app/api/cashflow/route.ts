@@ -284,7 +284,8 @@ export const GET = withAuth(async () => {
             audited_by_user:users!cashflow_entries_audited_by_fkey(id, name)
         `)
         .order("tanggal", { ascending: false })
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
 
     if (error) {
         console.error("[cashflow GET]", error);
