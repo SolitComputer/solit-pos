@@ -206,10 +206,12 @@ export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", 
 export const CC_REPORT_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
 ];
-// Hapus report/posting: hanya head + full access
 export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING",
 ];
+
+// ─── To-Do List — hanya ADMIN & PROGRAMMER ────────────────────────────────────
+export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -381,7 +383,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
 
-  // ── Cashflow — PURCHASING punya akses penuh ────────────────────────────────
+  // ── Cashflow ───────────────────────────────────────────────────────────────
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
   "/dashboard/customer-birthdays": [...ALL_ROLES],
   "/api/transaction/customer-birthdays": [...ALL_ROLES],
@@ -391,10 +393,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/missions/progress": [...ALL_ROLES],
   "/dashboard/missions/history": [...ALL_ROLES],
   "/api/missions": [...ALL_ROLES],
-  
+
   // ── Content Creator ────────────────────────────────────────────────────────
   "/dashboard/cc-reports": [...CC_REPORT_ROLES],
   "/api/cc-reports": [...CC_REPORT_ROLES],
+
+  // ── To-Do List — ADMIN & PROGRAMMER only ──────────────────────────────────
+  "/dashboard/todos": [...TODO_ROLES],
+  "/api/todos": [...TODO_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
@@ -471,8 +477,6 @@ export const PERMISSIONS = {
   CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
   EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
 
-  /** Akses halaman "Semua Unit" (global inventory view). Aksi tulis (create/edit/delete unit)
-   *  TETAP pakai EDIT_UNITS/CREATE_UNITS yang sudah ada — bukan permission baru. */
   VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
   VIEW_WARRANTY: [
@@ -519,7 +523,7 @@ export const PERMISSIONS = {
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
   DELIVERY_VOICE_TARGET: [...DELIVERY_VOICE_TARGET_ROLES] as UserRole[],
 
-  // ── Cashflow — PURCHASING punya akses penuh ────────────────────────────────
+  // ── Cashflow ───────────────────────────────────────────────────────────────
   VIEW_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
@@ -528,6 +532,10 @@ export const PERMISSIONS = {
   VIEW_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
   MANAGE_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
   DELETE_CC_REPORT: [...CC_REPORT_MANAGE_ROLES] as UserRole[],
+
+  // ── To-Do List ──────────────────────────────────────────────────────────────
+  VIEW_TODOS: [...TODO_ROLES] as UserRole[],
+  MANAGE_TODOS: [...TODO_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(

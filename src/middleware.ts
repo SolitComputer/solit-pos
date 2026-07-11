@@ -309,5 +309,7 @@ export const config = {
     "/api/missions/:path*",
     "/dashboard/cc-reports/:path*",
     "/api/cc-reports/:path*",
+    "/dashboard/todos/:path*",
+    "/api/todos/:path*",
   ],
 };
