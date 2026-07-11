@@ -1344,7 +1344,8 @@ export default function Page() {
       filtered = filtered.filter((item) => {
         const cn = (item.company_name ?? "").toLowerCase();
         if (q === "sotech") return cn.includes("sotech");
-        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech");
+        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech") && !cn.includes("onpoint") && !cn.includes("on point");
+        if (q === "onpoint") return cn.includes("onpoint") || cn.includes("on point");
         return cn === q;
       });
     }
@@ -1794,6 +1795,7 @@ export default function Page() {
                     { value: "ALL", label: "Semua", icon: "🏢", desc: null },
                     { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
                     { value: "sotech", label: "Sotech", icon: "🔧", desc: "Sotech, SOTECH.ID, dll" },
+                    { value: "onpoint", label: "On Point", icon: "🎯", desc: "On Point, Onpoint, dll" },
                   ].map((c) => (
                     <button
                       key={c.value}
@@ -1813,7 +1815,7 @@ export default function Page() {
                   <p className="text-[10px] text-gray-400 mt-1.5">
                     Menampilkan transaksi toko:{" "}
                     <span className="font-semibold text-gray-600">
-                      {companyName === "solit" ? "Solit 03" : "Sotech"}
+                      {companyName === "solit" ? "Solit 03" : companyName === "sotech" ? "Sotech" : "On Point"}
                     </span>
                     {" "}<span className="text-gray-300">·</span>{" "}
                     <span className="text-gray-400">termasuk semua variasi penulisan nama</span>
