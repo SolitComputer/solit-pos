@@ -24,8 +24,9 @@ interface User {
 
 const ALL_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-  "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",    // ← ADD PURCHASING
+  "KEPALA_SALES", "KEPALA_ZENITH",              // ← pindah ke sini
+  "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
@@ -39,9 +40,11 @@ const ALL_ROLES = [
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Admin", PROGRAMMER: "Programmer", ASISTEN_CEO: "Asisten CEO",
-  KEPALA_SALES: "Kepala Sales", KEPALA_MARKETING: "Kepala Marketing", KEPALA_TEKNISI: "Kepala Teknisi",
+  KEPALA_SALES: "Kepala Sales", KEPALA_ZENITH: "Kepala Zenith",
+  KEPALA_MARKETING: "Kepala Marketing", KEPALA_TEKNISI: "Kepala Teknisi",
   CREW_SALES: "Crew Sales", SOTECH: "Sotech", ACCOUNTING: "Accounting",
-  PENGELOLA_BARANG: "Pengelola Barang", KEPALA_PENGELOLA_BARANG: "Kepala Pengelola Barang", TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
+  PENGELOLA_BARANG: "Pengelola Barang", KEPALA_PENGELOLA_BARANG: "Kepala Pengelola Barang",
+  TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
   KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
@@ -49,8 +52,10 @@ const ROLE_LABEL: Record<string, string> = {
   PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
   PKL_ONPOINT: "PKL Onpoint", PKL_TEKNISI: "PKL Teknisi", PKL_KONTEN: "PKL Content Creator",
-  PKL_PENGANTARAN: "PKL Pengantaran", CUSTOMER_SERVICE: "Customer Service", PKL_CUSTOMER_SERVICE: "PKL Customer Service",     // ← NEW
-  PKL_PENGELOLA_BARANG: "PKL Pengelola Barang", PURCHASING: "Purchasing",
+  PKL_PENGANTARAN: "PKL Pengantaran",
+  CUSTOMER_SERVICE: "Customer Service", PKL_CUSTOMER_SERVICE: "PKL Customer Service",
+  PKL_PENGELOLA_BARANG: "PKL Pengelola Barang",
+  PURCHASING: "Purchasing",
 };
 
 const ROLE_ICON: Record<string, string> = {
@@ -65,7 +70,7 @@ const ROLE_ICON: Record<string, string> = {
   PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
   PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
   CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",     // ← NEW
-  PKL_PENGELOLA_BARANG: "🎓", PURCHASING: "🛒",
+  PKL_PENGELOLA_BARANG: "🎓", PURCHASING: "🛒", KEPALA_ZENITH: "⚡",
 };
 
 const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
@@ -100,6 +105,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PKL_CUSTOMER_SERVICE: PKL_BADGE,     // ← NEW
   PKL_PENGELOLA_BARANG: PKL_BADGE,
   PURCHASING: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
+  KEPALA_ZENITH: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -107,7 +113,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   KEPALA_SALES: "#059669", KEPALA_MARKETING: "#e11d48", KEPALA_TEKNISI: "#dc2626",
   CREW_SALES: "#0284c7", SOTECH: "#65a30d", ACCOUNTING: "#d97706",
   PENGELOLA_BARANG: "#2563eb", KEPALA_PENGELOLA_BARANG: "#1d4ed8", TEKNISI: "#ea580c",
-  PENGANTARAN: "#0d9488",
+  PENGANTARAN: "#0d9488", KEPALA_ZENITH: "#7c3aed",
   MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
   KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
@@ -121,7 +127,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
 const KEPALA_ROLES = new Set([
-  "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
   "KEPALA_PENGELOLA_BARANG",
 ]);
@@ -199,7 +205,7 @@ function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </optgroup>
       <optgroup label="— Management —">
-        {["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
+        {["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
           <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
         ))}
       </optgroup>
@@ -405,7 +411,8 @@ function MultiRoleSelect({
 }) {
   const ALL_ROLE_GROUPS = [
     { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
-    { label: "Management", roles: ["KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+    { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+
     {
       label: "Operasional",
       roles: [
