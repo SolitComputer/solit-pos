@@ -440,6 +440,8 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
 };
 
 // ── Shared group builders ─────────────────────────────────────────────────────
+
+// PERUBAHAN: ITEM_CC_REPORT dipindah dari ADMIN_TRANSAKSI ke sini (Overview)
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
@@ -455,12 +457,11 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
     ITEM_CUSTOMER_BIRTHDAY,
+    ITEM_CC_REPORT, // ← dipindah dari Transaksi ke Overview
   ],
 };
 
 // ── ADMIN_INVENTARIS: Data Barang (laptop+aksesoris) + Siap Jual + Minus + Garansi + Semua Unit
-// Legacy href /dashboard/laptops, /dashboard/laptops/ready, /dashboard/laptops/minus,
-// /dashboard/accessories sudah tidak ada di sini — digantikan item baru.
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
@@ -472,6 +473,7 @@ const ADMIN_INVENTARIS: MenuGroup = {
   ],
 };
 
+// PERUBAHAN: ITEM_CC_REPORT dihapus dari sini
 const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
@@ -479,7 +481,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_CC_REPORT,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -618,6 +619,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
   ],
 
+  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline PROGRAMMER
   PROGRAMMER: [
     {
       label: "Overview",
@@ -633,6 +635,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         ITEM_CASHFLOW,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
+        ITEM_CC_REPORT, // ← dipindah ke Overview
       ],
     },
     ADMIN_INVENTARIS,
@@ -642,6 +645,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
   ],
 
+  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline ASISTEN_CEO
   ASISTEN_CEO: [
     {
       label: "Overview",
@@ -655,6 +659,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
+        ITEM_CC_REPORT, // ← dipindah ke Overview
       ],
     },
     ADMIN_INVENTARIS,
@@ -778,7 +783,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
-  // ── ACCOUNTING ─────────────────────────────────────────────────────────────
+  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline ACCOUNTING
   ACCOUNTING: [
     {
       label: "Overview",
@@ -794,6 +799,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
+        ITEM_CC_REPORT, // ← dipindah ke Overview
       ],
     },
     ADMIN_INVENTARIS,
@@ -884,14 +890,17 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
+  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview
   MARKETING: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
-    },
-    {
-      label: "Konten",
-      items: [ITEM_CC_REPORT],
+      items: [
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
+        ITEM_MISSIONS,
+        ITEM_CC_REPORT, // ← dipindah ke Overview
+      ],
     },
     {
       label: "Inventaris",
@@ -899,12 +908,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
- KEPALA_MARKETING: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    {
-      label: "Konten",
-      items: [ITEM_CC_REPORT],
-    },
+  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview via SALES_OVERVIEW
+  KEPALA_MARKETING: [
+    SALES_OVERVIEW([ITEM_USERS, ITEM_CC_REPORT]), // ← ITEM_CC_REPORT masuk Overview
     {
       label: "Inventaris",
       items: [
@@ -991,15 +997,17 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     },
   ],
 
-  // ── KONTEN ─────────────────────────────────────────────────────────────────
+  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview
   KONTEN: [
     {
       label: "Overview",
-      items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS],
-    },
-    {
-      label: "Konten",
-      items: [ITEM_CC_REPORT],
+      items: [
+        ITEM_ABSENSI,
+        ITEM_LEMBUR,
+        ITEM_USERS,
+        ITEM_MISSIONS,
+        ITEM_CC_REPORT, // ← dipindah ke Overview
+      ],
     },
     {
       label: "Inventaris",
