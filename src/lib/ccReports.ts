@@ -52,11 +52,15 @@ export function computeStatus(r: Pick<CCReport, "take_done" | "edit_done"> & { p
   return "BELUM_SELESAI";
 }
 
+export function canStartPosting(r: Pick<CCReport, "take_done" | "edit_done">): boolean {
+  return Boolean(r.take_done || r.edit_done);
+}
+
 export const CC_STATUS_META: Record<CCStatus, { label: string; className: string }> = {
-  BELUM_SELESAI: { label: "Belum Selesai", className: "bg-gray-100 text-gray-600" },
-  PROSES:        { label: "Proses",        className: "bg-amber-100 text-amber-700" },
-  SIAP_POSTING:  { label: "Siap Posting",  className: "bg-blue-100 text-blue-700" },
-  POSTED:        { label: "Sudah Posting", className: "bg-emerald-100 text-emerald-700" },
+  BELUM_SELESAI: { label: "Belum Mulai",   className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
+  PROSES:        { label: "Bisa Posting",  className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  SIAP_POSTING:  { label: "Siap Posting",  className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
+  POSTED:        { label: "Sudah Posting", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
 };
 
 export const CC_PLATFORMS = [
@@ -98,4 +102,66 @@ export function durationLabel(start?: string | null, end?: string | null): strin
   const m = Math.round(ms / 60000);
   const h = Math.floor(m / 60);
   return h > 0 ? `${h}j ${m % 60}m` : `${m}m`;
+}
+
+// ── Formatter angka ──
+export function fmtNum(n: number): string {
+  return (n || 0).toLocaleString("id-ID");
+}
+
+export function fmtCompact(n: number): string {
+  const v = n || 0;
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000_000) return (v / 1e9).toFixed(1).replace(".", ",") + "M";
+  if (abs >= 1_000_000) return (v / 1e6).toFixed(abs >= 1e7 ? 0 : 1).replace(".", ",") + "jt";
+  if (abs >= 1_000) return (v / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(".", ",") + "rb";
+  return String(v);
+}
+
+/** Persentase perubahan vs periode sebelumnya. null = tidak ada baseline. */
+export function pctDelta(cur: number, prev: number): number | null {
+  if (!prev) return cur > 0 ? null : 0;
+  return ((cur - prev) / prev) * 100;
+}
+
+// ── Tipe response /api/cc-reports/analytics ──
+export type CCRange = "7" | "30" | "90" | "all";
+
+export interface CCTimelinePoint {
+  date: string;          // YYYY-MM-DD (WIB)
+  views: number;
+  likes: number;
+  comments: number;
+  posts: number;
+  cumViews: number;
+  cumLikes: number;
+  cumComments: number;
+}
+
+export interface CCAnalytics {
+  success: true;
+  range: CCRange;
+  timeline: CCTimelinePoint[];
+  perContent: {
+    report_id: string;
+    title: string;
+    views: number;
+    likes: number;
+    comments: number;
+    postCount: number;
+    platforms: string[];
+  }[];
+  platformTotals: { platform: string; views: number; likes: number; comments: number; count: number }[];
+  topPosts: {
+    id: string;
+    title: string;
+    platform: string;
+    post_url: string | null;
+    posted_at: string | null;
+    views: number;
+    likes: number;
+    comments: number;
+  }[];
+  totals: { views: number; likes: number; comments: number; postCount: number; contentCount: number };
+  prevTotals: { views: number; likes: number; comments: number; postCount: number };
 }
