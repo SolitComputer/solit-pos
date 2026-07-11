@@ -9,7 +9,6 @@ import { HTCallProvider } from "@/contexts/HTCallContext";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
 
-
 function ScrollRestorer() {
   const pathname = usePathname();
   const positions = useRef<Record<string, number>>({});

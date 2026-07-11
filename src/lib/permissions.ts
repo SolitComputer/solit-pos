@@ -407,7 +407,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 
-  VIEW_FINANCIALS: [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"] as UserRole[],
+  VIEW_FINANCIALS: ["ADMIN", "ACCOUNTING", "PROGRAMMER"] as UserRole[],
   VIEW_REPORTS: [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"] as UserRole[],
 
   VIEW_TRANSACTIONS: [
