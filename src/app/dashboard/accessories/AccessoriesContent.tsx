@@ -1,61 +1,36 @@
+// src/app/dashboard/accessories/AccessoriesContent.tsx
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as XLSX from "xlsx-js-style";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-interface AccessoryUnit {
-    id: string;
-    accessory_id: string;
-    serial_number: string;
-    condition: "BARU" | "BEKAS";
-    status: "TERSEDIA" | "TERJUAL" | "RESERVED";
-    buy_price: number;
-    selling_price: number;
-    notes: string | null;
-    created_at: string;
-}
-
 interface Accessory {
     id: string;
     name: string;
     category: string;
     brand: string | null;
     spec: string | null;
+    buy_price: number;
     sell_price: number;
+    stock: number;
     notes: string | null;
     created_at: string;
-    accessory_units: AccessoryUnit[];
-    stock_tersedia: number;
-    stock_total: number;
+    // kompat dari API (di-map dari `stock`)
+    stock_tersedia?: number;
+    stock_total?: number;
 }
 
 type AccessoryForm = {
-    name: string;
-    category: string;
-    brand: string;
-    spec: string;
-    sell_price: number;
-    notes: string;
-};
-
-type UnitForm = {
-    serial_number: string;
-    condition: "BARU" | "BEKAS";
-    buy_price: number;
-    selling_price: number;
-    notes: string;
+    name: string; category: string; brand: string; spec: string;
+    buy_price: number; sell_price: number; stock: number; notes: string;
 };
 
 const EMPTY_ACC_FORM: AccessoryForm = {
-    name: "", category: "", brand: "", spec: "", sell_price: 0, notes: "",
-};
-
-const EMPTY_UNIT_FORM: UnitForm = {
-    serial_number: "", condition: "BARU", buy_price: 0, selling_price: 0, notes: "",
+    name: "", category: "", brand: "", spec: "",
+    buy_price: 0, sell_price: 0, stock: 0, notes: "",
 };
 
 const CATEGORIES = [
@@ -153,36 +128,6 @@ function sTotal(right = false, currency = false): XlsxCellStyle {
         ...(currency ? { numFmt: '"Rp "#,##0' } : {}),
     };
 }
-function sSN(zebraGroup = false): XlsxCellStyle {
-    return {
-        font: { sz: 9, name: "Courier New", color: { rgb: "1D4ED8" } },
-        fill: { fgColor: { rgb: zebraGroup ? "DBEAFE" : "EFF6FF" }, patternType: "solid" },
-        alignment: { horizontal: "left", vertical: "center", wrapText: true },
-        border: BORDER_THIN,
-    };
-}
-function sStatus(status: string): XlsxCellStyle {
-    const map: Record<string, { bg: string; fg: string }> = {
-        "Tersedia": { bg: "ECFDF5", fg: "065F46" },
-        "Terjual": { bg: "F3F4F6", fg: "6B7280" },
-        "Reserved": { bg: "FFFBEB", fg: "92400E" },
-    };
-    const c = map[status] ?? { bg: "FFFFFF", fg: "374151" };
-    return {
-        font: { bold: true, sz: 9, color: { rgb: c.fg } },
-        fill: { fgColor: { rgb: c.bg }, patternType: "solid" },
-        alignment: { horizontal: "center", vertical: "center" },
-        border: BORDER_THIN,
-    };
-}
-function sKondisi(kondisi: string): XlsxCellStyle {
-    return {
-        font: { bold: true, sz: 9, color: { rgb: kondisi === "BARU" ? "065F46" : "92400E" } },
-        fill: { fgColor: { rgb: kondisi === "BARU" ? "ECFDF5" : "FFFBEB" }, patternType: "solid" },
-        alignment: { horizontal: "center", vertical: "center" },
-        border: BORDER_THIN,
-    };
-}
 function sMargin(margin: number): XlsxCellStyle {
     return {
         font: { bold: true, sz: 10, color: { rgb: margin >= 0 ? "065F46" : "991B1B" } },
@@ -214,26 +159,6 @@ function CategoryBadge({ cat }: { cat: string }) {
         </span>
     );
 }
-function StatusBadge({ status }: { status: string }) {
-    const map: Record<string, { badge: string; dot: string; label: string }> = {
-        TERSEDIA: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Tersedia" },
-        TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
-        RESERVED: { badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400", label: "Reserved" },
-    };
-    const s = map[status] ?? map.TERSEDIA;
-    return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${s.badge}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
-        </span>
-    );
-}
-function ConditionBadge({ condition }: { condition: string }) {
-    return (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${condition === "BARU" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-            {condition}
-        </span>
-    );
-}
 
 // ─── Price Input ─────────────────────────────────────────────────────────────
 function PriceInput({ value, onChange, placeholder }: {
@@ -254,7 +179,7 @@ function PriceInput({ value, onChange, placeholder }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MODAL: Aksesori
+// MODAL: Aksesori (create/edit) — quantity-based
 // ═══════════════════════════════════════════════════════════════════════════
 function AccessoryModal({ open, onClose, onSave, initial, loading }: {
     open: boolean; onClose: () => void;
@@ -263,13 +188,24 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
 }) {
     const [form, setForm] = useState<AccessoryForm>(EMPTY_ACC_FORM);
     const [sellInput, setSellInput] = useState("");
+    const [buyInput, setBuyInput] = useState("");
+    const [stockInput, setStockInput] = useState("");
 
     useEffect(() => {
         if (!open) return;
         if (initial) {
-            setForm({ name: initial.name, category: initial.category, brand: initial.brand ?? "", spec: initial.spec ?? "", sell_price: initial.sell_price, notes: initial.notes ?? "" });
+            setForm({
+                name: initial.name, category: initial.category,
+                brand: initial.brand ?? "", spec: initial.spec ?? "",
+                buy_price: initial.buy_price, sell_price: initial.sell_price,
+                stock: initial.stock, notes: initial.notes ?? "",
+            });
             setSellInput(fmtInput(initial.sell_price));
-        } else { setForm(EMPTY_ACC_FORM); setSellInput(""); }
+            setBuyInput(fmtInput(initial.buy_price));
+            setStockInput(String(initial.stock ?? 0));
+        } else {
+            setForm(EMPTY_ACC_FORM); setSellInput(""); setBuyInput(""); setStockInput("");
+        }
     }, [open, initial]);
 
     useEffect(() => {
@@ -279,15 +215,25 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
         return () => window.removeEventListener("keydown", h);
     }, [open, onClose]);
 
-    const set = <K extends keyof AccessoryForm>(k: K, v: AccessoryForm[K]) => setForm(p => ({ ...p, [k]: v }));
+    const set = <K extends keyof AccessoryForm>(k: K, v: AccessoryForm[K]) =>
+        setForm(p => ({ ...p, [k]: v }));
 
     const handleSubmit = async () => {
         if (!form.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
         if (!form.category) { toast.error("Kategori wajib dipilih"); return; }
-        await onSave({ ...form, sell_price: parseRupiah(sellInput) });
+        await onSave({
+            ...form,
+            buy_price: parseRupiah(buyInput),
+            sell_price: parseRupiah(sellInput),
+            stock: parseInt(stockInput || "0", 10),
+        });
     };
 
     if (!open) return null;
+    const buyVal = parseRupiah(buyInput);
+    const sellVal = parseRupiah(sellInput);
+    const margin = sellVal - buyVal;
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
@@ -296,7 +242,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <div>
                         <h2 className="font-bold text-gray-900 text-[15px] tracking-tight">{initial ? "Edit Aksesori" : "Tambah Aksesori"}</h2>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Data master — harga modal dikelola per unit/SN</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Stok dikelola sebagai jumlah (tanpa serial number)</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all duration-150">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -324,10 +270,37 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
                         <label className={labelCls}>Spesifikasi</label>
                         <input className={inputCls} placeholder="500GB, DDR4 8GB, 65W..." value={form.spec} onChange={e => set("spec", e.target.value)} />
                     </div>
-                    <div>
-                        <label className={labelCls}>Harga Jual Default <span className="ml-1 text-gray-400 normal-case font-normal">(bisa di-override per unit)</span></label>
-                        <PriceInput value={sellInput} onChange={setSellInput} />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>Harga Modal</label>
+                            <PriceInput value={buyInput} onChange={setBuyInput} />
+                        </div>
+                        <div>
+                            <label className={labelCls}>Harga Jual <span className="text-red-400">*</span></label>
+                            <PriceInput value={sellInput} onChange={setSellInput} />
+                        </div>
                     </div>
+
+                    {(sellVal > 0 && buyVal > 0) && (
+                        <div className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Estimasi Margin / unit</span>
+                                <span className={`text-sm font-black tabular-nums ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                    {margin >= 0 ? "+" : ""}{fmt(margin)}
+                                    <span className="text-[10px] font-medium ml-1 opacity-70">({Math.round((margin / buyVal) * 100)}%)</span>
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className={labelCls}>Stok Tersedia <span className="text-red-400">*</span></label>
+                        <input inputMode="numeric" className={`${inputCls} tabular-nums`} placeholder="0"
+                            value={stockInput}
+                            onChange={e => setStockInput(e.target.value.replace(/\D/g, ""))} />
+                        <p className="text-[10px] text-gray-400 mt-1">Stok berkurang otomatis saat aksesori terjual / dijadikan bonus di pembayaran.</p>
+                    </div>
+
                     <div>
                         <label className={labelCls}>Keterangan</label>
                         <textarea rows={2} className={textareaCls} placeholder="Catatan tambahan (opsional)" value={form.notes} onChange={e => set("notes", e.target.value)} />
@@ -345,110 +318,11 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MODAL: Tambah/Edit Unit (SN)
+// MODAL: Detail Aksesori — quantity-based
 // ═══════════════════════════════════════════════════════════════════════════
-function UnitModal({ open, onClose, onSave, accessory, editUnit, loading }: {
-    open: boolean; onClose: () => void;
-    onSave: (data: UnitForm) => Promise<void>;
-    accessory: Accessory | null; editUnit?: AccessoryUnit | null; loading: boolean;
-}) {
-    const [form, setForm] = useState<UnitForm>(EMPTY_UNIT_FORM);
-    const [buyInput, setBuyInput] = useState("");
-    const [sellInput, setSellInput] = useState("");
-
-    useEffect(() => {
-        if (!open) return;
-        if (editUnit) {
-            setForm({ serial_number: editUnit.serial_number, condition: editUnit.condition, buy_price: editUnit.buy_price, selling_price: editUnit.selling_price, notes: editUnit.notes ?? "" });
-            setBuyInput(fmtInput(editUnit.buy_price)); setSellInput(fmtInput(editUnit.selling_price));
-        } else {
-            setForm({ ...EMPTY_UNIT_FORM, selling_price: accessory?.sell_price ?? 0 });
-            setBuyInput(""); setSellInput(fmtInput(accessory?.sell_price ?? 0));
-        }
-    }, [open, editUnit, accessory]);
-
-    useEffect(() => {
-        if (!open) return;
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", h);
-        return () => window.removeEventListener("keydown", h);
-    }, [open, onClose]);
-
-    const set = <K extends keyof UnitForm>(k: K, v: UnitForm[K]) => setForm(p => ({ ...p, [k]: v }));
-    const handleSubmit = async () => {
-        if (!form.serial_number.trim()) { toast.error("Serial number wajib diisi"); return; }
-        await onSave({ ...form, buy_price: parseRupiah(buyInput), selling_price: parseRupiah(sellInput) });
-    };
-    const buyVal = parseRupiah(buyInput), sellVal = parseRupiah(sellInput), margin = sellVal - buyVal;
-
-    if (!open) return null;
-    return (
-        <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-md shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn max-h-[92dvh] sm:max-h-[88vh]">
-                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-                    <div className="min-w-0">
-                        <h2 className="font-bold text-gray-900 text-[15px] tracking-tight">{editUnit ? "Edit Unit" : "Tambah Unit / SN"}</h2>
-                        <p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-[240px]">{accessory?.name}</p>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all duration-150">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-                    <div>
-                        <label className={labelCls}>Serial Number <span className="text-red-400">*</span></label>
-                        <input className={`${inputCls} font-mono uppercase`} placeholder="cth. SN-HDD-001" value={form.serial_number} onChange={e => set("serial_number", e.target.value.toUpperCase())} />
-                    </div>
-                    <div>
-                        <label className={labelCls}>Kondisi</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(["BARU", "BEKAS"] as const).map(c => (
-                                <button key={c} type="button" onClick={() => set("condition", c)}
-                                    className={`h-10 rounded-xl text-xs font-bold border transition ${form.condition === c ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>{c}</button>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div><label className={labelCls}>Harga Modal</label><PriceInput value={buyInput} onChange={setBuyInput} /></div>
-                        <div><label className={labelCls}>Harga Jual</label><PriceInput value={sellInput} onChange={setSellInput} placeholder={fmtInput(accessory?.sell_price ?? 0) || "0"} /></div>
-                    </div>
-                    {(sellVal > 0 && buyVal > 0) && (
-                        <div className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Estimasi Margin</span>
-                                <span className={`text-sm font-black tabular-nums ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                    {margin >= 0 ? "+" : ""}{fmt(margin)}<span className="text-[10px] font-medium ml-1 opacity-70">({Math.round((margin / buyVal) * 100)}%)</span>
-                                </span>
-                            </div>
-                            <div className="mt-1.5 h-1 bg-gray-200 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full transition-all ${margin >= 0 ? "bg-emerald-500" : "bg-red-500"}`} style={{ width: `${Math.min(100, Math.max(0, (margin / sellVal) * 100))}%` }} />
-                            </div>
-                        </div>
-                    )}
-                    <div>
-                        <label className={labelCls}>Catatan Unit</label>
-                        <input className={inputCls} placeholder="Kondisi khusus, dll (opsional)" value={form.notes} onChange={e => set("notes", e.target.value)} />
-                    </div>
-                </div>
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
-                    <button onClick={onClose} disabled={loading} className="px-4 h-11 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition disabled:opacity-50">Batal</button>
-                    <button onClick={handleSubmit} disabled={loading} className="px-5 h-11 rounded-xl text-sm font-bold bg-gray-800 text-white hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-gray-800/20 flex items-center gap-2">
-                        {loading && <Spinner />}{editUnit ? "Simpan" : "Tambah Unit"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MODAL: Detail Aksesori
-// ═══════════════════════════════════════════════════════════════════════════
-function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDelete }: {
+function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: {
     accessory: Accessory | null; onClose: () => void;
-    onManageUnits: () => void; onEdit: () => void; onDelete: () => void;
+    onEdit: () => void; onDelete: () => void;
 }) {
     useEffect(() => {
         if (!accessory) return;
@@ -457,10 +331,8 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
     }, [accessory, onClose]);
 
     if (!accessory) return null;
-    const units = accessory.accessory_units ?? [];
-    const tersedia = accessory.stock_tersedia, total = accessory.stock_total;
-    const terjual = units.filter(u => u.status === "TERJUAL").length;
-    const reserved = units.filter(u => u.status === "RESERVED").length;
+    const stock = accessory.stock ?? 0;
+    const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0);
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -481,26 +353,36 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                             <p className="text-sm text-gray-400 mt-0.5 font-medium">{accessory.brand || "—"}{accessory.spec ? ` · ${accessory.spec}` : ""}</p>
                             <div className="flex flex-wrap gap-2 mt-3">
                                 <CategoryBadge cat={accessory.category} />
-                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${tersedia === 0 ? "bg-red-50 text-red-600 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>{tersedia} unit tersedia</span>
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${stock === 0 ? "bg-red-50 text-red-600 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"}`}>Stok: {stock}</span>
                             </div>
                         </div>
                         <div className="sm:text-right flex-shrink-0">
-                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual Default</p>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
                             <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">{accessory.sell_price > 0 ? fmt(accessory.sell_price) : "—"}</p>
                         </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2.5">
-                        {[{ label: "Total Unit", value: total, color: "text-gray-800" }, { label: "Tersedia", value: tersedia, color: "text-emerald-600" }, { label: "Reserved", value: reserved, color: "text-amber-600" }, { label: "Terjual", value: terjual, color: "text-gray-400" }].map(s => (
+
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {[
+                            { label: "Stok Tersedia", value: String(stock), color: stock === 0 ? "text-red-500" : "text-emerald-600" },
+                            { label: "Harga Modal", value: accessory.buy_price > 0 ? fmt(accessory.buy_price) : "—", color: "text-gray-700" },
+                            { label: "Margin / unit", value: (accessory.buy_price > 0 ? `${margin >= 0 ? "+" : ""}${fmt(margin)}` : "—"), color: margin >= 0 ? "text-emerald-600" : "text-red-500" },
+                        ].map(s => (
                             <div key={s.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
-                                <p className={`text-xl font-black tabular-nums ${s.color}`}>{s.value}</p>
+                                <p className={`text-base font-black tabular-nums ${s.color}`}>{s.value}</p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>
+
                     <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                            {[{ label: "Kategori", value: accessory.category }, { label: "Merk", value: accessory.brand }, { label: "Spesifikasi", value: accessory.spec }].map(({ label, value }) => (
+                            {[
+                                { label: "Kategori", value: accessory.category },
+                                { label: "Merk", value: accessory.brand },
+                                { label: "Spesifikasi", value: accessory.spec },
+                            ].map(({ label, value }) => (
                                 <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
                                     <p className="text-sm font-semibold text-gray-800 break-all leading-tight">{value || <span className="text-gray-300 font-normal">—</span>}</p>
@@ -508,10 +390,7 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                             ))}
                         </div>
                     </div>
-                    <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-                        <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <p className="text-xs text-gray-600 leading-relaxed">Stok & harga modal dikelola per-unit. Klik <span className="font-bold text-gray-800">Kelola Unit/SN</span> untuk mengatur serial number, harga modal, harga jual, dan margin tiap unit.</p>
-                    </div>
+
                     {accessory.notes && (
                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5">
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Keterangan</p>
@@ -522,104 +401,9 @@ function AccessoryDetailModal({ accessory, onClose, onManageUnits, onEdit, onDel
                 <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap">
                     <p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p>
                     <div className="flex gap-2">
-                        <button onClick={onManageUnits} className="h-9 px-4 text-sm font-semibold text-white bg-gray-800 rounded-xl hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M8 12h.01M12 12h.01M16 12h.01" /></svg>
-                            Kelola Unit/SN
-                        </button>
-                        <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">Edit</button>
+                        <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-gray-800 rounded-xl hover:bg-gray-900 active:scale-[0.97] transition-all duration-150">Edit</button>
                         <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>
                     </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PANEL: Unit/SN (slide-in kanan)
-// ═══════════════════════════════════════════════════════════════════════════
-function UnitPanel({ accessory, onClose, onAddUnit, onEditUnit, onDeleteUnit }: {
-    accessory: Accessory | null; onClose: () => void; onAddUnit: () => void;
-    onEditUnit: (unit: AccessoryUnit) => void; onDeleteUnit: (unit: AccessoryUnit) => void;
-}) {
-    useEffect(() => {
-        if (!accessory) return;
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
-    }, [accessory, onClose]);
-
-    if (!accessory) return null;
-    const units = accessory.accessory_units ?? [];
-    const fmtDate = (iso: string) => iso ? new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso)) : "—";
-
-    return (
-        <div className="fixed inset-0 z-[45] flex animate-fadeIn">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative ml-auto w-full max-w-lg bg-[#F7F7F8] h-full shadow-2xl flex flex-col animate-slideInRight">
-                <div className="bg-gray-800 px-5 py-4 flex items-start justify-between flex-shrink-0">
-                    <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-white truncate">{accessory.name}</h3>
-                        <p className="text-[11px] text-white/50 mt-0.5 truncate">{accessory.brand && `${accessory.brand} · `}{accessory.spec ?? ""}</p>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-white/15 text-white border border-white/10">{accessory.category}</span>
-                            <span className="text-[11px] text-white/70">{accessory.stock_tersedia} tersedia / {accessory.stock_total} total</span>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition flex-shrink-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                    {units.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 gap-2">
-                            <div className="text-3xl opacity-40">📦</div>
-                            <p className="text-sm text-gray-400 font-medium">Belum ada unit/SN</p>
-                            <button onClick={onAddUnit} className="text-xs text-gray-700 font-semibold hover:underline mt-1">+ Tambah unit pertama</button>
-                        </div>
-                    ) : units.map(unit => {
-                        const margin = (unit.selling_price || 0) - (unit.buy_price || 0);
-                        const marginPct = unit.buy_price > 0 ? Math.round((margin / unit.buy_price) * 100) : 0;
-                        return (
-                            <div key={unit.id} className="bg-white border border-gray-100 rounded-xl p-3.5 shadow-sm">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                        <span className="font-mono text-sm font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">{unit.serial_number}</span>
-                                        <StatusBadge status={unit.status} /><ConditionBadge condition={unit.condition} />
-                                    </div>
-                                    {unit.status !== "TERJUAL" && (
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            <button onClick={() => onEditUnit(unit)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition" title="Edit">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                            </button>
-                                            <button onClick={() => onDeleteUnit(unit)} className="p-1.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition" title="Hapus">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6M9 6V4h6v2" /></svg>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mt-3">
-                                    <div className="bg-gray-50 rounded-lg px-2.5 py-1.5"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Modal</p><p className="text-xs font-semibold text-gray-700 tabular-nums">{unit.buy_price > 0 ? fmt(unit.buy_price) : "—"}</p></div>
-                                    <div className="bg-gray-50 rounded-lg px-2.5 py-1.5"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Jual</p><p className="text-xs font-semibold text-gray-800 tabular-nums">{fmt(unit.selling_price)}</p></div>
-                                    <div className={`rounded-lg px-2.5 py-1.5 ${unit.buy_price > 0 ? (margin >= 0 ? "bg-emerald-50" : "bg-red-50") : "bg-gray-50"}`}>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Margin</p>
-                                        <p className={`text-xs font-bold tabular-nums ${unit.buy_price > 0 ? (margin >= 0 ? "text-emerald-600" : "text-red-500") : "text-gray-300"}`}>
-                                            {unit.buy_price > 0 ? <>{margin >= 0 ? "+" : ""}{fmt(margin)}<span className="text-[9px] font-medium ml-1 opacity-70">{marginPct}%</span></> : "—"}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between mt-2">
-                                    {unit.notes ? <p className="text-[11px] text-gray-400 truncate flex-1">{unit.notes}</p> : <span className="flex-1" />}
-                                    <p className="text-[10px] text-gray-300 flex-shrink-0 ml-2">{fmtDate(unit.created_at)}</p>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                <div className="p-4 border-t border-gray-100 bg-white flex-shrink-0">
-                    <button onClick={onAddUnit} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-gray-800 text-white text-sm font-bold hover:bg-gray-900 active:scale-[0.98] transition-all shadow-lg shadow-gray-800/20">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                        Tambah Unit / SN
-                    </button>
                 </div>
             </div>
         </div>
@@ -671,7 +455,6 @@ function DeleteConfirm({ open, title, name, onClose, onConfirm, loading }: {
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
 function AccessoriesContent() {
-    const router = useRouter();
     const [items, setItems] = useState<Accessory[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -714,9 +497,9 @@ function AccessoriesContent() {
 
     const stats = useMemo(() => ({
         jenis: total,
-        tersedia: items.reduce((s, i) => s + i.stock_tersedia, 0),
-        totalUnit: items.reduce((s, i) => s + i.stock_total, 0),
-        habis: items.filter(i => i.stock_tersedia === 0).length,
+        tersedia: items.reduce((s, i) => s + (i.stock ?? 0), 0),
+        habis: items.filter(i => (i.stock ?? 0) === 0).length,
+        nilai: items.reduce((s, i) => s + (i.sell_price ?? 0) * (i.stock ?? 0), 0),
     }), [items, total]);
 
     const handleSaveAcc = async (data: AccessoryForm) => {
@@ -748,7 +531,7 @@ function AccessoriesContent() {
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // EXPORT EXCEL — styled dengan xlsx-js-style
+    // EXPORT EXCEL — quantity-based (1 sheet)
     // ═══════════════════════════════════════════════════════════════════════
     const exportToExcel = async () => {
         setIsExporting(true);
@@ -764,147 +547,75 @@ function AccessoriesContent() {
 
             if (all.length === 0) { toast.error("Tidak ada data untuk di-export"); return; }
 
-            const statusLabel: Record<string, string> = {
-                TERSEDIA: "Tersedia", TERJUAL: "Terjual", RESERVED: "Reserved",
-            };
-
             const wb = XLSX.utils.book_new();
 
-            // ── SHEET 1: MASTER AKSESORI ──────────────────────────────────
-            // No | Nama | Kategori | Merk | Spek | Harga Default |
-            // SN Tersedia | SN Semua | Stok | Total | Terjual | Ket | Tgl
-            {
-                const COLS = [
-                    "No", "Nama Aksesori", "Kategori", "Merk", "Spesifikasi",
-                    "Harga Jual Default", "SN Tersedia", "SN Semua Unit",
-                    "Stok Tersedia", "Total Unit", "Terjual", "Keterangan", "Tanggal Input",
-                ];
-                const wsData: ReturnType<typeof xCell>[][] = [
-                    COLS.map((h, ci) => xCell(h, sHeader([0, 8, 9, 10].includes(ci)))),
-                ];
+            const COLS = [
+                "No", "Nama Aksesori", "Kategori", "Merk", "Spesifikasi",
+                "Harga Modal", "Harga Jual", "Stok", "Margin/unit", "Nilai Stok", "Keterangan", "Tanggal Input",
+            ];
+            const wsData: ReturnType<typeof xCell>[][] = [
+                COLS.map((h, ci) => xCell(h, sHeader([0, 5, 6, 7, 8, 9].includes(ci)))),
+            ];
 
-                all.forEach((a, idx) => {
-                    const units = a.accessory_units ?? [];
-                    const terjual = units.filter(u => u.status === "TERJUAL").length;
-                    const snTersedia = units.filter(u => u.status === "TERSEDIA").map(u => u.serial_number).join(", ") || "—";
-                    const snSemua = units.map(u => u.serial_number).join(", ") || "—";
-                    const tanggal = a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-                    const isZebra = idx % 2 === 1;
-                    const d = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
-                    // Warna stok: merah=0, kuning<=2, hijau>2
-                    const stokColor = a.stock_tersedia === 0 ? "DC2626" : a.stock_tersedia <= 2 ? "D97706" : "059669";
+            let totModal = 0, totJual = 0, totStok = 0, totNilai = 0;
 
-                    wsData.push([
-                        xCell(idx + 1, d(true)),
-                        xCell(a.name, d()),
-                        xCell(a.category, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
-                        xCell(a.brand ?? "—", d()),
-                        xCell(a.spec ?? "—", d()),
-                        xCell(a.sell_price || 0, d(true, true)),
-                        xCell(snTersedia, sSN(isZebra)),
-                        xCell(snSemua, { ...d(), font: { sz: 9, name: "Courier New", color: { rgb: "6B7280" } }, alignment: { horizontal: "left", wrapText: true } }),
-                        xCell(a.stock_tersedia, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: stokColor } } }),
-                        xCell(a.stock_total, d(true)),
-                        xCell(terjual, d(true)),
-                        xCell(a.notes ?? "—", d()),
-                        xCell(tanggal, d(true)),
-                    ]);
-                });
+            all.forEach((a, idx) => {
+                const margin = (a.sell_price || 0) - (a.buy_price || 0);
+                const nilaiStok = (a.sell_price || 0) * (a.stock || 0);
+                totModal += a.buy_price || 0;
+                totJual += a.sell_price || 0;
+                totStok += a.stock || 0;
+                totNilai += nilaiStok;
+                const isZebra = idx % 2 === 1;
+                const d = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
+                const stokColor = (a.stock || 0) === 0 ? "DC2626" : (a.stock || 0) <= 2 ? "D97706" : "059669";
+                const tanggal = a.created_at ? new Date(a.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-                const ws = XLSX.utils.aoa_to_sheet(wsData);
-                ws["!cols"] = [
-                    { wch: 5 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
-                    { wch: 20 }, { wch: 44 }, { wch: 44 },
-                    { wch: 13 }, { wch: 11 }, { wch: 10 }, { wch: 26 }, { wch: 16 },
-                ];
-                ws["!rows"] = [{ hpt: 22 }, ...all.map(() => ({ hpt: 18 }))];
-                (ws as Record<string, unknown>)["!freeze"] = { xSplit: 0, ySplit: 1 };
-                XLSX.utils.book_append_sheet(wb, ws, "Aksesori");
-            }
-
-            // ── SHEET 2: DETAIL UNIT / SN ─────────────────────────────────
-            // No | Nama | Kategori | Merk | SN | Kondisi | Status |
-            // Modal | Jual | Margin | Margin% | Catatan | Tgl
-            {
-                const COLS = [
-                    "No", "Nama Aksesori", "Kategori", "Merk", "Serial Number",
-                    "Kondisi", "Status", "Harga Modal", "Harga Jual",
-                    "Margin", "Margin %", "Catatan", "Tanggal Input",
-                ];
-                const wsData: ReturnType<typeof xCell>[][] = [
-                    COLS.map((h, ci) => xCell(h, sHeader([0, 5, 6, 7, 8, 9, 10].includes(ci)))),
-                ];
-
-                let unitNo = 1, totalModal = 0, totalJual = 0, totalMargin = 0;
-
-                all.forEach((a, ai) => {
-                    (a.accessory_units ?? []).forEach(u => {
-                        const margin = (u.selling_price || 0) - (u.buy_price || 0);
-                        const marginPct = u.buy_price > 0 ? `${Math.round((margin / u.buy_price) * 100)}%` : "—";
-                        totalModal += u.buy_price || 0;
-                        totalJual += u.selling_price || 0;
-                        totalMargin += margin;
-                        const isZebra = ai % 2 === 1; // zebra per grup aksesori
-                        const d = (r = false, c = false) => isZebra ? sZebra(r, c) : sData(r, c);
-                        const tanggal = u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-                        wsData.push([
-                            xCell(unitNo++, d(true)),
-                            xCell(a.name, d()),
-                            xCell(a.category, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
-                            xCell(a.brand ?? "—", d()),
-                            xCell(u.serial_number, sSN(isZebra)),
-                            xCell(u.condition, sKondisi(u.condition)),
-                            xCell(statusLabel[u.status] ?? u.status, sStatus(statusLabel[u.status])),
-                            xCell(u.buy_price || 0, d(true, true)),
-                            xCell(u.selling_price || 0, d(true, true)),
-                            xCell(margin, sMargin(margin)),
-                            xCell(marginPct, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: margin >= 0 ? "065F46" : "991B1B" } } }),
-                            xCell(u.notes ?? "—", d()),
-                            xCell(tanggal, d(true)),
-                        ]);
-                    });
-                });
-
-                // Baris TOTAL
                 wsData.push([
-                    xCell("", sTotal()),
-                    xCell("TOTAL", sTotal()),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
-                    xCell(totalModal, sTotal(true, true)),
-                    xCell(totalJual, sTotal(true, true)),
-                    xCell(totalMargin, sTotal(true, true)),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
-                    xCell("", sTotal()),
+                    xCell(idx + 1, d(true)),
+                    xCell(a.name, d()),
+                    xCell(a.category, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: "374151" } } }),
+                    xCell(a.brand ?? "—", d()),
+                    xCell(a.spec ?? "—", d()),
+                    xCell(a.buy_price || 0, d(true, true)),
+                    xCell(a.sell_price || 0, d(true, true)),
+                    xCell(a.stock || 0, { ...d(true), font: { bold: true, sz: 10, name: "Calibri", color: { rgb: stokColor } } }),
+                    xCell(margin, sMargin(margin)),
+                    xCell(nilaiStok, d(true, true)),
+                    xCell(a.notes ?? "—", d()),
+                    xCell(tanggal, d(true)),
                 ]);
+            });
 
-                if (wsData.length > 1) {
-                    const ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws["!cols"] = [
-                        { wch: 5 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
-                        { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 },
-                        { wch: 16 }, { wch: 10 }, { wch: 22 }, { wch: 16 },
-                    ];
-                    ws["!rows"] = [
-                        { hpt: 22 },
-                        ...Array(wsData.length - 2).fill({ hpt: 18 }),
-                        { hpt: 24 },
-                    ];
-                    (ws as Record<string, unknown>)["!freeze"] = { xSplit: 0, ySplit: 1 };
-                    XLSX.utils.book_append_sheet(wb, ws, "Detail Unit");
-                }
-            }
+            // Baris TOTAL
+            wsData.push([
+                xCell("", sTotal()),
+                xCell("TOTAL", sTotal()),
+                xCell("", sTotal()),
+                xCell("", sTotal()),
+                xCell("", sTotal()),
+                xCell(totModal, sTotal(true, true)),
+                xCell(totJual, sTotal(true, true)),
+                xCell(totStok, sTotal(true)),
+                xCell("", sTotal()),
+                xCell(totNilai, sTotal(true, true)),
+                xCell("", sTotal()),
+                xCell("", sTotal()),
+            ]);
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws["!cols"] = [
+                { wch: 5 }, { wch: 32 }, { wch: 14 }, { wch: 14 }, { wch: 22 },
+                { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 16 }, { wch: 18 }, { wch: 26 }, { wch: 16 },
+            ];
+            ws["!rows"] = [{ hpt: 22 }, ...all.map(() => ({ hpt: 18 })), { hpt: 24 }];
+            (ws as Record<string, unknown>)["!freeze"] = { xSplit: 0, ySplit: 1 };
+            XLSX.utils.book_append_sheet(wb, ws, "Aksesori");
 
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
             XLSX.writeFile(wb, `Aksesori_${dateStr}.xlsx`);
             toast.success(`Export berhasil — ${all.length} jenis aksesori`);
-
         } catch (err) {
             console.error("Export Excel gagal:", err);
             toast.error("Gagal export Excel. Coba lagi.");
@@ -922,12 +633,10 @@ function AccessoriesContent() {
                 @keyframes popIn        { from{opacity:0;transform:scale(0.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)} }
                 @keyframes slideDown    { from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)} }
                 @keyframes slideUp      { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
-                @keyframes slideInRight { from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)} }
                 .animate-fadeIn      { animation: fadeIn 0.2s ease-out; }
                 .animate-popIn       { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
                 .animate-slideDown   { animation: slideDown 0.3s ease-out; }
                 .animate-slideUp     { animation: slideUp 0.3s ease-out; }
-                .animate-slideInRight{ animation: slideInRight 0.28s cubic-bezier(0.22,1,0.36,1); }
                 .table-scroll { scrollbar-width: thin; scrollbar-color: #d1d5db #f9fafb; }
                 .table-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
                 .table-scroll::-webkit-scrollbar-track { background: #f9fafb; border-radius: 99px; }
@@ -980,8 +689,8 @@ function AccessoriesContent() {
                     {/* STAT CARDS */}
                     <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 animate-slideDown">
                         <StatCard label="Total Jenis" value={`${stats.jenis} jenis`} accent="bg-gray-700" icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>} />
-                        <StatCard label="Unit Tersedia" value={`${stats.tersedia} unit`} accent="bg-emerald-500" icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-                        <StatCard label="Total Unit" value={`${stats.totalUnit} unit`} accent="bg-blue-500" icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
+                        <StatCard label="Total Stok" value={`${stats.tersedia} unit`} accent="bg-emerald-500" icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+                        <StatCard label="Nilai Stok" value={fmt(stats.nilai)} accent="bg-blue-500" icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
                         <StatCard label="Stok Habis" value={`${stats.habis} jenis`} accent="bg-red-500" icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
                     </div>
 
@@ -1025,80 +734,47 @@ function AccessoriesContent() {
                                             <Th>Kategori</Th>
                                             <Th>Merk</Th>
                                             <Th>Spek</Th>
-                                            <Th>Serial Number (Tersedia)</Th>
-                                            <Th right>Harga Jual Default</Th>
-                                            <Th right>Stok Tersedia</Th>
-                                            <Th right>Total Unit</Th>
+                                            <Th right>Harga Modal</Th>
+                                            <Th right>Harga Jual</Th>
+                                            <Th right>Stok</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {items.map((item, idx) => {
-                                            const unitsTersedia = (item.accessory_units ?? []).filter(u => u.status === "TERSEDIA");
-                                            const snVisible = unitsTersedia.slice(0, 3);
-                                            const snOverflow = unitsTersedia.length - 3;
-                                            return (
-                                                <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
-                                                    onClick={() => { setSelectedAcc(item); setView("detail"); }}>
-                                                    <td className="px-4 py-3.5 text-center w-10">
-                                                        <span className="text-xs font-semibold text-gray-300 tabular-nums">{String((page - 1) * LIMIT + idx + 1).padStart(2, "0")}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 max-w-[200px]">
-                                                        <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.name}>{item.name}</span>
-                                                        {item.notes && <span className="block text-[11px] text-gray-400 truncate mt-0.5">{item.notes}</span>}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 whitespace-nowrap"><CategoryBadge cat={item.category} /></td>
-                                                    <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span></td>
-                                                    <td className="px-4 py-3.5 max-w-[140px]"><span className="block text-xs text-gray-600 truncate" title={item.spec ?? ""}>{item.spec || <span className="text-gray-200">—</span>}</span></td>
-
-                                                    {/* Serial Number chips */}
-                                                    <td className="px-4 py-3.5 max-w-[240px]" onClick={e => e.stopPropagation()}>
-                                                        {unitsTersedia.length === 0 ? (
-                                                            <span className="text-[11px] text-gray-300 font-medium italic">Tidak ada stok</span>
-                                                        ) : (
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {snVisible.map(u => (
-                                                                    <span key={u.id} title={u.serial_number}
-                                                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-100 leading-none whitespace-nowrap">
-                                                                        {u.serial_number}
-                                                                    </span>
-                                                                ))}
-                                                                {snOverflow > 0 && (
-                                                                    <span title={unitsTersedia.slice(3).map(u => u.serial_number).join(", ")}
-                                                                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 leading-none cursor-default">
-                                                                        +{snOverflow} lagi
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className="text-[13px] font-bold text-gray-800 tabular-nums">{item.sell_price > 0 ? fmt(item.sell_price) : <span className="text-gray-200 font-medium">—</span>}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${item.stock_tersedia === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : item.stock_tersedia <= 2 ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>
-                                                            {item.stock_tersedia}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className="text-sm font-semibold text-gray-600 tabular-nums">{item.stock_total}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <button onClick={() => router.push(`/dashboard/accessories/${item.id}/units`)}
-                                                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Kelola Unit/SN">
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M8 12h.01M12 12h.01M16 12h.01" /></svg>
-                                                            </button>
-                                                            <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }}
-                                                                className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
-                                                            <button onClick={() => setDeleteAcc(item)}
-                                                                className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
+                                        {items.map((item, idx) => (
+                                            <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0"
+                                                onClick={() => { setSelectedAcc(item); setView("detail"); }}>
+                                                <td className="px-4 py-3.5 text-center w-10">
+                                                    <span className="text-xs font-semibold text-gray-300 tabular-nums">{String((page - 1) * LIMIT + idx + 1).padStart(2, "0")}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 max-w-[220px]">
+                                                    <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.name}>{item.name}</span>
+                                                    {item.notes && <span className="block text-[11px] text-gray-400 truncate mt-0.5">{item.notes}</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap"><CategoryBadge cat={item.category} /></td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span></td>
+                                                <td className="px-4 py-3.5 max-w-[160px]"><span className="block text-xs text-gray-600 truncate" title={item.spec ?? ""}>{item.spec || <span className="text-gray-200">—</span>}</span></td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className="text-xs text-gray-500 tabular-nums">{item.buy_price > 0 ? fmt(item.buy_price) : <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className="text-[13px] font-bold text-gray-800 tabular-nums">{item.sell_price > 0 ? fmt(item.sell_price) : <span className="text-gray-200 font-medium">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stock ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : (item.stock ?? 0) <= 2 ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>
+                                                        {item.stock ?? 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }}
+                                                            className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                        <button onClick={() => setDeleteAcc(item)}
+                                                            className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -1132,7 +808,6 @@ function AccessoriesContent() {
             {view === "detail" && (
                 <AccessoryDetailModal accessory={selectedAcc}
                     onClose={() => { setView(null); setSelectedAcc(null); }}
-                    onManageUnits={() => { setView(null); router.push(`/dashboard/accessories/${selectedAcc!.id}/units`); }}
                     onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }}
                     onDelete={() => setDeleteAcc(selectedAcc)} />
             )}
@@ -1145,9 +820,7 @@ function AccessoriesContent() {
 
 export default function AccessoriesPage() {
     return (
-        <DashboardLayout>
             <AccessoriesContent />
-        </DashboardLayout>
     );
 }
 
@@ -1205,7 +878,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Aksesori", "Kategori", "Merk", "Spek", "Serial Number", "Harga", "Stok", "Total", "Aksi"].map(h => (
+                            {["No", "Nama Aksesori", "Kategori", "Merk", "Spek", "Modal", "Jual", "Stok", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1218,11 +891,10 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={18} r="6px" /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={90} h={12} /></td>
-                                <td className="px-4 py-3.5"><div className="flex gap-1"><Shimmer w={70} h={18} r="4px" /><Shimmer w={70} h={18} r="4px" /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={90} h={13} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={24} h={13} /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={28} h={28} r="8px" /><Shimmer w={40} h={28} r="8px" /><Shimmer w={44} h={28} r="8px" /></div></td>
+                                <td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={40} h={28} r="8px" /><Shimmer w={44} h={28} r="8px" /></div></td>
                             </tr>
                         ))}
                     </tbody>
