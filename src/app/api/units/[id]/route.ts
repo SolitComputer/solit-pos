@@ -45,14 +45,14 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { data, error } = await supabase
       .from("laptop_units")
       .update({
-        ...(serial_number    !== undefined && { serial_number }),
-        ...(grade            !== undefined && { grade }),
-        ...(condition_note   !== undefined && { condition_note }),
-        ...(purchase_price   !== undefined && { purchase_price:  Math.round(Number(purchase_price)) }),
-        ...(selling_price    !== undefined && { selling_price:   Math.round(Number(selling_price)) }),
+        ...(serial_number !== undefined && { serial_number }),
+        ...(grade !== undefined && { grade }),
+        ...(condition_note !== undefined && { condition_note }),
+        ...(purchase_price !== undefined && { purchase_price: Math.round(Number(purchase_price)) }),
+        ...(selling_price !== undefined && { selling_price: Math.round(Number(selling_price)) }),
         ...(body.sparepart_cost !== undefined && { sparepart_cost: Math.round(Number(body.sparepart_cost)) }),
-        ...(status           !== undefined && { status }),
-        ...(notes            !== undefined && { notes }),
+        ...(status !== undefined && { status }),
+        ...(notes !== undefined && { notes }),
         ...(body.received_at !== undefined && body.received_at !== "" && {
           created_at: body.received_at,
         }),
@@ -64,15 +64,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (error) throw error;
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "EDIT",
-      entity:      "unit",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "unit",
+      entityId: id,
       entityLabel: `SN: ${before?.serial_number ?? serial_number ?? id}`,
-      beforeData:  before,
-      afterData:   data,
+      beforeData: before,
+      afterData: data,
     });
 
     return NextResponse.json({ success: true, data });
@@ -173,15 +173,15 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
               (sum, u) => sum + Math.round(Number(u.purchase_price ?? 0)), 0
             );
             const dealPrice = Number(tx.deal_price ?? tx.amount ?? 0);
-            const newOther  = dealPrice - newInventoryPrice;
+            const newOther = dealPrice - newInventoryPrice;
 
             await supabase
               .from("transactions")
               .update({
                 inventory_price: newInventoryPrice,
-                other:           newOther,
-                last_edited_by:  user.name,
-                last_edited_at:  new Date().toISOString(),
+                other: newOther,
+                last_edited_by: user.name,
+                last_edited_at: new Date().toISOString(),
               })
               .eq("invoice_number", tx.invoice_number);
           })
@@ -189,15 +189,15 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
 
       await logActivity({
-        userId:      user.id,
-        userName:    user.name,
-        userRole:    user.role,
-        action:      "EDIT",
-        entity:      "unit",
-        entityId:    unitId,
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: "EDIT",
+        entity: "unit",
+        entityId: unitId,
         entityLabel: `SN: ${before.serial_number} — koreksi harga modal`,
-        beforeData:  { purchase_price: before.purchase_price },
-        afterData:   { purchase_price: newPrice },
+        beforeData: { purchase_price: before.purchase_price },
+        afterData: { purchase_price: newPrice },
       });
 
       return NextResponse.json({ success: true, data: updated });
@@ -224,15 +224,15 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (updateError) throw updateError;
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "EDIT",
-      entity:      "unit",
-      entityId:    unitId,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "EDIT",
+      entity: "unit",
+      entityId: unitId,
       entityLabel: `SN: ${before.serial_number} — koreksi harga sparepart`,
-      beforeData:  { sparepart_cost: before.sparepart_cost },
-      afterData:   { sparepart_cost: newSparepart },
+      beforeData: { sparepart_cost: before.sparepart_cost },
+      afterData: { sparepart_cost: newSparepart },
     });
 
     return NextResponse.json({ success: true, data: updated });
@@ -250,40 +250,69 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
 
+    // Ambil data unit sebelum dihapus (untuk log)
     const { data: unit } = await supabase
       .from("laptop_units")
       .select("*")
       .eq("id", id)
       .single();
 
+    // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
+    // transactions.unit_id (single) sudah ditangani oleh FK ON DELETE SET NULL.
+    // Tapi unit_ids (array) tidak ada FK-nya, jadi harus dibersihkan manual.
+    const { data: txWithArray } = await supabase
+      .from("transactions")
+      .select("invoice_number, unit_ids")
+      .contains("unit_ids", [id]);
+
+    if (txWithArray && txWithArray.length > 0) {
+      await Promise.allSettled(
+        txWithArray.map((tx) =>
+          supabase
+            .from("transactions")
+            .update({
+              unit_ids: (tx.unit_ids as string[]).filter((uid: string) => uid !== id),
+            })
+            .eq("invoice_number", tx.invoice_number)
+        )
+      );
+    }
+
+    // ── Hapus unit (transactions.unit_id akan auto SET NULL via FK) ────────
     const { error } = await supabase
       .from("laptop_units")
       .delete()
       .eq("id", id);
 
-    if (error) throw error;
+    if (error) {
+      console.error("[DELETE unit] error:", error);
+      return NextResponse.json(
+        { success: false, message: "Gagal hapus unit: " + error.message },
+        { status: 500 }
+      );
+    }
 
     await logActivity({
-      userId:      user.id,
-      userName:    user.name,
-      userRole:    user.role,
-      action:      "DELETE",
-      entity:      "unit",
-      entityId:    id,
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "DELETE",
+      entity: "unit",
+      entityId: id,
       entityLabel: `SN: ${unit?.serial_number ?? id}`,
-      beforeData:  unit,
+      beforeData: unit,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error("[DELETE /api/units/[id]]", err);
     return NextResponse.json(
-      { success: false, message: "Gagal hapus unit" },
+      { success: false, message: "Gagal hapus unit: " + String(err) },
       { status: 500 }
     );
   }
 }
 
-export const PUT    = withAuth(putHandler,    PERMISSIONS.EDIT_UNITS);
-export const PATCH  = withAuth(patchHandler,  PERMISSIONS.EDIT_UNITS);
+export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_UNITS);
+export const PATCH = withAuth(patchHandler, PERMISSIONS.EDIT_UNITS);
 export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_UNITS);
