@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,25 +72,13 @@ function isDueToday(due_date: string | null, is_done: boolean): boolean {
     );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── EmptyState ───────────────────────────────────────────────────────────────
 
 function EmptyState({ filter }: { filter: FilterType }) {
     const messages: Record<FilterType, { icon: string; title: string; desc: string }> = {
-        all: {
-            icon: "✅",
-            title: "Belum ada tugas",
-            desc: "Tambah tugas pertamamu sekarang",
-        },
-        active: {
-            icon: "🎉",
-            title: "Semua tugas selesai!",
-            desc: "Tidak ada tugas yang tertunda",
-        },
-        done: {
-            icon: "📋",
-            title: "Belum ada tugas selesai",
-            desc: "Selesaikan tugas dan centang di sini",
-        },
+        all: { icon: "✅", title: "Belum ada tugas", desc: "Tambah tugas pertamamu sekarang" },
+        active: { icon: "🎉", title: "Semua tugas selesai!", desc: "Tidak ada tugas yang tertunda" },
+        done: { icon: "📋", title: "Belum ada tugas selesai", desc: "Selesaikan tugas dan centang di sini" },
     };
     const { icon, title, desc } = messages[filter];
     return (
@@ -101,7 +90,7 @@ function EmptyState({ filter }: { filter: FilterType }) {
     );
 }
 
-// ─── Add/Edit Modal ───────────────────────────────────────────────────────────
+// ─── TodoFormModal ────────────────────────────────────────────────────────────
 
 interface TodoFormModalProps {
     open: boolean;
@@ -166,7 +155,6 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-                    {/* Title */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                             Judul Tugas <span className="text-red-500">*</span>
@@ -183,7 +171,6 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                         />
                     </div>
 
-                    {/* Description */}
                     <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                             Deskripsi <span className="text-gray-400 font-normal">(opsional)</span>
@@ -198,7 +185,6 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                         />
                     </div>
 
-                    {/* Priority + Due Date */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-xs font-semibold text-gray-600 mb-1.5">Prioritas</label>
@@ -225,7 +211,6 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                         </div>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex gap-2 pt-1">
                         <button
                             type="button"
@@ -254,7 +239,7 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
     );
 }
 
-// ─── Todo Item Card ───────────────────────────────────────────────────────────
+// ─── TodoItem ─────────────────────────────────────────────────────────────────
 
 interface TodoItemProps {
     todo: Todo;
@@ -275,23 +260,19 @@ function TodoItem({ todo, onToggle, onEdit, onDelete, toggling }: TodoItemProps)
             className={`group relative flex items-start gap-3 px-4 py-3.5 rounded-2xl border transition-all duration-200
         ${todo.is_done
                     ? "bg-gray-50 border-gray-100 opacity-75"
-                    : `bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm`
+                    : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm"
                 }`}
         >
-            {/* Priority accent bar */}
             <div
                 className={`absolute left-0 top-3 bottom-3 w-1 rounded-r-full ${cfg.dot} ${todo.is_done ? "opacity-30" : ""}`}
             />
 
-            {/* Checkbox */}
             <button
                 onClick={() => onToggle(todo.id, !todo.is_done)}
                 disabled={isToggling}
                 className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
-          ${todo.is_done
-                        ? "bg-emerald-500 border-emerald-500"
-                        : "border-gray-300 hover:border-[#1a1a2e]"
-                    } ${isToggling ? "opacity-50 animate-pulse" : ""}`}
+          ${todo.is_done ? "bg-emerald-500 border-emerald-500" : "border-gray-300 hover:border-[#1a1a2e]"}
+          ${isToggling ? "opacity-50 animate-pulse" : ""}`}
                 aria-label={todo.is_done ? "Tandai belum selesai" : "Tandai selesai"}
             >
                 {todo.is_done && (
@@ -301,28 +282,20 @@ function TodoItem({ todo, onToggle, onEdit, onDelete, toggling }: TodoItemProps)
                 )}
             </button>
 
-            {/* Content */}
             <div className="flex-1 min-w-0">
-                <p
-                    className={`text-sm font-semibold leading-snug break-words
-            ${todo.is_done ? "line-through text-gray-400" : "text-gray-800"}`}
-                >
+                <p className={`text-sm font-semibold leading-snug break-words ${todo.is_done ? "line-through text-gray-400" : "text-gray-800"}`}>
                     {todo.title}
                 </p>
-
                 {todo.description && (
                     <p className={`text-xs mt-1 leading-relaxed break-words ${todo.is_done ? "text-gray-400" : "text-gray-500"}`}>
                         {todo.description}
                     </p>
                 )}
-
-                {/* Meta: priority + due date */}
                 <div className="flex items-center flex-wrap gap-2 mt-2">
                     <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                         {cfg.label}
                     </span>
-
                     {todo.due_date && (
                         <span
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full
@@ -340,7 +313,6 @@ function TodoItem({ todo, onToggle, onEdit, onDelete, toggling }: TodoItemProps)
                 </div>
             </div>
 
-            {/* Action buttons — show on hover */}
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                 <button
                     onClick={() => onEdit(todo)}
@@ -369,7 +341,7 @@ function TodoItem({ todo, onToggle, onEdit, onDelete, toggling }: TodoItemProps)
     );
 }
 
-// ─── Stats Bar ────────────────────────────────────────────────────────────────
+// ─── StatsBar ─────────────────────────────────────────────────────────────────
 
 function StatsBar({ todos }: { todos: Todo[] }) {
     const total = todos.length;
@@ -388,13 +360,9 @@ function StatsBar({ todos }: { todos: Todo[] }) {
             ].map(({ label, value, icon, color }) => (
                 <div key={label} className="bg-white rounded-2xl border border-gray-100 px-4 py-3">
                     <p className="text-xs text-gray-400 font-medium mb-1">{label}</p>
-                    <p className={`text-2xl font-black ${color}`}>
-                        {icon} {value}
-                    </p>
+                    <p className={`text-2xl font-black ${color}`}>{icon} {value}</p>
                 </div>
             ))}
-
-            {/* Progress bar — full width */}
             {total > 0 && (
                 <div className="col-span-2 sm:col-span-4 bg-white rounded-2xl border border-gray-100 px-4 py-3">
                     <div className="flex justify-between items-center mb-2">
@@ -407,22 +375,17 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                             style={{ width: `${pct}%` }}
                         />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">
-                        {done} dari {total} tugas selesai
-                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">{done} dari {total} tugas selesai</p>
                 </div>
             )}
         </div>
     );
 }
 
-// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+// ─── DeleteConfirmModal ───────────────────────────────────────────────────────
 
 function DeleteConfirmModal({
-    open,
-    onClose,
-    onConfirm,
-    loading,
+    open, onClose, onConfirm, loading,
 }: {
     open: boolean;
     onClose: () => void;
@@ -482,7 +445,6 @@ export default function TodosClient() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Modal states
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<Todo | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -490,12 +452,10 @@ export default function TodosClient() {
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [toggling, setToggling] = useState<string | null>(null);
 
-    // Filter + search
     const [filter, setFilter] = useState<FilterType>("all");
     const [search, setSearch] = useState("");
     const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
 
-    // Toast notifications
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -504,8 +464,6 @@ export default function TodosClient() {
         setToast({ msg, type });
         toastTimer.current = setTimeout(() => setToast(null), 3000);
     }, []);
-
-    // ── Fetch todos ────────────────────────────────────────────────────────────
 
     const fetchTodos = useCallback(async () => {
         setLoading(true);
@@ -516,18 +474,13 @@ export default function TodosClient() {
             const data = await res.json();
             setTodos(data.todos ?? []);
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : "Terjadi kesalahan";
-            setError(msg);
+            setError(err instanceof Error ? err.message : "Terjadi kesalahan");
         } finally {
             setLoading(false);
         }
     }, []);
 
-    useEffect(() => {
-        fetchTodos();
-    }, [fetchTodos]);
-
-    // ── Filtered + searched todos ──────────────────────────────────────────────
+    useEffect(() => { fetchTodos(); }, [fetchTodos]);
 
     const filteredTodos = useMemo(() => {
         let list = todos;
@@ -536,23 +489,15 @@ export default function TodosClient() {
         if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter(
-                (t) =>
-                    t.title.toLowerCase().includes(q) ||
-                    (t.description ?? "").toLowerCase().includes(q)
+            list = list.filter((t) =>
+                t.title.toLowerCase().includes(q) ||
+                (t.description ?? "").toLowerCase().includes(q)
             );
         }
         return list;
     }, [todos, filter, priorityFilter, search]);
 
-    // ── CRUD handlers ──────────────────────────────────────────────────────────
-
-    const handleCreate = async (data: {
-        title: string;
-        description: string;
-        priority: Priority;
-        due_date: string;
-    }) => {
+    const handleCreate = async (data: { title: string; description: string; priority: Priority; due_date: string }) => {
         setFormLoading(true);
         try {
             const res = await fetch("/api/todos", {
@@ -572,12 +517,7 @@ export default function TodosClient() {
         }
     };
 
-    const handleEdit = async (data: {
-        title: string;
-        description: string;
-        priority: Priority;
-        due_date: string;
-    }) => {
+    const handleEdit = async (data: { title: string; description: string; priority: Priority; due_date: string }) => {
         if (!editTarget) return;
         setFormLoading(true);
         try {
@@ -588,9 +528,7 @@ export default function TodosClient() {
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.error ?? "Gagal mengedit tugas");
-            setTodos((prev) =>
-                prev.map((t) => (t.id === editTarget.id ? result.todo : t))
-            );
+            setTodos((prev) => prev.map((t) => (t.id === editTarget.id ? result.todo : t)));
             setEditTarget(null);
             showToast("Tugas berhasil diperbarui ✏️");
         } catch (err: unknown) {
@@ -602,10 +540,7 @@ export default function TodosClient() {
 
     const handleToggle = async (id: string, is_done: boolean) => {
         setToggling(id);
-        // Optimistic update
-        setTodos((prev) =>
-            prev.map((t) => (t.id === id ? { ...t, is_done } : t))
-        );
+        setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, is_done } : t)));
         try {
             const res = await fetch(`/api/todos/${id}`, {
                 method: "PATCH",
@@ -613,18 +548,13 @@ export default function TodosClient() {
                 body: JSON.stringify({ is_done }),
             });
             if (!res.ok) {
-                // Rollback on error
-                setTodos((prev) =>
-                    prev.map((t) => (t.id === id ? { ...t, is_done: !is_done } : t))
-                );
+                setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, is_done: !is_done } : t)));
                 showToast("Gagal mengupdate status", "error");
             } else {
                 showToast(is_done ? "Tugas selesai! 🎉" : "Tugas dibuka kembali");
             }
         } catch {
-            setTodos((prev) =>
-                prev.map((t) => (t.id === id ? { ...t, is_done: !is_done } : t))
-            );
+            setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, is_done: !is_done } : t)));
             showToast("Gagal mengupdate status", "error");
         } finally {
             setToggling(null);
@@ -653,11 +583,8 @@ export default function TodosClient() {
     const handleClearDone = async () => {
         const doneIds = todos.filter((t) => t.is_done).map((t) => t.id);
         if (doneIds.length === 0) return;
-        // Delete one by one (kita punya few records, ini fine)
         try {
-            await Promise.all(
-                doneIds.map((id) => fetch(`/api/todos/${id}`, { method: "DELETE" }))
-            );
+            await Promise.all(doneIds.map((id) => fetch(`/api/todos/${id}`, { method: "DELETE" })));
             setTodos((prev) => prev.filter((t) => !t.is_done));
             showToast(`${doneIds.length} tugas selesai dihapus 🧹`);
         } catch {
@@ -665,11 +592,10 @@ export default function TodosClient() {
         }
     };
 
-    // ── Render ─────────────────────────────────────────────────────────────────
-
     const doneTodos = todos.filter((t) => t.is_done);
 
-    return (
+    // ── Inner content (dirender di dalam DashboardLayout) ─────────────────────
+    const content = (
         <>
             <style>{`
         @keyframes todoModalIn {
@@ -682,7 +608,7 @@ export default function TodosClient() {
         }
       `}</style>
 
-            {/* ── Toast ── */}
+            {/* Toast */}
             {toast && (
                 <div
                     className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white flex items-center gap-2
@@ -693,7 +619,7 @@ export default function TodosClient() {
                 </div>
             )}
 
-            {/* ── Modals ── */}
+            {/* Modals */}
             <TodoFormModal
                 open={formOpen || editTarget !== null}
                 onClose={() => { setFormOpen(false); setEditTarget(null); }}
@@ -708,144 +634,132 @@ export default function TodosClient() {
                 loading={deleteLoading}
             />
 
-            {/* ── Page ── */}
-            <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-                <div className="max-w-3xl mx-auto">
+            {/* Page content */}
+            <div className="max-w-3xl mx-auto">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-6">
+                    <div>
+                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">To-Do List</h1>
+                        <p className="text-sm text-gray-400 mt-0.5">Catat dan kelola tugasmu di sini</p>
+                    </div>
+                    <button
+                        onClick={() => { setEditTarget(null); setFormOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a2e] hover:bg-[#2d2d4a] text-white text-sm font-semibold rounded-xl transition shadow-md shadow-[#1a1a2e]/20 flex-shrink-0"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Tambah Tugas
+                    </button>
+                </div>
 
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-black text-gray-900 tracking-tight">To-Do List</h1>
-                            <p className="text-sm text-gray-400 mt-0.5">Catat dan kelola tugasmu di sini</p>
-                        </div>
-                        <button
-                            onClick={() => { setEditTarget(null); setFormOpen(true); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a2e] hover:bg-[#2d2d4a] text-white text-sm font-semibold rounded-xl transition shadow-md shadow-[#1a1a2e]/20 flex-shrink-0"
+                {/* Stats */}
+                {!loading && todos.length > 0 && <StatsBar todos={todos} />}
+
+                {/* Search + Filters */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 space-y-3">
+                    <div className="relative">
+                        <svg
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                            Tambah Tugas
-                        </button>
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Cari tugas..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
+                        />
                     </div>
 
-                    {/* Stats */}
-                    {!loading && todos.length > 0 && <StatsBar todos={todos} />}
-
-                    {/* Search + Filters */}
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 space-y-3">
-                        {/* Search */}
-                        <div className="relative">
-                            <svg
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(["all", "active", "done"] as FilterType[]).map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition
+                  ${filter === f ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                             >
-                                <circle cx="11" cy="11" r="8" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                            <input
-                                type="text"
-                                placeholder="Cari tugas..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition"
-                            />
-                        </div>
-
-                        {/* Filter tabs + priority */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                            {(["all", "active", "done"] as FilterType[]).map((f) => (
+                                {f === "all" ? "Semua" : f === "active" ? "Belum Selesai" : "Selesai"}
+                            </button>
+                        ))}
+                        <div className="ml-auto flex items-center gap-2">
+                            <select
+                                value={priorityFilter}
+                                onChange={(e) => setPriorityFilter(e.target.value as Priority | "all")}
+                                className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition bg-white text-gray-600"
+                            >
+                                <option value="all">Semua Prioritas</option>
+                                <option value="high">🔴 Tinggi</option>
+                                <option value="medium">🟡 Sedang</option>
+                                <option value="low">🔵 Rendah</option>
+                            </select>
+                            {doneTodos.length > 0 && (
                                 <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition
-                    ${filter === f
-                                            ? "bg-[#1a1a2e] text-white"
-                                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                        }`}
+                                    onClick={handleClearDone}
+                                    className="px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition"
+                                    title="Hapus semua tugas yang sudah selesai"
                                 >
-                                    {f === "all" ? "Semua" : f === "active" ? "Belum Selesai" : "Selesai"}
+                                    Bersihkan ✅
                                 </button>
-                            ))}
-
-                            <div className="ml-auto flex items-center gap-2">
-                                <select
-                                    value={priorityFilter}
-                                    onChange={(e) => setPriorityFilter(e.target.value as Priority | "all")}
-                                    className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition bg-white text-gray-600"
-                                >
-                                    <option value="all">Semua Prioritas</option>
-                                    <option value="high">🔴 Tinggi</option>
-                                    <option value="medium">🟡 Sedang</option>
-                                    <option value="low">🔵 Rendah</option>
-                                </select>
-
-                                {doneTodos.length > 0 && (
-                                    <button
-                                        onClick={handleClearDone}
-                                        className="px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition"
-                                        title="Hapus semua tugas yang sudah selesai"
-                                    >
-                                        Bersihkan ✅
-                                    </button>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </div>
+                </div>
 
-                    {/* Todo List */}
-                    <div className="space-y-2">
-                        {loading ? (
-                            <div className="space-y-2">
-                                {[1, 2, 3].map((i) => (
-                                    <div
-                                        key={i}
-                                        className="h-20 bg-white border border-gray-100 rounded-2xl animate-pulse"
-                                        style={{ animationDelay: `${i * 60}ms` }}
-                                    />
-                                ))}
-                            </div>
-                        ) : error ? (
-                            <div className="bg-red-50 border border-red-100 rounded-2xl p-5 text-center">
-                                <p className="text-sm text-red-600 font-semibold mb-3">{error}</p>
-                                <button
-                                    onClick={fetchTodos}
-                                    className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition"
-                                >
-                                    Coba Lagi
-                                </button>
-                            </div>
-                        ) : filteredTodos.length === 0 ? (
-                            <div className="bg-white border border-gray-100 rounded-2xl">
-                                <EmptyState filter={filter} />
-                            </div>
-                        ) : (
-                            filteredTodos.map((todo) => (
+                {/* Todo List */}
+                <div className="space-y-2">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
                                 <div
-                                    key={todo.id}
-                                    style={{ animation: "todoModalIn 0.2s ease-out both" }}
-                                >
-                                    <TodoItem
-                                        todo={todo}
-                                        onToggle={handleToggle}
-                                        onEdit={(t) => { setEditTarget(t); setFormOpen(false); }}
-                                        onDelete={(id) => setDeleteTarget(id)}
-                                        toggling={toggling}
-                                    />
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Footer info */}
-                    {!loading && filteredTodos.length > 0 && (
-                        <p className="text-xs text-gray-400 text-center mt-6">
-                            Menampilkan {filteredTodos.length} dari {todos.length} tugas
-                        </p>
+                                    key={i}
+                                    className="h-20 bg-white border border-gray-100 rounded-2xl animate-pulse"
+                                    style={{ animationDelay: `${i * 60}ms` }}
+                                />
+                            ))}
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 border border-red-100 rounded-2xl p-5 text-center">
+                            <p className="text-sm text-red-600 font-semibold mb-3">{error}</p>
+                            <button
+                                onClick={fetchTodos}
+                                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition"
+                            >
+                                Coba Lagi
+                            </button>
+                        </div>
+                    ) : filteredTodos.length === 0 ? (
+                        <div className="bg-white border border-gray-100 rounded-2xl">
+                            <EmptyState filter={filter} />
+                        </div>
+                    ) : (
+                        filteredTodos.map((todo) => (
+                            <div key={todo.id} style={{ animation: "todoModalIn 0.2s ease-out both" }}>
+                                <TodoItem
+                                    todo={todo}
+                                    onToggle={handleToggle}
+                                    onEdit={(t) => { setEditTarget(t); setFormOpen(false); }}
+                                    onDelete={(id) => setDeleteTarget(id)}
+                                    toggling={toggling}
+                                />
+                            </div>
+                        ))
                     )}
                 </div>
+
+                {!loading && filteredTodos.length > 0 && (
+                    <p className="text-xs text-gray-400 text-center mt-6">
+                        Menampilkan {filteredTodos.length} dari {todos.length} tugas
+                    </p>
+                )}
             </div>
         </>
     );
+
+    return <DashboardLayout>{content}</DashboardLayout>;
 }
