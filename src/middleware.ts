@@ -23,8 +23,10 @@ const PUBLIC_API_ROUTES = [
   "/api/public/catalog",
 ];
 
-const CRON_ROUTES = ["/api/cc-reports/sync"];
-
+const CRON_ROUTES = [
+  "/api/cc-reports/sync",
+  "/api/cc-reports/tiktok/keepalive",   
+];
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",

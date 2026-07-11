@@ -13,8 +13,8 @@ import {
 } from "@/lib/ccReports";
 
 const METRIC_META: Record<CCMetric, { label: string; short: string; color: string }> = {
-  views:    { label: "Views",    short: "View",  color: "#7c3aed" },
-  likes:    { label: "Likes",    short: "Like",  color: "#10b981" },
+  views: { label: "Views", short: "View", color: "#7c3aed" },
+  likes: { label: "Likes", short: "Like", color: "#10b981" },
   comments: { label: "Komentar", short: "Komen", color: "#3b82f6" },
 };
 
@@ -26,9 +26,9 @@ const RANGES: { key: CCRange; label: string }[] = [
 ];
 
 const PROCESS_SEGMENTS = [
-  { key: "takeMinutes",    label: "Take",           color: "#7c3aed" },
+  { key: "takeMinutes", label: "Take", color: "#7c3aed" },
   { key: "handoffMinutes", label: "Serah ke Editor", color: "#f59e0b" },
-  { key: "editMinutes",    label: "Editing",         color: "#10b981" },
+  { key: "editMinutes", label: "Editing", color: "#10b981" },
 ] as const;
 
 const EMPTY: CCMetricTotals = { views: 0, likes: 0, comments: 0, postCount: 0 };
@@ -51,6 +51,17 @@ export default function CCAnalisaPage() {
   const [metric, setMetric] = useState<CCMetric>("views");
   const [range, setRange] = useState<CCRange>("30");
   const [filter, setFilter] = useState<AnalisaFilter>("ALL");
+  const [tt, setTt] = useState<{
+    connected: boolean; accountName: string | null; daysLeft: number | null;
+    level: "OK" | "WARN" | "DEAD"; error: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/cc-reports/tiktok/status")
+      .then((r) => r.json())
+      .then((j) => j.success && setTt(j))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -180,6 +191,60 @@ export default function CCAnalisaPage() {
     <DashboardLayout>
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
+         {/* ── Kesehatan koneksi TikTok ── */}
+          {tt && (
+            <div
+              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3 ${
+                tt.level === "OK"
+                  ? "border-emerald-100 bg-emerald-50"
+                  : tt.level === "WARN"
+                    ? "border-amber-100 bg-amber-50"
+                    : "border-red-100 bg-red-50"
+              }`}
+            >
+              <p
+                className={`text-xs font-medium ${
+                  tt.level === "OK"
+                    ? "text-emerald-800"
+                    : tt.level === "WARN"
+                      ? "text-amber-800"
+                      : "text-red-800"
+                }`}
+              >
+                {tt.level === "OK" && (
+                  <>
+                    <b>TikTok terhubung</b>
+                    {tt.accountName && <span className="ml-1">· @{tt.accountName}</span>}
+                    <span className="ml-1 opacity-70">
+                      — token diperbarui otomatis tiap hari
+                      {tt.daysLeft !== null && ` (aman ${tt.daysLeft} hari)`}
+                    </span>
+                  </>
+                )}
+                {tt.level === "WARN" && (
+                  <>
+                    <b>⚠️ Koneksi TikTok perlu perhatian.</b>{" "}
+                    {tt.error ?? (tt.daysLeft !== null && `Sesi tersisa ${tt.daysLeft} hari.`)}{" "}
+                    Sebaiknya hubungkan ulang sekarang.
+                  </>
+                )}
+                {tt.level === "DEAD" && (
+                  <>
+                    <b>🔴 TikTok tidak terhubung.</b> Metrik TikTok tidak akan ter-update otomatis.
+                    {tt.error && <span className="ml-1 opacity-80">({tt.error})</span>}
+                  </>
+                )}
+              </p>
+              {tt.level !== "OK" && (
+                <a
+                  href="/api/cc-reports/tiktok/connect"
+                  className="flex-shrink-0 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-gray-800"
+                >
+                  {tt.level === "DEAD" ? "Hubungkan TikTok" : "Hubungkan Ulang"}
+                </a>
+              )}
+            </div>
+          )}
           {/* ── Header ── */}
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <Link
@@ -218,11 +283,10 @@ export default function CCAnalisaPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${
-                    active
-                      ? "border-gray-900 bg-gray-900 text-white shadow-sm"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
-                  }`}
+                  className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${active
+                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                    }`}
                 >
                   <span
                     className="h-2 w-2 flex-shrink-0 rounded-full ring-1 ring-white/40"
@@ -241,9 +305,8 @@ export default function CCAnalisaPage() {
                 <button
                   key={k}
                   onClick={() => setMetric(k)}
-                  className={`rounded-lg px-4 py-1.5 text-sm font-bold transition ${
-                    metric === k ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
-                  }`}
+                  className={`rounded-lg px-4 py-1.5 text-sm font-bold transition ${metric === k ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
+                    }`}
                 >
                   {METRIC_META[k].label}
                 </button>
@@ -254,9 +317,8 @@ export default function CCAnalisaPage() {
                 <button
                   key={r.key}
                   onClick={() => setRange(r.key)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    range === r.key ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-700"
-                  }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${range === r.key ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-700"
+                    }`}
                 >
                   {r.label}
                 </button>
@@ -277,9 +339,8 @@ export default function CCAnalisaPage() {
                   </span>
                   {delta !== null && (
                     <span
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black tabular-nums ${
-                        up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-                      }`}
+                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black tabular-nums ${up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                        }`}
                     >
                       <svg
                         width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -484,7 +545,7 @@ export default function CCAnalisaPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
 
@@ -539,9 +600,8 @@ function PodiumCard({
             <div key={r.report_id}>
               <div className="mb-1 flex items-center gap-2">
                 <span
-                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-black ${
-                    i === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
-                  }`}
+                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-black ${i === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
+                    }`}
                 >
                   {i + 1}
                 </span>

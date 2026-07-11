@@ -1,5 +1,5 @@
 // src/lib/ccSync.ts
-// ⚠️ SERVER ONLY — jangan di-import dari komponen "use client"
+import { getValidAccessToken } from "./ccTikTok";
 import { parsePostUrl, type SyncStatus } from "./ccMetrics";
 
 export interface SyncOutcome {
@@ -147,25 +147,47 @@ async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
 }
 
 // ── TikTok ───────────────────────────────────────────────────────────────────
+interface TikTokVideo {
+  id?: string;
+  view_count?: number;
+  like_count?: number;
+  comment_count?: number;
+}
+interface TikTokQueryResponse {
+  data?: { videos?: TikTokVideo[] };
+  error?: { code?: string; message?: string };
+}
+
 async function syncTikTok(videoId: string): Promise<SyncOutcome> {
-  const token = process.env.TIKTOK_ACCESS_TOKEN;
-  if (!token) return fail("UNSUPPORTED", "TIKTOK_ACCESS_TOKEN belum di-set");
+  const auth = await getValidAccessToken();
+  if (auth.token === null) return fail("UNSUPPORTED", auth.error);
 
   const res = await fetch(
-    "https://open.tiktokapis.com/v2/video/query/?fields=id,like_count,comment_count,view_count",
+    "https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count",
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ filters: { video_ids: [videoId] } }),
       cache: "no-store",
     }
   );
-  const json = await res.json();
-  if (!res.ok || json?.error?.code !== "ok") {
-    return fail("ERROR", json?.error?.message ?? `TikTok HTTP ${res.status}`);
+
+  const json: TikTokQueryResponse = await res.json();
+
+  if (!res.ok || (json.error?.code && json.error.code !== "ok")) {
+    return fail("ERROR", json.error?.message ?? `TikTok HTTP ${res.status}`);
   }
-  const v = json?.data?.videos?.[0];
-  if (!v) return fail("ERROR", "Video tidak ditemukan (hanya video akun terautentikasi)");
+
+  const v = json.data?.videos?.[0];
+  if (!v) {
+    return fail(
+      "ERROR",
+      "Video tidak ditemukan di akun TikTok yang terhubung (metrik hanya bisa untuk konten sendiri)"
+    );
+  }
 
   return {
     status: "OK",
@@ -178,12 +200,28 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
   };
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────────
+async function resolveTikTokShortlink(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { redirect: "follow", cache: "no-store" });
+    return res.url || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function syncPosting(postUrl: string | null): Promise<SyncOutcome> {
   if (!postUrl) return fail("PENDING", "Link posting belum diisi");
 
-  const parsed = parsePostUrl(postUrl);
+  let parsed = parsePostUrl(postUrl);
   if (!parsed) return fail("ERROR", "Format link tidak valid");
+
+  if (parsed.platform === "TikTok" && !parsed.externalId) {
+    const resolved = await resolveTikTokShortlink(postUrl);
+    if (resolved) {
+      const again = parsePostUrl(resolved);
+      if (again?.externalId) parsed = again;
+    }
+  }
 
   if (!parsed.externalId) {
     return {
