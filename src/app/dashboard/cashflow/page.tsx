@@ -57,6 +57,7 @@ type Entry = {
     photo_url: string | null;
     is_audited: boolean;
     audited_at: string | null;
+    is_voided?: boolean;
     created_by_user?: { name: string } | null;
     audited_by_user?: { name: string } | null;
 };
@@ -80,10 +81,15 @@ const IconPlus = () => (
         <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
 );
-const IconTrash = () => (
+const IconEdit = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
+);
+const IconTrash = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+</svg>
 );
 const IconCheck = () => (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -484,6 +490,16 @@ function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
 
 // ── Audit cell ───────────────────────────────────────────────────────────────
 function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
+    if (entry.is_voided) {
+        return (
+            <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+                title="Transaksi sumber sudah di-restore/dibatalkan — tidak bisa diaudit"
+            >
+                🚫 Dibatalkan
+            </span>
+        );
+    }
     if (entry.is_audited) {
         return (
             <span
@@ -820,10 +836,11 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 // ── Detail Modal (uang keluar / uang masuk manual) ────────────────────────────
-function DetailModal({ entry, onClose, onDelete }: {
+function DetailModal({ entry, onClose, onDelete, onEdit }: {
     entry: Entry;
     onClose: () => void;
     onDelete: (e: Entry) => void;
+    onEdit: (e: Entry) => void;
 }) {
     const [zoom, setZoom] = useState(false);
 
@@ -919,7 +936,17 @@ function DetailModal({ entry, onClose, onDelete }: {
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    {entry.source_type === "MANUAL" && (
+                    {/* ✅ Uang Keluar manual → tombol Edit (bukan Hapus) */}
+                    {entry.source_type === "MANUAL" && entry.direction === "OUT" && (
+                        <button
+                            onClick={() => { onClose(); onEdit(entry); }}
+                            className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50 transition"
+                        >
+                            <IconEdit /> Edit
+                        </button>
+                    )}
+                    {/* Uang Masuk manual (Biaya Lain-lain) tetap bisa dihapus seperti biasa */}
+                    {entry.source_type === "MANUAL" && entry.direction === "IN" && (
                         <button
                             onClick={() => { onClose(); onDelete(entry); }}
                             className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition"
@@ -1052,6 +1079,122 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
                     <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-60">{savingLabel}</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Edit Expense Modal (uang keluar manual — pakai PUT) ───────────────────────
+function EditExpenseModal({ entry, onClose, onSaved }: {
+    entry: Entry;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const categories = Object.entries(EXPENSE_CATEGORIES);
+    const [category, setCategory] = useState(entry.category);
+    const [nominal, setNominal] = useState(String(entry.nominal ?? ""));
+    const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
+    const [tanggal, setTanggal] = useState(entry.tanggal);
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(entry.payment_method ?? "CASH");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const submit = async () => {
+        if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/cashflow/${entry.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    category,
+                    nominal: Number(nominal),
+                    keterangan: keterangan.trim() || null,
+                    tanggal,
+                    payment_method: paymentMethod,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) return setError(json.message || "Gagal menyimpan perubahan");
+            onSaved();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+                <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base">✏️</div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-900">Edit Uang Keluar</p>
+                            <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                </div>
+                <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            {(["CASH", "SALDO"] as const).map((m) => (
+                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
+                                    <span>{m === "CASH" ? "💵" : "🏦"}</span> {m === "CASH" ? "Cash" : "Saldo"}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
+                        <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+                            {categories.map(([k, label]) => (<option key={k} value={k}>{label}</option>))}
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
+                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            {nominal && Number(nominal) > 0 && (
+                                <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
+                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+                    </div>
+                    {entry.photo_url && (
+                        <div>
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Foto Bukti <span className="text-gray-400 font-normal">(tidak bisa diubah di sini)</span></label>
+                            <img src={entry.photo_url} alt="Bukti" className="w-full max-h-40 object-cover rounded-xl border border-gray-200" />
+                        </div>
+                    )}
+                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
+                    <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
                 </div>
             </div>
         </div>
@@ -1204,6 +1347,7 @@ export default function CashflowPage() {
     const [showModalAwal, setShowModalAwal] = useState(false);
     const [showIncomeModal, setShowIncomeModal] = useState(false);
     const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
+    const [editEntry, setEditEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
@@ -1361,8 +1505,21 @@ export default function CashflowPage() {
             {showModal && <ExpenseModal onClose={() => setShowModal(false)} onSaved={() => fetchData(true)} />}
             {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
             {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
-            {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} />}
-
+            {detailEntry && (
+                <DetailModal
+                    entry={detailEntry}
+                    onClose={() => setDetailEntry(null)}
+                    onDelete={deleteEntry}
+                    onEdit={(e) => setEditEntry(e)}
+                />
+            )}
+            {editEntry && (
+                <EditExpenseModal
+                    entry={editEntry}
+                    onClose={() => setEditEntry(null)}
+                    onSaved={() => fetchData(true)}
+                />
+            )}
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
                 {/* ── Header ──────────────────────────────────────────────── */}
@@ -1605,7 +1762,7 @@ export default function CashflowPage() {
                                             <tr
                                                 key={e.id}
                                                 onClick={() => isClickable && handleRowClick(e)}
-                                                className={`transition-colors group ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}
+                                                className={`transition-colors group ${e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}
                                             >
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">{fmtTanggalShort(e.tanggal)}</span>
@@ -1642,12 +1799,12 @@ export default function CashflowPage() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                                                <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[200px]">
                                                     <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
-                                                   {e.photo_url && (
+                                                    {e.photo_url && (
                                                         <button
                                                             type="button"
                                                             onClick={(ev) => { ev.stopPropagation(); setDetailEntry(e); }}
@@ -1667,8 +1824,15 @@ export default function CashflowPage() {
                                                     }
                                                 </td>
                                                 <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                  <div className="flex items-center justify-end gap-1">
-                                                        {e.source_type === "MANUAL" && (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {/* ✅ Uang Keluar manual → tombol Edit (bukan Hapus) */}
+                                                        {e.source_type === "MANUAL" && e.direction === "OUT" && (
+                                                            <button onClick={() => setEditEntry(e)} className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Edit">
+                                                                <IconEdit />
+                                                            </button>
+                                                        )}
+                                                        {/* Uang Masuk manual (Biaya Lain-lain) tetap bisa dihapus */}
+                                                        {e.source_type === "MANUAL" && e.direction === "IN" && (
                                                             <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Hapus">
                                                                 <IconTrash />
                                                             </button>
