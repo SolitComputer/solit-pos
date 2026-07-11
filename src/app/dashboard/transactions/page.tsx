@@ -1247,8 +1247,7 @@ export default function Page() {
   const itemsPerPage = isMobile ? 10 : 15;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [detailItem, setDetailItem] = useState<any | null>(null);
-  const [highlightInvoice, setHighlightInvoice] = useState<string | null>(null);
-  const [highlightName, setHighlightName] = useState<string | null>(null);
+  const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -1263,10 +1262,10 @@ export default function Page() {
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const hl = p.get("highlight");
-    const nm = p.get("nama");
-    if (hl) { setHighlightInvoice(hl); setSearch(hl); }
-    if (nm) setHighlightName(nm);
+    // `invoice` = param baru (exact). `highlight` = param lama, tetap didukung
+    // agar link/bookmark lama tidak rusak.
+    const inv = p.get("invoice") ?? p.get("highlight");
+    if (inv) setFocusInvoice(inv.trim());
   }, []);
 
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
@@ -1289,6 +1288,12 @@ export default function Page() {
   };
 
   const filteredTransactions = useMemo(() => {
+    // jadi INV-001 ikut menarik INV-0012 dan urutan `newest` bikin baris teratas
+    // bukan transaksi yang diklik.
+    if (focusInvoice) {
+      return allTransactions.filter((item) => item.invoice_number === focusInvoice);
+    }
+
     let filtered = [...allTransactions];
 
     if (search.trim()) {
@@ -1337,7 +1342,7 @@ export default function Page() {
     });
 
     return filtered;
-  }, [allTransactions, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
+  }, [allTransactions, focusInvoice, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const paginatedTransactions = useMemo(() => {
@@ -1623,15 +1628,25 @@ export default function Page() {
         </div>
 
         {/* ── Banner deep-link dari Cashflow ── */}
-        {highlightInvoice && (
+        {focusInvoice && (
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-xs text-amber-800">
-              🔗 Menyorot transaksi dari <b>Cashflow</b>
-              {highlightName ? <>: <b>{highlightName}</b></> : ""}{" "}
-              <span className="font-mono text-amber-600">({highlightInvoice})</span>
+              🔗 Transaksi dari <b>Cashflow</b>{" "}
+              <span className="font-mono text-amber-600">({focusInvoice})</span>
+              {/* Customer diambil dari datanya sendiri — tidak dikirim lewat URL,
+                  jadi tidak mungkin mismatch dengan baris yang ditampilkan. */}
+              {filteredTransactions[0]?.customer_name && (
+                <> · <b>{filteredTransactions[0].customer_name}</b></>
+              )}
+              {filteredTransactions.length === 0 && (
+                <span className="text-amber-600"> — transaksi tidak ditemukan</span>
+              )}
             </p>
             <button
-              onClick={() => { setHighlightInvoice(null); setHighlightName(null); setSearch(""); }}
+              onClick={() => {
+                setFocusInvoice(null);
+                window.history.replaceState({}, "", "/dashboard/transactions");
+              }}
               className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold whitespace-nowrap"
             >
               ✕ Tampilkan semua

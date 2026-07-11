@@ -58,6 +58,8 @@ type Entry = {
     is_audited: boolean;
     audited_at: string | null;
     is_voided?: boolean;
+    is_stale?: boolean;
+    source_nominal?: number | null;
     created_by_user?: { name: string } | null;
     audited_by_user?: { name: string } | null;
 };
@@ -67,6 +69,7 @@ type Summary = {
     total_keluar: number;
     saldo: number;
     belum_audit: number;
+    stale?: number;
     modal_awal_entry: Entry | null;
 };
 
@@ -1349,6 +1352,7 @@ export default function CashflowPage() {
     const [detailEntry, setDetailEntry] = useState<Entry | null>(null);
     const [editEntry, setEditEntry] = useState<Entry | null>(null);
     const [showFilter, setShowFilter] = useState(false);
+    const [showVoided, setShowVoided] = useState(false);
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
     const [auditingId, setAuditingId] = useState<string | null>(null);
@@ -1399,7 +1403,9 @@ export default function CashflowPage() {
     const handleExport = async () => {
         setExporting(true);
         try {
-            await exportCashflowExcel(masuk, keluar);
+            const m = showVoided ? masuk : masuk.filter((e) => !e.is_voided);
+            const k = showVoided ? keluar : keluar.filter((e) => !e.is_voided);
+            await exportCashflowExcel(m, k);
         } finally {
             setExporting(false);
         }
@@ -1436,7 +1442,7 @@ export default function CashflowPage() {
         if (e.source_type === "MODAL_AWAL") return;
         if (isDetailRow(e)) { setDetailEntry(e); return; }
         if (e.source_type === "TRANSACTION" && e.source_id) {
-            router.push(`/dashboard/transactions?highlight=${e.source_id}&nama=${encodeURIComponent(e.nama || "")}`);
+            router.push(`/dashboard/transactions?invoice=${encodeURIComponent(e.source_id)}`);
         } else if (e.source_type === "SERVICE") {
             router.push("/dashboard/service/history");
         }
@@ -1453,10 +1459,18 @@ export default function CashflowPage() {
         );
     }
 
-    // ── Derived values ────────────────────────────────────────────────────────
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
-    const allRows = tab === "IN" ? masuk : keluar;
+
+    const notVoided = (e: Entry) => !e.is_voided;
+
+    const visibleMasuk = showVoided ? masuk : masuk.filter(notVoided);
+    const visibleKeluar = showVoided ? keluar : keluar.filter(notVoided);
+
+    const voidedCount =
+        masuk.filter((e) => e.is_voided).length + keluar.filter((e) => e.is_voided).length;
+
+    const allRows = tab === "IN" ? visibleMasuk : visibleKeluar;
     const rows = applyFilters(allRows, currentFilter);
     const filterCount = activeFilterCount(currentFilter);
 
@@ -1465,7 +1479,7 @@ export default function CashflowPage() {
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut]);
+    useEffect(() => { setCurrentPage(1); }, [tab, filterIn, filterOut, showVoided]);
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const jakartaNow = new Date();
@@ -1484,8 +1498,13 @@ export default function CashflowPage() {
         return !!(customFrom || customTo);
     };
 
-    const incomeValue = masuk.reduce((s, e) => (e.source_type !== "MODAL_AWAL" && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
-    const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
+    const incomeValue = masuk.reduce(
+        (s, e) =>
+            e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal)
+                ? s + Number(e.nominal || 0)
+                : s,
+        0
+    ); const expenseValue = keluar.reduce((s, e) => (inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s), 0);
 
     const periodLabel = period === "today" ? "Hari Ini"
         : period === "week" ? "Minggu Ini"
@@ -1596,6 +1615,14 @@ export default function CashflowPage() {
                                         <p className="text-[11px] text-amber-700 font-semibold">{summary.belum_audit} entry belum diaudit</p>
                                     </div>
                                 )}
+                                {!loading && (summary.stale ?? 0) > 0 && (
+                                    <div className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200">
+                                        <IconAlertTriangle />
+                                        <p className="text-[11px] text-orange-700 font-semibold">
+                                            {summary.stale} entry sudah diaudit tapi harga transaksinya berubah
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                             {/* Period selector */}
                             <div className="flex flex-col items-end gap-2">
@@ -1642,8 +1669,8 @@ export default function CashflowPage() {
                                         }`}
                                 >
                                     {t === "IN"
-                                        ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}`
-                                        : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`
+                                        ? `↑ Masuk ${!loading ? `(${visibleMasuk.length})` : ""}`
+                                        : `↓ Keluar ${!loading ? `(${visibleKeluar.length})` : ""}`
                                     }
                                 </button>
                             ))}
@@ -1665,6 +1692,27 @@ export default function CashflowPage() {
                                 </span>
                             )}
                         </button>
+
+                        {/* ✅ Toggle entry dibatalkan/restore — hanya muncul kalau memang ada */}
+                        {!loading && voidedCount > 0 && (
+                            <button
+                                onClick={() => setShowVoided((v) => !v)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition ${showVoided
+                                    ? "bg-gray-100 text-gray-700 border-gray-300"
+                                    : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:text-gray-600"
+                                    }`}
+                                title={
+                                    showVoided
+                                        ? "Sembunyikan entry dari transaksi yang dibatalkan/di-restore"
+                                        : "Tampilkan entry dari transaksi yang dibatalkan/di-restore (tidak dihitung ke saldo)"
+                                }
+                            >
+                                🚫 {showVoided ? "Sembunyikan" : "Dibatalkan"}
+                                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">
+                                    {voidedCount}
+                                </span>
+                            </button>
+                        )}
                     </div>
                     {tab === "IN" && (
                         <button
@@ -1691,6 +1739,16 @@ export default function CashflowPage() {
                         onReset={() => setCurrentFilter(defaultCashflowFilter())}
                         direction={tab}
                     />
+                )}
+
+                {showVoided && voidedCount > 0 && (
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">
+                        <IconInfo />
+                        <span>
+                            Menampilkan <b>{voidedCount} entry dibatalkan</b> (transaksi sumbernya sudah di-restore).
+                            Entry ini <b>tidak dihitung</b> ke saldo maupun total periode, dan tidak bisa diaudit.
+                        </span>
+                    </div>
                 )}
 
                 {tab === "IN" && (
@@ -1801,6 +1859,14 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className={`px-3 py-3 text-right font-mono font-bold text-[13px] tabular-nums whitespace-nowrap ${e.is_voided ? "text-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                                                     {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
+                                                    {e.is_stale && e.source_nominal != null && (
+                                                        <p
+                                                            className="text-[9px] font-sans font-bold text-amber-600 mt-0.5"
+                                                            title={`Harga deal di transaksi sudah berubah jadi ${fmtRupiah(e.source_nominal)}, tapi entry ini sudah diaudit sehingga nominalnya dikunci.`}
+                                                        >
+                                                            ⚠️ Kini {fmtRupiah(e.source_nominal)}
+                                                        </p>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[200px]">
                                                     <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>

@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { CASHFLOW_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CASHFLOW_START_DATE, isValidCategory, isModalAwalActive, isManualIncomeCategory } from "@/lib/cashflow";
+import {
+    CASHFLOW_START_DATE,
+    isValidCategory,
+    isModalAwalActive,
+    isManualIncomeCategory,
+} from "@/lib/cashflow";
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -13,9 +18,11 @@ function getAdmin(): SupabaseClient {
     );
 }
 
-// ── Helper: ambil name dari Supabase join (bisa array atau object) ──────────
+// ── Helpers ────────────────────────────────────────────────────────────────
+const jakartaDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+
 // Supabase kadang menginfer relasi FK sebagai array meski hasilnya singular.
-// Fungsi ini handle kedua kasus.
 function getJoinedName(joined: any): string | null {
     if (!joined) return null;
     if (Array.isArray(joined)) {
@@ -24,66 +31,191 @@ function getJoinedName(joined: any): string | null {
     return (joined as { id: string; name: string }).name ?? null;
 }
 
-// ── Sync transaksi & service → cashflow_entries ────────────────────────────
-async function syncDerivedEntries(supabase: SupabaseClient) {
+// ── Payload builder: SATU sumber kebenaran, dipakai insert DAN reconcile ────
+// Kalau bentuk entry berubah, cukup ubah di sini — insert & update ikut.
+function buildTxPayload(t: any) {
+    const refDate = (t.paid_at || t.created_at) as string;
+    return {
+        direction: "IN",
+        category: "PENJUALAN_LAPTOP",
+        nama: (t.sales_name as string) || "Sales",
+        nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
+        modal: null,
+        keterangan: `Penjualan laptop · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
+        tanggal: jakartaDate(refDate),
+        source_type: "TRANSACTION",
+        source_id: t.invoice_number as string,
+        payment_method: null,
+    };
+}
 
-    // ── 1. Sync transaksi PAID ─────────────────────────────────────────────
-    const { data: transactions, error: txError } = await supabase
+function buildSvcPayload(s: any, techName: string) {
+    const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
+    return {
+        direction: "IN",
+        category: "SERVICE",
+        nama: techName,
+        nominal: Math.round(Number(s.payment_amount ?? 0)),
+        modal: null,
+        keterangan: `Service · ${(s.nama as string) || "—"} · ${(s.payment_method as string) || "—"}`,
+        tanggal: jakartaDate(refDate),
+        source_type: "SERVICE",
+        source_id: String(s.id),
+        // cashflow_entries hanya terima CASH/SALDO — method asli disimpan di keterangan
+        payment_method: null,
+    };
+}
+
+// Field yang ikut di-reconcile kalau sumbernya berubah.
+const RECONCILE_FIELDS = ["nominal", "nama", "keterangan", "tanggal", "category"] as const;
+
+function diffPayload(existing: any, desired: Record<string, any>): Record<string, any> {
+    const patch: Record<string, any> = {};
+    for (const f of RECONCILE_FIELDS) {
+        if (!(f in desired)) continue;
+        const a = f === "nominal" ? Number(existing[f] ?? 0) : existing[f];
+        const b = f === "nominal" ? Number(desired[f] ?? 0) : desired[f];
+        if (a !== b) patch[f] = desired[f];
+    }
+    return patch;
+}
+
+// ── Sync transaksi PAID → cashflow_entries (INSERT + RECONCILE) ─────────────
+async function syncTransactionEntries(supabase: SupabaseClient) {
+    const { data: transactions, error } = await supabase
         .from("transactions")
         .select("invoice_number, customer_name, sales_name, deal_price, amount, created_at, paid_at, status")
         .eq("status", "PAID")
         .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
-    if (txError) {
-        console.error("[cashflow sync] fetch transactions error:", txError.message);
-    } else if (transactions && transactions.length > 0) {
-        const invoiceNumbers = transactions.map((t: any) => t.invoice_number as string);
-
-        const { data: existingTx } = await supabase
-            .from("cashflow_entries")
-            .select("source_id")
-            .eq("source_type", "TRANSACTION")
-            .in("source_id", invoiceNumbers);
-
-        const existingTxIds = new Set((existingTx ?? []).map((e: any) => e.source_id as string));
-
-        const newTxEntries = transactions
-            .filter((t: any) => !existingTxIds.has(t.invoice_number as string))
-            .map((t: any) => {
-                const refDate = (t.paid_at || t.created_at) as string;
-                const tanggal = new Date(refDate).toLocaleDateString("en-CA", {
-                    timeZone: "Asia/Jakarta",
-                });
-                return {
-                    direction: "IN",
-                    category: "PENJUALAN_LAPTOP",
-                    // ✅ nama = sales yang melakukan transaksi
-                    nama: (t.sales_name as string) || "Sales",
-                    nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
-                    modal: null,
-                    // ✅ customer masuk ke keterangan
-                    keterangan: `Penjualan laptop · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
-                    tanggal,
-                    source_type: "TRANSACTION",
-                    source_id: t.invoice_number as string,
-                    is_audited: false,
-                    payment_method: null,
-                };
-            })
-            .filter((e: any) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE);
-
-        if (newTxEntries.length > 0) {
-            const { error: insertTxError } = await supabase
-                .from("cashflow_entries")
-                .insert(newTxEntries);
-
-            if (insertTxError) {
-                console.error("[cashflow sync] insert transactions error:", insertTxError.message);
-            } else {
-                console.log(`[cashflow sync] inserted ${newTxEntries.length} transaction entries`);
-            }
-        }
+    if (error) {
+        console.error("[cashflow sync] fetch transactions error:", error.message);
+        return;
     }
+    if (!transactions || transactions.length === 0) return;
+
+    const invoices = transactions.map((t: any) => t.invoice_number as string);
+
+    // ✅ Ambil field lengkap — dibutuhkan untuk membandingkan, bukan cuma cek "ada/tidak"
+    const { data: existing } = await supabase
+        .from("cashflow_entries")
+        .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
+        .eq("source_type", "TRANSACTION")
+        .in("source_id", invoices);
+
+    const existingMap = new Map<string, any>(
+        (existing ?? []).map((e: any) => [e.source_id as string, e])
+    );
+
+    const toInsert: any[] = [];
+    const updates: { id: string; patch: Record<string, any> }[] = [];
+
+    for (const t of transactions as any[]) {
+        const desired = buildTxPayload(t);
+        if (desired.nominal <= 0 || desired.tanggal < CASHFLOW_START_DATE) continue;
+
+        const cur = existingMap.get(t.invoice_number as string);
+
+        // Belum ada → insert baru
+        if (!cur) {
+            toInsert.push({ ...desired, is_audited: false });
+            continue;
+        }
+
+        // ✅ Sudah diaudit → JANGAN diubah diam-diam. Audit bersifat one-way.
+        // Drift-nya nanti dilaporkan sebagai `is_stale` di GET.
+        if (cur.is_audited) continue;
+
+        const patch = diffPayload(cur, desired);
+        if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
+    }
+
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
+        if (insErr) console.error("[cashflow sync] insert transactions error:", insErr.message);
+        else console.log(`[cashflow sync] inserted ${toInsert.length} transaction entries`);
+    }
+
+    if (updates.length > 0) {
+        const results = await Promise.allSettled(
+            updates.map((u) =>
+                supabase.from("cashflow_entries").update(u.patch).eq("id", u.id)
+            )
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        console.log(`[cashflow sync] reconciled ${updates.length - failed} transaction entries`);
+        if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile transaksi GAGAL`);
+    }
+}
+
+// ── Sync service → cashflow_entries (INSERT + RECONCILE) ────────────────────
+async function syncServiceEntries(
+    supabase: SupabaseClient,
+    services: any[],
+    technicianNameMap: Map<string, string>
+) {
+    if (services.length === 0) return;
+
+    const serviceIds = services.map((s: any) => String(s.id));
+
+    const { data: existing } = await supabase
+        .from("cashflow_entries")
+        .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
+        .eq("source_type", "SERVICE")
+        .in("source_id", serviceIds);
+
+    const existingMap = new Map<string, any>(
+        (existing ?? []).map((e: any) => [e.source_id as string, e])
+    );
+
+    const toInsert: any[] = [];
+    const updates: { id: string; patch: Record<string, any> }[] = [];
+
+    for (const s of services) {
+        // Nama teknisi dari map, fallback ke joined object
+        let techName = "Teknisi";
+        if (s.dikerjakan_by && technicianNameMap.has(s.dikerjakan_by as string)) {
+            techName = technicianNameMap.get(s.dikerjakan_by as string)!;
+        } else {
+            const joinedName = getJoinedName(s.dikerjakan_by_user);
+            if (joinedName) techName = joinedName;
+        }
+
+        const desired = buildSvcPayload(s, techName);
+        if (desired.nominal <= 0 || desired.tanggal < CASHFLOW_START_DATE) continue;
+
+        const cur = existingMap.get(String(s.id));
+
+        if (!cur) {
+            toInsert.push({ ...desired, is_audited: false });
+            continue;
+        }
+        if (cur.is_audited) continue;
+
+        const patch = diffPayload(cur, desired);
+        if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
+    }
+
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
+        if (insErr) console.error("[cashflow sync] insert service entries error:", insErr.message);
+        else console.log(`[cashflow sync] inserted ${toInsert.length} service entries`);
+    }
+
+    if (updates.length > 0) {
+        const results = await Promise.allSettled(
+            updates.map((u) =>
+                supabase.from("cashflow_entries").update(u.patch).eq("id", u.id)
+            )
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        console.log(`[cashflow sync] reconciled ${updates.length - failed} service entries`);
+        if (failed > 0) console.error(`[cashflow sync] ${failed} reconcile service GAGAL`);
+    }
+}
+
+async function syncDerivedEntries(supabase: SupabaseClient) {
+    await syncTransactionEntries(supabase);
 
     const { data: services, error: svcError } = await supabase
         .from("service_orders")
@@ -113,12 +245,16 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             .in("status", ["DONE", "SUDAH_DIAMBIL"])
             .not("payment_amount", "is", null)
             .gt("payment_amount", 0);
+
         if (svcFbError) {
             console.error("[cashflow sync] fetch service fallback error:", svcFbError.message);
         } else if (servicesFallback && servicesFallback.length > 0) {
             await syncServiceEntries(supabase, servicesFallback, new Map());
         }
-    } else if (services && services.length > 0) {
+        return;
+    }
+
+    if (services && services.length > 0) {
         const technicianNameMap = new Map<string, string>();
         for (const svc of services as any[]) {
             const techName = getJoinedName(svc.dikerjakan_by_user);
@@ -127,72 +263,6 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             }
         }
         await syncServiceEntries(supabase, services as any[], technicianNameMap);
-    }
-}
-
-async function syncServiceEntries(
-    supabase: SupabaseClient,
-    services: any[],
-    technicianNameMap: Map<string, string>
-) {
-    const serviceIds = services.map((s: any) => String(s.id));
-
-    const { data: existingSvc } = await supabase
-        .from("cashflow_entries")
-        .select("source_id")
-        .eq("source_type", "SERVICE")
-        .in("source_id", serviceIds);
-
-    const existingSvcIds = new Set((existingSvc ?? []).map((e: any) => e.source_id as string));
-
-    const newSvcEntries = services
-        .filter((s: any) => !existingSvcIds.has(String(s.id)))
-        .map((s: any) => {
-            // ✅ Nama teknisi dari map atau fallback joined object
-            let techName = "Teknisi";
-            if (s.dikerjakan_by && technicianNameMap.has(s.dikerjakan_by as string)) {
-                techName = technicianNameMap.get(s.dikerjakan_by as string)!;
-            } else {
-                const joinedName = getJoinedName(s.dikerjakan_by_user);
-                if (joinedName) techName = joinedName;
-            }
-
-            const nominal = Math.round(Number(s.payment_amount ?? 0));
-
-            const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
-            const tanggal = new Date(refDate).toLocaleDateString("en-CA", {
-                timeZone: "Asia/Jakarta",
-            });
-
-            // ✅ nama = teknisi, keterangan = customer + payment method service
-            return {
-                direction: "IN",
-                category: "SERVICE",
-                nama: techName,
-                nominal,
-                modal: null,
-                keterangan: `Service · ${(s.nama as string) || "—"} · ${(s.payment_method as string) || "—"}`,
-                tanggal,
-                source_type: "SERVICE",
-                source_id: String(s.id),
-                is_audited: false,
-                // ✅ payment_method selalu null — cashflow_entries hanya terima CASH/SALDO
-                // method asli disimpan di keterangan
-                payment_method: null,
-            };
-        })
-        .filter((e: any) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE);
-
-    if (newSvcEntries.length > 0) {
-        const { error: insertSvcError } = await supabase
-            .from("cashflow_entries")
-            .insert(newSvcEntries);
-
-        if (insertSvcError) {
-            console.error("[cashflow sync] insert service entries error:", insertSvcError.message);
-        } else {
-            console.log(`[cashflow sync] inserted ${newSvcEntries.length} service entries`);
-        }
     }
 }
 
@@ -223,9 +293,11 @@ export const GET = withAuth(async () => {
 
     const rawAll = data ?? [];
 
-    // ── Cek status transaksi asli untuk entry bersumber TRANSACTION ─────────
-    // Kalau transaksi sudah di-restore (status ≠ PAID), entry cashflow-nya
-    // ditandai voided: tampil abu-abu & tidak bisa diaudit di halaman Cashflow.
+    // ── Cek transaksi asli untuk entry bersumber TRANSACTION ────────────────
+    // is_voided : transaksi sudah di-restore (status ≠ PAID) → abu-abu, tidak diaudit,
+    //             DAN tidak ikut dihitung ke total/saldo.
+    // is_stale  : entry sudah diaudit tapi deal_price transaksinya berubah setelahnya
+    //             → tidak di-reconcile (audit one-way), tapi ditandai supaya kelihatan.
     const txSourceIds = Array.from(
         new Set(
             rawAll
@@ -234,29 +306,49 @@ export const GET = withAuth(async () => {
         )
     );
 
-    let voidedInvoiceSet = new Set<string>();
+    const txMap = new Map<string, { status: string; nominal: number }>();
     if (txSourceIds.length > 0) {
         const { data: linkedTx } = await supabase
             .from("transactions")
-            .select("invoice_number, status")
+            .select("invoice_number, status, deal_price, amount")
             .in("invoice_number", txSourceIds);
 
-        voidedInvoiceSet = new Set(
-            (linkedTx ?? [])
-                .filter((t: any) => t.status !== "PAID")
-                .map((t: any) => t.invoice_number as string)
-        );
+        for (const t of linkedTx ?? []) {
+            txMap.set(t.invoice_number as string, {
+                status: t.status as string,
+                nominal: Math.round(Number((t as any).deal_price ?? (t as any).amount ?? 0)),
+            });
+        }
     }
 
-    const all = rawAll.map((e: any) => ({
-        ...e,
-        is_voided: e.source_type === "TRANSACTION" && voidedInvoiceSet.has(e.source_id),
-    }));
+    const all = rawAll.map((e: any) => {
+        if (e.source_type !== "TRANSACTION" || !e.source_id) {
+            return { ...e, is_voided: false, is_stale: false };
+        }
+        const tx = txMap.get(e.source_id as string);
+        const isVoided = !!tx && tx.status !== "PAID";
+        const isStale =
+            !!tx &&
+            !isVoided &&
+            e.is_audited &&
+            Number(e.nominal ?? 0) !== tx.nominal;
+
+        return {
+            ...e,
+            is_voided: isVoided,
+            is_stale: isStale,
+            source_nominal: tx?.nominal ?? null, // nominal terkini di transaksi (untuk UI)
+        };
+    });
 
     const masuk = all.filter((e: any) => e.direction === "IN");
     const keluar = all.filter((e: any) => e.direction === "OUT");
 
-    const totalMasuk = masuk.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);
+    // ✅ Entry voided TIDAK dihitung — dulu masih ikut dan bikin saldo over-stated
+    const totalMasuk = masuk.reduce(
+        (s: number, e: any) => (e.is_voided ? s : s + Number(e.nominal || 0)),
+        0
+    );
     const totalKeluar = keluar.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);
 
     const modalAwalEntry = all.find((e: any) => e.source_type === "MODAL_AWAL") ?? null;
@@ -268,7 +360,8 @@ export const GET = withAuth(async () => {
             total_masuk: totalMasuk,
             total_keluar: totalKeluar,
             saldo: totalMasuk - totalKeluar,
-            belum_audit: all.filter((e: any) => !e.is_audited).length,
+            belum_audit: all.filter((e: any) => !e.is_audited && !e.is_voided).length,
+            stale: all.filter((e: any) => e.is_stale).length,
             modal_awal_entry: modalAwalEntry,
         },
     });
@@ -293,7 +386,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     const userName = (user?.name && String(user.name).trim()) || "—";
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
-    // ── Special case: Modal Awal ───────────────────────────────────────────────
+    // ── Special case: Modal Awal ───────────────────────────────────────────
     if (direction === "IN" && category === "MODAL_AWAL") {
         if (!isModalAwalActive())
             return NextResponse.json(
@@ -338,7 +431,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data: inserted }, { status: 201 });
     }
 
-    // ── Regular: Uang Masuk Manual (hanya kategori Biaya Lain-lain) ────────────
+    // ── Uang Masuk Manual (hanya kategori Biaya Lain-lain) ─────────────────
     if (direction === "IN") {
         if (!isManualIncomeCategory(category))
             return NextResponse.json(
@@ -372,10 +465,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     }
 
     if (direction !== "OUT")
-        return NextResponse.json(
-            { success: false, message: "Direction tidak valid" },
-            { status: 400 }
-        );
+        return NextResponse.json({ success: false, message: "Direction tidak valid" }, { status: 400 });
 
     if (!isValidCategory(direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
