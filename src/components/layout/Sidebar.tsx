@@ -543,6 +543,7 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
