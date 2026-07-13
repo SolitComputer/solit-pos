@@ -13,6 +13,32 @@ function getAdmin(): SupabaseClient {
     );
 }
 
+/**
+ * `is_voided` BUKAN kolom di tabel `cashflow_entries`.
+ * Itu field turunan (derived) yang dihitung di GET /api/cashflow dengan
+ * mencocokkan source_id ke tabel `transactions` lalu cek status !== "PAID".
+ * Helper ini menghitung ulang status tersebut untuk satu entry.
+ */
+async function isEntryVoided(
+    supabase: SupabaseClient,
+    entry: { source_type: string | null; source_id: string | null }
+): Promise<boolean> {
+    if (entry.source_type !== "TRANSACTION" || !entry.source_id) return false;
+
+    const { data: tx, error } = await supabase
+        .from("transactions")
+        .select("status")
+        .eq("invoice_number", entry.source_id)
+        .maybeSingle();
+
+    if (error) {
+        console.error("[cashflow] cek void gagal:", error.message);
+        return false; // fail-open: jangan blokir aksi hanya karena lookup gagal
+    }
+
+    return !!tx && tx.status !== "PAID";
+}
+
 // ── PATCH /api/cashflow/[id] — toggle audit ───────────────────────────────────
 export const PATCH = withAuth(async (req, ctx, user: any) => {
     const { id } = await ctx.params;
@@ -26,23 +52,27 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
 
     const supabase = getAdmin();
 
+    // ✅ FIX: hapus `is_voided` dari select — kolomnya tidak ada di DB.
+    //    Ambil `source_id` supaya status void bisa dihitung derived.
     const { data: entry, error: fetchErr } = await supabase
         .from("cashflow_entries")
-        .select("id, is_audited, is_voided, direction, source_type, nominal")
+        .select("id, is_audited, direction, source_type, source_id, nominal")
         .eq("id", id)
         .single();
 
     if (fetchErr || !entry) {
-        console.error("[cashflow PATCH] fetchErr:", fetchErr, "| id:", id, "| type:", typeof id);
-        return NextResponse.json({
-            success: false,
-            message: fetchErr?.message || "Entry tidak ditemukan",  // ← tampilkan error asli
-            debug: { id, fetchErr: fetchErr?.message }
-        }, { status: 404 });
+        console.error("[cashflow PATCH] fetch entry gagal:", fetchErr?.message, "| id:", id);
+        return NextResponse.json(
+            { success: false, message: fetchErr?.message || "Entry tidak ditemukan" },
+            { status: 404 }
+        );
     }
 
-    if (entry.is_voided)
-        return NextResponse.json({ success: false, message: "Entry yang dibatalkan tidak bisa diaudit" }, { status: 400 });
+    if (await isEntryVoided(supabase, entry))
+        return NextResponse.json(
+            { success: false, message: "Entry yang dibatalkan tidak bisa diaudit" },
+            { status: 400 }
+        );
 
     if (Number(entry.nominal ?? 0) <= 0)
         return NextResponse.json(
@@ -51,7 +81,10 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
         );
 
     if (entry.is_audited)
-        return NextResponse.json({ success: false, message: "Entry sudah diaudit, tidak bisa dibatalkan" }, { status: 400 });
+        return NextResponse.json(
+            { success: false, message: "Entry sudah diaudit, tidak bisa dibatalkan" },
+            { status: 400 }
+        );
 
     const { data: updated, error: updateErr } = await supabase
         .from("cashflow_entries")
@@ -73,7 +106,7 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
 }, CASHFLOW_ROLES);
 
 // ── PUT /api/cashflow/[id] — edit uang keluar manual ─────────────────────────
-export const PUT = withAuth(async (req, ctx, user: any) => {
+export const PUT = withAuth(async (req, ctx, _user: any) => {
     const { id } = await ctx.params;
     if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
@@ -87,9 +120,12 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
     };
 
     const nom = Math.round(Number(nominal));
-    if (!Number.isFinite(nom) || nom <= 0)
+
+    // ✅ FIX: nominal 0 DIIZINKAN saat edit (koreksi entry salah input).
+    //    Yang ditolak hanya non-numerik atau negatif.
+    if (!Number.isFinite(nom) || nom < 0)
         return NextResponse.json(
-            { success: false, message: "Nominal harus lebih dari 0" },
+            { success: false, message: "Nominal tidak valid (tidak boleh negatif)" },
             { status: 400 }
         );
 
@@ -146,7 +182,7 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
 }, CASHFLOW_ROLES);
 
 // ── DELETE /api/cashflow/[id] — hapus entry manual ───────────────────────────
-export const DELETE = withAuth(async (req, ctx) => {
+export const DELETE = withAuth(async (_req, ctx) => {
     const { id } = await ctx.params;
     if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
