@@ -33,14 +33,19 @@ export default function MissionLeaderboardPage() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
-  const [boardType, setBoardType] = useState<"kerja" | "misi">("kerja");
+  const [boardType, setBoardType] = useState<"kerja" | "misi" | "absensi">("kerja");
   const [error, setError] = useState("");
 
-  const fetchData = async (p: string, b: "kerja" | "misi") => {
+  const fetchData = async (p: string, b: "kerja" | "misi" | "absensi") => {
     try {
       setLoading(true);
       if (b === "kerja") {
         const res = await fetch(`/api/leaderboard-kerja?period=${p}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Gagal mengambil data");
+        setUsers(json.data || []);
+      } else if (b === "absensi") {
+        const res = await fetch(`/api/attendance/leaderboard?period=${p}`);
         const json = await res.json();
         if (!res.ok) throw new Error(json.message || "Gagal mengambil data");
         setUsers(json.data || []);
@@ -104,7 +109,7 @@ export default function MissionLeaderboardPage() {
   };
 
   const groupedUsers = users.reduce((acc, user) => {
-    const div = getDivision(user.role);
+    const div = boardType === "absensi" ? "Semua Divisi" : getDivision(user.role);
     if (!acc[div]) acc[div] = [];
     acc[div].push(user);
     return acc;
@@ -122,16 +127,16 @@ export default function MissionLeaderboardPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <Trophy className="w-5 h-5 text-blue-600" />
-              {boardType === "kerja" ? "Leaderboard Pekerjaan" : "Leaderboard Misi"}
+              {boardType === "kerja" ? "Leaderboard Pekerjaan" : boardType === "misi" ? "Leaderboard Misi" : "Leaderboard Absensi"}
             </h1>
             <p className="text-gray-500 text-xs mt-1">
-              {boardType === "kerja" ? "Peringkat karyawan berdasarkan aktivitas utama tiap divisi." : "Peringkat karyawan berdasarkan penyelesaian misi."}
+              {boardType === "kerja" ? "Peringkat karyawan berdasarkan aktivitas utama tiap divisi." : boardType === "misi" ? "Peringkat karyawan berdasarkan penyelesaian misi." : "Peringkat kehadiran karyawan berdasarkan data absensi (wajah)."}
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
             <div className="flex bg-gray-100 rounded-lg shadow-sm border border-gray-200/60 p-0.5">
-              {(["kerja", "misi"] as const).map((b) => (
+              {(["kerja", "misi", "absensi"] as const).map((b) => (
                 <button
                   key={b}
                   onClick={() => setBoardType(b)}
@@ -141,7 +146,7 @@ export default function MissionLeaderboardPage() {
                       : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50"
                   }`}
                 >
-                  {b === "kerja" ? "Pekerjaan" : "Misi"}
+                  {b === "kerja" ? "Pekerjaan" : b === "misi" ? "Misi" : "Absensi"}
                 </button>
               ))}
             </div>
