@@ -527,7 +527,6 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   ],
 });
 
-// SALES: Data Barang (laptop+aksesoris) + Siap Jual + Garansi
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
