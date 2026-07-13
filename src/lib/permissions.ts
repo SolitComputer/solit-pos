@@ -431,8 +431,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
 
-  "/dashboard/akuntansi": [...AKUNTANSI_ROLES],
-  "/api/akuntansi": [...AKUNTANSI_ROLES],
+  "/dashboard/akutansi": [...AKUNTANSI_ROLES],
+  "/api/akutansi": [...AKUNTANSI_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
