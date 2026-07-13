@@ -58,6 +58,34 @@ const CARD_STYLE = {
 } as const;
 const NAVY_GRADIENT = "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)";
 const NAVY_SHADOW = "0 8px 22px -6px rgba(15,12,41,0.45)";
+const SECTION_HEAD = {
+    borderBottom: "1px solid #f2f3fa",
+    background: "linear-gradient(180deg, #fbfcff 0%, #f7f9ff 100%)",
+} as const;
+
+// ── Calendar tokens ───────────────────────────────────────────────────────────
+const DAY_LABELS = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+const DOT_COLOR: Record<string, string> = {
+    REVIEWED: "#10b981",
+    SUBMITTED: "#3b82f6",
+    REVISION: "#f59e0b",
+};
+const CELL_TINT: Record<string, string> = {
+    REVIEWED: "#ecfdf5",
+    SUBMITTED: "#eff6ff",
+    REVISION: "#fffbeb",
+};
+const CELL_TEXT: Record<string, string> = {
+    REVIEWED: "#047857",
+    SUBMITTED: "#1d4ed8",
+    REVISION: "#b45309",
+};
+const CELL_BORDER: Record<string, string> = {
+    REVIEWED: "#a7f3d0",
+    SUBMITTED: "#bfdbfe",
+    REVISION: "#fde68a",
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isFullAccess(role?: string) { return !!role && FULL_ACCESS.includes(role); }
@@ -85,6 +113,26 @@ function formatDateShort(iso: string) {
 function getDivisionInfo(id: string) {
     return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" };
 }
+function shiftMonth(ym: string, delta: number) {
+    const [y, m] = ym.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+// ── Section Header (dipakai ulang di beberapa kartu) ──────────────────────────
+function SectionHeader({ title, subtitle, right }: {
+    title: React.ReactNode; subtitle?: React.ReactNode; right?: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5" style={SECTION_HEAD}>
+            <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#0f172a] truncate">{title}</p>
+                {subtitle && <p className="text-[10px] text-[#94a3b8] mt-0.5 truncate">{subtitle}</p>}
+            </div>
+            {right && <div className="flex-shrink-0">{right}</div>}
+        </div>
+    );
+}
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({ icon, value, label, gradient, tint, loading }: {
@@ -94,20 +142,377 @@ function StatCard({ icon, value, label, gradient, tint, loading }: {
         <div className="group relative bg-white rounded-2xl p-4 overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
             style={CARD_STYLE}>
             {/* soft corner glow */}
-            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-[0.10] transition-opacity duration-300 group-hover:opacity-20"
+            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-[0.10] transition-opacity duration-300 group-hover:opacity-25"
                 style={{ background: gradient }} />
             <div className="relative flex items-start justify-between mb-3.5">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] leading-none"
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] leading-none ring-1 ring-inset ring-white/60"
                     style={{ background: tint }}>
                     {icon}
                 </div>
             </div>
-            <p className="relative text-[26px] font-black text-[#0f172a] tabular-nums leading-none">
+            <p className="relative text-[27px] font-black text-[#0f172a] tabular-nums leading-none tracking-tight">
                 {loading
                     ? <span className="inline-block w-9 h-7 bg-[#f1f5f9] rounded-lg animate-pulse" />
                     : value}
             </p>
             <p className="relative text-[10px] font-bold uppercase tracking-wider text-[#94a3b8] mt-2">{label}</p>
+            <div className="relative mt-2.5 h-[3px] w-8 rounded-full opacity-70 transition-all duration-300 group-hover:w-14"
+                style={{ background: gradient }} />
+        </div>
+    );
+}
+
+// ── Mini Calendar (lebih besar & lebih terbaca) ───────────────────────────────
+function MiniCalendar({
+    month,
+    reports,
+    isPKLUser,
+    filterDate,
+    onMonthChange,
+    onPickDate,
+}: {
+    month: string;
+    reports: PKLReport[];
+    isPKLUser: boolean;
+    filterDate: string | null;
+    onMonthChange: (m: string) => void;
+    onPickDate: (date: string, existing: PKLReport | null) => void;
+}) {
+    const today = getWIBToday();
+    const [y, m] = month.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDay = new Date(y, m - 1, 1).getDay();
+    const atCurrentMonth = month >= today.slice(0, 7);
+    const isCurrentMonth = month === today.slice(0, 7);
+
+    const byDate = useMemo(() => {
+        const map = new Map<string, PKLReport[]>();
+        reports.forEach(r => {
+            const arr = map.get(r.report_date);
+            if (arr) arr.push(r);
+            else map.set(r.report_date, [r]);
+        });
+        return map;
+    }, [reports]);
+
+    // Prioritas warna: ada revisi → REVISION, semua disetujui → REVIEWED, sisanya → SUBMITTED
+    const statusOf = (dk: string): keyof typeof DOT_COLOR | null => {
+        const list = byDate.get(dk);
+        if (!list || list.length === 0) return null;
+        if (list.some(r => r.status === "REVISION")) return "REVISION";
+        if (list.every(r => r.status === "REVIEWED")) return "REVIEWED";
+        return "SUBMITTED";
+    };
+
+    const navBtn =
+        "w-8 h-8 flex items-center justify-center rounded-lg border border-[#e8ecf5] bg-white text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#1a1545] transition-all disabled:opacity-30 disabled:cursor-not-allowed";
+
+    return (
+        <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
+            {/* Header + navigasi bulan */}
+            <div className="flex items-center justify-between gap-3 px-5 py-3.5" style={SECTION_HEAD}>
+                <div className="min-w-0">
+                    <p className="text-[15px] font-black text-[#0f172a] truncate tracking-tight">
+                        {MONTH_NAMES[m - 1]} <span className="text-[#94a3b8] font-bold">{y}</span>
+                    </p>
+                    <p className="text-[10px] text-[#94a3b8] mt-0.5">
+                        {isPKLUser ? "Klik tanggal untuk buat / lihat laporan" : "Klik tanggal untuk filter tabel"}
+                    </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {!isCurrentMonth && (
+                        <button
+                            onClick={() => onMonthChange(today.slice(0, 7))}
+                            className="h-8 px-3 rounded-lg border border-[#e8ecf5] bg-white text-[10px] font-bold text-[#475569] hover:bg-[#f1f5f9] transition-all"
+                        >
+                            Hari ini
+                        </button>
+                    )}
+                    <button
+                        onClick={() => onMonthChange(shiftMonth(month, -1))}
+                        className={navBtn}
+                        aria-label="Bulan sebelumnya"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => onMonthChange(shiftMonth(month, 1))}
+                        disabled={atCurrentMonth}
+                        className={navBtn}
+                        aria-label="Bulan berikutnya"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div className="px-4 pt-4 pb-4">
+                {/* Nama hari */}
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-2">
+                    {DAY_LABELS.map((d, i) => (
+                        <div key={d + i}
+                            className={`text-center text-[10px] font-black uppercase tracking-wide py-1 ${i === 0 ? "text-[#fb7185]" : "text-[#b8c1d1]"}`}>
+                            {d}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Grid tanggal */}
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                    {Array(firstDay).fill(null).map((_, i) => <div key={`e-${i}`} className="h-[52px] sm:h-14" />)}
+
+                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                        const dk = `${y}-${pad2(m)}-${pad2(day)}`;
+                        const st = statusOf(dk);
+                        const count = byDate.get(dk)?.length ?? 0;
+                        const isToday = dk === today;
+                        const isFuture = dk > today;
+                        const isSelected = filterDate === dk;
+                        const isSunday = new Date(y, m - 1, day).getDay() === 0;
+
+                        const cellStyle: React.CSSProperties = isSelected
+                            ? { background: NAVY_GRADIENT, color: "#fff", boxShadow: NAVY_SHADOW, border: "1px solid transparent" }
+                            : st
+                                ? { background: CELL_TINT[st], color: CELL_TEXT[st], border: `1px solid ${CELL_BORDER[st]}` }
+                                : { border: "1px solid transparent" };
+
+                        return (
+                            <button
+                                key={day}
+                                disabled={isFuture}
+                                onClick={() => onPickDate(dk, byDate.get(dk)?.[0] ?? null)}
+                                style={cellStyle}
+                                title={
+                                    isFuture
+                                        ? "Tanggal belum berjalan"
+                                        : count > 0
+                                            ? `${count} laporan · ${formatDateShort(dk)}`
+                                            : formatDateShort(dk)
+                                }
+                                className={`relative h-[52px] sm:h-14 rounded-2xl flex flex-col items-center justify-center gap-0.5 text-[15px] font-bold transition-all duration-200
+                                    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7c3aed]/40
+                                    ${isFuture
+                                        ? "text-[#e2e8f0] cursor-not-allowed"
+                                        : isSelected
+                                            ? "scale-[1.03]"
+                                            : st
+                                                ? "hover:scale-[1.05] hover:shadow-sm cursor-pointer"
+                                                : `cursor-pointer hover:bg-[#f5f7ff] ${isSunday ? "text-[#fb7185]" : "text-[#64748b]"}`
+                                    }
+                                    ${isToday && !isSelected ? "ring-[2px] ring-[#1a1545] ring-offset-1 ring-offset-white" : ""}`}
+                            >
+                                <span className="tabular-nums leading-none">{day}</span>
+
+                                {/* indikator status */}
+                                {st && !isSelected && (
+                                    <span className="flex items-center gap-[3px] leading-none">
+                                        <span className="w-[5px] h-[5px] rounded-full" style={{ background: DOT_COLOR[st] }} />
+                                        {count > 1 && (
+                                            <span className="text-[9px] font-black tabular-nums" style={{ color: DOT_COLOR[st] }}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
+                                {st && isSelected && (
+                                    <span className="w-[5px] h-[5px] rounded-full bg-white/80" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-3 flex-wrap mt-4 pt-3" style={{ borderTop: "1px solid #f2f3fa" }}>
+                    {[
+                        { c: DOT_COLOR.REVIEWED, l: "Disetujui" },
+                        { c: DOT_COLOR.SUBMITTED, l: "Terkirim" },
+                        { c: DOT_COLOR.REVISION, l: "Revisi" },
+                    ].map(({ c, l }) => (
+                        <span key={l} className="flex items-center gap-1.5 text-[10px] font-semibold text-[#94a3b8]">
+                            <span className="w-2 h-2 rounded-full" style={{ background: c }} />{l}
+                        </span>
+                    ))}
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[#94a3b8]">
+                        <span className="w-3 h-3 rounded-md ring-[2px] ring-[#1a1545]" />Hari ini
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Month Insight ─────────────────────────────────────────────────────────────
+function MonthInsight({
+    month,
+    reports,
+    isPKLUser,
+    pklUsers,
+    onPickDate,
+}: {
+    month: string;
+    reports: PKLReport[];
+    isPKLUser: boolean;
+    pklUsers: PKLUser[];
+    onPickDate: (date: string) => void;
+}) {
+    const today = getWIBToday();
+    const curMonth = today.slice(0, 7);
+    const [y, m] = month.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const elapsed = month === curMonth ? Number(today.slice(8, 10)) : month < curMonth ? daysInMonth : 0;
+
+    const reportedDates = useMemo(() => new Set(reports.map(r => r.report_date)), [reports]);
+
+    // Hari kerja = Senin–Sabtu (Minggu dikecualikan)
+    const workDays = useMemo(() => {
+        const arr: string[] = [];
+        for (let d = 1; d <= elapsed; d++) {
+            if (new Date(y, m - 1, d).getDay() === 0) continue;
+            arr.push(`${y}-${pad2(m)}-${pad2(d)}`);
+        }
+        return arr;
+    }, [y, m, elapsed]);
+
+    const missing = useMemo(() => workDays.filter(d => !reportedDates.has(d)), [workDays, reportedDates]);
+    const filled = workDays.length - missing.length;
+    const pct = workDays.length > 0 ? Math.round((filled / workDays.length) * 100) : 0;
+
+    const counts = useMemo(() => ({
+        SUBMITTED: reports.filter(r => r.status === "SUBMITTED").length,
+        REVIEWED: reports.filter(r => r.status === "REVIEWED").length,
+        REVISION: reports.filter(r => r.status === "REVISION").length,
+    }), [reports]);
+    const total = counts.SUBMITTED + counts.REVIEWED + counts.REVISION;
+
+    const notReportedToday = useMemo(() => {
+        if (isPKLUser) return [];
+        const done = new Set(reports.filter(r => r.report_date === today).map(r => r.user_id));
+        return pklUsers.filter(u => !done.has(u.id));
+    }, [isPKLUser, pklUsers, reports, today]);
+
+    const R = 30;
+    const CIRC = 2 * Math.PI * R;
+    const ringColor = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#f43f5e";
+
+    return (
+        <div className="bg-white rounded-2xl overflow-hidden h-full" style={CARD_STYLE}>
+            <SectionHeader
+                title={<>✨ Ringkasan {MONTH_NAMES[m - 1]}</>}
+                subtitle={isPKLUser ? "Kepatuhan laporan harianmu (Senin–Sabtu)" : "Sebaran status & pemantauan harian"}
+            />
+
+            <div className="p-5 space-y-5">
+                <div className="flex items-center gap-5">
+                    {/* Ring progress */}
+                    <div className="relative flex-shrink-0" style={{ width: 78, height: 78 }}>
+                        <svg width="78" height="78" className="-rotate-90">
+                            <circle cx="39" cy="39" r={R} fill="none" stroke="#f1f5f9" strokeWidth="8" />
+                            <circle
+                                cx="39" cy="39" r={R} fill="none"
+                                stroke={ringColor} strokeWidth="8" strokeLinecap="round"
+                                strokeDasharray={CIRC}
+                                strokeDashoffset={CIRC - (CIRC * pct) / 100}
+                                style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.16,1,0.3,1)" }}
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[16px] font-black text-[#0f172a] tabular-nums">{pct}%</span>
+                        </div>
+                    </div>
+
+                    <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide">
+                            {isPKLUser ? "Kepatuhan Laporan" : "Hari Ada Laporan"}
+                        </p>
+                        <p className="text-[24px] font-black text-[#0f172a] leading-tight tabular-nums tracking-tight">
+                            {filled}<span className="text-sm text-[#cbd5e1] font-bold"> / {workDays.length} hari</span>
+                        </p>
+                        <p className="text-[10px] text-[#94a3b8] mt-0.5">
+                            {total} laporan masuk bulan ini
+                        </p>
+                    </div>
+                </div>
+
+                {/* Stacked status bar */}
+                {total > 0 && (
+                    <div>
+                        <div className="flex h-2.5 rounded-full overflow-hidden bg-[#f1f5f9] gap-[2px]">
+                            {(["REVIEWED", "SUBMITTED", "REVISION"] as const).map(k =>
+                                counts[k] > 0 ? (
+                                    <div key={k}
+                                        style={{ width: `${(counts[k] / total) * 100}%`, background: DOT_COLOR[k] }}
+                                        className="transition-all duration-700"
+                                    />
+                                ) : null
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-2.5 flex-wrap">
+                            {([["REVIEWED", "Disetujui"], ["SUBMITTED", "Terkirim"], ["REVISION", "Revisi"]] as const).map(([k, label]) => (
+                                <span key={k} className="flex items-center gap-1.5 text-[10px] font-semibold text-[#64748b]">
+                                    <span className="w-2 h-2 rounded-full" style={{ background: DOT_COLOR[k] }} />
+                                    {label} <span className="font-black text-[#0f172a] tabular-nums">{counts[k]}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* PKL: hari yang belum dilaporkan */}
+                {isPKLUser && missing.length > 0 && (
+                    <div className="pt-4" style={{ borderTop: "1px solid #f2f3fa" }}>
+                        <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">
+                            ⚠️ Belum dilaporkan ({missing.length}) — klik untuk isi
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {missing.slice(-8).map(d => (
+                                <button
+                                    key={d}
+                                    onClick={() => onPickDate(d)}
+                                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa] hover:bg-[#ffedd5] hover:border-[#fdba74] transition-all active:scale-[0.97]"
+                                >
+                                    + {formatDateShort(d).replace(/ \d{4}$/, "")}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {isPKLUser && missing.length === 0 && workDays.length > 0 && (
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#ecfdf5] border border-[#a7f3d0]">
+                        <span className="text-lg">🎉</span>
+                        <p className="text-[11px] font-bold text-[#047857]">Semua hari kerja sudah dilaporkan!</p>
+                    </div>
+                )}
+
+                {/* Admin/Kepala: PKL belum lapor hari ini */}
+                {!isPKLUser && pklUsers.length > 0 && (
+                    <div className="pt-4" style={{ borderTop: "1px solid #f2f3fa" }}>
+                        <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">
+                            Belum lapor hari ini ({notReportedToday.length}/{pklUsers.length})
+                        </p>
+                        {notReportedToday.length === 0 ? (
+                            <p className="text-[11px] font-bold text-[#047857]">✅ Semua PKL sudah mengirim laporan hari ini</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                                {notReportedToday.map(u => (
+                                    <span key={u.id}
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-[#fff1f2] text-[#be123c] border border-[#fecdd3]">
+                                        <span className="w-4 h-4 rounded-md bg-[#fecdd3] text-[7px] flex items-center justify-center text-[#9f1239]">
+                                            {initials(u.name)}
+                                        </span>
+                                        {u.name.split(" ")[0]}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -134,7 +539,6 @@ function ReportFormModal({
 }) {
     const isEdit = !!editData;
     const isAdminAdd = canAddManual(currentUser?.role) && !!prefillUserId && prefillUserId !== currentUser?.id;
-    const isPKLUser = isPKL(currentUser?.role);
 
     const [form, setForm] = useState({
         report_date: editData?.report_date ?? prefillDate ?? getWIBToday(),
@@ -154,7 +558,7 @@ function ReportFormModal({
         try {
             let body: Record<string, any>;
             let method = "POST";
-            let url = "/api/pkl-reports";
+            const url = "/api/pkl-reports";
 
             if (isEdit) {
                 method = "PATCH";
@@ -189,10 +593,17 @@ function ReportFormModal({
         finally { setSaving(false); }
     };
 
+    const inputCls =
+        "w-full h-11 border border-[#e8ecf5] rounded-xl px-3.5 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-300 focus:bg-white transition-all";
+    const labelCls = "block text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5";
+
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
+                {/* Handle bar mobile */}
+                <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/30 z-10" />
+
                 {/* Header */}
                 <div className="relative overflow-hidden px-6 py-5 flex items-start justify-between flex-shrink-0"
                     style={{ background: NAVY_GRADIENT }}>
@@ -222,13 +633,11 @@ function ReportFormModal({
                     {/* Pilih PKL — admin only */}
                     {canAddManual(currentUser?.role) && !isEdit && allPKLUsers && allPKLUsers.length > 0 && (
                         <div>
-                            <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">
-                                PKL yang dimasukkan laporannya
-                            </label>
+                            <label className={labelCls}>PKL yang dimasukkan laporannya</label>
                             <select
                                 value={form.pkl_user_id}
                                 onChange={e => setForm(f => ({ ...f, pkl_user_id: e.target.value }))}
-                                className="w-full h-11 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition-all"
+                                className={inputCls}
                             >
                                 <option value="">— Pilih PKL —</option>
                                 {allPKLUsers.map(u => (
@@ -241,20 +650,20 @@ function ReportFormModal({
                     {/* Divisi */}
                     {!isEdit && (
                         <div>
-                            <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">Divisi Penempatan</label>
+                            <label className={labelCls}>Divisi Penempatan</label>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {DIVISIONS.map(div => (
                                     <button
                                         key={div.id}
                                         type="button"
                                         onClick={() => setForm(f => ({ ...f, division: div.id }))}
-                                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all"
+                                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all active:scale-[0.97]"
                                         style={form.division === div.id
                                             ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                             : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                     >
                                         <span>{div.emoji}</span>
-                                        <span>{div.label}</span>
+                                        <span className="truncate">{div.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -264,20 +673,20 @@ function ReportFormModal({
                     {/* Tanggal */}
                     {!isEdit && (
                         <div>
-                            <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">Tanggal Laporan</label>
+                            <label className={labelCls}>Tanggal Laporan</label>
                             <input
                                 type="date"
                                 value={form.report_date}
                                 max={getWIBToday()}
                                 onChange={e => setForm(f => ({ ...f, report_date: e.target.value }))}
-                                className="w-full h-11 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition-all"
+                                className={inputCls}
                             />
                         </div>
                     )}
 
                     {/* Judul */}
                     <div>
-                        <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">
+                        <label className={labelCls}>
                             Judul <span className="text-[#cbd5e1] font-normal normal-case">(opsional)</span>
                         </label>
                         <input
@@ -285,13 +694,13 @@ function ReportFormModal({
                             value={form.title}
                             onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                             placeholder={`Contoh: Laporan Kerja ${form.report_date}`}
-                            className="w-full h-11 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition-all"
+                            className={inputCls}
                         />
                     </div>
 
                     {/* Deskripsi */}
                     <div>
-                        <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">
+                        <label className={labelCls}>
                             Deskripsi Kegiatan Kerja <span className="text-red-400">*</span>
                         </label>
                         <textarea
@@ -299,30 +708,30 @@ function ReportFormModal({
                             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                             rows={6}
                             placeholder={`Ceritakan kegiatan yang dilakukan hari ini:\n- Tugas apa yang dikerjakan\n- Hasil yang dicapai\n- Kendala yang dihadapi (jika ada)\n- Hal yang dipelajari`}
-                            className="w-full border border-[#e8ecf5] rounded-xl px-3 py-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition-all resize-none leading-relaxed"
+                            className="w-full border border-[#e8ecf5] rounded-xl px-3.5 py-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-300 focus:bg-white transition-all resize-none leading-relaxed"
                         />
-                        <p className="text-[10px] text-[#94a3b8] mt-1">
+                        <p className="text-[10px] text-[#94a3b8] mt-1 text-right tabular-nums">
                             {form.description.length} karakter
                         </p>
                     </div>
 
                     {/* Preview info */}
                     {form.report_date && form.description && (
-                        <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl px-4 py-3">
-                            <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">Preview</p>
-                            <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl px-4 py-3.5">
+                            <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">Pratinjau</p>
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${getDivisionInfo(form.division).color}`}>
                                     {getDivisionInfo(form.division).emoji} {getDivisionInfo(form.division).label}
                                 </span>
                                 <span className="text-[10px] text-[#94a3b8]">{formatDateShort(form.report_date)}</span>
                             </div>
-                            <p className="text-xs text-[#64748b] line-clamp-2">{form.description}</p>
+                            <p className="text-xs text-[#64748b] line-clamp-2 leading-relaxed">{form.description}</p>
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-[#f1f5f9] flex-shrink-0 flex gap-3">
+                <div className="px-6 py-4 border-t border-[#f1f5f9] flex-shrink-0 flex gap-3 bg-white">
                     <button onClick={onClose} className="flex-1 h-11 bg-[#f1f5f9] text-[#64748b] rounded-xl text-sm font-semibold hover:bg-[#e2e8f0] transition-all">
                         Batal
                     </button>
@@ -399,7 +808,7 @@ function ReviewModal({
 
                     {/* Isi laporan */}
                     <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${div.color}`}>
                                 {div.emoji} {div.label}
                             </span>
@@ -411,18 +820,18 @@ function ReviewModal({
 
                     {/* Status review */}
                     <div>
-                        <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-2">Status Review</label>
+                        <label className="block text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">Status Review</label>
                         <div className="grid grid-cols-2 gap-2">
                             <button type="button" onClick={() => setStatus("REVIEWED")}
-                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${status === "REVIEWED"
-                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${status === "REVIEWED"
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
                                 <span>✅</span> Disetujui
                             </button>
                             <button type="button" onClick={() => setStatus("REVISION")}
-                                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all ${status === "REVISION"
-                                    ? "bg-amber-500 text-white border-amber-500 shadow-md"
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${status === "REVISION"
+                                    ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
                                 <span>🔄</span> Perlu Revisi
@@ -432,7 +841,7 @@ function ReviewModal({
 
                     {/* Catatan reviewer */}
                     <div>
-                        <label className="block text-xs font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">
+                        <label className="block text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-1.5">
                             Catatan Review <span className="text-[#cbd5e1] font-normal normal-case">(opsional)</span>
                         </label>
                         <textarea
@@ -440,12 +849,12 @@ function ReviewModal({
                             onChange={e => setNote(e.target.value)}
                             rows={3}
                             placeholder="Tambahkan masukan, arahan, atau catatan untuk PKL ini..."
-                            className="w-full border border-[#e8ecf5] rounded-xl px-3 py-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition-all resize-none"
+                            className="w-full border border-[#e8ecf5] rounded-xl px-3.5 py-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-300 focus:bg-white transition-all resize-none"
                         />
                     </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-[#f1f5f9] flex gap-3 flex-shrink-0">
+                <div className="px-6 py-4 border-t border-[#f1f5f9] flex gap-3 flex-shrink-0 bg-white">
                     <button onClick={onClose} className="flex-1 h-11 bg-[#f1f5f9] text-[#64748b] rounded-xl text-sm font-semibold hover:bg-[#e2e8f0] transition-all">Batal</button>
                     <button onClick={submit} disabled={saving}
                         className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
@@ -517,7 +926,7 @@ function ReportDetailModal({
                     </div>
 
                     {/* Tanggal */}
-                    <div className="bg-[#fafbff] rounded-xl px-4 py-3">
+                    <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-xl px-4 py-3">
                         <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-0.5">Tanggal</p>
                         <p className="text-sm font-bold text-[#0f172a]">{formatDate(report.report_date)}</p>
                     </div>
@@ -550,22 +959,22 @@ function ReportDetailModal({
                     )}
 
                     {/* Info waktu */}
-                    <div className="text-[10px] text-[#94a3b8] space-y-0.5">
+                    <div className="text-[10px] text-[#94a3b8] space-y-0.5 pt-1">
                         <p>Dibuat: {new Date(report.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}</p>
                         {report.reviewed_at && <p>Direview: {new Date(report.reviewed_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}</p>}
                     </div>
                 </div>
 
-                <div className="px-6 py-4 border-t border-[#f1f5f9] flex gap-2 flex-shrink-0 flex-wrap">
+                <div className="px-6 py-4 border-t border-[#f1f5f9] flex gap-2 flex-shrink-0 flex-wrap bg-white">
                     {canDel && (
                         <button onClick={onDelete}
-                            className="h-10 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-all">
+                            className="h-10 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-all active:scale-[0.98]">
                             🗑️ Hapus
                         </button>
                     )}
                     {canEdit && (
                         <button onClick={onEdit}
-                            className="h-10 px-4 bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0] rounded-xl text-xs font-bold hover:bg-[#e2e8f0] transition-all">
+                            className="h-10 px-4 bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0] rounded-xl text-xs font-bold hover:bg-[#e2e8f0] transition-all active:scale-[0.98]">
                             ✏️ Edit
                         </button>
                     )}
@@ -742,10 +1151,17 @@ export default function PKLReportsPage() {
     const isPKLUser = isPKL(currentUser?.role);
     const isAdminUser = isFullAccess(currentUser?.role);
     const isKepalaUser = isKepala(currentUser?.role);
+    const calendarMonth = filterMonth || getWIBToday().slice(0, 7);
+
+    const activeFilterCount =
+        (filterStatus !== "ALL" ? 1 : 0) +
+        (filterPKL !== "ALL" ? 1 : 0) +
+        (filterDate ? 1 : 0) +
+        (!isPKLUser && !isKepalaUser && activeDivision !== "ALL" ? 1 : 0);
 
     return (
         <DashboardLayout>
-            <div className="min-h-screen bg-[#F7F7F8]">
+            <div className="min-h-screen" style={{ background: "linear-gradient(180deg, #F6F7FB 0%, #F7F7F8 320px)" }}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 animate-fadeIn">
 
                     {/* ── Hero Header ── */}
@@ -756,6 +1172,15 @@ export default function PKLReportsPage() {
                             style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
                         <div className="absolute -bottom-24 left-8 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none"
                             style={{ background: "radial-gradient(circle, #3b82f6, transparent 70%)" }} />
+                        {/* subtle grid texture */}
+                        <div className="absolute inset-0 opacity-[0.06] pointer-events-none"
+                            style={{
+                                backgroundImage:
+                                    "linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)",
+                                backgroundSize: "36px 36px",
+                                maskImage: "radial-gradient(circle at 20% 0%, black, transparent 70%)",
+                                WebkitMaskImage: "radial-gradient(circle at 20% 0%, black, transparent 70%)",
+                            }} />
 
                         <div className="relative flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-center gap-3.5 min-w-0">
@@ -787,6 +1212,25 @@ export default function PKLReportsPage() {
                                 </button>
                             )}
                         </div>
+
+                        {/* mini pills */}
+                        <div className="relative flex flex-wrap items-center gap-2 mt-5">
+                            {[
+                                { l: "Terkirim", v: stats.submitted, c: DOT_COLOR.SUBMITTED },
+                                { l: "Disetujui", v: stats.reviewed, c: DOT_COLOR.REVIEWED },
+                                { l: "Revisi", v: stats.revision, c: DOT_COLOR.REVISION },
+                            ].map(p => (
+                                <span key={p.l}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 ring-1 ring-white/10 backdrop-blur-sm text-[11px] font-semibold text-white/75">
+                                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.c }} />
+                                    {p.l}
+                                    <span className="font-black text-white tabular-nums">{p.v}</span>
+                                </span>
+                            ))}
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 ring-1 ring-white/10 backdrop-blur-sm text-[11px] font-semibold text-white/75">
+                                🗓️ {MONTH_NAMES[parseInt(calendarMonth.split("-")[1]) - 1]} {calendarMonth.split("-")[0]}
+                            </span>
+                        </div>
                     </div>
 
                     {/* ── Stat Cards ── */}
@@ -797,11 +1241,39 @@ export default function PKLReportsPage() {
                         <StatCard icon="🔄" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
                     </div>
 
+                    {/* ── Kalender + Insight ── */}
+                    {(isPKLUser || isAdminUser || isKepalaUser) && (
+                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,460px)_1fr] gap-4 items-start">
+                            <MiniCalendar
+                                month={calendarMonth}
+                                reports={reports}
+                                isPKLUser={isPKLUser}
+                                filterDate={filterDate}
+                                onMonthChange={(mm) => { setFilterMonth(mm); setFilterDate(null); }}
+                                onPickDate={(date, existing) => {
+                                    if (isPKLUser) {
+                                        if (existing) { setSelectedReport(existing); setShowDetail(true); }
+                                        else { setPrefillDate(date); setEditReport(null); setShowForm(true); }
+                                    } else {
+                                        setFilterDate(prev => (prev === date ? null : date));
+                                    }
+                                }}
+                            />
+                            <MonthInsight
+                                month={calendarMonth}
+                                reports={reports}
+                                isPKLUser={isPKLUser}
+                                pklUsers={pklUsers}
+                                onPickDate={(date) => { setPrefillDate(date); setEditReport(null); setShowForm(true); }}
+                            />
+                        </div>
+                    )}
+
                     {/* ── Filter Bar ── */}
                     <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
 
                         {/* Header strip — toggle di mobile */}
-                        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5" style={SECTION_HEAD}>
                             <button
                                 onClick={() => setShowMobileFilters(!showMobileFilters)}
                                 className="sm:hidden flex items-center gap-2 text-sm font-bold text-[#334155]"
@@ -810,6 +1282,11 @@ export default function PKLReportsPage() {
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                                 </svg>
                                 Filter & Pencarian
+                                {activeFilterCount > 0 && (
+                                    <span className="text-[9px] font-black text-white bg-[#1a1545] rounded-full w-4 h-4 flex items-center justify-center tabular-nums">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                                     className={`transition-transform duration-300 ${showMobileFilters ? "rotate-180" : ""}`}>
                                     <polyline points="6 9 12 15 18 9" />
@@ -820,6 +1297,11 @@ export default function PKLReportsPage() {
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                                 </svg>
                                 Filter & Pencarian
+                                {activeFilterCount > 0 && (
+                                    <span className="text-[9px] font-black text-white bg-[#1a1545] rounded-full w-4 h-4 flex items-center justify-center tabular-nums">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -832,7 +1314,7 @@ export default function PKLReportsPage() {
                                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                         <button
                                             onClick={() => setActiveDivision("ALL")}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0"
+                                            className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0 active:scale-[0.97]"
                                             style={activeDivision === "ALL"
                                                 ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                 : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
@@ -843,7 +1325,7 @@ export default function PKLReportsPage() {
                                             <button
                                                 key={div.id}
                                                 onClick={() => setActiveDivision(div.id)}
-                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0"
+                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0 active:scale-[0.97]"
                                                 style={activeDivision === div.id
                                                     ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                     : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
@@ -876,8 +1358,8 @@ export default function PKLReportsPage() {
                                     <input
                                         type="month"
                                         value={filterMonth}
-                                        onChange={e => setFilterMonth(e.target.value)}
-                                        className="h-9 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                                        onChange={e => { setFilterMonth(e.target.value); setFilterDate(null); }}
+                                        className="h-10 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:bg-white transition-all"
                                     />
                                 </div>
 
@@ -887,7 +1369,7 @@ export default function PKLReportsPage() {
                                     <select
                                         value={filterStatus}
                                         onChange={e => setFilterStatus(e.target.value)}
-                                        className="h-9 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 min-w-[140px]"
+                                        className="h-10 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:bg-white transition-all min-w-[140px]"
                                     >
                                         <option value="ALL">Semua Status</option>
                                         <option value="SUBMITTED">📤 Terkirim</option>
@@ -903,7 +1385,7 @@ export default function PKLReportsPage() {
                                         <select
                                             value={filterPKL}
                                             onChange={e => setFilterPKL(e.target.value)}
-                                            className="h-9 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f5f7ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 min-w-[160px]"
+                                            className="h-10 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:bg-white transition-all min-w-[160px]"
                                         >
                                             <option value="ALL">Semua PKL</option>
                                             {pklUsers.map(u => (
@@ -916,8 +1398,8 @@ export default function PKLReportsPage() {
                                 {/* Refresh */}
                                 <div className="flex items-end">
                                     <button onClick={fetchReports}
-                                        className="h-9 px-4 bg-white border border-[#e8ecf5] text-[#64748b] rounded-xl text-xs font-semibold hover:bg-[#f8fafc] transition-all flex items-center gap-1.5">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        className="h-10 px-4 bg-white border border-[#e8ecf5] text-[#64748b] rounded-xl text-xs font-semibold hover:bg-[#f8fafc] hover:text-[#1a1545] transition-all flex items-center gap-1.5 active:scale-[0.97]">
+                                        <svg className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                         Refresh
                                     </button>
                                 </div>
@@ -925,116 +1407,15 @@ export default function PKLReportsPage() {
                         </div>
                     </div>
 
-                    {/* ── Kalender view — tampil untuk semua role ── */}
-                    {(isPKLUser || isAdminUser || isKepalaUser) && (() => {
-                        const [y, m] = filterMonth ? filterMonth.split("-").map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
-                        const dim = new Date(y, m, 0).getDate();
-                        const fd = new Date(y, m - 1, 1).getDay();
-                        const reportDates = new Set(reports.map(r => r.report_date));
-                        const reviewedDates = new Set(reports.filter(r => r.status === "REVIEWED").map(r => r.report_date));
-                        const revisionDates = new Set(reports.filter(r => r.status === "REVISION").map(r => r.report_date));
-                        const today = getWIBToday();
-
-                        return (
-                            <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
-                                <div className="px-5 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-2" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
-                                    <div>
-                                        <p className="text-sm font-bold text-[#0f172a]">📅 Kalender Laporan</p>
-                                        <p className="text-[10px] text-[#94a3b8] mt-0.5">
-                                            {isPKLUser
-                                                ? "Klik tanggal kosong untuk buat laporan · Klik tanggal berisi untuk lihat detail"
-                                                : "Klik tanggal untuk filter tabel · Klik lagi untuk reset filter"}
-                                        </p>
-                                    </div>
-                                    {filterDate && !isPKLUser && (
-                                        <button
-                                            onClick={() => setFilterDate(null)}
-                                            className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl transition-all"
-                                            style={{ background: "#f3f0ff", color: "#6d28d9", border: "1px solid #ddd6fe" }}
-                                        >
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                                            Reset · {formatDateShort(filterDate)}
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="p-4">
-                                    <div className="grid grid-cols-7 mb-2">
-                                        {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(d => (
-                                            <div key={d} className="text-center text-[10px] font-black text-[#94a3b8] uppercase py-1">{d}</div>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-7 gap-1">
-                                        {Array(fd).fill(null).map((_, i) => <div key={`e-${i}`} />)}
-                                        {Array.from({ length: dim }, (_, i) => i + 1).map(day => {
-                                            const dk = `${y}-${pad2(m)}-${pad2(day)}`;
-                                            const hasRep = reportDates.has(dk);
-                                            const isRev = reviewedDates.has(dk);
-                                            const isRevision = revisionDates.has(dk);
-                                            const isTod = dk === today;
-                                            const isFuture = dk > today;
-                                            const isSelected = filterDate === dk;
-
-                                            return (
-                                                <button
-                                                    key={day}
-                                                    disabled={isFuture}
-                                                    onClick={() => {
-                                                        if (isPKLUser) {
-                                                            if (hasRep) {
-                                                                const r = reports.find(r => r.report_date === dk);
-                                                                if (r) { setSelectedReport(r); setShowDetail(true); }
-                                                            } else {
-                                                                setPrefillDate(dk);
-                                                                setEditReport(null);
-                                                                setShowForm(true);
-                                                            }
-                                                        } else {
-                                                            // admin/kepala: toggle filter tanggal
-                                                            setFilterDate(prev => prev === dk ? null : dk);
-                                                        }
-                                                    }}
-                                                    className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs font-bold transition-all
-                                                        ${isFuture ? "text-[#e2e8f0] cursor-not-allowed" :
-                                                            isSelected ? "bg-[#4338ca] text-white ring-2 ring-[#a5b4fc] scale-[1.05] shadow-md cursor-pointer" :
-                                                                isRev ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
-                                                                    isRevision ? "bg-amber-100 text-amber-700 ring-1 ring-amber-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
-                                                                        hasRep ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 cursor-pointer hover:ring-2 hover:scale-[1.02]" :
-                                                                            isTod ? "ring-2 ring-[#1a1545] text-[#1a1545] font-black hover:bg-[#f8fafc] cursor-pointer" :
-                                                                                "hover:bg-[#f8fafc] text-[#64748b] cursor-pointer"
-                                                        }`}
-                                                >
-                                                    {day}
-                                                    {hasRep && !isSelected && (
-                                                        <div className={`w-1 h-1 rounded-full mt-0.5 ${isRev ? "bg-emerald-500" : isRevision ? "bg-amber-500" : "bg-blue-500"}`} />
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Legend */}
-                                    <div className="flex items-center gap-4 mt-4 pt-3 flex-wrap" style={{ borderTop: "1px solid #f5f5fb" }}>
-                                        {[
-                                            { color: "bg-emerald-400", label: "Disetujui" },
-                                            { color: "bg-blue-400", label: "Terkirim" },
-                                            { color: "bg-amber-400", label: "Perlu Revisi" },
-                                            { color: "bg-[#4338ca]", label: "Dipilih" },
-                                            { color: "ring-2 ring-[#1a1545] bg-white", label: "Hari ini" },
-                                        ].map(({ color, label }) => (
-                                            <span key={label} className="flex items-center gap-1.5 text-[10px] text-[#64748b]">
-                                                <span className={`w-3 h-3 rounded-full ${color}`} />{label}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-
                     {/* ── PKL Summary Cards (untuk admin/kepala lihat per PKL) ── */}
                     {!isPKLUser && Object.keys(reportsByPKL).length > 0 && (
                         <div>
-                            <p className="text-sm font-bold text-[#475569] mb-3">📊 Ringkasan per PKL</p>
+                            <div className="flex items-center gap-2 mb-3">
+                                <p className="text-sm font-bold text-[#475569]">📊 Ringkasan per PKL</p>
+                                <span className="text-[10px] font-bold text-[#94a3b8] bg-white border border-[#eef0f6] px-2 py-0.5 rounded-full tabular-nums">
+                                    {Object.keys(reportsByPKL).length} orang
+                                </span>
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {Object.entries(reportsByPKL).map(([uid, rpts]) => {
                                     const pklName = rpts[0]?.users?.name ?? "—";
@@ -1050,38 +1431,41 @@ export default function PKLReportsPage() {
                                     return (
                                         <div key={uid} className="group bg-white rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5"
                                             style={CARD_STYLE}>
-                                            <div className="flex items-center gap-3 mb-3">
+                                            <div className="flex items-center gap-3 mb-3.5">
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[10px] font-black flex-shrink-0 ring-2 ring-white shadow-sm"
                                                     style={{ background: "linear-gradient(135deg, #fbbf24, #b45309)" }}>
                                                     {initials(pklName)}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-[#0f172a] text-sm truncate">{pklName}</p>
-                                                    <p className="text-[10px] text-[#b45309] font-semibold">{pklRole.replace(/_/g, " ")}</p>
+                                                    <p className="text-[10px] text-[#b45309] font-semibold truncate">{pklRole.replace(/_/g, " ")}</p>
                                                 </div>
+                                                <span className="ml-auto text-[10px] font-black text-[#94a3b8] tabular-nums bg-[#f8fafc] border border-[#eef0f6] px-2 py-0.5 rounded-lg flex-shrink-0">
+                                                    {rpts.length}
+                                                </span>
                                             </div>
 
                                             {/* Stats */}
-                                            <div className="grid grid-cols-3 gap-2 mb-3">
-                                                <div className="bg-blue-50 rounded-lg p-2 text-center">
-                                                    <p className="text-lg font-black text-blue-600">{submitted}</p>
-                                                    <p className="text-[9px] text-[#94a3b8] font-medium">Terkirim</p>
+                                            <div className="grid grid-cols-3 gap-2 mb-3.5">
+                                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2 text-center">
+                                                    <p className="text-lg font-black text-blue-600 tabular-nums">{submitted}</p>
+                                                    <p className="text-[9px] text-[#94a3b8] font-semibold">Terkirim</p>
                                                 </div>
-                                                <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                                                    <p className="text-lg font-black text-emerald-600">{reviewed}</p>
-                                                    <p className="text-[9px] text-[#94a3b8] font-medium">Disetujui</p>
+                                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2 text-center">
+                                                    <p className="text-lg font-black text-emerald-600 tabular-nums">{reviewed}</p>
+                                                    <p className="text-[9px] text-[#94a3b8] font-semibold">Disetujui</p>
                                                 </div>
-                                                <div className="bg-amber-50 rounded-lg p-2 text-center">
-                                                    <p className="text-lg font-black text-amber-600">{revision}</p>
-                                                    <p className="text-[9px] text-[#94a3b8] font-medium">Revisi</p>
+                                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-2 text-center">
+                                                    <p className="text-lg font-black text-amber-600 tabular-nums">{revision}</p>
+                                                    <p className="text-[9px] text-[#94a3b8] font-semibold">Revisi</p>
                                                 </div>
                                             </div>
 
                                             {/* Progress bar */}
                                             <div className="mb-2">
                                                 <div className="flex items-center justify-between mb-1">
-                                                    <p className="text-[10px] text-[#64748b]">Tingkat Persetujuan</p>
-                                                    <p className={`text-[10px] font-bold ${pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-amber-600" : "text-red-500"}`}>{pct}%</p>
+                                                    <p className="text-[10px] text-[#64748b] font-medium">Tingkat persetujuan</p>
+                                                    <p className={`text-[10px] font-black tabular-nums ${pct >= 80 ? "text-emerald-600" : pct >= 50 ? "text-amber-600" : "text-red-500"}`}>{pct}%</p>
                                                 </div>
                                                 <div className="h-1.5 bg-[#f1f5f9] rounded-full overflow-hidden">
                                                     <div
@@ -1105,7 +1489,7 @@ export default function PKLReportsPage() {
 
                     {/* ── Daftar Laporan ── */}
                     <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
-                        <div className="px-5 sm:px-6 py-5 flex items-center justify-between flex-wrap gap-3" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                        <div className="px-5 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-3" style={SECTION_HEAD}>
                             <div>
                                 <p className="text-base font-bold text-[#0f172a]">
                                     {isPKLUser ? "Laporan Kerjamu" : "Semua Laporan"}
@@ -1129,7 +1513,7 @@ export default function PKLReportsPage() {
                             {isPKLUser && (
                                 <button
                                     onClick={() => { setPrefillDate(getWIBToday()); setEditReport(null); setShowForm(true); }}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-[#f1f5f9] border border-[#e2e8f0] px-4 py-2 rounded-xl hover:bg-[#e2e8f0] transition-all"
+                                    className="flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-white border border-[#e2e8f0] px-4 py-2 rounded-xl hover:bg-[#f1f5f9] transition-all active:scale-[0.97]"
                                 >
                                     ✏️ Laporan Hari Ini
                                 </button>
@@ -1137,7 +1521,7 @@ export default function PKLReportsPage() {
                         </div>
 
                         {loading ? (
-                            <div className="p-6 space-y-3">
+                            <div className="p-5 sm:p-6 space-y-3">
                                 {Array(4).fill(0).map((_, i) => (
                                     <div key={i} className="h-20 bg-[#f5f7ff] rounded-2xl animate-pulse" />
                                 ))}
@@ -1147,13 +1531,15 @@ export default function PKLReportsPage() {
                                 <div className="w-14 h-14 rounded-2xl bg-[#f5f7ff] flex items-center justify-center mx-auto mb-4">
                                     <span className="text-3xl opacity-40">📋</span>
                                 </div>
-                                <p className="text-sm text-[#94a3b8] font-medium">Belum ada laporan</p>
+                                <p className="text-sm text-[#475569] font-bold">Belum ada laporan di rentang ini</p>
+                                <p className="text-xs text-[#94a3b8] mt-1">Ubah filter bulan/status, atau buat laporan baru.</p>
                                 {isPKLUser && (
                                     <button
                                         onClick={() => { setEditReport(null); setShowForm(true); }}
-                                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-[#f1f5f9] border border-[#e2e8f0] px-4 py-2 rounded-xl hover:bg-[#e2e8f0] transition-all"
+                                        className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-white px-5 py-2.5 rounded-xl transition-all active:scale-[0.98]"
+                                        style={{ background: NAVY_GRADIENT, boxShadow: NAVY_SHADOW }}
                                     >
-                                        ➕ Buat Laporan Pertama
+                                        ➕ Buat laporan
                                     </button>
                                 )}
                             </div>
@@ -1167,8 +1553,17 @@ export default function PKLReportsPage() {
                                     return (
                                         <div
                                             key={report.id}
-                                            className="px-5 sm:px-6 py-4 hover:bg-[#fafbff] transition-colors cursor-pointer group"
+                                            role="button"
+                                            tabIndex={0}
+                                            className="relative px-5 sm:px-6 py-4 border-l-[3px] hover:bg-[#fafbff] transition-colors cursor-pointer group focus:outline-none focus-visible:bg-[#f5f7ff]"
+                                            style={{ borderLeftColor: DOT_COLOR[report.status] ?? "transparent" }}
                                             onClick={() => { setSelectedReport(report); setShowDetail(true); }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    setSelectedReport(report); setShowDetail(true);
+                                                }
+                                            }}
                                         >
                                             <div className="flex items-start gap-3 sm:gap-4">
                                                 {/* Avatar */}
