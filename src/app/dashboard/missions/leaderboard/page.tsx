@@ -33,15 +33,41 @@ export default function MissionLeaderboardPage() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
+  const [boardType, setBoardType] = useState<"kerja" | "misi">("kerja");
   const [error, setError] = useState("");
 
-  const fetchData = async (p: string) => {
+  const fetchData = async (p: string, b: "kerja" | "misi") => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/leaderboard-kerja?period=${p}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Gagal mengambil data");
-      setUsers(json.data || []);
+      if (b === "kerja") {
+        const res = await fetch(`/api/leaderboard-kerja?period=${p}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Gagal mengambil data");
+        setUsers(json.data || []);
+      } else {
+        const res = await fetch(`/api/missions/leaderboard?period=${p}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Gagal mengambil data");
+        
+        const finalUsers: LeaderboardUser[] = [];
+        Object.values(json.data || {}).forEach((group: any) => {
+            group.forEach((u: any) => {
+                finalUsers.push({
+                    id: u.id,
+                    name: u.name,
+                    role: u.role,
+                    photo_url: null,
+                    score: u.totalCompleted * 10,
+                    metrics: [
+                        { label: "Selesai", value: u.totalCompleted },
+                        { label: "Waktu Resp", value: u.avgResponseMs ? Math.round(u.avgResponseMs / 1000 / 60) : 0, unit: "mnt" },
+                        { label: "Waktu Pengerjaan", value: u.avgCompletionMs ? Math.round(u.avgCompletionMs / 1000 / 60) : 0, unit: "mnt" }
+                    ]
+                });
+            });
+        });
+        setUsers(finalUsers);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -50,8 +76,8 @@ export default function MissionLeaderboardPage() {
   };
 
   useEffect(() => {
-    fetchData(period);
-  }, [period]);
+    fetchData(period, boardType);
+  }, [period, boardType]);
 
   const getDivision = (role: string) => {
     const r = (role || "").toUpperCase();
@@ -96,27 +122,45 @@ export default function MissionLeaderboardPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
               <Trophy className="w-5 h-5 text-blue-600" />
-              Leaderboard Pekerjaan
+              {boardType === "kerja" ? "Leaderboard Pekerjaan" : "Leaderboard Misi"}
             </h1>
             <p className="text-gray-500 text-xs mt-1">
-              Peringkat karyawan berdasarkan aktivitas utama tiap divisi.
+              {boardType === "kerja" ? "Peringkat karyawan berdasarkan aktivitas utama tiap divisi." : "Peringkat karyawan berdasarkan penyelesaian misi."}
             </p>
           </div>
 
-          <div className="flex bg-white rounded-lg shadow-sm border border-gray-200/60 p-0.5 self-start sm:self-auto">
-            {(["today", "week", "month"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  period === p
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                {periodLabels[p]}
-              </button>
-            ))}
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+            <div className="flex bg-gray-100 rounded-lg shadow-sm border border-gray-200/60 p-0.5">
+              {(["kerja", "misi"] as const).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBoardType(b)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    boardType === b
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-900 hover:bg-gray-200/50"
+                  }`}
+                >
+                  {b === "kerja" ? "Pekerjaan" : "Misi"}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex bg-white rounded-lg shadow-sm border border-gray-200/60 p-0.5 self-start sm:self-auto">
+              {(["today", "week", "month"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    period === p
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  {periodLabels[p]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -1121,6 +1121,79 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
     );
 }
 
+function InlineDateRange({ from, to, onChange }: { from: string, to: string, onChange: (from: string, to: string) => void }) {
+    const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const viewDate = from ? new Date(from) : new Date();
+    const [currMonth, setCurrMonth] = useState(viewDate.getMonth());
+    const [currYear, setCurrYear] = useState(viewDate.getFullYear());
+
+    useEffect(() => {
+        if (from) {
+            const d = new Date(from);
+            setCurrMonth(d.getMonth());
+            setCurrYear(d.getFullYear());
+        }
+    }, [from]);
+
+    const prevMonth = () => setCurrMonth(m => m === 0 ? (setCurrYear(y => y - 1), 11) : m - 1);
+    const nextMonth = () => setCurrMonth(m => m === 11 ? (setCurrYear(y => y + 1), 0) : m + 1);
+    
+    const daysInMonth = new Date(currYear, currMonth + 1, 0).getDate();
+    const firstDay = new Date(currYear, currMonth, 1).getDay();
+    const blanks = Array.from({ length: firstDay });
+    const days = Array.from({ length: daysInMonth }).map((_, i) => i + 1);
+    const monthName = new Date(currYear, currMonth).toLocaleDateString("id-ID", { month: "long" });
+
+    const handleDayClick = (d: number) => {
+        const dateStr = `${currYear}-${String(currMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        if (!from || (from && to)) { onChange(dateStr, ""); }
+        else {
+            if (dateStr < from) onChange(dateStr, from);
+            else onChange(from, dateStr);
+        }
+    };
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl p-2 shadow-sm inline-block w-full max-w-[170px]">
+            <div className="flex items-center justify-between mb-1.5">
+                <button onClick={prevMonth} className="p-0.5 hover:bg-gray-100 rounded-md text-gray-600 transition"><IconChevronLeft /></button>
+                <div className="font-bold text-[10px] text-gray-800">
+                    {monthName} {currYear}
+                </div>
+                <button onClick={nextMonth} className="p-0.5 hover:bg-gray-100 rounded-md text-gray-600 transition"><IconChevronRight /></button>
+            </div>
+            <div className="grid grid-cols-7 gap-0 text-center text-[8px] font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((d) => <div key={d}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-0 text-center">
+                {blanks.map((_, i) => <div key={`blank-${i}`} />)}
+                {days.map(d => {
+                    const dateStr = `${currYear}-${String(currMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                    const isToday = dateStr === todayStr;
+                    const isSelected = dateStr === from || dateStr === to;
+                    const inRange = from && to && dateStr > from && dateStr < to;
+                    
+                    let cls = "h-5 w-5 mx-auto rounded flex items-center justify-center cursor-pointer transition text-[9px] font-semibold ";
+                    if (isSelected) cls += "bg-gray-900 text-white shadow-sm ring-1 ring-gray-900";
+                    else if (inRange) cls += "bg-gray-100 text-gray-900";
+                    else if (isToday) cls += "bg-gray-50 text-gray-900 font-bold border border-gray-200 hover:bg-gray-100";
+                    else cls += "text-gray-600 hover:bg-gray-50 hover:text-gray-900";
+
+                    return (
+                        <div key={d} onClick={() => handleDayClick(d)} className={cls}>
+                            {d}
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="mt-2 flex justify-between items-center border-t border-gray-100 pt-2">
+                <button onClick={() => onChange(todayStr, todayStr)} className="text-[9px] font-semibold text-gray-500 hover:text-gray-900 transition">Hari Ini</button>
+                <button onClick={() => onChange("", "")} className="text-[9px] font-semibold text-gray-500 hover:text-gray-900 transition">Semua</button>
+            </div>
+        </div>
+    );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CashflowPage() {
     const router = useRouter();
@@ -1129,9 +1202,14 @@ export default function CashflowPage() {
     const [keluar, setKeluar] = useState<Entry[]>([]);
     const [summary, setSummary] = useState<Summary>({ total_masuk: 0, total_keluar: 0, saldo: 0, belum_audit: 0, modal_awal_entry: null });
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
-    const [period, setPeriod] = useState<"today" | "week" | "month" | "custom">("today");
     const [customFrom, setCustomFrom] = useState("");
     const [customTo, setCustomTo] = useState("");
+
+    useEffect(() => {
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+        setCustomFrom(today);
+        setCustomTo(today);
+    }, []);
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
     const [showIncomeModal, setShowIncomeModal] = useState(false);
@@ -1235,17 +1313,8 @@ export default function CashflowPage() {
     const paginatedRows = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const jakartaNow = new Date();
-    const weekDay = jakartaNow.getDay();
-    const weekStart = new Date(jakartaNow);
-    weekStart.setDate(jakartaNow.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
-    const weekStartStr = weekStart.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const monthPrefix = jakartaToday.slice(0, 7);
 
     const inPeriod = (tanggal: string) => {
-        if (period === "today") return tanggal === jakartaToday;
-        if (period === "week") return tanggal >= weekStartStr && tanggal <= jakartaToday;
-        if (period === "month") return (tanggal || "").slice(0, 7) === monthPrefix;
         if (customFrom && tanggal < customFrom) return false;
         if (customTo && tanggal > customTo) return false;
         return !!(customFrom || customTo);
@@ -1253,8 +1322,7 @@ export default function CashflowPage() {
 
     const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
     const expenseValue = keluar.reduce((s, e) => inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
-    const periodLabel = period === "today" ? "Hari Ini" : period === "week" ? "Minggu Ini" : period === "month" ? "Bulan Ini"
-        : (customFrom || customTo) ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}` : "Custom";
+    const periodLabel = (customFrom || customTo) ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}` : "Semua Waktu";
 
     const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
     const clickable = (e: Entry) => e.source_type !== "MODAL_AWAL";
@@ -1332,19 +1400,12 @@ export default function CashflowPage() {
                                     </div>
                                 )}
                             </div>
-                            <div className="flex flex-col items-end gap-2">
-                                <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5">
-                                    {([["today", "Hari Ini"], ["week", "Minggu"], ["month", "Bulan"], ["custom", "Kustom"]] as [typeof period, string][]).map(([val, label]) => (
-                                        <button key={val} onClick={() => setPeriod(val)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${period === val ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:bg-white/60"}`}>{label}</button>
-                                    ))}
-                                </div>
-                                {period === "custom" && (
-                                    <div className="flex items-center gap-1.5">
-                                        <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
-                                        <span className="text-xs text-gray-400">—</span>
-                                        <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition" />
-                                    </div>
-                                )}
+                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                <InlineDateRange 
+                                    from={customFrom} 
+                                    to={customTo} 
+                                    onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }} 
+                                />
                             </div>
                         </div>
                     </div>
