@@ -24,7 +24,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard/akuntansi"
+            href="/dashboard/akutansi"
             className="w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:bg-gray-50 transition"
             title="Ganti bulan"
           >
