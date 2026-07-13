@@ -3,8 +3,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface Followup {
   id: string;
   transaction_id: string | null;
@@ -22,14 +23,31 @@ interface Followup {
   notes: string | null;
   is_active: boolean;
   created_at: string;
+
+  // dari DB (migration baru)
+  pic_user_id: string | null;
+  last_followup_proof_url: string | null;
+
+  // flag hasil kalkulasi server — SATU-SATUNYA sumber kebenaran untuk gating UI
   is_due: boolean;
+  is_owner: boolean;
+  can_followup: boolean;
+  lock_reason: string | null;
 }
 
-// Data user yang sedang login
 interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
+  roles: UserRole[];
+}
+
+interface PicCandidate {
+  user_id: string;
+  name: string;
+  role: string;
+  roles: string[];
+  is_active: boolean;
 }
 
 type Tab = "USER" | "PEDAGANG";
@@ -67,15 +85,6 @@ const waLink = (f: Followup) =>
   `https://wa.me/${toWaNumber(f.customer_phone)}?text=${encodeURIComponent(
     buildWaMessage(f)
   )}`;
-
-/**
- * Cek apakah user yang login adalah PIC (orang yang closing).
- * Comparison case-insensitive dan trim untuk toleransi spasi/kapitalisasi.
- */
-function isPIC(authUser: AuthUser | null, closedBy: string | null): boolean {
-  if (!authUser || !closedBy) return false;
-  return authUser.name.trim().toLowerCase() === closedBy.trim().toLowerCase();
-}
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const WaIcon = ({ size = 14 }: { size?: number }) => (
@@ -124,14 +133,6 @@ const UploadIcon = () => (
   </svg>
 );
 
-const ImageIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21 15 16 10 5 21" />
-  </svg>
-);
-
 const TrashIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
     <polyline points="3 6 5 6 21 6" />
@@ -147,8 +148,21 @@ const LockIcon = () => (
   </svg>
 );
 
-const Spinner = () => (
-  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block flex-shrink-0" />
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg
+    width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" aria-hidden="true"
+    className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+  >
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+
+const Spinner = ({ dark = false }: { dark?: boolean }) => (
+  <span
+    className={`w-3.5 h-3.5 border-2 rounded-full animate-spin inline-block flex-shrink-0 ${dark ? "border-gray-300 border-t-gray-600" : "border-white/30 border-t-white"
+      }`}
+  />
 );
 
 // ── Avatar initials ───────────────────────────────────────────────────────────
@@ -211,39 +225,165 @@ function StatPill({ children }: { children: React.ReactNode }) {
 function InfoCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
-      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-        {label}
-      </p>
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
       <p className="text-xs font-bold text-gray-800 leading-snug">{value}</p>
-      {sub && (
-        <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate">{sub}</p>
+      {sub && <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Dropdown Checklist Akses PIC (Admin only) ────────────────────────────────
+function PicAccessDropdown({
+  pics,
+  loading,
+  error,
+  savingId,
+  onToggle,
+  onRetry,
+}: {
+  pics: PicCandidate[];
+  loading: boolean;
+  error: string | null;
+  savingId: string | null;
+  onToggle: (userId: string, next: boolean) => void;
+  onRetry: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const groups = useMemo(
+    () => [
+      {
+        label: "Kepala Marketing",
+        items: pics.filter((p) => p.roles.includes("KEPALA_MARKETING")),
+      },
+      {
+        label: "Crew Sales",
+        items: pics.filter(
+          (p) => p.roles.includes("CREW_SALES") && !p.roles.includes("KEPALA_MARKETING")
+        ),
+      },
+    ],
+    [pics]
+  );
+
+  const activeCount = pics.filter((p) => p.is_active).length;
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Atur siapa yang boleh follow-up"
+        className={`h-9 px-3 inline-flex items-center gap-2 rounded-xl border text-xs font-bold transition-all active:scale-[0.98] ${error
+          ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+          }`}
+      >
+        <span>{error ? "⚠️" : "🔐"}</span>
+        <span className="hidden sm:inline">Akses PIC</span>
+        {!error && (
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black">
+            {activeCount}
+          </span>
+        )}
+        <ChevronIcon open={open} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+            <p className="text-xs font-black text-gray-900">Izin Follow-up</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
+              Centang siapa yang boleh melakukan follow-up. Hanya Admin yang bisa mengubah.
+            </p>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto py-2">
+            {loading ? (
+              <div className="px-4 py-6 text-center text-xs text-gray-400">Memuat…</div>
+            ) : error ? (
+              /* ✅ Error tampil eksplisit — tidak lagi "diam" */
+              <div className="px-4 py-5 text-center">
+                <p className="text-xs font-bold text-red-600 mb-1">Gagal memuat</p>
+                <p className="text-[10px] text-gray-400 leading-relaxed mb-3">{error}</p>
+                <button
+                  onClick={onRetry}
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+                >
+                  Coba lagi
+                </button>
+              </div>
+            ) : pics.length === 0 ? (
+              <div className="px-4 py-6 text-center text-xs text-gray-400">
+                Belum ada Crew Sales / Kepala Marketing
+              </div>
+            ) : (
+              groups.map((g) =>
+                g.items.length === 0 ? null : (
+                  <div key={g.label} className="mb-1">
+                    <p className="px-4 py-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                      {g.label}
+                    </p>
+                    {g.items.map((p) => {
+                      const saving = savingId === p.user_id;
+                      return (
+                        <button
+                          key={p.user_id}
+                          onClick={() => onToggle(p.user_id, !p.is_active)}
+                          disabled={saving}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 transition-colors disabled:opacity-50 text-left"
+                        >
+                          <span
+                            className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center flex-shrink-0 transition-all ${p.is_active
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "bg-white border-gray-300"
+                              }`}
+                          >
+                            {saving ? (
+                              <Spinner dark={!p.is_active} />
+                            ) : p.is_active ? (
+                              <CheckIcon />
+                            ) : null}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-xs font-bold text-gray-800 truncate">
+                              {p.name}
+                            </span>
+                            <span
+                              className={`block text-[10px] ${p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
+                                }`}
+                            >
+                              {p.is_active ? "Boleh follow-up" : "Nonaktif"}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              )
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// ── Tombol Chat WA ────────────────────────────────────────────────────────────
-// Hanya bisa diklik oleh PIC (orang yang closing = closed_by) ATAU Kepala Sales.
-// Admin/role lain hanya lihat versi terkunci.
-function WaChatButton({
-  f,
-  authUser,
-  isKepalaSales = false,
-  fullWidth = false,
-}: {
-  f: Followup;
-  authUser: AuthUser | null;
-  isKepalaSales?: boolean;
-  fullWidth?: boolean;
-}) {
-  const isUserPIC = isPIC(authUser, f.closed_by);
-  const canClickWa = isUserPIC || isKepalaSales;
-
-  // Jika bukan PIC & bukan Kepala Sales: tampilkan tombol disabled dengan tooltip jelas
-  if (!canClickWa) {
+// ── Tombol Chat WA — hanya PIC pemilik ───────────────────────────────────────
+function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boolean }) {
+  if (!f.is_owner) {
     return (
       <div
-        title={`Hanya ${f.closed_by ?? "PIC"} atau Kepala Sales yang bisa mengirim pesan WA ke customer ini`}
+        title={f.lock_reason ?? `Hanya ${f.closed_by ?? "PIC"} yang bisa chat customer ini`}
         className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-semibold" : "w-9"
           }`}
       >
@@ -278,18 +418,26 @@ function TandaiFuButton({
   processing: boolean;
   onFollowup: (id: string) => void;
 }) {
+  const isUnowned = !f.pic_user_id;
+
   return (
     <button
       onClick={() => onFollowup(f.id)}
       disabled={processing}
-      title="Tandai sudah follow-up — akan minta bukti & konfirmasi"
+      title={
+        isUnowned
+          ? "FU sekaligus klaim customer ini sebagai milikmu"
+          : "Tandai sudah follow-up"
+      }
       className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
         ? "bg-blue-400 opacity-70 cursor-not-allowed"
-        : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+        : isUnowned
+          ? "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
+          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
         }`}
     >
-      {processing ? <Spinner /> : <PhoneIcon />}
-      Follow-up
+      {processing ? <Spinner /> : isUnowned ? <span>🙋</span> : <PhoneIcon />}
+      {isUnowned ? "Klaim & FU" : "Follow-up"}
     </button>
   );
 }
@@ -305,7 +453,6 @@ function BuktiFuUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  // Buat/revoke object URL setiap kali file berubah
   useEffect(() => {
     if (!value) {
       setPreview(null);
@@ -318,12 +465,10 @@ function BuktiFuUploader({
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
-    // Validasi tipe: hanya gambar
     if (!file.type.startsWith("image/")) {
       alert("Hanya file gambar (JPG, PNG, WEBP) yang diperbolehkan.");
       return;
     }
-    // Validasi ukuran: max 5 MB
     if (file.size > 5 * 1024 * 1024) {
       alert("Ukuran file maksimal 5 MB.");
       return;
@@ -343,14 +488,9 @@ function BuktiFuUploader({
       </p>
 
       {preview ? (
-        /* ── Preview gambar yang dipilih ── */
         <div className="relative rounded-xl overflow-hidden border border-blue-200 bg-blue-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt="Bukti FU"
-            className="w-full max-h-48 object-contain"
-          />
+          <img src={preview} alt="Bukti FU" className="w-full max-h-48 object-contain" />
           <button
             onClick={() => {
               onChange(null);
@@ -362,37 +502,33 @@ function BuktiFuUploader({
             <TrashIcon />
           </button>
           <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-blue-100">
-            <p className="text-[10px] font-bold text-blue-600 truncate">
-              <ImageIcon /> {value?.name}
-            </p>
+            <p className="text-[10px] font-bold text-blue-600 truncate">🖼️ {value?.name}</p>
             <p className="text-[9px] text-gray-400 mt-0.5">
               {value ? (value.size / 1024).toFixed(0) + " KB" : ""}
             </p>
           </div>
         </div>
       ) : (
-        /* ── Drop zone / klik untuk pilih ── */
         <div
           onClick={() => inputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 group"
         >
-          <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-2.5 transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-2.5 transition-colors text-gray-500">
             <UploadIcon />
           </div>
           <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700 transition-colors">
             Upload Screenshot Bukti FU
           </p>
           <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
-            Klik atau drag & drop gambar ke sini
+            Klik atau drag &amp; drop gambar ke sini
             <br />
             JPG, PNG, WEBP · Maks. 5 MB
           </p>
         </div>
       )}
 
-      {/* Input file hidden */}
       <input
         ref={inputRef}
         type="file"
@@ -412,21 +548,31 @@ function ConfirmFollowupModal({
   processing,
 }: {
   followup: Followup | null;
-  // onConfirm sekarang menerima File bukti
   onConfirm: (buktiFu: File) => void;
   onCancel: () => void;
   processing: boolean;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [buktiFu, setBuktiFu] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Reset state setiap kali modal dibuka dengan followup baru
   useEffect(() => {
     if (followup) {
       setStep(1);
       setBuktiFu(null);
     }
   }, [followup]);
+
+  // ✅ Object URL dibuat di effect (bukan di render) supaya tidak leak memory
+  useEffect(() => {
+    if (!buktiFu) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(buktiFu);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [buktiFu]);
 
   if (!followup) return null;
 
@@ -441,15 +587,12 @@ function ConfirmFollowupModal({
       aria-modal="true"
       aria-labelledby="confirm-fu-title"
     >
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={!processing ? onCancel : undefined}
       />
 
-      {/* Panel */}
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
-        {/* Progress bar */}
         <div className="flex h-1 bg-gray-100">
           <div
             className={`h-full bg-blue-600 transition-all duration-300 ${step === 1 ? "w-1/2" : "w-full"
@@ -458,15 +601,12 @@ function ConfirmFollowupModal({
         </div>
 
         <div className="px-5 pt-5 pb-5 max-h-[90vh] overflow-y-auto">
-          {/* Step label */}
           <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-4">
             Langkah {step} dari 2
           </p>
 
           {step === 1 ? (
-            /* ── Step 1: Upload Bukti FU ── */
             <>
-              {/* Customer info */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-base flex-shrink-0">
                   {followup.customer_name.charAt(0).toUpperCase()}
@@ -484,24 +624,21 @@ function ConfirmFollowupModal({
                 </div>
               </div>
 
-              {/* Info box */}
               <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 mb-4">
                 <p className="text-xs font-semibold text-blue-700 leading-relaxed">
                   Apakah kamu sudah melakukan follow-up ke{" "}
                   <span className="font-black">{firstName}</span>?
                 </p>
                 <p className="text-[11px] text-blue-500 mt-1.5 leading-relaxed">
-                  Upload screenshot percakapan WA sebagai bukti bahwa FU sudah
-                  benar-benar dilakukan.
+                  Upload screenshot percakapan WA sebagai bukti bahwa FU sudah benar-benar
+                  dilakukan.
                 </p>
               </div>
 
-              {/* Upload bukti */}
               <div className="mb-5">
                 <BuktiFuUploader value={buktiFu} onChange={setBuktiFu} />
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-2">
                 <button
                   onClick={onCancel}
@@ -527,13 +664,9 @@ function ConfirmFollowupModal({
               </div>
             </>
           ) : (
-            /* ── Step 2: Konfirmasi Final ── */
             <>
               <div className="mb-4">
-                <h2
-                  id="confirm-fu-title"
-                  className="text-sm font-black text-gray-900 mb-1"
-                >
+                <h2 id="confirm-fu-title" className="text-sm font-black text-gray-900 mb-1">
                   Konfirmasi Final
                 </h2>
                 <p className="text-xs text-gray-500 leading-relaxed">
@@ -541,18 +674,13 @@ function ConfirmFollowupModal({
                 </p>
               </div>
 
-              {/* Preview bukti (thumbnail kecil) */}
-              {buktiFu && (
+              {buktiFu && previewUrl && (
                 <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-emerald-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={URL.createObjectURL(buktiFu)}
-                      alt="Bukti FU"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={previewUrl} alt="Bukti FU" className="w-full h-full object-cover" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider leading-none mb-0.5">
                       Bukti FU
                     </p>
@@ -561,13 +689,12 @@ function ConfirmFollowupModal({
                       {(buktiFu.size / 1024).toFixed(0)} KB · Siap diupload
                     </p>
                   </div>
-                  <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0">
                     <CheckIcon />
                   </div>
                 </div>
               )}
 
-              {/* Summary rows */}
               <div className="space-y-2 mb-5">
                 <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -617,21 +744,18 @@ function ConfirmFollowupModal({
                 )}
               </div>
 
-              {/* Pertanyaan keamanan final */}
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-5">
                 <p className="text-xs font-black text-amber-800 leading-relaxed">
                   ⚠️ Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
                 </p>
                 <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
-                  Data ini akan tersimpan permanen dan tidak bisa dibatalkan.
-                  Jadwal follow-up berikutnya akan digeser{" "}
-                  <span className="font-bold">{intervalDays} hari</span> ke depan.
+                  Data ini akan tersimpan permanen dan tidak bisa dibatalkan. Jadwal follow-up
+                  berikutnya akan digeser <span className="font-bold">{intervalDays} hari</span> ke
+                  depan.
                 </p>
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-2">
-                {/* Tombol back ke step 1 */}
                 <button
                   onClick={() => setStep(1)}
                   disabled={processing}
@@ -641,13 +765,10 @@ function ConfirmFollowupModal({
                   <BackIcon />
                 </button>
 
-                {/* Tombol confirm — panggil onConfirm dengan file bukti */}
                 <button
                   onClick={() => buktiFu && onConfirm(buktiFu)}
                   disabled={processing || !buktiFu}
-                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing
-                    ? "bg-blue-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700"
+                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                     }`}
                 >
                   {processing ? <Spinner /> : <CheckIcon />}
@@ -668,9 +789,6 @@ function FollowupCard({
   scope,
   processing,
   canManage,
-  canFollowup,
-  isKepalaSales,
-  authUser,
   onFollowup,
   onArchive,
   onReactivate,
@@ -679,9 +797,6 @@ function FollowupCard({
   scope: Scope;
   processing: boolean;
   canManage: boolean;
-  canFollowup: boolean;
-  isKepalaSales: boolean;
-  authUser: AuthUser | null;
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
   onReactivate: (id: string) => void;
@@ -689,20 +804,13 @@ function FollowupCard({
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
   const isDue = f.is_due && scope === "ACTIVE";
-  const showActions = canManage || canFollowup;
-
-  // FU & WA cuma boleh diakses oleh PIC (closed_by) atau Kepala Sales — role lain (termasuk Admin) TIDAK bisa
-  const isUserPIC = isPIC(authUser, f.closed_by);
-  const canDoFollowup = canFollowup && (isUserPIC || isKepalaSales);
 
   return (
     <div
       className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
         }`}
     >
-      {isDue && (
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />
-      )}
+      {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />}
 
       {/* ── Card Header ── */}
       <div className={`px-4 pb-3 border-b border-gray-100 ${isDue ? "pt-4" : "pt-3.5"}`}>
@@ -741,19 +849,40 @@ function FollowupCard({
       {/* ── Card Body ── */}
       <div className="px-4 py-3.5 flex-1 space-y-3">
         {/* PIC Follow-up */}
-        <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
-          <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
-            {(f.closed_by ?? "?").charAt(0).toUpperCase()}
+        {f.pic_user_id ? (
+          <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
+            <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+              {(f.closed_by ?? "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
+                PIC Follow-up
+              </p>
+              <p className="text-xs font-black text-violet-800 leading-tight truncate">
+                {f.closed_by}
+              </p>
+            </div>
+            {f.is_owner && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
+                Kamu
+              </span>
+            )}
           </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
-              PIC Follow-up
-            </p>
-            <p className="text-xs font-black text-violet-800 leading-tight truncate">
-              {f.closed_by ?? "Belum tercatat"}
-            </p>
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
+              🙋
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-0.5">
+                PIC Follow-up
+              </p>
+              <p className="text-xs font-bold text-emerald-700 leading-tight">
+                Belum ada — kamu bisa klaim!
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <InfoCell
@@ -761,105 +890,85 @@ function FollowupCard({
             value={fmtDate(f.last_purchase_at)}
             sub={f.invoice_number ?? undefined}
           />
-          <InfoCell
-            label="Jadwal berikutnya"
-            value={fmtDate(f.next_followup_at)}
-          />
+          <InfoCell label="Jadwal berikutnya" value={fmtDate(f.next_followup_at)} />
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatPill>🛒 {f.purchase_count}× beli</StatPill>
           <StatPill>📞 {f.followup_count}× FU</StatPill>
-          {f.last_followup_by && (
-            <StatPill>👤 FU terakhir: {f.last_followup_by}</StatPill>
+          {f.last_followup_by && <StatPill>👤 FU terakhir: {f.last_followup_by}</StatPill>}
+          {f.last_followup_proof_url && (
+            <a
+              href={f.last_followup_proof_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 hover:bg-blue-100 transition"
+            >
+              🖼️ Lihat bukti
+            </a>
           )}
         </div>
       </div>
 
       {/* ── Card Actions ── */}
-      {showActions && (
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
-          {scope === "ACTIVE" ? (
-            <>
-              {/*
-                * Tombol WA: hanya PIC (closed_by) atau Kepala Sales yang bisa klik.
-                * Role lain (termasuk Admin) lihat tombol locked.
-                */}
-              <WaChatButton f={f} authUser={authUser} isKepalaSales={isKepalaSales} />
+      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
+        {scope === "ACTIVE" ? (
+          <>
+            <WaChatButton f={f} />
 
-              {/* Tombol Tandai FU: hanya canFollowup */}
-              {canFollowup ? (
-                canDoFollowup ? (
-                  f.is_due ? (
-                    <TandaiFuButton f={f} processing={processing} onFollowup={onFollowup} />
-                  ) : (
-                    <button
-                      disabled
-                      title={`Sudah FU. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
-                      className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
-                    >
-                      <CheckIcon />
-                      Sudah FU · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
-                    </button>
-                  )
-                ) : (
-                  <div
-                    title={`Hanya ${f.closed_by ?? "PIC"} atau Kepala Sales yang bisa follow-up customer ini`}
-                    className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
-                  >
-                    <LockIcon />
-                    FU Terkunci
-                  </div>
-                )
+            {f.can_followup ? (
+              f.is_due ? (
+                <TandaiFuButton f={f} processing={processing} onFollowup={onFollowup} />
               ) : (
-                <div className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-50 text-gray-400 text-xs font-semibold border border-gray-100 cursor-default select-none">
-                  {f.is_due ? (
-                    <span>⏰ Perlu Follow-up</span>
-                  ) : (
-                    <>
-                      <CheckIcon />
-                      <span>Sudah FU</span>
-                    </>
-                  )}
-                </div>
-              )}
+                <button
+                  disabled
+                  title={`Sudah FU oleh ${f.last_followup_by ?? f.closed_by ?? "PIC"}. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
+                  className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                >
+                  <CheckIcon />
+                  <span className="truncate">
+                    Sudah FU · {f.last_followup_by ?? f.closed_by ?? "—"} · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
+                  </span>
+                </button>
+              )
+            ) : (
+              <div
+                title={f.lock_reason ?? "Kamu tidak berwenang follow-up customer ini"}
+                className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+              >
+                <LockIcon />
+                FU Terkunci
+              </div>
+            )}
 
-              {/* Tombol Archive: hanya canManage (Admin/Kepala Marketing tetap bisa) */}
-              {canManage && (
-                <button
-                  onClick={() => onArchive(f.id)}
-                  disabled={processing}
-                  title="Arsipkan (stop follow-up)"
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
-                >
-                  <ArchiveIcon />
-                </button>
-              )}
-            </>
-          ) : (
-            /* ── Scope ARCHIVED ── */
-            <>
-              <WaChatButton
-                f={f}
-                authUser={authUser}
-                isKepalaSales={isKepalaSales}
-                fullWidth={!canManage}
-              />
-              {canManage && (
-                <button
-                  onClick={() => onReactivate(f.id)}
-                  disabled={processing}
-                  className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
-                >
-                  {processing ? <Spinner /> : <RefreshIcon />}
-                  Aktifkan Lagi
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+            {canManage && (
+              <button
+                onClick={() => onArchive(f.id)}
+                disabled={processing}
+                title="Arsipkan (stop follow-up)"
+                className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
+              >
+                <ArchiveIcon />
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <WaChatButton f={f} fullWidth={!canManage} />
+            {canManage && (
+              <button
+                onClick={() => onReactivate(f.id)}
+                disabled={processing}
+                className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
+              >
+                {processing ? <Spinner /> : <RefreshIcon />}
+                Aktifkan Lagi
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div >
   );
 }
 
@@ -958,47 +1067,42 @@ export default function ManagementSellerPage() {
   const [scope, setScope] = useState<Scope>("ACTIVE");
   const [search, setSearch] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
-
-  // State modal konfirmasi follow-up
   const [confirmFu, setConfirmFu] = useState<Followup | null>(null);
 
-  // Fetch auth user — ambil name supaya bisa compare dengan closed_by
+  // ── PIC checklist state ──
+  const [pics, setPics] = useState<PicCandidate[]>([]);
+  const [picsLoading, setPicsLoading] = useState(false);
+  const [picsError, setPicsError] = useState<string | null>(null);
+  const [savingPicId, setSavingPicId] = useState<string | null>(null);
+
+  // ── Auth ──
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((r) => {
-        if (r.user) {
-          setAuthUser({
-            id: r.user.id,
-            // Sesuaikan field name dengan response API kamu.
-            // Kemungkinan: r.user.name / r.user.username / r.user.full_name
-            name: r.user.name ?? r.user.username ?? "",
-            role: r.user.role,
-          });
-        }
+        if (!r.user) return;
+        const roles: UserRole[] =
+          Array.isArray(r.user.roles) && r.user.roles.length > 0 ? r.user.roles : [r.user.role];
+        setAuthUser({
+          id: r.user.id,
+          name: r.user.name ?? r.user.username ?? "",
+          role: r.user.role,
+          roles,
+        });
       })
       .catch(() => setAuthUser(null));
   }, []);
 
-  const userRole = authUser?.role ?? null;
+  const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
 
-  const canView = userRole
-    ? hasPermission(userRole, PERMISSIONS.VIEW_SELLER_FOLLOWUP)
-    : false;
+  const canView = hasAnyRole(userRoles, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
+  const canManage = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
 
-  const canManage = userRole
-    ? hasPermission(userRole, PERMISSIONS.MANAGE_SELLER_FOLLOWUP)
-    : false;
+  // ✅ Visibilitas tombol checklist ditentukan dari ROLE user (client-side),
+  //    bukan dari hasil API. Enforcement asli tetap di server (PUT /api/seller-pics).
+  const canManagePic = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_PIC);
 
-  const canFollowup = userRole
-    ? hasPermission(userRole, PERMISSIONS.FOLLOWUP_SELLER)
-    : false;
-
-  // Khusus WA & FU: HANYA role Kepala Sales yang boleh override PIC.
-  // Admin/Kepala Marketing (canManage) TIDAK termasuk di sini.
-  // PENTING: ganti "KEPALA_SALES" sesuai nama constant role yang ada di src/lib/permissions.ts
-  const isKepalaSales = userRole === "KEPALA_SALES";
-
+  // ── Load followups ──
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -1014,34 +1118,77 @@ export default function ManagementSellerPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    loadData();
-  }, [scope]);
+    if (authUser) loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, authUser]);
 
-  /**
-   * runAction: kirim PATCH ke API.
-   * Untuk action "followup", body dikirim sebagai FormData
-   * supaya bisa include file bukti FU.
-   * Action lain (archive, reactivate) tetap pakai JSON.
-   */
-  const runAction = async (
-    id: string,
-    body: object,
-    buktiFuFile?: File
-  ) => {
+  // ── Load PIC candidates (untuk checklist & dropdown assign) ──
+  const loadPics = async () => {
+    setPicsLoading(true);
+    setPicsError(null);
+    try {
+      const res = await fetch("/api/seller-pics");
+      const result = await res.json();
+      if (!result.success) {
+        setPics([]);
+        setPicsError(result.message ?? "Gagal memuat daftar PIC");
+        return;
+      }
+      setPics(result.data as PicCandidate[]);
+    } catch {
+      setPics([]);
+      setPicsError("Gagal terhubung ke server");
+    } finally {
+      setPicsLoading(false);
+    }
+  };
+
+  // Load untuk Admin (checklist) maupun manager (dropdown assign)
+  useEffect(() => {
+    if (canManage || canManagePic) loadPics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage, canManagePic]);
+
+  const activePics = useMemo(() => pics.filter((p) => p.is_active), [pics]);
+
+  // ── Toggle checklist akses PIC (Admin) — optimistic ──
+  const togglePic = async (userId: string, next: boolean) => {
+    setSavingPicId(userId);
+    setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, is_active: next } : p)));
+    try {
+      const res = await fetch("/api/seller-pics", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, is_active: next }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        alert(result.message ?? "Gagal mengubah akses PIC");
+        setPics((prev) =>
+          prev.map((p) => (p.user_id === userId ? { ...p, is_active: !next } : p))
+        );
+        return;
+      }
+      await loadData(true); // refresh flag can_followup di kartu
+    } catch {
+      setPics((prev) => prev.map((p) => (p.user_id === userId ? { ...p, is_active: !next } : p)));
+      alert("Terjadi kesalahan koneksi");
+    } finally {
+      setSavingPicId(null);
+    }
+  };
+
+  // ── PATCH runner ──
+  const runAction = async (id: string, body: Record<string, unknown>, buktiFuFile?: File) => {
     setProcessingId(id);
     try {
       let res: Response;
 
       if (buktiFuFile) {
-        // Kirim sebagai multipart/form-data untuk include file
         const fd = new FormData();
         Object.entries(body).forEach(([k, v]) => fd.append(k, String(v)));
         fd.append("bukti_fu", buktiFuFile, buktiFuFile.name);
-        res = await fetch(`/api/seller-followups/${id}`, {
-          method: "PATCH",
-          body: fd,
-          // Jangan set Content-Type — browser set boundary otomatis untuk FormData
-        });
+        res = await fetch(`/api/seller-followups/${id}`, { method: "PATCH", body: fd });
       } else {
         res = await fetch(`/api/seller-followups/${id}`, {
           method: "PATCH",
@@ -1063,13 +1210,11 @@ export default function ManagementSellerPage() {
     }
   };
 
-  // Buka modal konfirmasi, bukan langsung call API
   const onFollowup = (id: string) => {
     const target = items.find((i) => i.id === id) ?? null;
     setConfirmFu(target);
   };
 
-  // Dipanggil dari step 2 modal — menerima file bukti FU
   const handleConfirmFollowup = async (buktiFu: File) => {
     if (!confirmFu) return;
     await runAction(confirmFu.id, { action: "followup" }, buktiFu);
@@ -1079,22 +1224,11 @@ export default function ManagementSellerPage() {
   const onArchive = (id: string) => runAction(id, { action: "archive" });
   const onReactivate = (id: string) => runAction(id, { action: "reactivate" });
 
-  const userItems = useMemo(
-    () => items.filter((i) => i.seller_type === "USER"),
-    [items]
-  );
-  const pedagangItems = useMemo(
-    () => items.filter((i) => i.seller_type === "PEDAGANG"),
-    [items]
-  );
-  const userDue = useMemo(
-    () => userItems.filter((i) => i.is_due).length,
-    [userItems]
-  );
-  const pedagangDue = useMemo(
-    () => pedagangItems.filter((i) => i.is_due).length,
-    [pedagangItems]
-  );
+  // ── Derived ──
+  const userItems = useMemo(() => items.filter((i) => i.seller_type === "USER"), [items]);
+  const pedagangItems = useMemo(() => items.filter((i) => i.seller_type === "PEDAGANG"), [items]);
+  const userDue = useMemo(() => userItems.filter((i) => i.is_due).length, [userItems]);
+  const pedagangDue = useMemo(() => pedagangItems.filter((i) => i.is_due).length, [pedagangItems]);
 
   const visible = useMemo(() => {
     const base = tab === "USER" ? userItems : pedagangItems;
@@ -1108,17 +1242,15 @@ export default function ManagementSellerPage() {
     );
   }, [tab, userItems, pedagangItems, search]);
 
+  const dueCount = visible.filter((i) => i.is_due).length;
+
+  // ── Akses ditolak ──
   if (authUser && !canView) {
     return (
       <DashboardLayout>
         <div className="max-w-sm mx-auto mt-24 text-center px-6">
           <div className="w-14 h-14 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-7 h-7 text-red-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -1130,19 +1262,17 @@ export default function ManagementSellerPage() {
           <h2 className="text-base font-bold text-gray-800">Akses Ditolak</h2>
           <p className="text-gray-400 text-sm mt-1.5 leading-relaxed">
             Halaman ini hanya untuk{" "}
-            <span className="font-semibold text-gray-600">Kepala Marketing</span> &amp; Admin.
+            <span className="font-semibold text-gray-600">Admin, Kepala Marketing, Kepala Sales</span>{" "}
+            &amp; Crew Sales.
           </p>
         </div>
       </DashboardLayout>
     );
   }
 
-  const dueCount = visible.filter((i) => i.is_due).length;
-
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1156,19 +1286,33 @@ export default function ManagementSellerPage() {
               User tiap 7 hari &nbsp;·&nbsp; Pedagang tiap 3 hari
             </p>
           </div>
-          <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 flex-shrink-0">
-            {(["ACTIVE", "ARCHIVED"] as Scope[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setScope(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-                  }`}
-              >
-                {s === "ACTIVE" ? "Aktif" : "Arsip"}
-              </button>
-            ))}
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {canManagePic && (
+              <PicAccessDropdown
+                pics={pics}
+                loading={picsLoading}
+                error={picsError}
+                savingId={savingPicId}
+                onToggle={togglePic}
+                onRetry={loadPics}
+              />
+            )}
+
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+              {(["ACTIVE", "ARCHIVED"] as Scope[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setScope(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                    }`}
+                >
+                  {s === "ACTIVE" ? "Aktif" : "Arsip"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1180,7 +1324,13 @@ export default function ManagementSellerPage() {
           {(
             [
               { key: "USER" as Tab, label: "User", icon: "🙋", count: userItems.length, due: userDue },
-              { key: "PEDAGANG" as Tab, label: "Pedagang", icon: "🏷️", count: pedagangItems.length, due: pedagangDue },
+              {
+                key: "PEDAGANG" as Tab,
+                label: "Pedagang",
+                icon: "🏷️",
+                count: pedagangItems.length,
+                due: pedagangDue,
+              },
             ] as const
           ).map((t) => {
             const isActive = tab === t.key;
@@ -1226,13 +1376,8 @@ export default function ManagementSellerPage() {
         <div className="relative">
           <svg
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" aria-hidden="true"
           >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -1250,15 +1395,7 @@ export default function ManagementSellerPage() {
               className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition"
               aria-label="Hapus pencarian"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                aria-hidden="true"
-              >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -1312,9 +1449,6 @@ export default function ManagementSellerPage() {
                   scope={scope}
                   processing={processingId === f.id}
                   canManage={canManage}
-                  canFollowup={canFollowup}
-                  isKepalaSales={isKepalaSales}
-                  authUser={authUser}
                   onFollowup={onFollowup}
                   onArchive={onArchive}
                   onReactivate={onReactivate}
@@ -1325,7 +1459,6 @@ export default function ManagementSellerPage() {
         )}
       </div>
 
-      {/* ── Confirm Followup Modal (2-step + bukti upload) ── */}
       <ConfirmFollowupModal
         followup={confirmFu}
         onConfirm={handleConfirmFollowup}

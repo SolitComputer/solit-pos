@@ -25,7 +25,7 @@ const PUBLIC_API_ROUTES = [
 
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
-  "/api/cc-reports/tiktok/keepalive",   
+  "/api/cc-reports/tiktok/keepalive",
 ];
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
@@ -322,6 +322,7 @@ export const config = {
     "/api/accessories/:path*",
     "/dashboard/accessories/:path*",
     "/api/seller-followups/:path*",
+    "/api/seller-pics/:path*",
     "/dashboard/preparation/:path*",
     "/api/preparation/:path*",
     "/api/missions/:path*",

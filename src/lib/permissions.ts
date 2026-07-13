@@ -103,7 +103,29 @@ const TRANSACTION_VIEW: UserRole[] = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "CREW_SALES"];
+// ─── Management Seller / PIC Follow-up ────────────────────────────────────────
+
+/** Boleh membuka halaman Management Seller */
+export const SELLER_FOLLOWUP_VIEW_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES", "CREW_SALES",
+];
+
+/** Melihat SEMUA data lintas PIC (tidak difilter ownership) */
+export const SELLER_FOLLOWUP_SUPERVISOR_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING", "KEPALA_SALES",
+];
+
+/** Role yang SECARA STRUKTURAL boleh follow-up — masih dicek whitelist + ownership */
+export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MARKETING"];
+
+/** Archive / reactivate / assign ulang PIC */
+export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
+
+/** Hanya Admin & Programmer yang boleh ubah checklist akses PIC */
+export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+
+/** Role yang muncul sebagai kandidat di dropdown checklist PIC */
+export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MARKETING"];
 
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [
@@ -371,8 +393,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ],
 
-  "/dashboard/management-seller": [...SELLER_FOLLOWUP_ROLES],
-  "/api/seller-followups": [...SELLER_FOLLOWUP_ROLES],
+  "/dashboard/management-seller": [...SELLER_FOLLOWUP_VIEW_ROLES],
+  "/api/seller-followups": [...SELLER_FOLLOWUP_VIEW_ROLES],
+  "/api/seller-pics": [...SELLER_FOLLOWUP_VIEW_ROLES],
 
   // ── Preparation routes ─────────────────────────────────────────────────────
   "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
@@ -510,9 +533,13 @@ export const PERMISSIONS = {
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
 
-  VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
-  MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_ROLES] as UserRole[],
-  FOLLOWUP_SELLER: [...FULL_ACCESS, "KEPALA_MARKETING", "CREW_SALES"] as UserRole[],
+  // ── Management Seller ──────────────────────────────────────────────────────
+  VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
+  VIEW_ALL_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_SUPERVISOR_ROLES] as UserRole[],
+  MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_MANAGE_ROLES] as UserRole[],
+  FOLLOWUP_SELLER: [...SELLER_FOLLOWUP_ACTOR_ROLES] as UserRole[],
+  VIEW_SELLER_PIC: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
+  MANAGE_SELLER_PIC: [...SELLER_PIC_MANAGE_ROLES] as UserRole[],
 
   // ── Preparation permissions ─────────────────────────────────────────────────
   VIEW_PREPARATION: [...PREPARATION_VIEW_ROLES] as UserRole[],
