@@ -1,6 +1,37 @@
 // src/lib/ccReports.ts
 import type { SyncStatus } from "./ccMetrics";
 
+/* ── Brand / Divisi ──────────────────────────────────────────────────────── */
+
+export const CC_BRANDS = ["Solit", "OnPoint", "Sotech", "Zenit"] as const;
+export type CCBrand = (typeof CC_BRANDS)[number];
+export type BrandFilter = "ALL" | CCBrand;
+
+export const DEFAULT_BRAND: CCBrand = "Solit";
+
+export const BRAND_META: Record<CCBrand, { label: string; color: string; className: string }> = {
+  Solit:   { label: "Solit 03", color: "#7c3aed", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
+  OnPoint: { label: "OnPoint",  color: "#0ea5e9", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200" },
+  Sotech:  { label: "Sotech",   color: "#10b981", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  Zenit:   { label: "Zenit",    color: "#f59e0b", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+};
+
+export const BRAND_TABS: { key: BrandFilter; label: string; color: string }[] = [
+  { key: "ALL", label: "Semua", color: "#111827" },
+  ...CC_BRANDS.map((b) => ({ key: b as BrandFilter, label: BRAND_META[b].label, color: BRAND_META[b].color })),
+];
+
+export function isCCBrand(v: unknown): v is CCBrand {
+  return typeof v === "string" && (CC_BRANDS as readonly string[]).includes(v);
+}
+
+/** Normalisasi input brand dari body/query — fallback ke default, bukan throw. */
+export function normalizeBrand(v: unknown): CCBrand {
+  return isCCBrand(v) ? v : DEFAULT_BRAND;
+}
+
+/* ── Status ──────────────────────────────────────────────────────────────── */
+
 export type CCStatus =
   | "BELUM_SELESAI"
   | "PROSES"
@@ -18,7 +49,6 @@ export interface CCPosting {
   likes: number;
   comments: number;
 
-  // ── auto-sync ──
   external_id?: string | null;
   auto_sync?: boolean;
   last_synced_at?: string | null;
@@ -32,6 +62,8 @@ export interface CCPosting {
 export interface CCReport {
   id: string;
   title: string;
+  brand: CCBrand;
+  posting_count?: number;
 
   take_done: boolean;
   videographer: string | null;
@@ -61,14 +93,20 @@ export interface CCReport {
   status?: CCStatus;
 }
 
+/**
+ * Sumber kebenaran status. Urutan cek WAJIB sama dengan filter SQL
+ * di /api/cc-reports (posting_done → posting_count → edit_done → take_done).
+ */
 export function computeStatus(
   r: Pick<CCReport, "take_done" | "edit_done"> & {
     posting_done?: boolean;
+    posting_count?: number;
     postings?: CCPosting[];
   }
 ): CCStatus {
   if (r.posting_done) return "SELESAI";
-  if ((r.postings?.length ?? 0) > 0) return "POSTED";
+  const posts = r.posting_count ?? r.postings?.length ?? 0;
+  if (posts > 0) return "POSTED";
   if (r.edit_done) return "SIAP_POSTING";
   if (r.take_done) return "PROSES";
   return "BELUM_SELESAI";
@@ -82,14 +120,15 @@ export function canFinish(r: { postings?: CCPosting[]; posting_done?: boolean })
   return (r.postings?.length ?? 0) > 0 && !r.posting_done;
 }
 
-// ── ganti CC_STATUS_META ──
 export const CC_STATUS_META: Record<CCStatus, { label: string; className: string }> = {
-  BELUM_SELESAI: { label: "Belum Mulai",    className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
-  PROSES:        { label: "Menunggu Edit",  className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  SIAP_POSTING:  { label: "Siap Posting",   className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
-  POSTED:        { label: "Sudah Posting",  className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
-  SELESAI:       { label: "Selesai ✓",      className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  BELUM_SELESAI: { label: "Belum Mulai",   className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
+  PROSES:        { label: "Menunggu Edit", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  SIAP_POSTING:  { label: "Siap Posting",  className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
+  POSTED:        { label: "Sudah Posting", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
+  SELESAI:       { label: "Selesai ✓",     className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
 };
+
+/* ── Platform ────────────────────────────────────────────────────────────── */
 
 export const CC_PLATFORMS = [
   "Instagram", "Facebook", "YouTube", "TikTok", "Shopee", "Tokopedia", "Lainnya",
@@ -105,7 +144,6 @@ export const PLATFORM_COLOR: Record<string, string> = {
   Lainnya: "#6B7280",
 };
 
-// ── Filter grid halaman Analisa ──────────────────────────────────────────────
 export const CORE_PLATFORMS = ["YouTube", "TikTok", "Instagram", "Shopee"] as const;
 
 export const ANALISA_FILTERS = [
@@ -125,7 +163,130 @@ export function matchFilter(platform: string, f: AnalisaFilter): boolean {
   return platform === f;
 }
 
-// ── datetime helpers ─────────────────────────────────────────────────────────
+/* ── Rentang waktu (WIB) ─────────────────────────────────────────────────── */
+// ⚠️ Semua batas hari dihitung di WIB (UTC+7). Kalau pakai UTC, konten yang
+//    diposting jam 06:00 WIB akan masuk hitungan "kemarin".
+
+export const WIB_OFFSET_MS = 7 * 3_600_000;
+const DAY_MS = 86_400_000;
+
+export type CCRange = "today" | "7" | "30" | "90" | "all" | "custom";
+
+export const CC_RANGES: { key: CCRange; label: string }[] = [
+  { key: "today", label: "Hari Ini" },
+  { key: "7", label: "7 Hari" },
+  { key: "30", label: "30 Hari" },
+  { key: "90", label: "90 Hari" },
+  { key: "all", label: "Semua" },
+  { key: "custom", label: "📅 Pilih Tanggal" },
+];
+
+/** "YYYY-MM-DD" menurut kalender WIB. */
+export function wibDateStr(d: Date = new Date()): string {
+  return new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+}
+export function wibStartMs(dateStr: string): number {
+  return new Date(`${dateStr}T00:00:00.000+07:00`).getTime();
+}
+export function wibEndMs(dateStr: string): number {
+  return new Date(`${dateStr}T23:59:59.999+07:00`).getTime();
+}
+export function shiftDateStr(dateStr: string, days: number): string {
+  return wibDateStr(new Date(wibStartMs(dateStr) + days * DAY_MS));
+}
+export function isDateStr(v?: string | null): v is string {
+  return !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+export function fmtDay(dateStr: string): string {
+  return new Date(`${dateStr}T00:00:00+07:00`).toLocaleDateString("id-ID", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+}
+
+export interface ResolvedRange {
+  key: CCRange;
+  /** null = tanpa batas bawah (range "all") */
+  startCur: number | null;
+  endCur: number;
+  /** null = tidak ada periode pembanding */
+  startPrev: number | null;
+  endPrev: number | null;
+  label: string;
+  from: string | null;
+  to: string | null;
+}
+
+/** Dipakai SERVER & CLIENT — satu sumber kebenaran batas periode. */
+export function resolveRange(
+  key: string | null | undefined,
+  from?: string | null,
+  to?: string | null
+): ResolvedRange {
+  const now = Date.now();
+  const k = (key ?? "30") as CCRange;
+
+  if (k === "custom" && isDateStr(from)) {
+    const rawEnd = isDateStr(to) ? to : from;
+    const [a, b] = wibStartMs(from) <= wibStartMs(rawEnd) ? [from, rawEnd] : [rawEnd, from];
+    const startCur = wibStartMs(a);
+    const endCur = wibEndMs(b);
+    const span = endCur - startCur;
+    return {
+      key: "custom",
+      startCur,
+      endCur,
+      startPrev: startCur - span - 1,
+      endPrev: startCur - 1,
+      label: a === b ? fmtDay(a) : `${fmtDay(a)} – ${fmtDay(b)}`,
+      from: a,
+      to: b,
+    };
+  }
+
+  if (k === "today") {
+    const d = wibDateStr();
+    const y = shiftDateStr(d, -1);
+    return {
+      key: "today",
+      startCur: wibStartMs(d),
+      endCur: now,
+      startPrev: wibStartMs(y),
+      endPrev: wibEndMs(y),
+      label: `Hari ini · ${fmtDay(d)}`,
+      from: d,
+      to: d,
+    };
+  }
+
+  if (k === "all") {
+    return {
+      key: "all",
+      startCur: null,
+      endCur: now,
+      startPrev: null,
+      endPrev: null,
+      label: "Seluruh periode",
+      from: null,
+      to: null,
+    };
+  }
+
+  const days = Math.max(1, Number(k) || 30);
+  const startCur = now - days * DAY_MS;
+  return {
+    key: String(days) as CCRange,
+    startCur,
+    endCur: now,
+    startPrev: now - 2 * days * DAY_MS,
+    endPrev: startCur - 1,
+    label: `${days} hari terakhir`,
+    from: wibDateStr(new Date(startCur)),
+    to: wibDateStr(new Date(now)),
+  };
+}
+
+/* ── datetime helpers ────────────────────────────────────────────────────── */
+
 export function isoToLocalInput(iso?: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -158,7 +319,8 @@ export function durationLabel(start?: string | null, end?: string | null): strin
   return fmtMinutes(minutesBetween(start, end));
 }
 
-// ── Formatter angka ──────────────────────────────────────────────────────────
+/* ── Formatter angka ─────────────────────────────────────────────────────── */
+
 export function fmtNum(n: number): string {
   return (n || 0).toLocaleString("id-ID");
 }
@@ -175,8 +337,8 @@ export function pctDelta(cur: number, prev: number): number | null {
   return ((cur - prev) / prev) * 100;
 }
 
-// ── Tipe response /api/cc-reports/analytics ──────────────────────────────────
-export type CCRange = "7" | "30" | "90" | "all";
+/* ── Tipe response API ───────────────────────────────────────────────────── */
+
 export type CCMetric = "views" | "likes" | "comments";
 
 export interface CCMetricTotals {
@@ -195,6 +357,7 @@ export interface CCPlatformStat extends CCMetricTotals {
 export interface CCContentRow {
   report_id: string;
   title: string;
+  brand: CCBrand;
   perPlatform: Record<string, CCPlatformStat>;
   platforms: string[];
   totals: CCMetricTotals;
@@ -203,10 +366,11 @@ export interface CCContentRow {
 export interface CCProcessRow {
   report_id: string;
   title: string;
-  takeMinutes: number | null;      // take_start → take_end
-  handoffMinutes: number | null;   // take_end → take_received_editor
-  editMinutes: number | null;      // edit_start → edit_end
-  totalMinutes: number | null;     // take_start → edit_end
+  brand: CCBrand;
+  takeMinutes: number | null;
+  handoffMinutes: number | null;
+  editMinutes: number | null;
+  totalMinutes: number | null;
   take_done: boolean;
   edit_done: boolean;
 }
@@ -217,17 +381,6 @@ export interface CCProcessSummary {
   avgEdit: number | null;
   avgTotal: number | null;
   count: number;
-}
-
-export interface CCAnalytics {
-  success: true;
-  range: CCRange;
-  contents: CCContentRow[];
-  prevByPlatform: Record<string, CCMetricTotals>;
-  process: { rows: CCProcessRow[]; summary: CCProcessSummary };
-  lastSyncedAt: string | null;
-  issues: CCSyncIssueSummary;      
-  problems: CCSyncIssue[];         
 }
 
 export interface CCSyncIssue {
@@ -245,4 +398,30 @@ export interface CCSyncIssueSummary {
   partial: number;
   error: number;
   pending: number;
+}
+
+export interface CCAnalytics {
+  success: true;
+  range: CCRange;
+  rangeLabel: string;
+  period: { from: string | null; to: string | null };
+  brand: BrandFilter;
+  contents: CCContentRow[];
+  byBrand: Record<string, CCMetricTotals>;
+  prevByPlatform: Record<string, CCMetricTotals>;
+  process: { rows: CCProcessRow[]; summary: CCProcessSummary };
+  lastSyncedAt: string | null;
+  issues: CCSyncIssueSummary;
+  problems: CCSyncIssue[];
+}
+
+/* ── Response list report (paginated) ────────────────────────────────────── */
+
+export interface CCReportListResponse {
+  success: true;
+  reports: CCReport[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

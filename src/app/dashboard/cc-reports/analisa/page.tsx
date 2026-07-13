@@ -3,14 +3,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isStale, AUTO_SYNC_STALE_MINUTES, SYNC_STATUS_META } from "@/lib/ccMetrics";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { isStale, AUTO_SYNC_STALE_MINUTES, SYNC_STATUS_META } from "@/lib/ccMetrics";
 import {
-  ANALISA_FILTERS, PLATFORM_COLOR, fmtCompact, fmtNum, fmtMinutes, pctDelta, matchFilter,
-  type AnalisaFilter, type CCAnalytics, type CCMetric, type CCMetricTotals, type CCRange,
+  ANALISA_FILTERS, PLATFORM_COLOR, BRAND_TABS, BRAND_META, CC_RANGES, DEFAULT_BRAND,
+  fmtCompact, fmtNum, fmtMinutes, pctDelta, matchFilter, wibDateStr, isDateStr,
+  type AnalisaFilter, type BrandFilter, type CCAnalytics, type CCBrand,
+  type CCMetric, type CCMetricTotals, type CCRange,
 } from "@/lib/ccReports";
 
 const METRIC_META: Record<CCMetric, { label: string; short: string; color: string }> = {
@@ -18,13 +20,6 @@ const METRIC_META: Record<CCMetric, { label: string; short: string; color: strin
   likes: { label: "Likes", short: "Like", color: "#10b981" },
   comments: { label: "Komentar", short: "Komen", color: "#3b82f6" },
 };
-
-const RANGES: { key: CCRange; label: string }[] = [
-  { key: "7", label: "7H" },
-  { key: "30", label: "30H" },
-  { key: "90", label: "90H" },
-  { key: "all", label: "Semua" },
-];
 
 const PROCESS_SEGMENTS = [
   { key: "takeMinutes", label: "Take", color: "#7c3aed" },
@@ -34,10 +29,12 @@ const PROCESS_SEGMENTS = [
 
 const EMPTY: CCMetricTotals = { views: 0, likes: 0, comments: 0, postCount: 0 };
 
-/** Baris siap-pakai setelah difilter platform */
+const DETAIL_PAGE_SIZE = 10;
+
 interface Row {
   report_id: string;
   title: string;
+  brand: CCBrand;
   views: number;
   likes: number;
   comments: number;
@@ -57,9 +54,19 @@ export default function CCAnalisaPage() {
   const [data, setData] = useState<CCAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+
   const [metric, setMetric] = useState<CCMetric>("views");
   const [range, setRange] = useState<CCRange>("30");
   const [filter, setFilter] = useState<AnalisaFilter>("ALL");
+  const [brand, setBrand] = useState<BrandFilter>("ALL");
+
+  // custom date range
+  const today = useMemo(() => wibDateStr(), []);
+  const [from, setFrom] = useState<string>(today);
+  const [to, setTo] = useState<string>(today);
+
+  const [visible, setVisible] = useState(DETAIL_PAGE_SIZE);
+
   const [tt, setTt] = useState<ConnHealth | null>(null);
   const [ig, setIg] = useState<ConnHealth | null>(null);
 
@@ -75,11 +82,21 @@ export default function CCAnalisaPage() {
       .catch(() => { });
   }, []);
 
+  // ── Query string analytics ────────────────────────────────────────────────
+  const query = useMemo(() => {
+    const sp = new URLSearchParams({ range });
+    if (brand !== "ALL") sp.set("brand", brand);
+    if (range === "custom" && isDateStr(from)) {
+      sp.set("from", from);
+      sp.set("to", isDateStr(to) ? to : from);
+    }
+    return sp.toString();
+  }, [range, brand, from, to]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cc-reports/analytics?range=${range}`, { signal });
+      const res = await fetch(`/api/cc-reports/analytics?${query}`, { signal });
       const json = await res.json();
       if (json.success) setData(json as CCAnalytics);
     } catch {
@@ -87,14 +104,16 @@ export default function CCAnalisaPage() {
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [query]);
 
   useEffect(() => {
     const c = new AbortController();
     load(c.signal);
+    setVisible(DETAIL_PAGE_SIZE);   // reset paging tiap ganti filter
     return () => c.abort();
   }, [load]);
 
+  // ── Auto-sync kalau metrik basi ───────────────────────────────────────────
   const autoSynced = useRef(false);
 
   useEffect(() => {
@@ -118,12 +137,13 @@ export default function CCAnalisaPage() {
   const handleSyncAll = async () => {
     setSyncing(true);
     try {
-      const res = await fetch("/api/cc-reports/sync", { method: "POST" });
+      const res = await fetch("/api/cc-reports/sync?force=1", { method: "POST" });
       const json = await res.json();
       if (json.success) {
         alert(
           `Sync selesai — OK: ${json.ok}, sebagian: ${json.partial ?? 0}, gagal: ${json.failed}, total: ${json.total}`
-        ); await load();
+        );
+        await load();
       } else {
         alert(json.error ?? "Gagal sync");
       }
@@ -134,7 +154,7 @@ export default function CCAnalisaPage() {
 
   const m = METRIC_META[metric];
 
-  // ── Terapkan filter platform ke seluruh konten ─────────────────────────────
+  // ── Terapkan filter platform ──────────────────────────────────────────────
   const rows = useMemo<Row[]>(() => {
     if (!data) return [];
     return data.contents
@@ -144,6 +164,7 @@ export default function CCAnalisaPage() {
         return {
           report_id: c.report_id,
           title: c.title,
+          brand: c.brand,
           views: stats.reduce((s, p) => s + p.views, 0),
           likes: stats.reduce((s, p) => s + p.likes, 0),
           comments: stats.reduce((s, p) => s + p.comments, 0),
@@ -185,17 +206,14 @@ export default function CCAnalisaPage() {
 
   const delta = pctDelta(totals[metric], prevTotals[metric]);
   const up = (delta ?? 0) >= 0;
-
   const engagement = totals.views > 0 ? ((totals.likes + totals.comments) / totals.views) * 100 : 0;
 
-  // ── Top 3 per metrik ──────────────────────────────────────────────────────
   const top3 = useCallback(
     (key: CCMetric) =>
       [...rows].filter((r) => r[key] > 0).sort((a, b) => b[key] - a[key]).slice(0, 3),
     [rows]
   );
 
-  // ── Data diagram batang (10 konten teratas by metric aktif) ───────────────
   const barData = useMemo(
     () =>
       [...rows]
@@ -205,7 +223,6 @@ export default function CCAnalisaPage() {
     [rows, metric]
   );
 
-  // ── Data proses pengerjaan (8 terbaru yang punya durasi) ──────────────────
   const processData = useMemo(() => {
     if (!data) return [];
     return data.process.rows
@@ -221,10 +238,19 @@ export default function CCAnalisaPage() {
 
   const summary = data?.process.summary;
 
+  // Rincian per konten (paginated)
+  const detailRows = useMemo(() => {
+    if (!data) return [];
+    return data.contents.filter((c) =>
+      Object.keys(c.perPlatform).some((p) => matchFilter(p, filter))
+    );
+  }, [data, filter]);
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
+
           {/* ── Kesehatan koneksi TikTok ── */}
           {tt && (
             <div
@@ -235,14 +261,9 @@ export default function CCAnalisaPage() {
                   : "border-red-100 bg-red-50"
                 }`}
             >
-              <p
-                className={`text-xs font-medium ${tt.level === "OK"
-                  ? "text-emerald-800"
-                  : tt.level === "WARN"
-                    ? "text-amber-800"
-                    : "text-red-800"
-                  }`}
-              >
+              <p className={`text-xs font-medium ${tt.level === "OK"
+                ? "text-emerald-800"
+                : tt.level === "WARN" ? "text-amber-800" : "text-red-800"}`}>
                 {tt.level === "OK" && (
                   <>
                     <b>TikTok terhubung</b>
@@ -256,13 +277,12 @@ export default function CCAnalisaPage() {
                 {tt.level === "WARN" && (
                   <>
                     <b>⚠️ Koneksi TikTok perlu perhatian.</b>{" "}
-                    {tt.error ?? (tt.daysLeft !== null && `Sesi tersisa ${tt.daysLeft} hari.`)}{" "}
-                    Sebaiknya hubungkan ulang sekarang.
+                    {tt.error ?? (tt.daysLeft !== null && `Sesi tersisa ${tt.daysLeft} hari.`)}
                   </>
                 )}
                 {tt.level === "DEAD" && (
                   <>
-                    <b>🔴 TikTok tidak terhubung.</b> Metrik TikTok tidak akan ter-update otomatis.
+                    <b>🔴 TikTok tidak terhubung.</b> Metrik TikTok tidak ter-update otomatis.
                     {tt.error && <span className="ml-1 opacity-80">({tt.error})</span>}
                   </>
                 )}
@@ -277,23 +297,16 @@ export default function CCAnalisaPage() {
               )}
             </div>
           )}
+
           {/* ── Kesehatan koneksi Instagram ── */}
           {ig && ig.level !== "OK" && (
-            <div
-              className={`mb-4 rounded-2xl border p-3 ${ig.level === "WARN"
-                  ? "border-amber-100 bg-amber-50"
-                  : "border-red-100 bg-red-50"
-                }`}
-            >
-              <p
-                className={`text-xs font-medium ${ig.level === "WARN" ? "text-amber-800" : "text-red-800"
-                  }`}
-              >
+            <div className={`mb-4 rounded-2xl border p-3 ${ig.level === "WARN"
+              ? "border-amber-100 bg-amber-50" : "border-red-100 bg-red-50"}`}>
+              <p className={`text-xs font-medium ${ig.level === "WARN" ? "text-amber-800" : "text-red-800"}`}>
                 {ig.level === "WARN" ? (
                   <>
                     <b>⚠️ Token Instagram perlu perhatian.</b>{" "}
-                    {ig.error ??
-                      (ig.daysLeft !== null && `Sisa ${ig.daysLeft} hari sebelum kedaluwarsa.`)}
+                    {ig.error ?? (ig.daysLeft !== null && `Sisa ${ig.daysLeft} hari sebelum kedaluwarsa.`)}
                   </>
                 ) : (
                   <>
@@ -304,7 +317,8 @@ export default function CCAnalisaPage() {
               </p>
             </div>
           )}
-          {/* ── Metrik yang perlu dilengkapi manual ── */}
+
+          {/* ── Posting bermasalah ── */}
           {data && data.problems.length > 0 && (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
               <p className="text-xs font-black text-amber-900">
@@ -314,29 +328,23 @@ export default function CCAnalisaPage() {
               </p>
               <ul className="mt-2 space-y-1">
                 {data.problems.slice(0, 5).map((p) => (
-                  <li
-                    key={`${p.report_id}-${p.platform}-${p.post_url ?? ""}`}
-                    className="truncate text-[11px] font-medium text-amber-800"
-                  >
-                    <b>{p.title}</b> · {p.platform} —{" "}
-                    {p.sync_error ?? SYNC_STATUS_META[p.sync_status].label}
+                  <li key={`${p.report_id}-${p.platform}-${p.post_url ?? ""}`}
+                    className="truncate text-[11px] font-medium text-amber-800">
+                    <b>{p.title}</b> · {p.platform} — {p.sync_error ?? SYNC_STATUS_META[p.sync_status].label}
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/dashboard/cc-reports/laporan"
-                className="mt-2 inline-block rounded-lg bg-amber-900 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-amber-800"
-              >
+              <Link href="/dashboard/cc-reports/laporan"
+                className="mt-2 inline-block rounded-lg bg-amber-900 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-amber-800">
                 Lengkapi di Laporan Kerja →
               </Link>
             </div>
           )}
+
           {/* ── Header ── */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
-            <Link
-              href="/dashboard/cc-reports"
-              className="rounded-xl border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-900"
-            >
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <Link href="/dashboard/cc-reports"
+              className="rounded-xl border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50 hover:text-gray-900">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
@@ -344,10 +352,12 @@ export default function CCAnalisaPage() {
             <div className="min-w-0">
               <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Analisa Konten</h1>
               <p className="text-sm text-gray-500">
-                Performa view, like, komen + analisa proses produksi.
+                {data?.rangeLabel ?? "Memuat…"}
                 {data?.lastSyncedAt && (
                   <span className="ml-1 text-gray-400">
-                    · sync terakhir {new Date(data.lastSyncedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    · sync terakhir {new Date(data.lastSyncedAt).toLocaleString("id-ID", {
+                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                    })}
                   </span>
                 )}
               </p>
@@ -361,7 +371,90 @@ export default function CCAnalisaPage() {
             </button>
           </div>
 
-          {/* ── Filter platform (grid) ── */}
+          {/* ── Tab BRAND ── */}
+          <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {BRAND_TABS.map((b) => {
+              const active = brand === b.key;
+              const bt = b.key !== "ALL" ? data?.byBrand?.[b.key] : undefined;
+              return (
+                <button
+                  key={b.key}
+                  onClick={() => setBrand(b.key)}
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl border px-2 py-2.5 transition ${active
+                    ? "border-gray-900 bg-gray-900 text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                    }`}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-bold">
+                    <span
+                      className="h-2 w-2 flex-shrink-0 rounded-full ring-1 ring-white/40"
+                      style={{ background: b.color }}
+                    />
+                    <span className="truncate">{b.label}</span>
+                  </span>
+                  {bt && (
+                    <span className={`text-[10px] font-black tabular-nums ${active ? "text-white/70" : "text-gray-400"}`}>
+                      {fmtCompact(bt.views)} view
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Rentang waktu ── */}
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {CC_RANGES.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRange(r.key)}
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${range === r.key
+                  ? "border-gray-900 bg-gray-900 text-white"
+                  : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                  }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Custom date picker ── */}
+          {range === "custom" && (
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-gray-50/70 p-3.5">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Dari Tanggal</label>
+                <input
+                  type="date"
+                  value={from}
+                  max={today}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="mt-1 block rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-800 outline-none transition focus:ring-4 focus:ring-gray-900/5"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Sampai Tanggal</label>
+                <input
+                  type="date"
+                  value={to}
+                  min={from}
+                  max={today}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="mt-1 block rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-800 outline-none transition focus:ring-4 focus:ring-gray-900/5"
+                />
+              </div>
+              <button
+                onClick={() => { setFrom(today); setTo(today); }}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 transition hover:bg-gray-50"
+              >
+                Reset ke hari ini
+              </button>
+              <p className="ml-auto text-[11px] text-gray-400">
+                Isi tanggal yang sama untuk melihat 1 hari saja.
+              </p>
+            </div>
+          )}
+
+          {/* ── Filter platform ── */}
           <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {ANALISA_FILTERS.map((f) => {
               const active = filter === f.key;
@@ -374,42 +467,26 @@ export default function CCAnalisaPage() {
                     : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
                     }`}
                 >
-                  <span
-                    className="h-2 w-2 flex-shrink-0 rounded-full ring-1 ring-white/40"
-                    style={{ background: f.color }}
-                  />
+                  <span className="h-2 w-2 flex-shrink-0 rounded-full ring-1 ring-white/40"
+                    style={{ background: f.color }} />
                   <span className="truncate">{f.label}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* ── Toolbar metrik + range ── */}
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <div className="flex rounded-xl border border-gray-200 p-1">
-              {(Object.keys(METRIC_META) as CCMetric[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setMetric(k)}
-                  className={`rounded-lg px-4 py-1.5 text-sm font-bold transition ${metric === k ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
-                    }`}
-                >
-                  {METRIC_META[k].label}
-                </button>
-              ))}
-            </div>
-            <div className="ml-auto flex rounded-xl border border-gray-200 p-1">
-              {RANGES.map((r) => (
-                <button
-                  key={r.key}
-                  onClick={() => setRange(r.key)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${range === r.key ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:text-gray-700"
-                    }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+          {/* ── Toolbar metrik ── */}
+          <div className="mb-5 flex rounded-xl border border-gray-200 p-1">
+            {(Object.keys(METRIC_META) as CCMetric[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setMetric(k)}
+                className={`flex-1 rounded-lg px-4 py-1.5 text-sm font-bold transition ${metric === k ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
+                  }`}
+              >
+                {METRIC_META[k].label}
+              </button>
+            ))}
           </div>
 
           {/* ── Hero: diagram batang ── */}
@@ -417,22 +494,19 @@ export default function CCAnalisaPage() {
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                  Total {m.label} · {ANALISA_FILTERS.find((f) => f.key === filter)?.label}
+                  Total {m.label} · {BRAND_TABS.find((b) => b.key === brand)?.label} ·{" "}
+                  {ANALISA_FILTERS.find((f) => f.key === filter)?.label}
                 </p>
                 <div className="mt-1 flex items-center gap-3">
                   <span className="text-3xl font-black tabular-nums tracking-tight text-gray-900 sm:text-4xl">
                     {fmtNum(totals[metric])}
                   </span>
                   {delta !== null && (
-                    <span
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black tabular-nums ${up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-                        }`}
-                    >
-                      <svg
-                        width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    <span className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-black tabular-nums ${up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                      }`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="3"
-                        style={{ transform: up ? "none" : "rotate(180deg)" }}
-                      >
+                        style={{ transform: up ? "none" : "rotate(180deg)" }}>
                         <polyline points="4 15 12 7 20 15" />
                       </svg>
                       {Math.abs(delta).toFixed(1)}%
@@ -440,7 +514,7 @@ export default function CCAnalisaPage() {
                   )}
                 </div>
                 <p className="mt-1 text-xs text-gray-400">
-                  {range === "all" ? "Seluruh periode" : `${range} hari terakhir`} · vs periode sebelumnya
+                  {data?.rangeLabel ?? "—"} · vs periode sebelumnya
                 </p>
               </div>
               <div className="flex gap-4 text-right">
@@ -458,30 +532,16 @@ export default function CCAnalisaPage() {
               <ResponsiveContainer width="100%" height={340}>
                 <BarChart data={barData} margin={{ top: 10, right: 8, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="4 4" stroke="#f1f2f4" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                    height={60}
-                    tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 14)}…` : v)}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#9ca3af" }}
-                    tickFormatter={fmtCompact}
-                    axisLine={false}
-                    tickLine={false}
-                    width={52}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "#f9fafb" }}
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    axisLine={false} tickLine={false} interval={0} angle={-25}
+                    textAnchor="end" height={60}
+                    tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 14)}…` : v)} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickFormatter={fmtCompact}
+                    axisLine={false} tickLine={false} width={52} />
+                  <Tooltip cursor={{ fill: "#f9fafb" }}
                     content={(props) => (
                       <BarTooltip {...(props as TooltipInjected)} metricLabel={m.label} color={m.color} />
-                    )}
-                  />
+                    )} />
                   <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={54}>
                     {barData.map((_, i) => (
                       <Cell key={i} fill={m.color} fillOpacity={1 - i * 0.06} />
@@ -492,7 +552,7 @@ export default function CCAnalisaPage() {
             )}
           </div>
 
-          {/* ── Grid rating tertinggi (top 3) ── */}
+          {/* ── Top 3 ── */}
           <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {(Object.keys(METRIC_META) as CCMetric[]).map((k) => (
               <PodiumCard
@@ -501,6 +561,7 @@ export default function CCAnalisaPage() {
                 color={METRIC_META[k].color}
                 rows={top3(k)}
                 metric={k}
+                showBrand={brand === "ALL"}
                 loading={loading}
               />
             ))}
@@ -508,41 +569,48 @@ export default function CCAnalisaPage() {
 
           {/* ── Rincian per konten × platform ── */}
           <div className="mb-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-black text-gray-900">Rincian per Konten &amp; Platform</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-black text-gray-900">Rincian per Konten &amp; Platform</h2>
+              {detailRows.length > 0 && (
+                <span className="text-[11px] font-bold text-gray-400">
+                  {Math.min(visible, detailRows.length)} / {detailRows.length} konten
+                </span>
+              )}
+            </div>
+
             {loading ? (
               <div className="h-48 animate-pulse rounded-2xl bg-gray-50" />
-            ) : !data || data.contents.length === 0 ? (
-              <EmptyState text="Belum ada konten terposting." compact />
+            ) : detailRows.length === 0 ? (
+              <EmptyState text="Belum ada konten terposting pada filter ini." compact />
             ) : (
-              <div className="space-y-3">
-                {data.contents
-                  .filter((c) => Object.keys(c.perPlatform).some((p) => matchFilter(p, filter)))
-                  .map((c) => {
+              <>
+                <div className="space-y-3">
+                  {detailRows.slice(0, visible).map((c) => {
                     const stats = Object.values(c.perPlatform).filter((s) => matchFilter(s.platform, filter));
+                    const bm = BRAND_META[c.brand] ?? BRAND_META[DEFAULT_BRAND];
                     return (
                       <div key={c.report_id} className="rounded-2xl border border-gray-100 p-3.5">
                         <div className="mb-2.5 flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-black text-gray-900">{c.title}</p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${bm.className}`}>
+                              {bm.label}
+                            </span>
+                            <p className="truncate text-sm font-black text-gray-900">{c.title}</p>
+                          </div>
                           <span className="flex-shrink-0 text-[11px] font-bold text-gray-400">
                             {stats.length} platform
                           </span>
                         </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                           {stats.map((s) => (
-                            <div
-                              key={s.platform}
+                            <div key={s.platform}
                               className="rounded-xl bg-gray-50/70 p-3 ring-1 ring-gray-100"
-                              style={{ borderLeft: `3px solid ${PLATFORM_COLOR[s.platform] ?? "#6b7280"}` }}
-                            >
+                              style={{ borderLeft: `3px solid ${PLATFORM_COLOR[s.platform] ?? "#6b7280"}` }}>
                               <div className="mb-2 flex items-center justify-between">
                                 <span className="text-xs font-black text-gray-800">{s.platform}</span>
                                 {s.post_url && (
-                                  <a
-                                    href={s.post_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-bold text-violet-600 hover:underline"
-                                  >
+                                  <a href={s.post_url} target="_blank" rel="noopener noreferrer"
+                                    className="text-[10px] font-bold text-violet-600 hover:underline">
                                     Buka ↗
                                   </a>
                                 )}
@@ -558,7 +626,17 @@ export default function CCAnalisaPage() {
                       </div>
                     );
                   })}
-              </div>
+                </div>
+
+                {visible < detailRows.length && (
+                  <button
+                    onClick={() => setVisible((v) => v + DETAIL_PAGE_SIZE)}
+                    className="mt-4 w-full rounded-xl border border-gray-200 py-2.5 text-xs font-bold text-gray-600 transition hover:bg-gray-50"
+                  >
+                    Muat {Math.min(DETAIL_PAGE_SIZE, detailRows.length - visible)} konten lagi ↓
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -596,34 +674,18 @@ export default function CCAnalisaPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={processData} margin={{ top: 10, right: 8, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="4 4" stroke="#f1f2f4" vertical={false} />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: "#9ca3af" }}
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                    height={60}
-                    tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 14)}…` : v)}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#9ca3af" }}
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    axisLine={false} tickLine={false} interval={0} angle={-25}
+                    textAnchor="end" height={60}
+                    tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 14)}…` : v)} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }}
                     tickFormatter={(v: number) => fmtMinutes(v)}
-                    axisLine={false}
-                    tickLine={false}
-                    width={62}
-                  />
-                  <Tooltip cursor={{ fill: "#f9fafb" }} content={(p) => <ProcessTooltip {...(p as TooltipInjected)} />} />
+                    axisLine={false} tickLine={false} width={62} />
+                  <Tooltip cursor={{ fill: "#f9fafb" }}
+                    content={(p) => <ProcessTooltip {...(p as TooltipInjected)} />} />
                   {PROCESS_SEGMENTS.map((s) => (
-                    <Bar
-                      key={s.key}
-                      dataKey={s.key}
-                      stackId="proc"
-                      fill={s.color}
-                      maxBarSize={48}
-                      radius={s.key === "editMinutes" ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                    />
+                    <Bar key={s.key} dataKey={s.key} stackId="proc" fill={s.color} maxBarSize={48}
+                      radius={s.key === "editMinutes" ? [6, 6, 0, 0] : [0, 0, 0, 0]} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
@@ -631,7 +693,7 @@ export default function CCAnalisaPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout >
+    </DashboardLayout>
   );
 }
 
@@ -660,13 +722,14 @@ function EmptyState({ text, compact }: { text: string; compact?: boolean }) {
 }
 
 function PodiumCard({
-  title, color, rows, metric, loading,
+  title, color, rows, metric, loading, showBrand,
 }: {
   title: string;
   color: string;
   rows: Row[];
   metric: CCMetric;
   loading: boolean;
+  showBrand: boolean;
 }) {
   const max = rows[0]?.[metric] ?? 0;
   return (
@@ -682,29 +745,36 @@ function PodiumCard({
         <p className="py-8 text-center text-xs text-gray-400">Belum ada data.</p>
       ) : (
         <div className="space-y-2.5">
-          {rows.map((r, i) => (
-            <div key={r.report_id}>
-              <div className="mb-1 flex items-center gap-2">
-                <span
-                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-black ${i === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
-                    }`}
-                >
-                  {i + 1}
-                </span>
-                <p className="min-w-0 flex-1 truncate text-xs font-bold text-gray-800">{r.title}</p>
-                <span className="flex-shrink-0 text-sm font-black tabular-nums text-gray-900">
-                  {fmtCompact(r[metric])}
-                </span>
+          {rows.map((r, i) => {
+            const bm = BRAND_META[r.brand] ?? BRAND_META[DEFAULT_BRAND];
+            return (
+              <div key={r.report_id}>
+                <div className="mb-1 flex items-center gap-2">
+                  <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-black ${i === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"
+                    }`}>
+                    {i + 1}
+                  </span>
+                  <p className="min-w-0 flex-1 truncate text-xs font-bold text-gray-800">{r.title}</p>
+                  <span className="flex-shrink-0 text-sm font-black tabular-nums text-gray-900">
+                    {fmtCompact(r[metric])}
+                  </span>
+                </div>
+                <div className="ml-7 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${max ? (r[metric] / max) * 100 : 0}%`, background: color }} />
+                </div>
+                <p className="ml-7 mt-0.5 flex items-center gap-1 truncate text-[10px] text-gray-400">
+                  {showBrand && (
+                    <span className="flex-shrink-0 font-bold" style={{ color: bm.color }}>
+                      {bm.label}
+                    </span>
+                  )}
+                  {showBrand && <span>·</span>}
+                  <span className="truncate">{r.platforms.join(" · ")}</span>
+                </p>
               </div>
-              <div className="ml-7 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${max ? (r[metric] / max) * 100 : 0}%`, background: color }}
-                />
-              </div>
-              <p className="ml-7 mt-0.5 truncate text-[10px] text-gray-400">{r.platforms.join(" · ")}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -4,19 +4,19 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import type {
   CCPosting, CCContentRow, CCMetricTotals, CCPlatformStat,
   CCProcessRow, CCProcessSummary, CCSyncIssue, CCSyncIssueSummary,
+  CCBrand, BrandFilter,
 } from "@/lib/ccReports";
-import { minutesBetween } from "@/lib/ccReports";
+import { minutesBetween, resolveRange, isCCBrand } from "@/lib/ccReports";
 import { isAutoSyncPlatform, type SyncStatus } from "@/lib/ccMetrics";
 
 export const dynamic = "force-dynamic";
-
-const DAY_MS = 86_400_000;
 
 const emptyTotals = (): CCMetricTotals => ({ views: 0, likes: 0, comments: 0, postCount: 0 });
 
 interface ReportRow {
   id: string;
   title: string;
+  brand: CCBrand;
   created_at: string;
   take_done: boolean;
   edit_done: boolean;
@@ -31,17 +31,25 @@ interface ReportRow {
 const avg = (arr: number[]): number | null =>
   arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : null;
 
-// GET /api/cc-reports/analytics?range=7|30|90|all
 export async function GET(req: NextRequest) {
-  const rangeRaw = (req.nextUrl.searchParams.get("range") ?? "30").toLowerCase();
-  const days = rangeRaw === "all" ? 0 : Math.max(1, Number(rangeRaw) || 30);
+  const sp = req.nextUrl.searchParams;
 
-  const { data, error } = await supabaseAdmin
+  const rr = resolveRange(sp.get("range"), sp.get("from"), sp.get("to"));
+
+  const brandRaw = sp.get("brand");
+  const brand: BrandFilter = isCCBrand(brandRaw) ? brandRaw : "ALL";
+
+  let query = supabaseAdmin
     .from("cc_reports")
     .select(
-      "id, title, created_at, take_done, edit_done, take_start, take_end, take_received_editor, edit_start, edit_end, postings:cc_postings(*)"
+      "id, title, brand, created_at, take_done, edit_done, take_start, take_end, take_received_editor, edit_start, edit_end, postings:cc_postings(*)"
     )
     .order("created_at", { ascending: false });
+
+  // ✅ brand difilter di DB, bukan di memori
+  if (brand !== "ALL") query = query.eq("brand", brand);
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -49,45 +57,45 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []) as unknown as ReportRow[];
 
-  const now = Date.now();
-  const startCur = days ? now - days * DAY_MS : 0;
-  const startPrev = days ? now - 2 * days * DAY_MS : 0;
-
   const ts = (iso: string | null) => (iso ? new Date(iso).getTime() : NaN);
 
-  // ✅ posted_at boleh kosong → pakai created_at report sebagai fallback,
-  //    supaya posting tidak "hilang" dari analisa hanya karena tanggal belum diisi.
-  const inCurrent = (p: CCPosting, fallbackIso: string) => {
-    if (!days) return true;
+  /**
+   * posted_at boleh kosong → fallback ke created_at report, supaya posting
+   * tidak "hilang" dari analisa hanya karena tanggalnya belum diisi.
+   */
+  const inWindow = (
+    p: CCPosting,
+    fallbackIso: string,
+    start: number | null,
+    end: number | null
+  ): boolean => {
+    if (start === null && end === null) return false; // periode pembanding tidak ada
     const t = ts(p.posted_at ?? fallbackIso);
-    return !Number.isNaN(t) && t >= startCur && t <= now;
-  };
-  const inPrevious = (p: CCPosting, fallbackIso: string) => {
-    if (!days) return false;
-    const t = ts(p.posted_at ?? fallbackIso);
-    return !Number.isNaN(t) && t >= startPrev && t < startCur;
+    if (Number.isNaN(t)) return false;
+    if (start !== null && t < start) return false;
+    if (end !== null && t > end) return false;
+    return true;
   };
 
   const contents: CCContentRow[] = [];
+  const byBrand: Record<string, CCMetricTotals> = {};
   const prevByPlatform: Record<string, CCMetricTotals> = {};
   const processRows: CCProcessRow[] = [];
   let lastSyncedAt: string | null = null;
 
-  // ── kesehatan metrik ──
   const issues: CCSyncIssueSummary = { ok: 0, partial: 0, error: 0, pending: 0 };
   const problems: CCSyncIssue[] = [];
 
   for (const r of rows) {
     const all = r.postings ?? [];
 
+    // ── kesehatan sync (tidak terikat rentang waktu) ──
     for (const p of all) {
       if (p.last_synced_at && (!lastSyncedAt || p.last_synced_at > lastSyncedAt)) {
         lastSyncedAt = p.last_synced_at;
       }
 
-      // hanya platform auto-sync yang punya link yang relevan dinilai
       if (!isAutoSyncPlatform(p.platform) || !p.post_url) continue;
-
       const st = (p.sync_status ?? "PENDING") as SyncStatus;
 
       if (st === "OK") issues.ok++;
@@ -108,8 +116,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── periode sebelumnya (buat delta %) ──
-    for (const p of all.filter((p) => inPrevious(p, r.created_at))) {
+    // ── periode pembanding (buat delta %) ──
+    for (const p of all) {
+      if (!inWindow(p, r.created_at, rr.startPrev, rr.endPrev)) continue;
       const t = (prevByPlatform[p.platform] ??= emptyTotals());
       t.views += p.views || 0;
       t.likes += p.likes || 0;
@@ -118,11 +127,15 @@ export async function GET(req: NextRequest) {
     }
 
     // ── proses pengerjaan (difilter by created_at) ──
-    const createdIn = !days || ts(r.created_at) >= startCur;
+    const createdAt = ts(r.created_at);
+    const createdIn =
+      (rr.startCur === null || createdAt >= rr.startCur) && createdAt <= rr.endCur;
+
     if (createdIn) {
       processRows.push({
         report_id: r.id,
         title: r.title,
+        brand: r.brand,
         takeMinutes: minutesBetween(r.take_start, r.take_end),
         handoffMinutes: minutesBetween(r.take_end, r.take_received_editor),
         editMinutes: minutesBetween(r.edit_start, r.edit_end),
@@ -133,11 +146,12 @@ export async function GET(req: NextRequest) {
     }
 
     // ── performa per konten × platform ──
-    const current = all.filter((p) => inCurrent(p, r.created_at));
+    const current = all.filter((p) => inWindow(p, r.created_at, rr.startCur, rr.endCur));
     if (current.length === 0) continue;
 
     const perPlatform: Record<string, CCPlatformStat> = {};
     const totals = emptyTotals();
+    const brandTotals = (byBrand[r.brand] ??= emptyTotals());
 
     for (const p of current) {
       const stat = (perPlatform[p.platform] ??= {
@@ -157,11 +171,17 @@ export async function GET(req: NextRequest) {
       totals.likes += p.likes || 0;
       totals.comments += p.comments || 0;
       totals.postCount += 1;
+
+      brandTotals.views += p.views || 0;
+      brandTotals.likes += p.likes || 0;
+      brandTotals.comments += p.comments || 0;
+      brandTotals.postCount += 1;
     }
 
     contents.push({
       report_id: r.id,
       title: r.title,
+      brand: r.brand,
       perPlatform,
       platforms: Object.keys(perPlatform),
       totals,
@@ -170,7 +190,6 @@ export async function GET(req: NextRequest) {
 
   contents.sort((a, b) => b.totals.views - a.totals.views);
 
-  // yang paling parah dulu: ERROR sebelum PARTIAL
   problems.sort((a, b) => {
     if (a.sync_status === b.sync_status) return a.title.localeCompare(b.title);
     return a.sync_status === "ERROR" ? -1 : 1;
@@ -186,8 +205,12 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    range: rangeRaw,
+    range: rr.key,
+    rangeLabel: rr.label,
+    period: { from: rr.from, to: rr.to },
+    brand,
     contents,
+    byBrand,
     prevByPlatform,
     process: { rows: processRows, summary },
     lastSyncedAt,
