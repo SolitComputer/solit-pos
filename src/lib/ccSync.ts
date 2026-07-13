@@ -1,13 +1,12 @@
 // src/lib/ccSync.ts
 // ⚠️ SERVER ONLY — jangan di-import dari komponen "use client"
 import { getValidAccessToken } from "./ccTikTok";
-import { getValidIgToken, IG_VERSION } from "./ccInstagram";   // ✅ BARU
+import { getValidIgToken, IG_VERSION } from "./ccInstagram";
 import { parsePostUrl, isInstagramStory, type SyncStatus } from "./ccMetrics";
 
 /**
  * null = API TIDAK mengembalikan metrik ini (bukan berarti nol).
- * Ini kunci fix-nya: nilai lama di DB tidak boleh ditimpa 0 hanya karena
- * field-nya absent di response.
+ * Nilai lama di DB tidak boleh ditimpa 0 hanya karena field-nya absent.
  */
 export interface SyncOutcome {
   status: SyncStatus;
@@ -16,7 +15,19 @@ export interface SyncOutcome {
   comments: number | null;
   error: string | null;
   externalId: string | null;
+  /** IG media ID asli dari Meta — disimpan supaya sync berikutnya langsung & live */
+  providerMediaId: string | null;
   platform: string | null;
+}
+
+export interface SyncOptions {
+  /**
+   * true = user menekan tombol sync / cron force.
+   * Membuang cache RAM + cache CDN Meta supaya angkanya benar-benar live.
+   */
+  force?: boolean;
+  /** provider_media_id yang sudah tersimpan → skip scan daftar media */
+  mediaId?: string | null;
 }
 
 type MetricKey = "views" | "likes" | "comments";
@@ -35,14 +46,16 @@ function num(v: unknown): number | null {
 }
 
 const fail = (status: SyncStatus, error: string): SyncOutcome => ({
-  status, views: null, likes: null, comments: null, error, externalId: null, platform: null,
+  status, views: null, likes: null, comments: null,
+  error, externalId: null, providerMediaId: null, platform: null,
 });
 
 /** OK = semua metrik didapat. PARTIAL = ada yang tidak dikembalikan API. */
 function settle(
   platform: string,
   externalId: string,
-  m: Record<MetricKey, number | null>
+  m: Record<MetricKey, number | null>,
+  providerMediaId: string | null = null
 ): SyncOutcome {
   const missing = (Object.keys(METRIC_LABEL) as MetricKey[]).filter((k) => m[k] === null);
   return {
@@ -55,6 +68,7 @@ function settle(
         ? null
         : `${platform} tidak mengembalikan ${missing.map((k) => METRIC_LABEL[k]).join(", ")} — silakan isi manual.`,
     externalId,
+    providerMediaId,
     platform,
   };
 }
@@ -65,13 +79,14 @@ function settle(
  */
 export function buildPostingPatch(
   out: SyncOutcome,
-  prev?: { external_id?: string | null }
+  prev?: { external_id?: string | null; provider_media_id?: string | null }
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {
     last_synced_at: new Date().toISOString(),
     sync_status: out.status,
     sync_error: out.error,
     external_id: out.externalId ?? prev?.external_id ?? null,
+    provider_media_id: out.providerMediaId ?? prev?.provider_media_id ?? null,
   };
 
   if (out.status === "OK" || out.status === "PARTIAL") {
@@ -82,22 +97,44 @@ export function buildPostingPatch(
   return patch;
 }
 
+/** Cache-buster: URL unik supaya CDN Meta/Google tidak melayani respons lama. */
+function bust(url: string, force?: boolean): string {
+  if (!force) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}_cb=${Date.now()}`;
+}
+
+const NO_CACHE: RequestInit = {
+  cache: "no-store",
+  headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+};
+
 // ── YouTube ──────────────────────────────────────────────────────────────────
-async function syncYouTube(videoId: string): Promise<SyncOutcome> {
+async function syncYouTube(videoId: string, opt: SyncOptions): Promise<SyncOutcome> {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) return fail("UNSUPPORTED", "YOUTUBE_API_KEY belum di-set di env");
 
-  const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(videoId)}&key=${key}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const url = bust(
+    `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(videoId)}&key=${key}`,
+    opt.force
+  );
+  const res = await fetch(url, NO_CACHE);
   const json = await res.json();
 
   if (!res.ok) {
-    return { ...fail("ERROR", json?.error?.message ?? `HTTP ${res.status}`), platform: "YouTube", externalId: videoId };
+    return {
+      ...fail("ERROR", json?.error?.message ?? `HTTP ${res.status}`),
+      platform: "YouTube",
+      externalId: videoId,
+    };
   }
 
   const s = json?.items?.[0]?.statistics;
   if (!s) {
-    return { ...fail("ERROR", "Video tidak ditemukan / private / dihapus"), platform: "YouTube", externalId: videoId };
+    return {
+      ...fail("ERROR", "Video tidak ditemukan / private / dihapus"),
+      platform: "YouTube",
+      externalId: videoId,
+    };
   }
 
   return settle("YouTube", videoId, {
@@ -108,9 +145,9 @@ async function syncYouTube(videoId: string): Promise<SyncOutcome> {
 }
 
 // ── Instagram ────────────────────────────────────────────────────────────────
-// ── Instagram ────────────────────────────────────────────────────────────────
 const IG_TTL = 60_000;
 const IG_MAX_PAGES = 15; // ±1500 konten terakhir
+const IG_FIELDS = "id,permalink,media_type,like_count,comments_count,views";
 
 interface IgMedia {
   id: string;
@@ -130,26 +167,43 @@ interface IgInsightsResponse {
   error?: { message?: string };
 }
 
+/**
+ * ⚠️ Cache ini HANYA untuk memetakan shortcode → media ID.
+ * JANGAN dipakai membaca metrik: endpoint /media (list) di-cache Meta dan
+ * angkanya tertinggal beberapa menit (inilah sebab "like 14 padahal 15").
+ * Metrik SELALU diambil ulang lewat endpoint single-media di igMediaDetail().
+ */
 let igCache: { at: number; map: Map<string, IgMedia> } | null = null;
+
+/** Dipanggil route sync sebelum force-refresh — proses PM2 persisten, cache tidak mati sendiri. */
+export function clearIgCache(): void {
+  igCache = null;
+}
 
 function shortcodeOf(permalink: string): string | null {
   return permalink.match(/\/(?:p|reel|reels|tv)\/([\w-]+)/)?.[1] ?? null;
 }
 
-const IG_FIELDS = "id,permalink,media_type,like_count,comments_count,views";
-
-async function loadIgMedia(token: string, igUserId: string): Promise<Map<string, IgMedia>> {
+async function loadIgMedia(
+  token: string,
+  igUserId: string,
+  force?: boolean
+): Promise<Map<string, IgMedia>> {
+  // ✅ force → buang cache RAM. Tanpa ini, tombol sync tidak berefek selama 60 detik.
+  if (force) igCache = null;
   if (igCache && Date.now() - igCache.at < IG_TTL) return igCache.map;
 
   const map = new Map<string, IgMedia>();
 
-  let next: string | null =
+  let next: string | null = bust(
     `https://graph.facebook.com/${IG_VERSION}/${igUserId}/media` +
-    `?fields=${IG_FIELDS}&limit=100&access_token=${encodeURIComponent(token)}`;
+      `?fields=${IG_FIELDS}&limit=100&access_token=${encodeURIComponent(token)}`,
+    force
+  );
 
   for (let page = 0; page < IG_MAX_PAGES && next !== null; page++) {
     const url: string = next;
-    const res: Response = await fetch(url, { cache: "no-store" });
+    const res: Response = await fetch(url, NO_CACHE);
     const json: IgMediaResponse = await res.json();
 
     if (!res.ok) throw new Error(json.error?.message ?? `IG HTTP ${res.status}`);
@@ -165,12 +219,23 @@ async function loadIgMedia(token: string, igUserId: string): Promise<Map<string,
   return map;
 }
 
-/** Tarik ulang 1 media — field kadang absent di listing tapi ada di endpoint detail. */
-async function igMediaDetail(mediaId: string, token: string): Promise<IgMedia | null> {
+/**
+ * ✅ SUMBER KEBENARAN METRIK IG.
+ * Endpoint single-media mengembalikan angka LIVE — persis seperti yang terlihat
+ * di app Instagram. Berbeda dengan /media (list) yang agregatnya di-cache Meta.
+ */
+async function igMediaDetail(
+  mediaId: string,
+  token: string,
+  force?: boolean
+): Promise<IgMedia | null> {
   try {
     const res = await fetch(
-      `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${encodeURIComponent(token)}`,
-      { cache: "no-store" }
+      bust(
+        `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${encodeURIComponent(token)}`,
+        force
+      ),
+      NO_CACHE
     );
     if (!res.ok) return null;
     return (await res.json()) as IgMedia;
@@ -180,12 +245,19 @@ async function igMediaDetail(mediaId: string, token: string): Promise<IgMedia | 
 }
 
 /** Fallback views lewat /insights (video_views sudah deprecated sejak v21). */
-async function igViewsFallback(mediaId: string, token: string): Promise<number | null> {
+async function igViewsFallback(
+  mediaId: string,
+  token: string,
+  force?: boolean
+): Promise<number | null> {
   for (const metric of ["views", "reach"] as const) {
     try {
       const res = await fetch(
-        `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`,
-        { cache: "no-store" }
+        bust(
+          `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`,
+          force
+        ),
+        NO_CACHE
       );
       const json: IgInsightsResponse = await res.json();
       if (!res.ok) continue;
@@ -198,47 +270,59 @@ async function igViewsFallback(mediaId: string, token: string): Promise<number |
   return null; // ✅ null, bukan 0
 }
 
-async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
-  // ✅ token diambil dari DB + auto-refresh, bukan lagi env mentah
+async function syncInstagram(shortcode: string, opt: SyncOptions): Promise<SyncOutcome> {
   const auth = await getValidIgToken();
   if (auth.token === null) {
     return { ...fail("ERROR", auth.error), platform: "Instagram", externalId: shortcode };
   }
 
   try {
-    const map = await loadIgMedia(auth.token, auth.igUserId);
-    const media = map.get(shortcode);
+    // ── 1. Dapatkan media ID ────────────────────────────────────────────────
+    // Sudah tersimpan → langsung pakai (hemat 15 request list + jauh lebih cepat).
+    let mediaId: string | null = opt.mediaId ?? null;
 
-    if (!media) {
+    if (!mediaId) {
+      const map = await loadIgMedia(auth.token, auth.igUserId, opt.force);
+      const found = map.get(shortcode);
+      if (!found) {
+        return {
+          ...fail(
+            "ERROR",
+            "Konten tidak ditemukan di akun IG Solit — metrik IG hanya bisa untuk konten sendiri"
+          ),
+          platform: "Instagram",
+          externalId: shortcode,
+        };
+      }
+      mediaId = found.id;
+    }
+
+    // ── 2. Ambil metrik LIVE dari single-media endpoint ──────────────────────
+    // ⚠️ Sengaja TIDAK memakai angka dari list — angkanya basi.
+    const detail = await igMediaDetail(mediaId, auth.token, opt.force);
+
+    if (!detail) {
+      // media ID tersimpan tapi ditolak (post dihapus / ganti akun) → resolve ulang
+      if (opt.mediaId) {
+        clearIgCache();
+        return syncInstagram(shortcode, { ...opt, mediaId: null, force: true });
+      }
       return {
-        ...fail(
-          "ERROR",
-          "Konten tidak ditemukan di akun IG Solit — metrik IG hanya bisa untuk konten sendiri"
-        ),
+        ...fail("ERROR", "Gagal membaca detail media IG"),
         platform: "Instagram",
         externalId: shortcode,
       };
     }
 
-    let views = num(media.views);
-    let likes = num(media.like_count);
-    let comments = num(media.comments_count);
+    let views = num(detail.views);
+    const likes = num(detail.like_count);
+    const comments = num(detail.comments_count);
 
-    if (views === null || likes === null || comments === null) {
-      const detail = await igMediaDetail(media.id, auth.token);
-      if (detail) {
-        views ??= num(detail.views);
-        likes ??= num(detail.like_count);
-        comments ??= num(detail.comments_count);
-      }
-    }
+    if (views === null) views = await igViewsFallback(mediaId, auth.token, opt.force);
 
-    if (views === null) views = await igViewsFallback(media.id, auth.token);
-
-    return settle("Instagram", shortcode, { views, likes, comments });
+    return settle("Instagram", shortcode, { views, likes, comments }, mediaId);
   } catch (e) {
-    // token invalid di tengah jalan → buang cache biar tidak nyangkut
-    igCache = null;
+    clearIgCache(); // token invalid di tengah jalan → jangan biarkan cache nyangkut
     return {
       ...fail("ERROR", e instanceof Error ? e.message : "Gagal ambil data IG"),
       platform: "Instagram",
@@ -272,6 +356,7 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
       headers: {
         Authorization: `Bearer ${auth.token}`,
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
       },
       body: JSON.stringify({ filters: { video_ids: [videoId] } }),
       cache: "no-store",
@@ -318,7 +403,10 @@ async function resolveRedirect(url: string): Promise<string | null> {
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
-export async function syncPosting(postUrl: string | null): Promise<SyncOutcome> {
+export async function syncPosting(
+  postUrl: string | null,
+  opt: SyncOptions = {}
+): Promise<SyncOutcome> {
   if (!postUrl) return fail("PENDING", "Link posting belum diisi");
 
   let parsed = parsePostUrl(postUrl);
@@ -354,10 +442,13 @@ export async function syncPosting(postUrl: string | null): Promise<SyncOutcome> 
   }
 
   switch (parsed.platform) {
-    case "YouTube":   return syncYouTube(parsed.externalId);
-    case "Instagram": return syncInstagram(parsed.externalId);
+    case "YouTube":   return syncYouTube(parsed.externalId, opt);
+    case "Instagram": return syncInstagram(parsed.externalId, opt);
     case "TikTok":    return syncTikTok(parsed.externalId);
     default:
-      return { ...fail("UNSUPPORTED", `${parsed.platform} belum didukung auto-sync`), platform: parsed.platform };
+      return {
+        ...fail("UNSUPPORTED", `${parsed.platform} belum didukung auto-sync`),
+        platform: parsed.platform,
+      };
   }
 }

@@ -32,7 +32,7 @@ export async function PATCH(
   let syncMessage: string | null = null;
   let synced = false;
 
-  if ("post_url" in patch) {
+ if ("post_url" in patch) {
     const url: string | null = patch.post_url;
     const parsed = url ? parsePostUrl(url) : null;
 
@@ -40,8 +40,7 @@ export async function PATCH(
     if (parsed && !("platform" in body)) patch.platform = parsed.platform;
 
     if (url) {
-      const out = await syncPosting(url);
-      // ✅ hanya menulis metrik yang benar-benar didapat (0 palsu tidak masuk)
+      const out = await syncPosting(url, { force: true, mediaId: null });
       Object.assign(patch, buildPostingPatch(out, { external_id: patch.external_id }));
       synced = out.status === "OK";
       if (out.status !== "OK") syncMessage = out.error;
@@ -49,6 +48,7 @@ export async function PATCH(
       patch.sync_status = "PENDING";
       patch.sync_error = null;
       patch.last_synced_at = null;
+      patch.provider_media_id = null;
     }
   }
 

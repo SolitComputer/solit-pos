@@ -1,7 +1,7 @@
 // src/app/api/cc-reports/[id]/postings/[postingId]/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { buildPostingPatch, syncPosting } from "@/lib/ccSync";
+import { buildPostingPatch, syncPosting, clearIgCache } from "@/lib/ccSync";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,16 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Posting tidak ditemukan" }, { status: 404 });
   }
 
-  const out = await syncPosting(posting.post_url);
+  // ✅ Sync manual per-posting SELALU force — user menekannya justru karena
+  //    angkanya terasa salah. Cache apa pun harus dibuang.
+  clearIgCache();
+
+  const before = { views: posting.views, likes: posting.likes, comments: posting.comments };
+
+  const out = await syncPosting(posting.post_url, {
+    force: true,
+    mediaId: posting.provider_media_id,
+  });
 
   const patch = buildPostingPatch(out, posting);
 
@@ -35,11 +44,17 @@ export async function POST(
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
+  const changed =
+    data.views !== before.views ||
+    data.likes !== before.likes ||
+    data.comments !== before.comments;
+
   return NextResponse.json({
     success: true,
     posting: data,
     synced: out.status === "OK",
     partial: out.status === "PARTIAL",
+    changed,
     message: out.error,
   });
 }

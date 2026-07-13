@@ -10,10 +10,10 @@ export type BrandFilter = "ALL" | CCBrand;
 export const DEFAULT_BRAND: CCBrand = "Solit";
 
 export const BRAND_META: Record<CCBrand, { label: string; color: string; className: string }> = {
-  Solit:   { label: "Solit 03", color: "#7c3aed", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
-  OnPoint: { label: "OnPoint",  color: "#0ea5e9", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200" },
-  Sotech:  { label: "Sotech",   color: "#10b981", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
-  Zenit:   { label: "Zenit",    color: "#f59e0b", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  Solit: { label: "Solit 03", color: "#7c3aed", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
+  OnPoint: { label: "OnPoint", color: "#0ea5e9", className: "bg-sky-50 text-sky-700 ring-1 ring-sky-200" },
+  Sotech: { label: "Sotech", color: "#10b981", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  Zenit: { label: "Zenit", color: "#f59e0b", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
 };
 
 export const BRAND_TABS: { key: BrandFilter; label: string; color: string }[] = [
@@ -50,6 +50,7 @@ export interface CCPosting {
   comments: number;
 
   external_id?: string | null;
+  provider_media_id?: string | null;  
   auto_sync?: boolean;
   last_synced_at?: string | null;
   sync_status?: SyncStatus | null;
@@ -121,11 +122,11 @@ export function canFinish(r: { postings?: CCPosting[]; posting_done?: boolean })
 }
 
 export const CC_STATUS_META: Record<CCStatus, { label: string; className: string }> = {
-  BELUM_SELESAI: { label: "Belum Mulai",   className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
-  PROSES:        { label: "Menunggu Edit", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
-  SIAP_POSTING:  { label: "Siap Posting",  className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
-  POSTED:        { label: "Sudah Posting", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
-  SELESAI:       { label: "Selesai ✓",     className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  BELUM_SELESAI: { label: "Belum Mulai", className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
+  PROSES: { label: "Menunggu Edit", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  SIAP_POSTING: { label: "Siap Posting", className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
+  POSTED: { label: "Sudah Posting", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
+  SELESAI: { label: "Selesai ✓", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
 };
 
 /* ── Platform ────────────────────────────────────────────────────────────── */

@@ -54,6 +54,8 @@ export default function CCAnalisaPage() {
   const [data, setData] = useState<CCAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [live, setLive] = useState(false);
+  const [lastPulse, setLastPulse] = useState<Date | null>(null);
 
   const [metric, setMetric] = useState<CCMetric>("views");
   const [range, setRange] = useState<CCRange>("30");
@@ -96,11 +98,13 @@ export default function CCAnalisaPage() {
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cc-reports/analytics?${query}`, { signal });
+      const res = await fetch(`/api/cc-reports/analytics?${query}&_cb=${Date.now()}`, {
+        signal,
+        cache: "no-store",
+      });
       const json = await res.json();
       if (json.success) setData(json as CCAnalytics);
     } catch {
-      /* aborted / network */
     } finally {
       setLoading(false);
     }
@@ -134,18 +138,52 @@ export default function CCAnalisaPage() {
     })();
   }, [data, syncing, load]);
 
+  useEffect(() => {
+    if (!live) return;
+
+    let stop = false;
+
+    const pulse = async () => {
+      if (stop) return;
+      try {
+        await fetch("/api/cc-reports/sync?force=1", { method: "POST", cache: "no-store" });
+        if (stop) return;
+        await load();
+        setLastPulse(new Date());
+      } catch {
+        /* diamkan — coba lagi di siklus berikutnya */
+      }
+    };
+
+    pulse();                                   
+    const t = setInterval(pulse, 60_000);
+
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [live, load]);
+
   const handleSyncAll = async () => {
     setSyncing(true);
     try {
-      const res = await fetch("/api/cc-reports/sync?force=1", { method: "POST" });
+      const res = await fetch("/api/cc-reports/sync?force=1", {
+        method: "POST",
+        cache: "no-store",
+      });
       const json = await res.json();
-      if (json.success) {
-        alert(
-          `Sync selesai — OK: ${json.ok}, sebagian: ${json.partial ?? 0}, gagal: ${json.failed}, total: ${json.total}`
-        );
-        await load();
-      } else {
+      if (!json.success) {
         alert(json.error ?? "Gagal sync");
+        return;
+      }
+      await load();
+      setLastPulse(new Date());
+
+      if (json.failed > 0) {
+        alert(
+          `Sync selesai — OK: ${json.ok}, sebagian: ${json.partial ?? 0}, gagal: ${json.failed}.\n` +
+          `Cek banner kuning untuk posting yang bermasalah.`
+        );
       }
     } finally {
       setSyncing(false);
@@ -349,18 +387,50 @@ export default function CCAnalisaPage() {
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </Link>
-            <div className="min-w-0">
+<div className="min-w-0">
               <h1 className="text-xl font-black tracking-tight text-gray-900 sm:text-2xl">Analisa Konten</h1>
               <p className="text-sm text-gray-500">
                 {data?.rangeLabel ?? "Memuat…"}
-                {data?.lastSyncedAt && (
-                  <span className="ml-1 text-gray-400">
-                    · sync terakhir {new Date(data.lastSyncedAt).toLocaleString("id-ID", {
-                      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                {lastPulse ? (
+                  <span className="ml-1 font-bold text-emerald-600">
+                    · diperbarui {lastPulse.toLocaleTimeString("id-ID", {
+                      hour: "2-digit", minute: "2-digit", second: "2-digit",
                     })}
                   </span>
+                ) : (
+                  data?.lastSyncedAt && (
+                    <span className="ml-1 text-gray-400">
+                      · sync terakhir {new Date(data.lastSyncedAt).toLocaleString("id-ID", {
+                        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                      })}
+                    </span>
+                  )
                 )}
               </p>
+            </div>
+
+            <div className="ml-auto flex flex-shrink-0 items-center gap-2">
+              {/* ✅ Toggle realtime */}
+              <button
+                onClick={() => setLive((v) => !v)}
+                title="Tarik ulang metrik otomatis tiap 60 detik"
+                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                  live
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${live ? "animate-pulse bg-emerald-500" : "bg-gray-300"}`} />
+                {live ? "Realtime ON" : "Realtime"}
+              </button>
+
+              <button
+                onClick={handleSyncAll}
+                disabled={syncing}
+                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-40"
+              >
+                {syncing ? "Menarik data…" : "↻ Sync Metrik"}
+              </button>
             </div>
             <button
               onClick={handleSyncAll}
