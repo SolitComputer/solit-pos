@@ -328,6 +328,7 @@ export const config = {
     "/api/accessories/:path*",
     "/dashboard/accessories/:path*",
     "/api/seller-followups/:path*",
+    "/api/seller-pics/:path*",
     "/dashboard/preparation/:path*",
     "/api/preparation/:path*",
     "/api/missions/:path*",
