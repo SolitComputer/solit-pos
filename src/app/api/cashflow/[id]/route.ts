@@ -28,7 +28,7 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
 
     const { data: entry, error: fetchErr } = await supabase
         .from("cashflow_entries")
-        .select("id, is_audited, is_voided, direction, source_type")
+        .select("id, is_audited, is_voided, direction, source_type, nominal")
         .eq("id", id)
         .single();
 
@@ -37,6 +37,12 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
 
     if (entry.is_voided)
         return NextResponse.json({ success: false, message: "Entry yang dibatalkan tidak bisa diaudit" }, { status: 400 });
+
+    if (Number(entry.nominal ?? 0) <= 0)
+        return NextResponse.json(
+            { success: false, message: "Entry dengan nominal 0 tidak bisa diaudit. Edit nominal terlebih dahulu." },
+            { status: 400 }
+        );
 
     if (entry.is_audited)
         return NextResponse.json({ success: false, message: "Entry sudah diaudit, tidak bisa dibatalkan" }, { status: 400 });
@@ -74,17 +80,15 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
         payment_method?: string;
     };
 
-    // ── Validasi nominal: boleh 0, tidak boleh minus atau NaN ────────────────
     const nom = Math.round(Number(nominal));
-    if (!Number.isFinite(nom) || nom < 0)
+    if (!Number.isFinite(nom) || nom <= 0)
         return NextResponse.json(
-            { success: false, message: "Nominal tidak valid (tidak boleh minus)" },
+            { success: false, message: "Nominal harus lebih dari 0" },
             { status: 400 }
         );
 
     const supabase = getAdmin();
 
-    // Cek entry ada dan boleh diedit
     const { data: entry, error: fetchErr } = await supabase
         .from("cashflow_entries")
         .select("id, direction, source_type, is_audited")
