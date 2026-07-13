@@ -43,10 +43,14 @@ async function readRow(): Promise<IgRow | null> {
 }
 
 async function writeRow(patch: Record<string, unknown>): Promise<void> {
-    await supabaseAdmin.from("cc_integrations").upsert(
+    const { error } = await supabaseAdmin.from("cc_integrations").upsert(
         { provider: PROVIDER, ...patch, updated_at: new Date().toISOString() },
         { onConflict: "provider" }
     );
+
+    if (error) {
+        throw new Error(`Gagal menyimpan token IG ke cc_integrations: ${error.message}`);
+    }
 }
 
 /**
@@ -152,20 +156,20 @@ export async function getValidIgToken(): Promise<IgAuth> {
         }
 
         const out = await exchangeLongLived(seed);
-
         if (out.token === null) {
-            await writeRow({
-                access_token: seed,
-                expires_at: new Date().toISOString(), // tandai mati
-                open_id: igUserId,
-                last_refresh_at: new Date().toISOString(),
-                last_refresh_error: out.error,
-                refresh_fail_count: 1,
-            });
             return { token: null, igUserId: null, error: out.error };
         }
 
-        await persist(out.token, out.expiresAt, igUserId);
+        try {
+            await persist(out.token, out.expiresAt, igUserId);
+        } catch (e) {
+            return {
+                token: null,
+                igUserId: null,
+                error: e instanceof Error ? e.message : "Gagal menyimpan token IG",
+            };
+        }
+
         return { token: out.token, igUserId, error: null };
     }
 
