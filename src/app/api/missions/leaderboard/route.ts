@@ -5,14 +5,45 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
+async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
+  const url = new URL(req.url);
+  const period = url.searchParams.get("period") ?? "today";
+
+  // Define time ranges
+  const now = new Date();
+  // Jakarta timezone calculation
+  now.setHours(now.getHours() + 7);
+  let startDate = new Date(now);
+  let endDate = new Date(now);
+
+  if (period === "today") {
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
+  } else if (period === "week") {
+    const day = startDate.getUTCDay();
+    const diff = startDate.getUTCDate() - day + (day === 0 ? -6 : 1);
+    startDate.setUTCDate(diff);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
+  } else if (period === "month") {
+    startDate.setUTCDate(1);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCMonth(endDate.getUTCMonth() + 1, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
+  }
+
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+
   const { data: missions, error } = await supabaseAdmin
     .from("missions")
     .select(`
       id, status, created_at, submitted_at, reviewed_at,
       assigned_to,
       assignee:users!missions_assigned_to_fkey(id, name, role, roles)
-    `);
+    `)
+    .gte("created_at", startIso)
+    .lte("created_at", endIso);
 
   if (error) {
     console.error("[missions/leaderboard]", error);

@@ -1120,42 +1120,37 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
     );
 }
 
-// ── Inline Date Range Picker ──────────────────────────────────────────────────
 function InlineDateRange({ from, to, onChange }: { from: string, to: string, onChange: (from: string, to: string) => void }) {
-    const [viewDate, setViewDate] = useState(() => {
-        const d = from ? new Date(from) : new Date();
-        d.setDate(1);
-        return d;
-    });
-
-    const currMonth = viewDate.getMonth();
-    const currYear = viewDate.getFullYear();
     const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+    const viewDate = from ? new Date(from) : new Date();
+    const [currMonth, setCurrMonth] = useState(viewDate.getMonth());
+    const [currYear, setCurrYear] = useState(viewDate.getFullYear());
 
-    const nextMonth = () => setViewDate(new Date(currYear, currMonth + 1, 1));
-    const prevMonth = () => setViewDate(new Date(currYear, currMonth - 1, 1));
+    useEffect(() => {
+        if (from) {
+            const d = new Date(from);
+            setCurrMonth(d.getMonth());
+            setCurrYear(d.getFullYear());
+        }
+    }, [from]);
 
+    const prevMonth = () => setCurrMonth(m => m === 0 ? (setCurrYear(y => y - 1), 11) : m - 1);
+    const nextMonth = () => setCurrMonth(m => m === 11 ? (setCurrYear(y => y + 1), 0) : m + 1);
+    
     const daysInMonth = new Date(currYear, currMonth + 1, 0).getDate();
-    const startDay = new Date(currYear, currMonth, 1).getDay();
+    const firstDay = new Date(currYear, currMonth, 1).getDay();
+    const blanks = Array.from({ length: firstDay });
+    const days = Array.from({ length: daysInMonth }).map((_, i) => i + 1);
+    const monthName = new Date(currYear, currMonth).toLocaleDateString("id-ID", { month: "long" });
 
-    const handleDayClick = (day: number) => {
-        const dateStr = `${currYear}-${String(currMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        if (!from || (from && to)) {
-            onChange(dateStr, "");
-        } else {
-            if (dateStr < from) {
-                onChange(dateStr, from);
-            } else {
-                onChange(from, dateStr);
-            }
+    const handleDayClick = (d: number) => {
+        const dateStr = `${currYear}-${String(currMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        if (!from || (from && to)) { onChange(dateStr, ""); }
+        else {
+            if (dateStr < from) onChange(dateStr, from);
+            else onChange(from, dateStr);
         }
     };
-
-    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-    const blanks = Array.from({ length: startDay }, (_, i) => i);
-
-    const monthName = viewDate.toLocaleDateString("id-ID", { month: "long" });
-
     return (
         <div className="bg-white border border-gray-200 rounded-xl p-2 shadow-sm inline-block w-full max-w-[170px]">
             <div className="flex items-center justify-between mb-1.5">
@@ -1169,7 +1164,7 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
                 {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((d) => <div key={d}>{d}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-0 text-center">
-                {blanks.map(b => <div key={`blank-${b}`} />)}
+                {blanks.map((_, i) => <div key={`blank-${i}`} />)}
                 {days.map(d => {
                     const dateStr = `${currYear}-${String(currMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
                     const isToday = dateStr === todayStr;
