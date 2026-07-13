@@ -20,7 +20,6 @@ async function getAuthUser(req: NextRequest) {
   return verifyToken(token);
 }
 
-// ── GET /api/service/[id] ─────────────────────────────────────────────────────
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }

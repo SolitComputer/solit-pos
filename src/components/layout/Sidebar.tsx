@@ -68,6 +68,9 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/missions") return pathname === "/dashboard/missions";
   if (href === "/dashboard/missions/all") return pathname === "/dashboard/missions/all";
   if (href === "/dashboard/todos") return pathname === "/dashboard/todos";
+  if (href === "/dashboard/akutansi") {
+    return pathname === "/dashboard/akutansi" || pathname.startsWith("/dashboard/akutansi/");
+  }
   return pathname.startsWith(href);
 }
 
@@ -346,6 +349,12 @@ const Icons = {
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
+  accounting: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -361,6 +370,11 @@ const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow",
 const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboard/cc-reports", icon: Icons.ccReport };
 const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
+const ITEM_AKUNTANSI: MenuItem = {
+  name: "Akuntansi",
+  href: "/dashboard/akutansi",
+  icon: Icons.accounting,
+};
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
@@ -459,7 +473,6 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
 
 // ── Shared group builders ─────────────────────────────────────────────────────
 
-// PERUBAHAN: ITEM_CC_REPORT dipindah dari ADMIN_TRANSAKSI ke sini (Overview)
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
@@ -472,6 +485,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
     { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
+    ITEM_AKUNTANSI, // ✅ NEW
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
     ITEM_CUSTOMER_BIRTHDAY,
@@ -639,7 +653,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
   ],
 
-  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline PROGRAMMER
   PROGRAMMER: [
     {
       label: "Overview",
@@ -653,6 +666,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         ITEM_CASHFLOW,
+        ITEM_AKUNTANSI, // ✅ NEW
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
         ITEM_CC_REPORT,
@@ -813,7 +827,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
-  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline ACCOUNTING
   ACCOUNTING: [
     {
       label: "Overview",
@@ -827,9 +840,10 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
+        ITEM_AKUNTANSI, // ✅ NEW
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-        ITEM_CC_REPORT, // ← dipindah ke Overview
+        ITEM_CC_REPORT,
       ],
     },
     ADMIN_INVENTARIS,

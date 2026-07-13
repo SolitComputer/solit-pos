@@ -22,7 +22,6 @@ const PUBLIC_API_ROUTES = [
   "/api/service/public",
   "/api/public/catalog",
 ];
-
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
   "/api/cc-reports/tiktok/keepalive",
@@ -336,5 +335,7 @@ export const config = {
     "/api/cc-reports/:path*",
     "/dashboard/todos/:path*",
     "/api/todos/:path*",
+     "/dashboard/akuntansi/:path*",
+    "/api/akuntansi/:path*",
   ],
 };
