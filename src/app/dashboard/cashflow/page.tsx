@@ -879,20 +879,33 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
+    // ✅ FIX: satu kondisi validasi, tidak ada return ganda yang memblokir fetch
     const submit = async () => {
-        if (nominal === "" || !Number.isFinite(Number(nominal)) || Number(nominal) < 0)
-            return setError("Nominal tidak boleh kosong atau minus");
-        setSaving(true); setError("");
+        if (nominal === "" || !Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
+            return setError("Nominal harus lebih dari 0");
+        setSaving(true);
+        setError("");
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, {
-                method: "PUT", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category, nominal: Number(nominal), keterangan: keterangan.trim() || null, tanggal, payment_method: paymentMethod }),
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    category,
+                    nominal: Number(nominal),
+                    keterangan: keterangan.trim() || null,
+                    tanggal,
+                    payment_method: paymentMethod,
+                }),
             });
             const json = await res.json();
             if (!json.success) return setError(json.message || "Gagal menyimpan perubahan");
-            onSaved(); onClose();
-        } catch { setError("Terjadi kesalahan koneksi"); }
-        finally { setSaving(false); }
+            onSaved();
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan koneksi");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition";
@@ -962,7 +975,6 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
 }
 
 // ── Income Modal ──────────────────────────────────────────────────────────────
-// Kategori manual: UTANG dan AKSESORIS — dropdown sama gaya ExpenseModal
 function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
     const MANUAL_INCOME_CATS = Object.entries(INCOME_CATEGORIES).filter(
         ([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key)
@@ -982,8 +994,8 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     }, [onClose]);
 
     const submit = async () => {
-        if (nominal === "" || nominal === null || !Number.isFinite(Number(nominal)) || Number(nominal) < 0)
-            return setError("Nominal tidak boleh kosong atau minus");
+        if (nominal === "" || !Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
+            return setError("Nominal harus lebih dari 0");
         setSaving(true); setError("");
         try {
             const res = await fetch("/api/cashflow", {
@@ -1022,65 +1034,33 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-                    {/* ── Kategori — dropdown sama gaya ExpenseModal ── */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
-                        <select
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className={inputCls}
-                        >
+                        <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
                             {MANUAL_INCOME_CATS.map(([key, label]) => (
                                 <option key={key} value={key}>{label}</option>
                             ))}
                         </select>
-                       
                     </div>
-                    {/* ── Nominal + Tanggal ── */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">
-                                Nominal <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="number"
-                                value={nominal}
-                                onChange={(e) => setNominal(e.target.value)}
-                                placeholder="0"
-                                className={`${inputCls} font-mono`}
-                                autoFocus
-                            />
+                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
+                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
                             {nominal && Number(nominal) > 0 && (
-                                <p className="text-[11px] text-emerald-600 mt-1 font-mono font-semibold">
-                                    {fmtRupiah(Number(nominal))}
-                                </p>
+                                <p className="text-[11px] text-emerald-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
                             )}
                         </div>
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
-                            <input
-                                type="date"
-                                value={tanggal}
-                                onChange={(e) => setTanggal(e.target.value)}
-                                className={inputCls}
-                            />
+                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
                         </div>
                     </div>
-                    {/* ── Keterangan ── */}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
-                        <textarea
-                            value={keterangan}
-                            onChange={(e) => setKeterangan(e.target.value)}
-                            rows={2}
-                            placeholder="Catatan tambahan..."
-                            className={`${inputCls.replace("h-10", "")} py-2 resize-none`}
-                        />
+                        <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
                     </div>
                     {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
-                            {error}
-                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
                     )}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
@@ -1195,6 +1175,7 @@ export default function CashflowPage() {
             const res = await fetch(`/api/cashflow/${entry.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_audit" }) });
             const json = await res.json();
             if (json.success) fetchData(true);
+            else alert(json.message || "Gagal mengaudit");
         } finally { setAuditingId(null); }
     };
 
