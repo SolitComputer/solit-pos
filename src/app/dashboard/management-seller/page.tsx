@@ -176,7 +176,7 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   const isPedagang = type === "PEDAGANG";
   return (
     <div
-      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
         }`}
     >
       {initials || "?"}
@@ -215,7 +215,7 @@ function StatusBadge({ f, scope }: { f: Followup; scope: Scope }) {
 // ── Stat Pill ─────────────────────────────────────────────────────────────────
 function StatPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 max-w-full text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
       {children}
     </span>
   );
@@ -224,9 +224,11 @@ function StatPill({ children }: { children: React.ReactNode }) {
 // ── Info Cell ─────────────────────────────────────────────────────────────────
 function InfoCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
-      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-xs font-bold text-gray-800 leading-snug">{value}</p>
+    <div className="min-w-0 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 truncate">
+        {label}
+      </p>
+      <p className="text-xs font-bold text-gray-800 leading-snug truncate">{value}</p>
       {sub && <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate">{sub}</p>}
     </div>
   );
@@ -282,13 +284,13 @@ function PicAccessDropdown({
       <button
         onClick={() => setOpen((o) => !o)}
         title="Atur siapa yang boleh follow-up"
-        className={`h-9 px-3 inline-flex items-center gap-2 rounded-xl border text-xs font-bold transition-all active:scale-[0.98] ${error
+        className={`h-10 px-3 inline-flex items-center gap-2 rounded-xl border text-xs font-bold transition-all active:scale-[0.98] ${error
           ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
           : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
           }`}
       >
         <span>{error ? "⚠️" : "🔐"}</span>
-        <span className="hidden sm:inline">Akses PIC</span>
+        <span className="hidden xs:inline sm:inline">Akses PIC</span>
         {!error && (
           <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black">
             {activeCount}
@@ -298,7 +300,7 @@ function PicAccessDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-[18rem] bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
             <p className="text-xs font-black text-gray-900">Izin Follow-up</p>
             <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
@@ -306,7 +308,7 @@ function PicAccessDropdown({
             </p>
           </div>
 
-          <div className="max-h-72 overflow-y-auto py-2">
+          <div className="max-h-[60vh] sm:max-h-72 overflow-y-auto py-2 overscroll-contain">
             {loading ? (
               <div className="px-4 py-6 text-center text-xs text-gray-400">Memuat…</div>
             ) : error ? (
@@ -384,7 +386,7 @@ function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boole
     return (
       <div
         title={f.lock_reason ?? `Hanya ${f.closed_by ?? "PIC"} yang bisa chat customer ini`}
-        className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-semibold" : "w-9"
+        className={`h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-semibold" : "w-10"
           }`}
       >
         <LockIcon />
@@ -399,7 +401,7 @@ function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boole
       target="_blank"
       rel="noopener noreferrer"
       title="Buka WhatsApp"
-      className={`h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-bold" : "w-9"
+      className={`h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-bold" : "w-10"
         }`}
     >
       <WaIcon />
@@ -429,7 +431,7 @@ function TandaiFuButton({
           ? "FU sekaligus klaim customer ini sebagai milikmu"
           : "Tandai sudah follow-up"
       }
-      className={`flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
+      className={`flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
         ? "bg-blue-400 opacity-70 cursor-not-allowed"
         : isUnowned
           ? "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
@@ -437,7 +439,7 @@ function TandaiFuButton({
         }`}
     >
       {processing ? <Spinner /> : isUnowned ? <span>🙋</span> : <PhoneIcon />}
-      {isUnowned ? "Klaim & FU" : "Follow-up"}
+      <span className="truncate">{isUnowned ? "Klaim & FU" : "Follow-up"}</span>
     </button>
   );
 }
@@ -490,13 +492,13 @@ function BuktiFuUploader({
       {preview ? (
         <div className="relative rounded-xl overflow-hidden border border-blue-200 bg-blue-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Bukti FU" className="w-full max-h-48 object-contain" />
+          <img src={preview} alt="Bukti FU" className="w-full max-h-40 sm:max-h-48 object-contain" />
           <button
             onClick={() => {
               onChange(null);
               if (inputRef.current) inputRef.current.value = "";
             }}
-            className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-md"
+            className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-md"
             title="Hapus gambar"
           >
             <TrashIcon />
@@ -582,7 +584,7 @@ function ConfirmFollowupModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-fu-title"
@@ -592,15 +594,22 @@ function ConfirmFollowupModal({
         onClick={!processing ? onCancel : undefined}
       />
 
-      <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex h-1 bg-gray-100">
+      {/* Bottom-sheet di HP, dialog tengah di laptop */}
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col">
+        {/* Progress bar */}
+        <div className="flex h-1 bg-gray-100 flex-shrink-0">
           <div
             className={`h-full bg-blue-600 transition-all duration-300 ${step === 1 ? "w-1/2" : "w-full"
               }`}
           />
         </div>
 
-        <div className="px-5 pt-5 pb-5 max-h-[90vh] overflow-y-auto">
+        {/* Grip handle — hanya di HP */}
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1 flex-shrink-0">
+          <span className="w-10 h-1 rounded-full bg-gray-200" />
+        </div>
+
+        <div className="px-5 pt-4 sm:pt-5 pb-6 sm:pb-5 overflow-y-auto overscroll-contain">
           <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-4">
             Langkah {step} dari 2
           </p>
@@ -618,7 +627,7 @@ function ConfirmFollowupModal({
                   >
                     {followup.customer_name}
                   </h2>
-                  <p className="text-xs text-gray-400 font-medium mt-0.5">
+                  <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
                     {followup.customer_phone}
                   </p>
                 </div>
@@ -643,7 +652,7 @@ function ConfirmFollowupModal({
                 <button
                   onClick={onCancel}
                   disabled={processing}
-                  className="flex-1 h-10 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40"
+                  className="flex-1 h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40"
                 >
                   Batal
                 </button>
@@ -651,7 +660,7 @@ function ConfirmFollowupModal({
                   onClick={() => setStep(2)}
                   disabled={!canProceedStep1}
                   title={!canProceedStep1 ? "Upload bukti FU terlebih dahulu" : ""}
-                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5 ${canProceedStep1
+                  className={`flex-1 h-11 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5 ${canProceedStep1
                     ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
                     : "bg-blue-200 cursor-not-allowed"
                     }`}
@@ -696,17 +705,17 @@ function ConfirmFollowupModal({
               )}
 
               <div className="space-y-2 mb-5">
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
                     Customer
                   </span>
-                  <span className="text-xs font-black text-gray-800 truncate max-w-[160px]">
+                  <span className="text-xs font-black text-gray-800 truncate">
                     {followup.customer_name}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
                     Tipe
                   </span>
                   <span className="text-xs font-black text-gray-800">
@@ -714,17 +723,17 @@ function ConfirmFollowupModal({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
                     Jadwal baru
                   </span>
-                  <span className="text-xs font-black text-blue-600">
+                  <span className="text-xs font-black text-blue-600 text-right">
                     +{intervalDays} hari dari sekarang
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
                     Total FU
                   </span>
                   <span className="text-xs font-black text-gray-800">
@@ -733,11 +742,11 @@ function ConfirmFollowupModal({
                 </div>
 
                 {followup.invoice_number && (
-                  <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
                       Invoice
                     </span>
-                    <span className="text-xs font-mono font-bold text-gray-700">
+                    <span className="text-xs font-mono font-bold text-gray-700 truncate">
                       {followup.invoice_number}
                     </span>
                   </div>
@@ -760,7 +769,7 @@ function ConfirmFollowupModal({
                   onClick={() => setStep(1)}
                   disabled={processing}
                   title="Kembali — ganti bukti FU"
-                  className="h-10 w-10 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-[0.98] transition-all flex items-center justify-center flex-shrink-0 disabled:opacity-40"
+                  className="h-11 w-11 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-[0.98] transition-all flex items-center justify-center flex-shrink-0 disabled:opacity-40"
                 >
                   <BackIcon />
                 </button>
@@ -768,11 +777,13 @@ function ConfirmFollowupModal({
                 <button
                   onClick={() => buktiFu && onConfirm(buktiFu)}
                   disabled={processing || !buktiFu}
-                  className={`flex-1 h-10 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  className={`flex-1 min-w-0 h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                     }`}
                 >
                   {processing ? <Spinner /> : <CheckIcon />}
-                  {processing ? "Menyimpan..." : "Ya, Sudah FU — Simpan"}
+                  <span className="truncate">
+                    {processing ? "Menyimpan..." : "Ya, Sudah FU — Simpan"}
+                  </span>
                 </button>
               </div>
             </>
@@ -807,14 +818,14 @@ function FollowupCard({
 
   return (
     <div
-      className={`relative bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
+      className={`relative h-full bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
         }`}
     >
       {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />}
 
       {/* ── Card Header ── */}
       <div className={`px-4 pb-3 border-b border-gray-100 ${isDue ? "pt-4" : "pt-3.5"}`}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <Avatar name={f.customer_name} type={f.seller_type} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
@@ -822,7 +833,7 @@ function FollowupCard({
                 <h3 className="text-sm font-bold text-gray-900 leading-tight truncate">
                   {f.customer_name}
                 </h3>
-                <p className="text-[11px] text-gray-400 font-medium mt-0.5 leading-none">
+                <p className="text-[11px] text-gray-400 font-medium mt-1 leading-none truncate">
                   {f.customer_phone}
                 </p>
               </div>
@@ -861,7 +872,7 @@ function FollowupCard({
                   {(picName ?? "?").charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
+                  <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-1">
                     PIC Follow-up
                   </p>
                   <p className="text-xs font-black text-violet-800 leading-tight truncate">
@@ -883,7 +894,7 @@ function FollowupCard({
                 🙋
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-0.5">
+                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-1">
                   PIC Follow-up
                 </p>
                 <p className="text-xs font-bold text-emerald-700 leading-tight">
@@ -906,7 +917,11 @@ function FollowupCard({
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatPill>🛒 {f.purchase_count}× beli</StatPill>
           <StatPill>📞 {f.followup_count}× FU</StatPill>
-          {f.last_followup_by && <StatPill>👤 FU terakhir: {f.last_followup_by}</StatPill>}
+          {f.last_followup_by && (
+            <StatPill>
+              <span className="truncate max-w-[140px]">👤 FU terakhir: {f.last_followup_by}</span>
+            </StatPill>
+          )}
           {f.last_followup_proof_url && (
             <a
               href={f.last_followup_proof_url}
@@ -933,21 +948,24 @@ function FollowupCard({
                 <button
                   disabled
                   title={`Sudah FU oleh ${f.last_followup_by ?? f.closed_by ?? "PIC"}. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
-                  className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                  className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none px-3"
                 >
-                  <CheckIcon />
+                  <span className="flex-shrink-0">
+                    <CheckIcon />
+                  </span>
                   <span className="truncate">
-                    Sudah FU · {f.last_followup_by ?? f.closed_by ?? "—"} · {diff <= 0 ? "hari ini" : `${diff}h lagi`}
+                    Sudah FU · {f.last_followup_by ?? f.closed_by ?? "—"} ·{" "}
+                    {diff <= 0 ? "hari ini" : `${diff}h lagi`}
                   </span>
                 </button>
               )
             ) : (
               <div
                 title={f.lock_reason ?? "Kamu tidak berwenang follow-up customer ini"}
-                className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
               >
                 <LockIcon />
-                FU Terkunci
+                <span className="truncate">FU Terkunci</span>
               </div>
             )}
 
@@ -956,7 +974,7 @@ function FollowupCard({
                 onClick={() => onArchive(f.id)}
                 disabled={processing}
                 title="Arsipkan (stop follow-up)"
-                className="h-9 w-9 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
               >
                 <ArchiveIcon />
               </button>
@@ -969,16 +987,16 @@ function FollowupCard({
               <button
                 onClick={() => onReactivate(f.id)}
                 disabled={processing}
-                className="flex-1 h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
+                className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
               >
                 {processing ? <Spinner /> : <RefreshIcon />}
-                Aktifkan Lagi
+                <span className="truncate">Aktifkan Lagi</span>
               </button>
             )}
           </>
         )}
       </div>
-    </div >
+    </div>
   );
 }
 
@@ -1001,28 +1019,28 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
       ];
 
   return (
-    <div className={`grid gap-2 ${scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3"}`}>
+    <div className={`grid gap-2 sm:gap-3 ${scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3"}`}>
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-2xl border px-3 py-3 flex items-center gap-2.5 transition-colors ${c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+          className={`rounded-2xl border px-2.5 py-2.5 sm:px-4 sm:py-3.5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3 transition-colors ${c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
             }`}
         >
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${c.danger ? "bg-red-100" : "bg-gray-100"
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-sm sm:text-base flex-shrink-0 ${c.danger ? "bg-red-100" : "bg-gray-100"
               }`}
           >
             {c.emoji}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 w-full">
             <p
-              className={`text-[9px] font-bold uppercase tracking-widest leading-none mb-1 truncate ${c.danger ? "text-red-400" : "text-gray-400"
+              className={`text-[9px] font-bold uppercase tracking-widest leading-tight mb-1 truncate ${c.danger ? "text-red-400" : "text-gray-400"
                 }`}
             >
               {c.label}
             </p>
             <p
-              className={`text-lg font-black leading-none ${c.danger ? "text-red-600" : "text-gray-900"
+              className={`text-base sm:text-xl font-black leading-none ${c.danger ? "text-red-600" : "text-gray-900"
                 }`}
             >
               {c.value}
@@ -1040,7 +1058,7 @@ function SkeletonCard() {
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-pulse">
       <div className="px-4 pt-3.5 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gray-100 rounded-xl flex-shrink-0" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-100 rounded-xl flex-shrink-0" />
           <div className="flex-1 space-y-1.5">
             <div className="flex items-start justify-between gap-2">
               <div className="h-4 w-32 bg-gray-100 rounded-lg" />
@@ -1052,6 +1070,7 @@ function SkeletonCard() {
         <div className="mt-2.5 h-4 w-28 bg-gray-100 rounded-full" />
       </div>
       <div className="px-4 py-3.5 space-y-3">
+        <div className="h-12 bg-gray-100 rounded-xl" />
         <div className="grid grid-cols-2 gap-2">
           <div className="h-14 bg-gray-100 rounded-xl" />
           <div className="h-14 bg-gray-100 rounded-xl" />
@@ -1062,7 +1081,7 @@ function SkeletonCard() {
         </div>
       </div>
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
-        <div className="h-9 bg-gray-100 rounded-xl" />
+        <div className="h-10 bg-gray-100 rounded-xl" />
       </div>
     </div>
   );
@@ -1258,7 +1277,7 @@ export default function ManagementSellerPage() {
   if (authUser && !canView) {
     return (
       <DashboardLayout>
-        <div className="max-w-sm mx-auto mt-24 text-center px-6">
+        <div className="max-w-sm mx-auto mt-20 sm:mt-24 text-center px-6">
           <div className="w-14 h-14 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -1282,13 +1301,13 @@ export default function ManagementSellerPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-4 sm:space-y-6">
         {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-[3px] h-6 bg-gray-900 rounded-full" />
-              <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
+              <div className="w-[3px] h-6 sm:h-7 bg-gray-900 rounded-full flex-shrink-0" />
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight truncate">
                 Management Seller
               </h1>
             </div>
@@ -1297,7 +1316,8 @@ export default function ManagementSellerPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Di HP: 1 baris penuh & tidak mepet. Di laptop: nempel kanan header */}
+          <div className="flex items-center gap-2 sm:flex-shrink-0">
             {canManagePic && (
               <PicAccessDropdown
                 pics={pics}
@@ -1309,12 +1329,12 @@ export default function ManagementSellerPage() {
               />
             )}
 
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 ml-auto sm:ml-0">
               {(["ACTIVE", "ARCHIVED"] as Scope[]).map((s) => (
                 <button
                   key={s}
                   onClick={() => setScope(s)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
                     }`}
@@ -1329,100 +1349,103 @@ export default function ManagementSellerPage() {
         {/* ── Summary Bar ── */}
         {!loading && <SummaryBar items={items} scope={scope} />}
 
-        {/* ── Tabs ── */}
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              { key: "USER" as Tab, label: "User", icon: "🙋", count: userItems.length, due: userDue },
-              {
-                key: "PEDAGANG" as Tab,
-                label: "Pedagang",
-                icon: "🏷️",
-                count: pedagangItems.length,
-                due: pedagangDue,
-              },
-            ] as const
-          ).map((t) => {
-            const isActive = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`relative flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
-                  ? "bg-gray-900 border-gray-900 shadow-md"
-                  : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${isActive ? "bg-white/10" : "bg-gray-100"
-                      }`}
-                  >
-                    {t.icon}
-                  </div>
-                  <div>
-                    <p
-                      className={`text-sm font-bold leading-tight ${isActive ? "text-white" : "text-gray-900"
+        {/* ── Toolbar: Tabs + Search ── */}
+        <div className="space-y-3 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
+          {/* Tabs */}
+          <div className="grid grid-cols-2 gap-2 sm:flex-1 sm:min-w-0">
+            {(
+              [
+                { key: "USER" as Tab, label: "User", icon: "🙋", count: userItems.length, due: userDue },
+                {
+                  key: "PEDAGANG" as Tab,
+                  label: "Pedagang",
+                  icon: "🏷️",
+                  count: pedagangItems.length,
+                  due: pedagangDue,
+                },
+              ] as const
+            ).map((t) => {
+              const isActive = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`relative flex items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
+                    ? "bg-gray-900 border-gray-900 shadow-md"
+                    : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                >
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 ${isActive ? "bg-white/10" : "bg-gray-100"
                         }`}
                     >
-                      {t.label}
-                    </p>
-                    <p className="text-[10px] font-medium mt-0.5 text-gray-400">
-                      {t.count} customer
-                    </p>
+                      {t.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <p
+                        className={`text-sm font-bold leading-tight truncate ${isActive ? "text-white" : "text-gray-900"
+                          }`}
+                      >
+                        {t.label}
+                      </p>
+                      <p className="text-[10px] font-medium mt-0.5 text-gray-400 truncate">
+                        {t.count} customer
+                      </p>
+                    </div>
                   </div>
-                </div>
-                {scope === "ACTIVE" && t.due > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-500 text-white flex-shrink-0">
-                    {t.due} FU
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  {scope === "ACTIVE" && t.due > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-red-500 text-white flex-shrink-0">
+                      {t.due} FU
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* ── Search ── */}
-        <div className="relative">
-          <svg
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Cari nama, nomor HP, atau invoice…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl h-10 pl-10 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition"
-              aria-label="Hapus pencarian"
+          {/* Search — sejajar tab di laptop, full-width di HP */}
+          <div className="relative sm:w-72 sm:flex-shrink-0">
+            <svg
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" aria-hidden="true"
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Cari nama, HP, atau invoice…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl h-11 pl-10 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition"
+                aria-label="Hapus pencarian"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Content ── */}
         {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 py-20 text-center">
-            <div className="text-5xl mb-4 opacity-25">
+          <div className="bg-white rounded-2xl border border-gray-200 py-16 sm:py-20 px-6 text-center">
+            <div className="text-4xl sm:text-5xl mb-4 opacity-25">
               {scope === "ARCHIVED" ? "🗂️" : search.trim() ? "🔍" : "✅"}
             </div>
             <p className="text-sm font-bold text-gray-700">
@@ -1442,7 +1465,7 @@ export default function ManagementSellerPage() {
             )}
           </div>
         ) : (
-          <>
+          <div className="space-y-3">
             {scope === "ACTIVE" && dueCount > 0 && (
               <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
@@ -1451,7 +1474,7 @@ export default function ManagementSellerPage() {
                 </p>
               </div>
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
               {visible.map((f) => (
                 <FollowupCard
                   key={f.id}
@@ -1465,7 +1488,7 @@ export default function ManagementSellerPage() {
                 />
               ))}
             </div>
-          </>
+          </div>
         )}
       </div>
 
