@@ -32,8 +32,14 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
         .eq("id", id)
         .single();
 
-    if (fetchErr || !entry)
-        return NextResponse.json({ success: false, message: "Entry tidak ditemukan" }, { status: 404 });
+    if (fetchErr || !entry) {
+        console.error("[cashflow PATCH] fetchErr:", fetchErr, "| id:", id, "| type:", typeof id);
+        return NextResponse.json({
+            success: false,
+            message: fetchErr?.message || "Entry tidak ditemukan",  // ← tampilkan error asli
+            debug: { id, fetchErr: fetchErr?.message }
+        }, { status: 404 });
+    }
 
     if (entry.is_voided)
         return NextResponse.json({ success: false, message: "Entry yang dibatalkan tidak bisa diaudit" }, { status: 400 });
