@@ -25,8 +25,15 @@ const PUBLIC_API_ROUTES = [
 
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
-  "/api/cc-reports/tiktok/keepalive",   
+  "/api/cc-reports/tiktok/keepalive",
+  "/api/cc-reports/tiktok/status",
+  "/api/cc-reports/instagram/keepalive",
+  "/api/cc-reports/instagram/status",
 ];
+
+function isCronRoute(pathname: string): boolean {
+  return CRON_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
 const FACE_API_WHITELIST = [
   "/api/auth/face-verify",
   "/api/auth/face-enroll",
@@ -162,7 +169,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (CRON_ROUTES.includes(pathname)) {
+  if (isCronRoute(pathname)) {
     const cronSecret = request.headers.get("x-cron-secret");
     if (cronSecret) {
       if (cronSecret === process.env.CRON_SECRET) {
@@ -173,7 +180,6 @@ export async function middleware(request: NextRequest) {
         { status: 401 }
       );
     }
-    // tanpa header → lanjut ke cek token di bawah
   }
 
   if (!token) {

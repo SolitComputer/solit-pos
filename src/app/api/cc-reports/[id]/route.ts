@@ -1,13 +1,11 @@
-// src/app/api/cc-reports/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { computeStatus, type CCReport } from "@/lib/ccReports";
+import { computeStatus, isCCBrand, type CCReport } from "@/lib/ccReports";
 import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 import type { UserRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// Field yang boleh di-update via PATCH (whitelist — hindari mass assignment)
 const TAKE_FIELDS = [
   "videographer", "talent", "location", "equipment",
   "take_start", "take_end", "take_received_editor", "take_done",
@@ -18,12 +16,12 @@ const EDIT_FIELDS = [
 ] as const;
 const POSTING_FIELDS = ["posting_done"] as const;
 
-// ✅ FIX: POSTING_FIELDS ikut masuk whitelist
 const ALLOWED = new Set<string>([
   ...TAKE_FIELDS,
   ...EDIT_FIELDS,
   ...POSTING_FIELDS,
   "title",
+  "brand",
 ]);
 
 // GET satu konten
@@ -49,7 +47,6 @@ export async function GET(
   });
 }
 
-// PATCH — update section take / edit / posting / judul
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -75,12 +72,17 @@ export async function PATCH(
     );
   }
 
-  // Timestamp otomatis saat ditandai / dibatalkan selesai
   if ("posting_done" in patch) {
     patch.posting_done_at = patch.posting_done ? new Date().toISOString() : null;
   }
 
-  // Guard alur: edit_done + minimal 1 posting wajib sebelum posting_done
+  if ("brand" in patch && !isCCBrand(patch.brand)) {
+    return NextResponse.json(
+      { success: false, error: "Brand tidak valid" },
+      { status: 400 }
+    );
+  }
+
   if (patch.posting_done === true) {
     const { data: cur, error: curErr } = await supabaseAdmin
       .from("cc_reports")

@@ -527,7 +527,6 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   ],
 });
 
-// SALES: Data Barang (laptop+aksesoris) + Siap Jual + Garansi
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
@@ -543,6 +542,7 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };

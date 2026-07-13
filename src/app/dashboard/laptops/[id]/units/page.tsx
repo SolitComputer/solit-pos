@@ -381,7 +381,6 @@ export default function UnitsPage() {
                         </div>
                         <div className="flex items-center gap-2">
 
-
                             {canManageUnits && (
                                 <>
                                     <button onClick={openCreate}

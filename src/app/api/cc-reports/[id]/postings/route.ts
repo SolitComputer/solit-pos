@@ -45,8 +45,9 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Platform wajib dipilih" }, { status: 400 });
   }
 
-  // ✅ Sync langsung saat insert — tidak perlu round-trip kedua
-  const out = postUrl ? await syncPosting(postUrl) : null;
+  const out = postUrl ? await syncPosting(postUrl, { force: true }) : null;
+  const gotMetrics = out?.status === "OK" || out?.status === "PARTIAL";
+  const manual = (v: unknown) => Number(v) || 0;
 
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
@@ -56,9 +57,10 @@ export async function POST(
       post_url: postUrl,
       posted_at: body?.posted_at || null,
       external_id: out?.externalId ?? parsed?.externalId ?? null,
-      views: out?.status === "OK" ? out.views : Number(body?.views) || 0,
-      likes: out?.status === "OK" ? out.likes : Number(body?.likes) || 0,
-      comments: out?.status === "OK" ? out.comments : Number(body?.comments) || 0,
+      provider_media_id: out?.providerMediaId ?? null,   
+      views:    gotMetrics && out!.views    !== null ? out!.views    : manual(body?.views),
+      likes:    gotMetrics && out!.likes    !== null ? out!.likes    : manual(body?.likes),
+      comments: gotMetrics && out!.comments !== null ? out!.comments : manual(body?.comments),
       sync_status: out?.status ?? "PENDING",
       sync_error: out?.error ?? null,
       last_synced_at: out ? new Date().toISOString() : null,

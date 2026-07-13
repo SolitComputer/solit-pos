@@ -103,7 +103,7 @@ const TRANSACTION_VIEW: UserRole[] = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING"];
+const SELLER_FOLLOWUP_ROLES: UserRole[] = [...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "CREW_SALES"];
 
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [

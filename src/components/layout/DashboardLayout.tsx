@@ -1,13 +1,16 @@
+// src/components/layout/DashboardLayout.tsx
 "use client";
 
 import Sidebar from "./Sidebar";
 import { usePresence } from "@/hooks/usePresence";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 import { HTCallProvider } from "@/contexts/HTCallContext";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
+import { MissionSoundNotifier } from "@/components/layout/MissionSoundNotifier";
+import { useMissionSound } from "@/hooks/useMissionSound";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -32,23 +35,60 @@ function ScrollRestorer() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [pathname]);
 
-  return null; 
+  return null;
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   usePresence();
 
+  // ── userId untuk sound notifier ────────────────────────────────────────────
+  // Ikuti pola MissionQuestTracker yang sudah proven: fetch /api/auth/me
+  const [soundUserId, setSoundUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(r => setSoundUserId(r?.user?.id ?? r?.data?.id ?? r?.id ?? null))
+      .catch(() => { });
+  }, []);
+
+  // ── Mission sound ──────────────────────────────────────────────────────────
+  const { playMissionSound, unlockAudio } = useMissionSound();
+
+  // Ref untuk hindari stale closure di event handler
+  const unlockRef = useRef(unlockAudio);
+  useEffect(() => { unlockRef.current = unlockAudio; }, [unlockAudio]);
+
   return (
     <HTCallProvider>
-      <div className="flex min-h-screen bg-[#f5f4f0]">
+      {/*
+       * onClick / onKeyDown / onTouchStart → unlock AudioContext.
+       * Interaksi pertama user di mana saja dalam dashboard
+       * akan membuka kunci autoplay browser.
+       */}
+      <div
+        className="flex min-h-screen bg-[#f5f4f0]"
+        onClick={() => void unlockRef.current()}
+        onKeyDown={() => void unlockRef.current()}
+        onTouchStart={() => void unlockRef.current()}
+      >
         <ScrollRestorer />
         <Sidebar />
         <DeliveryAlertListener />
+
+        <MissionSoundNotifier
+          userId={soundUserId}
+          unlockAudio={unlockAudio}
+          playMissionSound={playMissionSound}
+        />
+
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
             <div className="w-9" />
-            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight mx-auto">Solit POS</span>
+            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight mx-auto">
+              Solit POS
+            </span>
             <div className="w-9" />
           </div>
 
@@ -61,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      <ConfirmDialog />   {/* ← mount sekali, dipakai semua confirm() di dashboard */}
+      <ConfirmDialog />
     </HTCallProvider>
   );
 }
