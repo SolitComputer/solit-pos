@@ -16,7 +16,7 @@ export default function AkuntansiPeriodPickerPage() {
 
   const open = (month: number) => {
     const period = `${year}-${String(month).padStart(2, "0")}`;
-    router.push(`/dashboard/akuntansi/${period}`);
+    router.push(`/dashboard/akutansi/${period}`);
   };
 
   return (
