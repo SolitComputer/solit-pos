@@ -390,6 +390,13 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
             <IconCheck /> Sudah Audit
         </span>
     );
+    // Entry nominal 0 tidak bisa diaudit (harus dikoreksi dulu lewat Edit)
+    if (Number(entry.nominal ?? 0) <= 0) return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+            title="Nominal 0 — edit nominal terlebih dahulu sebelum audit">
+            ⚠️ Nominal 0
+        </span>
+    );
     return (
         <button onClick={(ev) => { ev.stopPropagation(); onAudit(); }} disabled={busy}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap"
@@ -774,6 +781,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
+    // Entry BARU tetap wajib > 0 (buat entry senilai 0 tidak ada gunanya)
     const submit = async () => {
         if (!nominal || Number(nominal) <= 0) return setError("Nominal harus lebih dari 0");
         setSaving(true); setError("");
@@ -838,7 +846,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
-                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
                             {nominal && Number(nominal) > 0 && <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>}
                         </div>
                         <div>
@@ -879,10 +887,13 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
 
-    // ✅ FIX: satu kondisi validasi, tidak ada return ganda yang memblokir fetch
+    // ✅ FIX: nominal 0 DIIZINKAN saat edit (koreksi entry salah input).
+    //    Ditolak hanya jika kosong, non-numerik, atau negatif.
     const submit = async () => {
-        if (nominal === "" || !Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
-            return setError("Nominal harus lebih dari 0");
+        const parsed = Number(nominal);
+        if (nominal.trim() === "" || !Number.isFinite(parsed) || parsed < 0)
+            return setError("Nominal tidak valid (tidak boleh kosong atau negatif)");
+
         setSaving(true);
         setError("");
         try {
@@ -891,7 +902,7 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     category,
-                    nominal: Number(nominal),
+                    nominal: parsed,
                     keterangan: keterangan.trim() || null,
                     tanggal,
                     payment_method: paymentMethod,
@@ -909,6 +920,7 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
     };
 
     const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition";
+    const showZeroHint = nominal.trim() !== "" && Number(nominal) === 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -945,14 +957,21 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
-                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
-                            {nominal && Number(nominal) > 0 && <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>}
+                            <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            {nominal.trim() !== "" && Number.isFinite(Number(nominal)) && Number(nominal) >= 0 && (
+                                <p className="text-[11px] text-gray-400 mt-1 font-mono">{fmtRupiah(Number(nominal))}</p>
+                            )}
                         </div>
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Tanggal</label>
                             <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
                         </div>
                     </div>
+                    {showZeroHint && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-700">
+                            Nominal 0 disimpan sebagai koreksi. Entry bernilai 0 <b>tidak bisa diaudit</b> sampai nominalnya diisi kembali.
+                        </div>
+                    )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
                         <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
@@ -1045,7 +1064,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Nominal <span className="text-red-500">*</span></label>
-                            <input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+                            <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
                             {nominal && Number(nominal) > 0 && (
                                 <p className="text-[11px] text-emerald-600 mt-1 font-mono font-semibold">{fmtRupiah(Number(nominal))}</p>
                             )}
