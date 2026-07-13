@@ -45,6 +45,14 @@ interface Row {
   platforms: string[];
 }
 
+type ConnHealth = {
+  connected: boolean;
+  accountName: string | null;
+  daysLeft: number | null;
+  level: "OK" | "WARN" | "DEAD";
+  error: string | null;
+};
+
 export default function CCAnalisaPage() {
   const [data, setData] = useState<CCAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,17 +60,21 @@ export default function CCAnalisaPage() {
   const [metric, setMetric] = useState<CCMetric>("views");
   const [range, setRange] = useState<CCRange>("30");
   const [filter, setFilter] = useState<AnalisaFilter>("ALL");
-  const [tt, setTt] = useState<{
-    connected: boolean; accountName: string | null; daysLeft: number | null;
-    level: "OK" | "WARN" | "DEAD"; error: string | null;
-  } | null>(null);
+  const [tt, setTt] = useState<ConnHealth | null>(null);
+  const [ig, setIg] = useState<ConnHealth | null>(null);
 
   useEffect(() => {
     fetch("/api/cc-reports/tiktok/status")
       .then((r) => r.json())
       .then((j) => j.success && setTt(j))
       .catch(() => { });
+
+    fetch("/api/cc-reports/instagram/status")
+      .then((r) => r.json())
+      .then((j) => j.success && setIg(j))
+      .catch(() => { });
   }, []);
+
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -263,6 +275,33 @@ export default function CCAnalisaPage() {
                   {tt.level === "DEAD" ? "Hubungkan TikTok" : "Hubungkan Ulang"}
                 </a>
               )}
+            </div>
+          )}
+          {/* ── Kesehatan koneksi Instagram ── */}
+          {ig && ig.level !== "OK" && (
+            <div
+              className={`mb-4 rounded-2xl border p-3 ${ig.level === "WARN"
+                  ? "border-amber-100 bg-amber-50"
+                  : "border-red-100 bg-red-50"
+                }`}
+            >
+              <p
+                className={`text-xs font-medium ${ig.level === "WARN" ? "text-amber-800" : "text-red-800"
+                  }`}
+              >
+                {ig.level === "WARN" ? (
+                  <>
+                    <b>⚠️ Token Instagram perlu perhatian.</b>{" "}
+                    {ig.error ??
+                      (ig.daysLeft !== null && `Sisa ${ig.daysLeft} hari sebelum kedaluwarsa.`)}
+                  </>
+                ) : (
+                  <>
+                    <b>🔴 Token Instagram kedaluwarsa.</b> Metrik IG tidak ter-update.
+                    {ig.error && <span className="ml-1 opacity-80">({ig.error})</span>}
+                  </>
+                )}
+              </p>
             </div>
           )}
           {/* ── Metrik yang perlu dilengkapi manual ── */}

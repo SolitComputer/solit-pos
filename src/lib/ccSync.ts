@@ -1,7 +1,8 @@
 // src/lib/ccSync.ts
 // ⚠️ SERVER ONLY — jangan di-import dari komponen "use client"
 import { getValidAccessToken } from "./ccTikTok";
-import { parsePostUrl, type SyncStatus } from "./ccMetrics";
+import { getValidIgToken, IG_VERSION } from "./ccInstagram";   // ✅ BARU
+import { parsePostUrl, isInstagramStory, type SyncStatus } from "./ccMetrics";
 
 /**
  * null = API TIDAK mengembalikan metrik ini (bukan berarti nol).
@@ -107,9 +108,9 @@ async function syncYouTube(videoId: string): Promise<SyncOutcome> {
 }
 
 // ── Instagram ────────────────────────────────────────────────────────────────
-const IG_VERSION = process.env.IG_GRAPH_VERSION || "v25.0";
+// ── Instagram ────────────────────────────────────────────────────────────────
 const IG_TTL = 60_000;
-const IG_MAX_PAGES = 15; // ±1500 konten terakhir (sebelumnya cuma 500)
+const IG_MAX_PAGES = 15; // ±1500 konten terakhir
 
 interface IgMedia {
   id: string;
@@ -137,16 +138,14 @@ function shortcodeOf(permalink: string): string | null {
 
 const IG_FIELDS = "id,permalink,media_type,like_count,comments_count,views";
 
-async function loadIgMedia(): Promise<Map<string, IgMedia>> {
+async function loadIgMedia(token: string, igUserId: string): Promise<Map<string, IgMedia>> {
   if (igCache && Date.now() - igCache.at < IG_TTL) return igCache.map;
 
-  const token = process.env.IG_ACCESS_TOKEN!;
-  const igUser = process.env.IG_USER_ID!;
   const map = new Map<string, IgMedia>();
 
   let next: string | null =
-    `https://graph.facebook.com/${IG_VERSION}/${igUser}/media` +
-    `?fields=${IG_FIELDS}&limit=100&access_token=${token}`;
+    `https://graph.facebook.com/${IG_VERSION}/${igUserId}/media` +
+    `?fields=${IG_FIELDS}&limit=100&access_token=${encodeURIComponent(token)}`;
 
   for (let page = 0; page < IG_MAX_PAGES && next !== null; page++) {
     const url: string = next;
@@ -166,12 +165,11 @@ async function loadIgMedia(): Promise<Map<string, IgMedia>> {
   return map;
 }
 
-/** Tarik ulang 1 media langsung — field kadang absent di listing tapi ada di sini. */
-async function igMediaDetail(mediaId: string): Promise<IgMedia | null> {
-  const token = process.env.IG_ACCESS_TOKEN!;
+/** Tarik ulang 1 media — field kadang absent di listing tapi ada di endpoint detail. */
+async function igMediaDetail(mediaId: string, token: string): Promise<IgMedia | null> {
   try {
     const res = await fetch(
-      `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${token}`,
+      `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${encodeURIComponent(token)}`,
       { cache: "no-store" }
     );
     if (!res.ok) return null;
@@ -182,13 +180,11 @@ async function igMediaDetail(mediaId: string): Promise<IgMedia | null> {
 }
 
 /** Fallback views lewat /insights (video_views sudah deprecated sejak v21). */
-async function igViewsFallback(mediaId: string): Promise<number | null> {
-  const token = process.env.IG_ACCESS_TOKEN!;
-
+async function igViewsFallback(mediaId: string, token: string): Promise<number | null> {
   for (const metric of ["views", "reach"] as const) {
     try {
       const res = await fetch(
-        `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${token}`,
+        `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`,
         { cache: "no-store" }
       );
       const json: IgInsightsResponse = await res.json();
@@ -203,16 +199,14 @@ async function igViewsFallback(mediaId: string): Promise<number | null> {
 }
 
 async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
-  if (!process.env.IG_ACCESS_TOKEN || !process.env.IG_USER_ID) {
-    return {
-      ...fail("UNSUPPORTED", "IG_ACCESS_TOKEN / IG_USER_ID belum di-set"),
-      platform: "Instagram",
-      externalId: shortcode,
-    };
+  // ✅ token diambil dari DB + auto-refresh, bukan lagi env mentah
+  const auth = await getValidIgToken();
+  if (auth.token === null) {
+    return { ...fail("ERROR", auth.error), platform: "Instagram", externalId: shortcode };
   }
 
   try {
-    const map = await loadIgMedia();
+    const map = await loadIgMedia(auth.token, auth.igUserId);
     const media = map.get(shortcode);
 
     if (!media) {
@@ -230,9 +224,8 @@ async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
     let likes = num(media.like_count);
     let comments = num(media.comments_count);
 
-    // ✅ field absent di listing → coba tarik per-media dulu sebelum menyerah
     if (views === null || likes === null || comments === null) {
-      const detail = await igMediaDetail(media.id);
+      const detail = await igMediaDetail(media.id, auth.token);
       if (detail) {
         views ??= num(detail.views);
         likes ??= num(detail.like_count);
@@ -240,11 +233,12 @@ async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
       }
     }
 
-    // views masih kosong (foto lama / carousel) → insights
-    if (views === null) views = await igViewsFallback(media.id);
+    if (views === null) views = await igViewsFallback(media.id, auth.token);
 
     return settle("Instagram", shortcode, { views, likes, comments });
   } catch (e) {
+    // token invalid di tengah jalan → buang cache biar tidak nyangkut
+    igCache = null;
     return {
       ...fail("ERROR", e instanceof Error ? e.message : "Gagal ambil data IG"),
       platform: "Instagram",
@@ -329,6 +323,16 @@ export async function syncPosting(postUrl: string | null): Promise<SyncOutcome> 
 
   let parsed = parsePostUrl(postUrl);
   if (!parsed) return fail("ERROR", "Format link tidak valid");
+
+  if (isInstagramStory(postUrl)) {
+    return {
+      ...fail(
+        "UNSUPPORTED",
+        "Instagram Story tidak tersedia di API (konten hilang setelah 24 jam) — isi view/like/komen manual"
+      ),
+      platform: "Instagram",
+    };
+  }
 
   // ✅ TikTok shortlink & IG share-link → ikuti redirect dulu
   if (

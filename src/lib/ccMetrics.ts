@@ -36,6 +36,13 @@ function safeUrl(raw: string): URL | null {
     }
 }
 
+export function isInstagramStory(raw: string): boolean {
+    const url = safeUrl(raw);
+    if (!url) return false;
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    return host.endsWith("instagram.com") && /^\/stories(\/|$)/.test(url.pathname);
+}
+
 /**
  * Deteksi platform + ID konten dari URL posting.
  * externalId = null → platform kedeteksi tapi ID belum bisa diambil
@@ -62,8 +69,8 @@ export function parsePostUrl(raw: string): ParsedPost | null {
 
     // ── Instagram (externalId = shortcode) ─────────────────────────────────────
     if (host.endsWith("instagram.com")) {
-        // ✅ link "share" bukan shortcode asli → biar server resolve redirect dulu
-        if (/^\/share(\/|$)/.test(path)) {
+        // story & share-link → tidak punya shortcode langsung
+        if (/^\/(?:stories|share)(\/|$)/.test(path)) {
             return { platform: "Instagram", externalId: null };
         }
         const m = path.match(/\/(?:p|reel|reels|tv)\/([\w-]+)/);
