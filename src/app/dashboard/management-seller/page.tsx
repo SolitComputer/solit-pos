@@ -849,40 +849,50 @@ function FollowupCard({
       {/* ── Card Body ── */}
       <div className="px-4 py-3.5 flex-1 space-y-3">
         {/* PIC Follow-up */}
-        {f.pic_user_id ? (
-          <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
-            <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
-              {(f.closed_by ?? "?").charAt(0).toUpperCase()}
+        {/* picName: pakai closed_by atau last_followup_by sebagai fallback data lama */}
+        {(() => {
+          const picName = f.closed_by ?? f.last_followup_by ?? null;
+          const hasHistory = !!picName;
+
+          if (f.pic_user_id || hasHistory) {
+            return (
+              <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+                  {(picName ?? "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
+                    PIC Follow-up
+                  </p>
+                  <p className="text-xs font-black text-violet-800 leading-tight truncate">
+                    {picName ?? "Belum tercatat"}
+                  </p>
+                </div>
+                {f.is_owner && f.pic_user_id && (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
+                    Kamu
+                  </span>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
+                🙋
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-0.5">
+                  PIC Follow-up
+                </p>
+                <p className="text-xs font-bold text-emerald-700 leading-tight">
+                  Belum ada — kamu bisa klaim!
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-0.5">
-                PIC Follow-up
-              </p>
-              <p className="text-xs font-black text-violet-800 leading-tight truncate">
-                {f.closed_by}
-              </p>
-            </div>
-            {f.is_owner && (
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
-                Kamu
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
-              🙋
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-0.5">
-                PIC Follow-up
-              </p>
-              <p className="text-xs font-bold text-emerald-700 leading-tight">
-                Belum ada — kamu bisa klaim!
-              </p>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="grid grid-cols-2 gap-2">
           <InfoCell
