@@ -666,6 +666,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
   ],
 
+  KEPALA_ZENITH: [
+    SALES_OVERVIEW([ITEM_USERS]),
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
+  ],
+
   // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline ASISTEN_CEO
   ASISTEN_CEO: [
     {
@@ -1210,6 +1219,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_PENGANTARAN: { label: "PKL Pengantaran", className: "bg-amber-50 text-amber-700" },
   PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
   PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
+  KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },   // ← NEW
+
 };
 
 function getInitials(name: string): string {

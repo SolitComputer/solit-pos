@@ -18,11 +18,9 @@ function getAdmin(): SupabaseClient {
     );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
 const jakartaDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
-// Supabase kadang menginfer relasi FK sebagai array meski hasilnya singular.
 function getJoinedName(joined: any): string | null {
     if (!joined) return null;
     if (Array.isArray(joined)) {
@@ -31,8 +29,6 @@ function getJoinedName(joined: any): string | null {
     return (joined as { id: string; name: string }).name ?? null;
 }
 
-// ── Payload builder: SATU sumber kebenaran, dipakai insert DAN reconcile ────
-// Kalau bentuk entry berubah, cukup ubah di sini — insert & update ikut.
 function buildTxPayload(t: any) {
     const refDate = (t.paid_at || t.created_at) as string;
     return {
@@ -61,12 +57,10 @@ function buildSvcPayload(s: any, techName: string) {
         tanggal: jakartaDate(refDate),
         source_type: "SERVICE",
         source_id: String(s.id),
-        // cashflow_entries hanya terima CASH/SALDO — method asli disimpan di keterangan
         payment_method: null,
     };
 }
 
-// Field yang ikut di-reconcile kalau sumbernya berubah.
 const RECONCILE_FIELDS = ["nominal", "nama", "keterangan", "tanggal", "category"] as const;
 
 function diffPayload(existing: any, desired: Record<string, any>): Record<string, any> {
@@ -80,7 +74,6 @@ function diffPayload(existing: any, desired: Record<string, any>): Record<string
     return patch;
 }
 
-// ── Sync transaksi PAID → cashflow_entries (INSERT + RECONCILE) ─────────────
 async function syncTransactionEntries(supabase: SupabaseClient) {
     const { data: transactions, error } = await supabase
         .from("transactions")
@@ -96,7 +89,6 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
 
     const invoices = transactions.map((t: any) => t.invoice_number as string);
 
-    // ✅ Ambil field lengkap — dibutuhkan untuk membandingkan, bukan cuma cek "ada/tidak"
     const { data: existing } = await supabase
         .from("cashflow_entries")
         .select("id, source_id, nominal, nama, keterangan, tanggal, category, is_audited")
@@ -116,14 +108,10 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
 
         const cur = existingMap.get(t.invoice_number as string);
 
-        // Belum ada → insert baru
         if (!cur) {
             toInsert.push({ ...desired, is_audited: false });
             continue;
         }
-
-        // ✅ Sudah diaudit → JANGAN diubah diam-diam. Audit bersifat one-way.
-        // Drift-nya nanti dilaporkan sebagai `is_stale` di GET.
         if (cur.is_audited) continue;
 
         const patch = diffPayload(cur, desired);
@@ -148,7 +136,6 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
     }
 }
 
-// ── Sync service → cashflow_entries (INSERT + RECONCILE) ────────────────────
 async function syncServiceEntries(
     supabase: SupabaseClient,
     services: any[],
@@ -172,7 +159,6 @@ async function syncServiceEntries(
     const updates: { id: string; patch: Record<string, any> }[] = [];
 
     for (const s of services) {
-        // Nama teknisi dari map, fallback ke joined object
         let techName = "Teknisi";
         if (s.dikerjakan_by && technicianNameMap.has(s.dikerjakan_by as string)) {
             techName = technicianNameMap.get(s.dikerjakan_by as string)!;
@@ -238,7 +224,6 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
     if (svcError) {
         console.error("[cashflow sync] fetch service error:", svcError.message);
 
-        // Fallback tanpa join
         const { data: servicesFallback, error: svcFbError } = await supabase
             .from("service_orders")
             .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
@@ -294,11 +279,6 @@ export const GET = withAuth(async () => {
 
     const rawAll = data ?? [];
 
-    // ── Cek transaksi asli untuk entry bersumber TRANSACTION ────────────────
-    // is_voided : transaksi sudah di-restore (status ≠ PAID) → abu-abu, tidak diaudit,
-    //             DAN tidak ikut dihitung ke total/saldo.
-    // is_stale  : entry sudah diaudit tapi deal_price transaksinya berubah setelahnya
-    //             → tidak di-reconcile (audit one-way), tapi ditandai supaya kelihatan.
     const txSourceIds = Array.from(
         new Set(
             rawAll
@@ -338,14 +318,13 @@ export const GET = withAuth(async () => {
             ...e,
             is_voided: isVoided,
             is_stale: isStale,
-            source_nominal: tx?.nominal ?? null, // nominal terkini di transaksi (untuk UI)
+            source_nominal: tx?.nominal ?? null,
         };
     });
 
     const masuk = all.filter((e: any) => e.direction === "IN");
     const keluar = all.filter((e: any) => e.direction === "OUT");
 
-    // ✅ Entry voided TIDAK dihitung — dulu masih ikut dan bikin saldo over-stated
     const totalMasuk = masuk.reduce(
         (s: number, e: any) => (e.is_voided ? s : s + Number(e.nominal || 0)),
         0
@@ -432,11 +411,13 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data: inserted }, { status: 201 });
     }
 
-    // ── Uang Masuk Manual (hanya kategori Biaya Lain-lain) ─────────────────
+    // ── Uang Masuk Manual ──────────────────────────────────────────────────
+    // Boleh: AKSESORIS, UTANG, SEWA, PENJUALAN_ASET, BIAYA_LAIN
+    // Tidak boleh: PENJUALAN_LAPTOP, SERVICE (auto-sync dari sistem)
     if (direction === "IN") {
         if (!isManualIncomeCategory(category))
             return NextResponse.json(
-                { success: false, message: "Uang masuk manual hanya untuk kategori Biaya Lain-lain" },
+                { success: false, message: "Kategori ini tidak bisa diinput manual (auto-sync dari sistem)" },
                 { status: 400 }
             );
 
@@ -465,6 +446,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
         return NextResponse.json({ success: true, data }, { status: 201 });
     }
 
+    // ── Uang Keluar Manual ─────────────────────────────────────────────────
     if (direction !== "OUT")
         return NextResponse.json({ success: false, message: "Direction tidak valid" }, { status: 400 });
 

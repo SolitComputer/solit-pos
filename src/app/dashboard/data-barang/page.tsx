@@ -13,7 +13,7 @@ interface TabDef {
   key: TabKey;
   label: string;
   roles: UserRole[];
-  icon: string; // Tabler icon name
+  icon: string;
 }
 
 const TABS: TabDef[] = [
