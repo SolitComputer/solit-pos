@@ -8,13 +8,13 @@ const supabaseAdmin = createClient(
 // ✅ ADD: "AUDIT" & "UNAUDIT" untuk aksi verifikasi audit di cashflow
 export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "AUDIT" | "UNAUDIT";
 
-// ✅ ADD: "cashflow" sebagai entity baru
 export type LogEntity =
   | "laptop"
   | "unit"
   | "transaction"
   | "warranty"
   | "seller_followup"
+  | "seller_followup_pic"   // ← NEW: audit trail checklist akses PIC
   | "preparation"
   | "cashflow";
 
@@ -32,15 +32,15 @@ interface LogActivityParams {
 
 export async function logActivity(params: LogActivityParams) {
   const { error } = await supabaseAdmin.from("activity_logs").insert({
-    user_id:      params.userId,
-    user_name:    params.userName,
-    user_role:    params.userRole,
-    action:       params.action,
-    entity:       params.entity,
-    entity_id:    params.entityId ?? null,
+    user_id: params.userId,
+    user_name: params.userName,
+    user_role: params.userRole,
+    action: params.action,
+    entity: params.entity,
+    entity_id: params.entityId ?? null,
     entity_label: params.entityLabel ?? null,
-    before_data:  params.beforeData ?? null,
-    after_data:   params.afterData ?? null,
+    before_data: params.beforeData ?? null,
+    after_data: params.afterData ?? null,
   });
 
   if (error) {

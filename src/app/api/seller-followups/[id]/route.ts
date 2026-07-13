@@ -1,31 +1,81 @@
 // src/app/api/seller-followups/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-import { hasPermission, PERMISSIONS as PERMS, UserRole } from "@/lib/permissions";
+import {
+  hasAnyRole,
+  expandRolesWithParents,
+  PERMISSIONS as PERMS,
+  SELLER_PIC_CANDIDATE_ROLES,
+} from "@/lib/permissions";
 import { nextFollowupISO, normalizeSellerType, SellerType } from "@/lib/sellerFollowup";
 import { logActivity } from "@/lib/activityLogger";
+
+export const runtime = "nodejs"; // butuh Buffer untuk upload storage
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
+const PROOF_BUCKET = "followup-proofs";
+const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Frontend mengirim FormData saat action "followup" (karena ada file bukti),
+ * dan JSON untuk action lain. Handler lama selalu req.json() → crash di multipart.
+ */
+async function parseBody(
+  req: NextRequest
+): Promise<{ fields: Record<string, any>; buktiFu: File | null }> {
+  const ct = req.headers.get("content-type") ?? "";
+
+  if (ct.includes("multipart/form-data")) {
+    const fd = await req.formData();
+    const fields: Record<string, any> = {};
+    let buktiFu: File | null = null;
+
+    for (const [key, value] of fd.entries()) {
+      if (value instanceof File) {
+        if (key === "bukti_fu") buktiFu = value;
+      } else {
+        fields[key] = String(value);
+      }
+    }
+    return { fields, buktiFu };
+  }
+
+  const json = await req.json().catch(() => ({}));
+  return { fields: json ?? {}, buktiFu: null };
+}
+
+async function uploadProof(file: File, followupId: string): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("Bukti FU harus berupa gambar");
+  if (file.size > MAX_PROOF_BYTES) throw new Error("Ukuran bukti FU maksimal 5 MB");
+
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${followupId}/${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error } = await supabaseAdmin.storage
+    .from(PROOF_BUCKET)
+    .upload(path, buffer, { contentType: file.type || "image/jpeg", upsert: false });
+
+  if (error) throw new Error(`Gagal upload bukti FU: ${error.message}`);
+
+  const { data } = supabaseAdmin.storage.from(PROOF_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
-    const body = await req.json();
-    const action: string | undefined = body.action;
+    const { fields, buktiFu } = await parseBody(req);
+    const action: string | undefined = fields.action;
 
-    // ── Double-lock: hanya Closing (CREW_SALES) & Admin yang boleh action "followup" ──
-    // ── Double-lock: hanya Closing (CREW_SALES) & Admin yang boleh action "followup" ──
-    if (action === "followup") {
-      if (!hasPermission(user.role as UserRole, PERMS.FOLLOWUP_SELLER)) {
-        return NextResponse.json(
-          { success: false, message: "Hanya tim Closing & Admin yang bisa melakukan follow-up" },
-          { status: 403 }
-        );
-      }
-    }
+    const roles = expandRolesWithParents(user.roles ?? [user.role]);
+    const isSupervisor = hasAnyRole(roles, PERMS.VIEW_ALL_SELLER_FOLLOWUP);
+    const canManage = hasAnyRole(roles, PERMS.MANAGE_SELLER_FOLLOWUP);
 
     const { data: existing, error: fetchErr } = await supabase
       .from("seller_followups")
@@ -40,44 +90,136 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // ── Triple-lock: FU cuma boleh oleh PIC (closed_by) atau Kepala Sales/Admin ──
-    if (action === "followup") {
-      const isPIC =
-        !!existing.closed_by &&
-        existing.closed_by.trim().toLowerCase() === (user.name ?? "").trim().toLowerCase();
-      const isManager = hasPermission(user.role as UserRole, PERMS.MANAGE_SELLER_FOLLOWUP);
+    // ── Ownership ─────────────────────────────────────────────────────────────
+    const isOwnedByMe = !!existing.pic_user_id && existing.pic_user_id === user.id;
+    const isUnowned = !existing.pic_user_id; // belum ada PIC → siapa pun bisa klaim
 
-      if (!isPIC && !isManager) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Hanya ${existing.closed_by ?? "PIC"} atau Kepala Sales yang bisa follow-up customer ini`,
-          },
-          { status: 403 }
-        );
-      }
+    // ── GATE 0: non-supervisor hanya boleh sentuh miliknya atau yang belum ada PIC ──
+    if (!isSupervisor && !isOwnedByMe && !isUnowned) {
+      return NextResponse.json(
+        { success: false, message: "Customer ini sudah milik PIC lain" },
+        { status: 403 }
+      );
     }
 
     const nowISO = new Date().toISOString();
     const update: Record<string, any> = { updated_at: nowISO };
 
-    const sellerType: SellerType = body.seller_type
-      ? normalizeSellerType(body.seller_type)
+    const sellerType: SellerType = fields.seller_type
+      ? normalizeSellerType(fields.seller_type)
       : normalizeSellerType(existing.seller_type);
-    if (body.seller_type) update.seller_type = sellerType;
-    if (typeof body.notes === "string") update.notes = body.notes;
+    if (fields.seller_type) update.seller_type = sellerType;
+    if (typeof fields.notes === "string") update.notes = fields.notes;
 
     if (action === "followup") {
+      // GATE 1 — role
+      if (!hasAnyRole(roles, PERMS.FOLLOWUP_SELLER)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Hanya Crew Sales & Kepala Marketing yang bisa melakukan follow-up",
+          },
+          { status: 403 }
+        );
+      }
+
+      // GATE 2 — whitelist Admin
+      const { data: picRow } = await supabaseAdmin
+        .from("seller_followup_pics")
+        .select("is_active")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!picRow?.is_active) {
+        return NextResponse.json(
+          { success: false, message: "Akses follow-up kamu belum diaktifkan oleh Admin" },
+          { status: 403 }
+        );
+      }
+
+      // GATE 3 — hanya pemilik atau unowned yang bisa FU
+      if (!isOwnedByMe && !isUnowned) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Customer ini sudah ditugaskan ke ${existing.closed_by ?? "PIC lain"}`,
+          },
+          { status: 403 }
+        );
+      }
+
+      if (!buktiFu) {
+        return NextResponse.json(
+          { success: false, message: "Bukti follow-up (screenshot) wajib diupload" },
+          { status: 400 }
+        );
+      }
+
+      update.last_followup_proof_url = await uploadProof(buktiFu, id);
       update.last_followup_at = nowISO;
       update.next_followup_at = nextFollowupISO(sellerType);
       update.followup_count = (existing.followup_count ?? 0) + 1;
       update.last_followup_by = user.name;
       update.is_active = true;
-    } else if (action === "archive") {
-      update.is_active = false;
-    } else if (action === "reactivate") {
-      update.is_active = true;
-      update.next_followup_at = nextFollowupISO(sellerType);
+
+      // ✅ AUTO-CLAIM: jika belum ada PIC, yang FU pertama jadi owner-nya
+      if (isUnowned) {
+        update.pic_user_id = user.id;
+        update.closed_by = user.name;
+      }
+    } else if (action === "archive" || action === "reactivate" || action === "assign") {
+      if (!canManage) {
+        return NextResponse.json(
+          { success: false, message: "Hanya Admin yang bisa melakukan aksi ini" },
+          { status: 403 }
+        );
+      }
+
+      if (action === "archive") {
+        update.is_active = false;
+      } else if (action === "reactivate") {
+        update.is_active = true;
+        update.next_followup_at = nextFollowupISO(sellerType);
+      } else if (action === "assign") {
+        const targetId: string | undefined = fields.pic_user_id;
+        if (!targetId) {
+          return NextResponse.json(
+            { success: false, message: "PIC tujuan wajib dipilih" },
+            { status: 400 }
+          );
+        }
+
+        const { data: target } = await supabaseAdmin
+          .from("users")
+          .select("id, name, role, roles")
+          .eq("id", targetId)
+          .maybeSingle();
+
+        const targetRoles: string[] =
+          Array.isArray(target?.roles) && target!.roles.length > 0
+            ? target!.roles
+            : [target?.role].filter(Boolean) as string[];
+
+        const validRole = targetRoles.some((r) =>
+          (SELLER_PIC_CANDIDATE_ROLES as string[]).includes(r)
+        );
+
+        const { data: targetPic } = await supabaseAdmin
+          .from("seller_followup_pics")
+          .select("is_active")
+          .eq("user_id", targetId)
+          .maybeSingle();
+
+        if (!target || !validRole || !targetPic?.is_active) {
+          return NextResponse.json(
+            { success: false, message: "PIC tujuan tidak valid atau belum diaktifkan" },
+            { status: 400 }
+          );
+        }
+
+        update.pic_user_id = target.id;
+        update.closed_by = target.name; // jaga kompatibilitas kolom lama
+      }
     }
 
     const { data, error } = await supabase
@@ -91,12 +233,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    // ── Log aktivitas — non-blocking (kalau gagal, aksi tetap sukses) ──
     if (action) {
       const labelMap: Record<string, string> = {
         followup: "Follow-up",
         archive: "Arsip",
         reactivate: "Aktifkan",
+        assign: "Assign PIC",
       };
       try {
         await logActivity({
@@ -118,7 +260,10 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
     return NextResponse.json({ success: true, data });
   } catch (err: any) {
     console.error("[PATCH /api/seller-followups/[id]]", err);
-    return NextResponse.json({ success: false, message: String(err) }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: err?.message ?? String(err) },
+      { status: 500 }
+    );
   }
 }
 
@@ -136,5 +281,6 @@ async function deleteHandler(req: NextRequest, props: Props, _user: AuthUser) {
   }
 }
 
-export const PATCH = withAuth(patchHandler, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
+// PATCH dibuka untuk semua role yang bisa VIEW; otorisasi detail dicek di dalam handler.
+export const PATCH = withAuth(patchHandler, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
 export const DELETE = withAuth(deleteHandler, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
