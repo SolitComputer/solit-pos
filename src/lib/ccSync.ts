@@ -21,10 +21,7 @@ export interface SyncOutcome {
 }
 
 export interface SyncOptions {
-  /**
-   * true = user menekan tombol sync / cron force.
-   * Membuang cache RAM + cache CDN Meta supaya angkanya benar-benar live.
-   */
+  /** true = tombol sync / cron force → buang cache RAM, tarik ulang dari sumber */
   force?: boolean;
   /** provider_media_id yang sudah tersimpan → skip scan daftar media */
   mediaId?: string | null;
@@ -97,7 +94,12 @@ export function buildPostingPatch(
   return patch;
 }
 
-/** Cache-buster: URL unik supaya CDN Meta/Google tidak melayani respons lama. */
+/**
+ * Cache-buster — HANYA untuk YouTube.
+ * ⚠️ JANGAN dipakai di Graph API: Meta bukan CDN, param tak dikenal bisa ditolak,
+ *    dan staleness IG berasal dari cache agregat di server Meta (bukan HTTP cache)
+ *    sehingga query param tidak menyelesaikan apa pun.
+ */
 function bust(url: string, force?: boolean): string {
   if (!force) return url;
   return `${url}${url.includes("?") ? "&" : "?"}_cb=${Date.now()}`;
@@ -147,7 +149,10 @@ async function syncYouTube(videoId: string, opt: SyncOptions): Promise<SyncOutco
 // ── Instagram ────────────────────────────────────────────────────────────────
 const IG_TTL = 60_000;
 const IG_MAX_PAGES = 15; // ±1500 konten terakhir
+
 const IG_FIELDS = "id,permalink,media_type,like_count,comments_count,views";
+/** Field minimum yang dijamin ada di semua media type (IMAGE / CAROUSEL / VIDEO). */
+const IG_FIELDS_SAFE = "id,permalink,media_type,like_count,comments_count";
 
 interface IgMedia {
   id: string;
@@ -166,16 +171,20 @@ interface IgInsightsResponse {
   data?: { name?: string; values?: { value?: number }[] }[];
   error?: { message?: string };
 }
+interface IgDetailResult {
+  media: IgMedia | null;
+  error: string | null;
+}
 
 /**
  * ⚠️ Cache ini HANYA untuk memetakan shortcode → media ID.
- * JANGAN dipakai membaca metrik: endpoint /media (list) di-cache Meta dan
- * angkanya tertinggal beberapa menit (inilah sebab "like 14 padahal 15").
- * Metrik SELALU diambil ulang lewat endpoint single-media di igMediaDetail().
+ * Metrik di endpoint /media (list) di-cache Meta dan tertinggal beberapa menit
+ * (inilah sebab "like 14 padahal 15"). Angka SELALU diambil ulang lewat
+ * endpoint single-media di igMediaDetail(); data list cuma cadangan terakhir.
  */
 let igCache: { at: number; map: Map<string, IgMedia> } | null = null;
 
-/** Dipanggil route sync sebelum force-refresh — proses PM2 persisten, cache tidak mati sendiri. */
+/** Proses PM2 persisten → cache tidak mati sendiri. Route sync memanggil ini saat force. */
 export function clearIgCache(): void {
   igCache = null;
 }
@@ -195,11 +204,9 @@ async function loadIgMedia(
 
   const map = new Map<string, IgMedia>();
 
-  let next: string | null = bust(
+  let next: string | null =
     `https://graph.facebook.com/${IG_VERSION}/${igUserId}/media` +
-      `?fields=${IG_FIELDS}&limit=100&access_token=${encodeURIComponent(token)}`,
-    force
-  );
+    `?fields=${IG_FIELDS}&limit=100&access_token=${encodeURIComponent(token)}`;
 
   for (let page = 0; page < IG_MAX_PAGES && next !== null; page++) {
     const url: string = next;
@@ -220,43 +227,50 @@ async function loadIgMedia(
 }
 
 /**
- * ✅ SUMBER KEBENARAN METRIK IG.
- * Endpoint single-media mengembalikan angka LIVE — persis seperti yang terlihat
- * di app Instagram. Berbeda dengan /media (list) yang agregatnya di-cache Meta.
+ * ✅ SUMBER KEBENARAN METRIK IG — angka LIVE, persis seperti di app Instagram.
+ *
+ * Field `views` tidak valid untuk sebagian media type (IMAGE / CAROUSEL). Kalau
+ * satu field saja error, Graph API menolak SELURUH request — jadi kita retry
+ * dengan field aman, bukan langsung menyerah. Pesan error asli dari Meta
+ * diteruskan ke pemanggil, tidak ditelan.
  */
-async function igMediaDetail(
-  mediaId: string,
-  token: string,
-  force?: boolean
-): Promise<IgMedia | null> {
-  try {
-    const res = await fetch(
-      bust(
-        `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${encodeURIComponent(token)}`,
-        force
-      ),
-      NO_CACHE
-    );
-    if (!res.ok) return null;
-    return (await res.json()) as IgMedia;
-  } catch {
-    return null;
-  }
+async function igMediaDetail(mediaId: string, token: string): Promise<IgDetailResult> {
+  const attempt = async (fields: string): Promise<IgDetailResult> => {
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${fields}&access_token=${encodeURIComponent(token)}`,
+        NO_CACHE
+      );
+      const json = (await res.json()) as IgMedia & { error?: { message?: string } };
+
+      if (!res.ok) {
+        return { media: null, error: json?.error?.message ?? `IG detail HTTP ${res.status}` };
+      }
+      return { media: json, error: null };
+    } catch (e) {
+      return {
+        media: null,
+        error: e instanceof Error ? e.message : "Gagal ambil detail media IG",
+      };
+    }
+  };
+
+  const full = await attempt(IG_FIELDS);
+  if (full.media) return full;
+
+  // ✅ kemungkinan besar `views` tidak didukung media type ini → coba field aman
+  const safe = await attempt(IG_FIELDS_SAFE);
+  if (safe.media) return safe;
+
+  return { media: null, error: full.error ?? safe.error };
 }
 
 /** Fallback views lewat /insights (video_views sudah deprecated sejak v21). */
-async function igViewsFallback(
-  mediaId: string,
-  token: string,
-  force?: boolean
-): Promise<number | null> {
+async function igViewsFallback(mediaId: string, token: string): Promise<number | null> {
   for (const metric of ["views", "reach"] as const) {
     try {
       const res = await fetch(
-        bust(
-          `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`,
-          force
-        ),
+        `https://graph.facebook.com/${IG_VERSION}/${mediaId}/insights?metric=${metric}&access_token=${encodeURIComponent(token)}`,
         NO_CACHE
       );
       const json: IgInsightsResponse = await res.json();
@@ -277,14 +291,14 @@ async function syncInstagram(shortcode: string, opt: SyncOptions): Promise<SyncO
   }
 
   try {
-    // ── 1. Dapatkan media ID ────────────────────────────────────────────────
-    // Sudah tersimpan → langsung pakai (hemat 15 request list + jauh lebih cepat).
+    // ── 1. Media ID ─────────────────────────────────────────────────────────
     let mediaId: string | null = opt.mediaId ?? null;
+    let listed: IgMedia | undefined;   // ✅ hasil list disimpan sebagai cadangan
 
     if (!mediaId) {
       const map = await loadIgMedia(auth.token, auth.igUserId, opt.force);
-      const found = map.get(shortcode);
-      if (!found) {
+      listed = map.get(shortcode);
+      if (!listed) {
         return {
           ...fail(
             "ERROR",
@@ -294,33 +308,50 @@ async function syncInstagram(shortcode: string, opt: SyncOptions): Promise<SyncO
           externalId: shortcode,
         };
       }
-      mediaId = found.id;
+      mediaId = listed.id;
     }
 
-    // ── 2. Ambil metrik LIVE dari single-media endpoint ──────────────────────
-    // ⚠️ Sengaja TIDAK memakai angka dari list — angkanya basi.
-    const detail = await igMediaDetail(mediaId, auth.token, opt.force);
+    // ── 2. Metrik LIVE dari single-media endpoint ────────────────────────────
+    const { media: detail, error: detailErr } = await igMediaDetail(mediaId, auth.token);
 
-    if (!detail) {
-      // media ID tersimpan tapi ditolak (post dihapus / ganti akun) → resolve ulang
-      if (opt.mediaId) {
-        clearIgCache();
-        return syncInstagram(shortcode, { ...opt, mediaId: null, force: true });
-      }
+    // media ID tersimpan ternyata basi (post dihapus / ganti akun) → resolve ulang
+    if (!detail && opt.mediaId) {
+      clearIgCache();
+      return syncInstagram(shortcode, { ...opt, mediaId: null, force: true });
+    }
+
+    // ✅ Detail gagal tapi list punya angkanya → JANGAN dibuang. Pakai, tandai PARTIAL.
+    //    Membuang data yang sudah di tangan = regresi; angka basi tetap lebih baik
+    //    daripada tidak ada angka sama sekali.
+    const src = detail ?? listed ?? null;
+
+    if (!src) {
       return {
-        ...fail("ERROR", "Gagal membaca detail media IG"),
+        ...fail("ERROR", detailErr ?? "Gagal membaca metrik IG"),
         platform: "Instagram",
         externalId: shortcode,
+        providerMediaId: mediaId,   // ✅ tetap disimpan — sync berikutnya tidak perlu scan ulang
       };
     }
 
-    let views = num(detail.views);
-    const likes = num(detail.like_count);
-    const comments = num(detail.comments_count);
+    let views = num(src.views);
+    const likes = num(src.like_count);
+    const comments = num(src.comments_count);
 
-    if (views === null) views = await igViewsFallback(mediaId, auth.token, opt.force);
+    if (views === null) views = await igViewsFallback(mediaId, auth.token);
 
-    return settle("Instagram", shortcode, { views, likes, comments }, mediaId);
+    const out = settle("Instagram", shortcode, { views, likes, comments }, mediaId);
+
+    if (!detail) {
+      // angka valid, tapi berasal dari list → bisa tertinggal beberapa menit
+      return {
+        ...out,
+        status: "PARTIAL",
+        error: `Angka diambil dari daftar (bisa tertinggal beberapa menit). Detail media gagal: ${detailErr ?? "tidak diketahui"}`,
+      };
+    }
+
+    return out;
   } catch (e) {
     clearIgCache(); // token invalid di tengah jalan → jangan biarkan cache nyangkut
     return {
