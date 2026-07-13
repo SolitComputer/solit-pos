@@ -2,7 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isStale, AUTO_SYNC_STALE_MINUTES, SYNC_STATUS_META } from "@/lib/ccMetrics";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
@@ -60,7 +61,7 @@ export default function CCAnalisaPage() {
     fetch("/api/cc-reports/tiktok/status")
       .then((r) => r.json())
       .then((j) => j.success && setTt(j))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -82,14 +83,35 @@ export default function CCAnalisaPage() {
     return () => c.abort();
   }, [load]);
 
+  const autoSynced = useRef(false);
+
+  useEffect(() => {
+    if (!data || autoSynced.current || syncing) return;
+    if (!isStale(data.lastSyncedAt, AUTO_SYNC_STALE_MINUTES)) return;
+
+    autoSynced.current = true;
+    (async () => {
+      setSyncing(true);
+      try {
+        await fetch(`/api/cc-reports/sync?stale=${AUTO_SYNC_STALE_MINUTES}`, { method: "POST" });
+        await load();
+      } catch {
+        /* diamkan — user masih bisa sync manual */
+      } finally {
+        setSyncing(false);
+      }
+    })();
+  }, [data, syncing, load]);
+
   const handleSyncAll = async () => {
     setSyncing(true);
     try {
       const res = await fetch("/api/cc-reports/sync", { method: "POST" });
       const json = await res.json();
       if (json.success) {
-        alert(`Sync selesai — berhasil: ${json.ok}, gagal: ${json.failed}, total: ${json.total}`);
-        await load();
+        alert(
+          `Sync selesai — OK: ${json.ok}, sebagian: ${json.partial ?? 0}, gagal: ${json.failed}, total: ${json.total}`
+        ); await load();
       } else {
         alert(json.error ?? "Gagal sync");
       }
@@ -191,25 +213,23 @@ export default function CCAnalisaPage() {
     <DashboardLayout>
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
-         {/* ── Kesehatan koneksi TikTok ── */}
+          {/* ── Kesehatan koneksi TikTok ── */}
           {tt && (
             <div
-              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3 ${
-                tt.level === "OK"
-                  ? "border-emerald-100 bg-emerald-50"
-                  : tt.level === "WARN"
-                    ? "border-amber-100 bg-amber-50"
-                    : "border-red-100 bg-red-50"
-              }`}
+              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3 ${tt.level === "OK"
+                ? "border-emerald-100 bg-emerald-50"
+                : tt.level === "WARN"
+                  ? "border-amber-100 bg-amber-50"
+                  : "border-red-100 bg-red-50"
+                }`}
             >
               <p
-                className={`text-xs font-medium ${
-                  tt.level === "OK"
-                    ? "text-emerald-800"
-                    : tt.level === "WARN"
-                      ? "text-amber-800"
-                      : "text-red-800"
-                }`}
+                className={`text-xs font-medium ${tt.level === "OK"
+                  ? "text-emerald-800"
+                  : tt.level === "WARN"
+                    ? "text-amber-800"
+                    : "text-red-800"
+                  }`}
               >
                 {tt.level === "OK" && (
                   <>
@@ -243,6 +263,33 @@ export default function CCAnalisaPage() {
                   {tt.level === "DEAD" ? "Hubungkan TikTok" : "Hubungkan Ulang"}
                 </a>
               )}
+            </div>
+          )}
+          {/* ── Metrik yang perlu dilengkapi manual ── */}
+          {data && data.problems.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+              <p className="text-xs font-black text-amber-900">
+                ⚠️ {data.problems.length} posting metriknya belum akurat
+                {data.issues.partial > 0 && ` · ${data.issues.partial} sebagian`}
+                {data.issues.error > 0 && ` · ${data.issues.error} gagal`}
+              </p>
+              <ul className="mt-2 space-y-1">
+                {data.problems.slice(0, 5).map((p) => (
+                  <li
+                    key={`${p.report_id}-${p.platform}-${p.post_url ?? ""}`}
+                    className="truncate text-[11px] font-medium text-amber-800"
+                  >
+                    <b>{p.title}</b> · {p.platform} —{" "}
+                    {p.sync_error ?? SYNC_STATUS_META[p.sync_status].label}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/dashboard/cc-reports/laporan"
+                className="mt-2 inline-block rounded-lg bg-amber-900 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-amber-800"
+              >
+                Lengkapi di Laporan Kerja →
+              </Link>
             </div>
           )}
           {/* ── Header ── */}

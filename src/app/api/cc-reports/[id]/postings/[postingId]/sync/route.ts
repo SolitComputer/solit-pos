@@ -1,7 +1,7 @@
 // src/app/api/cc-reports/[id]/postings/[postingId]/sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { syncPosting } from "@/lib/ccSync";
+import { buildPostingPatch, syncPosting } from "@/lib/ccSync";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +24,7 @@ export async function POST(
 
   const out = await syncPosting(posting.post_url);
 
-  // Metrik hanya ditimpa kalau sync sukses — kalau gagal, angka manual dibiarkan.
-  const patch: Record<string, unknown> = {
-    last_synced_at: new Date().toISOString(),
-    sync_status: out.status,
-    sync_error: out.error,
-    external_id: out.externalId ?? posting.external_id,
-  };
-  if (out.status === "OK") {
-    patch.views = out.views;
-    patch.likes = out.likes;
-    patch.comments = out.comments;
-  }
+  const patch = buildPostingPatch(out, posting);
 
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
@@ -50,6 +39,7 @@ export async function POST(
     success: true,
     posting: data,
     synced: out.status === "OK",
+    partial: out.status === "PARTIAL",
     message: out.error,
   });
 }

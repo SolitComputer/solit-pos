@@ -3,19 +3,83 @@
 import { getValidAccessToken } from "./ccTikTok";
 import { parsePostUrl, type SyncStatus } from "./ccMetrics";
 
+/**
+ * null = API TIDAK mengembalikan metrik ini (bukan berarti nol).
+ * Ini kunci fix-nya: nilai lama di DB tidak boleh ditimpa 0 hanya karena
+ * field-nya absent di response.
+ */
 export interface SyncOutcome {
   status: SyncStatus;
-  views: number;
-  likes: number;
-  comments: number;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
   error: string | null;
   externalId: string | null;
   platform: string | null;
 }
 
+type MetricKey = "views" | "likes" | "comments";
+
+const METRIC_LABEL: Record<MetricKey, string> = {
+  views: "view",
+  likes: "like",
+  comments: "komen",
+};
+
+/** angka valid → number; undefined/null/"" → null */
+function num(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 const fail = (status: SyncStatus, error: string): SyncOutcome => ({
-  status, views: 0, likes: 0, comments: 0, error, externalId: null, platform: null,
+  status, views: null, likes: null, comments: null, error, externalId: null, platform: null,
 });
+
+/** OK = semua metrik didapat. PARTIAL = ada yang tidak dikembalikan API. */
+function settle(
+  platform: string,
+  externalId: string,
+  m: Record<MetricKey, number | null>
+): SyncOutcome {
+  const missing = (Object.keys(METRIC_LABEL) as MetricKey[]).filter((k) => m[k] === null);
+  return {
+    status: missing.length === 0 ? "OK" : "PARTIAL",
+    views: m.views,
+    likes: m.likes,
+    comments: m.comments,
+    error:
+      missing.length === 0
+        ? null
+        : `${platform} tidak mengembalikan ${missing.map((k) => METRIC_LABEL[k]).join(", ")} — silakan isi manual.`,
+    externalId,
+    platform,
+  };
+}
+
+/**
+ * Patch DB dari hasil sync.
+ * ✅ Hanya menulis metrik yang benar-benar didapat → angka manual/lama aman.
+ */
+export function buildPostingPatch(
+  out: SyncOutcome,
+  prev?: { external_id?: string | null }
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {
+    last_synced_at: new Date().toISOString(),
+    sync_status: out.status,
+    sync_error: out.error,
+    external_id: out.externalId ?? prev?.external_id ?? null,
+  };
+
+  if (out.status === "OK" || out.status === "PARTIAL") {
+    if (out.views !== null) patch.views = out.views;
+    if (out.likes !== null) patch.likes = out.likes;
+    if (out.comments !== null) patch.comments = out.comments;
+  }
+  return patch;
+}
 
 // ── YouTube ──────────────────────────────────────────────────────────────────
 async function syncYouTube(videoId: string): Promise<SyncOutcome> {
@@ -26,74 +90,68 @@ async function syncYouTube(videoId: string): Promise<SyncOutcome> {
   const res = await fetch(url, { cache: "no-store" });
   const json = await res.json();
 
-  if (!res.ok) return fail("ERROR", json?.error?.message ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    return { ...fail("ERROR", json?.error?.message ?? `HTTP ${res.status}`), platform: "YouTube", externalId: videoId };
+  }
 
   const s = json?.items?.[0]?.statistics;
-  if (!s) return fail("ERROR", "Video tidak ditemukan / private / dihapus");
+  if (!s) {
+    return { ...fail("ERROR", "Video tidak ditemukan / private / dihapus"), platform: "YouTube", externalId: videoId };
+  }
 
-  return {
-    status: "OK",
-    views: Number(s.viewCount ?? 0),
-    likes: Number(s.likeCount ?? 0),          // bisa 0 kalau like disembunyikan
-    comments: Number(s.commentCount ?? 0),
-    error: null,
-    externalId: videoId,
-    platform: "YouTube",
-  };
+  return settle("YouTube", videoId, {
+    views: num(s.viewCount),
+    likes: num(s.likeCount),       // absent kalau like disembunyikan → null (BUKAN 0)
+    comments: num(s.commentCount), // absent kalau komentar dimatikan → null
+  });
 }
 
 // ── Instagram ────────────────────────────────────────────────────────────────
-// ✅ v25.0 — metrik agregat (views/likes/comments) sudah tersedia langsung di
-//    Media endpoint, jadi tidak perlu call /insights per post. Hemat kuota
-//    (rate limit IG = 200 request/jam/akun).
 const IG_VERSION = process.env.IG_GRAPH_VERSION || "v25.0";
+const IG_TTL = 60_000;
+const IG_MAX_PAGES = 15; // ±1500 konten terakhir (sebelumnya cuma 500)
 
 interface IgMedia {
   id: string;
-  permalink: string;
+  permalink?: string;
   media_type?: string;
   like_count?: number;
   comments_count?: number;
   views?: number;
 }
-
 interface IgMediaResponse {
   data?: IgMedia[];
   paging?: { next?: string };
   error?: { message?: string };
 }
-
 interface IgInsightsResponse {
   data?: { name?: string; values?: { value?: number }[] }[];
   error?: { message?: string };
 }
 
 let igCache: { at: number; map: Map<string, IgMedia> } | null = null;
-const IG_TTL = 60_000;
 
 function shortcodeOf(permalink: string): string | null {
   return permalink.match(/\/(?:p|reel|reels|tv)\/([\w-]+)/)?.[1] ?? null;
 }
+
+const IG_FIELDS = "id,permalink,media_type,like_count,comments_count,views";
 
 async function loadIgMedia(): Promise<Map<string, IgMedia>> {
   if (igCache && Date.now() - igCache.at < IG_TTL) return igCache.map;
 
   const token = process.env.IG_ACCESS_TOKEN!;
   const igUser = process.env.IG_USER_ID!;
-
-  const fields = "id,permalink,media_type,like_count,comments_count,views";
-
   const map = new Map<string, IgMedia>();
 
   let next: string | null =
     `https://graph.facebook.com/${IG_VERSION}/${igUser}/media` +
-    `?fields=${fields}&limit=100&access_token=${token}`;
+    `?fields=${IG_FIELDS}&limit=100&access_token=${token}`;
 
-  // Maks 5 halaman (±500 konten terakhir)
-  for (let page = 0; page < 5 && next !== null; page++) {
-    const url: string = next;                       // putus siklus inferensi TS
+  for (let page = 0; page < IG_MAX_PAGES && next !== null; page++) {
+    const url: string = next;
     const res: Response = await fetch(url, { cache: "no-store" });
-    const json: IgMediaResponse = await res.json(); // tipe konkret, bukan any
+    const json: IgMediaResponse = await res.json();
 
     if (!res.ok) throw new Error(json.error?.message ?? `IG HTTP ${res.status}`);
 
@@ -101,7 +159,6 @@ async function loadIgMedia(): Promise<Map<string, IgMedia>> {
       const code = shortcodeOf(m.permalink ?? "");
       if (code) map.set(code, m);
     }
-
     next = json.paging?.next ?? null;
   }
 
@@ -109,12 +166,23 @@ async function loadIgMedia(): Promise<Map<string, IgMedia>> {
   return map;
 }
 
-/**
- * Fallback views lewat /insights — hanya dipakai kalau Media endpoint tidak
- * mengembalikan `views` (mis. foto lama / carousel).
- * Catatan: `video_views` sudah deprecated sejak v21, jangan dipakai lagi.
- */
-async function igViewsFallback(mediaId: string): Promise<number> {
+/** Tarik ulang 1 media langsung — field kadang absent di listing tapi ada di sini. */
+async function igMediaDetail(mediaId: string): Promise<IgMedia | null> {
+  const token = process.env.IG_ACCESS_TOKEN!;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${IG_VERSION}/${mediaId}?fields=${IG_FIELDS}&access_token=${token}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as IgMedia;
+  } catch {
+    return null;
+  }
+}
+
+/** Fallback views lewat /insights (video_views sudah deprecated sejak v21). */
+async function igViewsFallback(mediaId: string): Promise<number | null> {
   const token = process.env.IG_ACCESS_TOKEN!;
 
   for (const metric of ["views", "reach"] as const) {
@@ -131,12 +199,16 @@ async function igViewsFallback(mediaId: string): Promise<number> {
       /* coba metrik berikutnya */
     }
   }
-  return 0;
+  return null; // ✅ null, bukan 0
 }
 
 async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
   if (!process.env.IG_ACCESS_TOKEN || !process.env.IG_USER_ID) {
-    return fail("UNSUPPORTED", "IG_ACCESS_TOKEN / IG_USER_ID belum di-set");
+    return {
+      ...fail("UNSUPPORTED", "IG_ACCESS_TOKEN / IG_USER_ID belum di-set"),
+      platform: "Instagram",
+      externalId: shortcode,
+    };
   }
 
   try {
@@ -154,18 +226,24 @@ async function syncInstagram(shortcode: string): Promise<SyncOutcome> {
       };
     }
 
-    const views =
-      typeof media.views === "number" ? media.views : await igViewsFallback(media.id);
+    let views = num(media.views);
+    let likes = num(media.like_count);
+    let comments = num(media.comments_count);
 
-    return {
-      status: "OK",
-      views,
-      likes: Number(media.like_count ?? 0),
-      comments: Number(media.comments_count ?? 0),
-      error: null,
-      externalId: shortcode,
-      platform: "Instagram",
-    };
+    // ✅ field absent di listing → coba tarik per-media dulu sebelum menyerah
+    if (views === null || likes === null || comments === null) {
+      const detail = await igMediaDetail(media.id);
+      if (detail) {
+        views ??= num(detail.views);
+        likes ??= num(detail.like_count);
+        comments ??= num(detail.comments_count);
+      }
+    }
+
+    // views masih kosong (foto lama / carousel) → insights
+    if (views === null) views = await igViewsFallback(media.id);
+
+    return settle("Instagram", shortcode, { views, likes, comments });
   } catch (e) {
     return {
       ...fail("ERROR", e instanceof Error ? e.message : "Gagal ambil data IG"),
@@ -228,19 +306,15 @@ async function syncTikTok(videoId: string): Promise<SyncOutcome> {
     };
   }
 
-  return {
-    status: "OK",
-    views: Number(v.view_count ?? 0),
-    likes: Number(v.like_count ?? 0),
-    comments: Number(v.comment_count ?? 0),
-    error: null,
-    externalId: videoId,
-    platform: "TikTok",
-  };
+  return settle("TikTok", videoId, {
+    views: num(v.view_count),
+    likes: num(v.like_count),
+    comments: num(v.comment_count),
+  });
 }
 
-/** Shortlink TikTok (vt./vm.) → URL asli yang mengandung video ID. */
-async function resolveTikTokShortlink(url: string): Promise<string | null> {
+/** Shortlink (vt.tiktok.com / instagram.com/share/...) → URL asli. */
+async function resolveRedirect(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, { redirect: "follow", cache: "no-store" });
     return res.url || null;
@@ -256,9 +330,12 @@ export async function syncPosting(postUrl: string | null): Promise<SyncOutcome> 
   let parsed = parsePostUrl(postUrl);
   if (!parsed) return fail("ERROR", "Format link tidak valid");
 
-  // TikTok shortlink → ikuti redirect dulu untuk dapat video ID
-  if (parsed.platform === "TikTok" && !parsed.externalId) {
-    const resolved = await resolveTikTokShortlink(postUrl);
+  // ✅ TikTok shortlink & IG share-link → ikuti redirect dulu
+  if (
+    (parsed.platform === "TikTok" || parsed.platform === "Instagram") &&
+    !parsed.externalId
+  ) {
+    const resolved = await resolveRedirect(postUrl);
     if (resolved) {
       const again = parsePostUrl(resolved);
       if (again?.externalId) parsed = again;

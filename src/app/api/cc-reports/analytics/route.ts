@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import type {
   CCPosting, CCContentRow, CCMetricTotals, CCPlatformStat,
-  CCProcessRow, CCProcessSummary,
+  CCProcessRow, CCProcessSummary, CCSyncIssue, CCSyncIssueSummary,
 } from "@/lib/ccReports";
 import { minutesBetween } from "@/lib/ccReports";
+import { isAutoSyncPlatform, type SyncStatus } from "@/lib/ccMetrics";
 
 export const dynamic = "force-dynamic";
 
@@ -54,14 +55,16 @@ export async function GET(req: NextRequest) {
 
   const ts = (iso: string | null) => (iso ? new Date(iso).getTime() : NaN);
 
-  const inCurrent = (p: CCPosting) => {
+  // ✅ posted_at boleh kosong → pakai created_at report sebagai fallback,
+  //    supaya posting tidak "hilang" dari analisa hanya karena tanggal belum diisi.
+  const inCurrent = (p: CCPosting, fallbackIso: string) => {
     if (!days) return true;
-    const t = ts(p.posted_at);
+    const t = ts(p.posted_at ?? fallbackIso);
     return !Number.isNaN(t) && t >= startCur && t <= now;
   };
-  const inPrevious = (p: CCPosting) => {
+  const inPrevious = (p: CCPosting, fallbackIso: string) => {
     if (!days) return false;
-    const t = ts(p.posted_at);
+    const t = ts(p.posted_at ?? fallbackIso);
     return !Number.isNaN(t) && t >= startPrev && t < startCur;
   };
 
@@ -70,6 +73,10 @@ export async function GET(req: NextRequest) {
   const processRows: CCProcessRow[] = [];
   let lastSyncedAt: string | null = null;
 
+  // ── kesehatan metrik ──
+  const issues: CCSyncIssueSummary = { ok: 0, partial: 0, error: 0, pending: 0 };
+  const problems: CCSyncIssue[] = [];
+
   for (const r of rows) {
     const all = r.postings ?? [];
 
@@ -77,10 +84,32 @@ export async function GET(req: NextRequest) {
       if (p.last_synced_at && (!lastSyncedAt || p.last_synced_at > lastSyncedAt)) {
         lastSyncedAt = p.last_synced_at;
       }
+
+      // hanya platform auto-sync yang punya link yang relevan dinilai
+      if (!isAutoSyncPlatform(p.platform) || !p.post_url) continue;
+
+      const st = (p.sync_status ?? "PENDING") as SyncStatus;
+
+      if (st === "OK") issues.ok++;
+      else if (st === "PARTIAL") issues.partial++;
+      else if (st === "ERROR") issues.error++;
+      else if (st === "PENDING") issues.pending++;
+
+      if (st === "PARTIAL" || st === "ERROR") {
+        problems.push({
+          report_id: r.id,
+          title: r.title,
+          platform: p.platform,
+          post_url: p.post_url,
+          sync_status: st,
+          sync_error: p.sync_error ?? null,
+          last_synced_at: p.last_synced_at ?? null,
+        });
+      }
     }
 
     // ── periode sebelumnya (buat delta %) ──
-    for (const p of all.filter(inPrevious)) {
+    for (const p of all.filter((p) => inPrevious(p, r.created_at))) {
       const t = (prevByPlatform[p.platform] ??= emptyTotals());
       t.views += p.views || 0;
       t.likes += p.likes || 0;
@@ -104,7 +133,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ── performa per konten × platform ──
-    const current = all.filter(inCurrent);
+    const current = all.filter((p) => inCurrent(p, r.created_at));
     if (current.length === 0) continue;
 
     const perPlatform: Record<string, CCPlatformStat> = {};
@@ -122,6 +151,7 @@ export async function GET(req: NextRequest) {
       stat.comments += p.comments || 0;
       stat.postCount += 1;
       if (!stat.post_url && p.post_url) stat.post_url = p.post_url;
+      if (!stat.posted_at && p.posted_at) stat.posted_at = p.posted_at;
 
       totals.views += p.views || 0;
       totals.likes += p.likes || 0;
@@ -140,6 +170,12 @@ export async function GET(req: NextRequest) {
 
   contents.sort((a, b) => b.totals.views - a.totals.views);
 
+  // yang paling parah dulu: ERROR sebelum PARTIAL
+  problems.sort((a, b) => {
+    if (a.sync_status === b.sync_status) return a.title.localeCompare(b.title);
+    return a.sync_status === "ERROR" ? -1 : 1;
+  });
+
   const summary: CCProcessSummary = {
     avgTake: avg(processRows.map((r) => r.takeMinutes).filter((v): v is number => v != null)),
     avgHandoff: avg(processRows.map((r) => r.handoffMinutes).filter((v): v is number => v != null)),
@@ -155,5 +191,7 @@ export async function GET(req: NextRequest) {
     prevByPlatform,
     process: { rows: processRows, summary },
     lastSyncedAt,
+    issues,
+    problems,
   });
 }

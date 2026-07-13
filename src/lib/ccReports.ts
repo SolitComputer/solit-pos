@@ -226,4 +226,23 @@ export interface CCAnalytics {
   prevByPlatform: Record<string, CCMetricTotals>;
   process: { rows: CCProcessRow[]; summary: CCProcessSummary };
   lastSyncedAt: string | null;
+  issues: CCSyncIssueSummary;      
+  problems: CCSyncIssue[];         
+}
+
+export interface CCSyncIssue {
+  report_id: string;
+  title: string;
+  platform: string;
+  post_url: string | null;
+  sync_status: SyncStatus;
+  sync_error: string | null;
+  last_synced_at: string | null;
+}
+
+export interface CCSyncIssueSummary {
+  ok: number;
+  partial: number;
+  error: number;
+  pending: number;
 }
