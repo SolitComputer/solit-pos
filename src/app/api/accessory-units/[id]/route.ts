@@ -1,8 +1,9 @@
 // src/app/api/accessory-units/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
+import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
+import { recordOutflow } from "@/lib/accessoryOutflow";
 
 const EDIT_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -12,7 +13,8 @@ const EDIT_ROLES: UserRole[] = [
 
 export const PATCH = withAuth(async (
     req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: Promise<{ id: string }> },
+    user: AuthUser
 ) => {
     const { id } = await params;
 
@@ -50,6 +52,12 @@ export const PATCH = withAuth(async (
         return NextResponse.json({ success: false, error: "Tidak ada data yang diubah" }, { status: 400 });
     }
 
+    const { data: oldData } = await supabaseAdmin
+        .from("accessory_units")
+        .select("status, accessory_id")
+        .eq("id", id)
+        .single();
+
     const { data, error } = await supabaseAdmin
         .from("accessory_units")
         .update(updates)
@@ -58,6 +66,23 @@ export const PATCH = withAuth(async (
         .single();
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+    if (updates.status === "TERJUAL" && oldData && oldData.status !== "TERJUAL") {
+        await recordOutflow({
+            accessory_id: oldData.accessory_id,
+            unit_id: id,
+            source_type: "manual",
+            qty: 1,
+            notes: "Status diubah menjadi TERJUAL via edit unit",
+            taken_by_role: "PENGELOLA_BARANG", // default assumption for manual edit
+            created_by: user.id
+        });
+        
+        await supabaseAdmin.rpc("decrement_accessory_stock", {
+            p_accessory_id: oldData.accessory_id,
+            p_qty: 1
+        });
+    }
 
     return NextResponse.json({ success: true, data });
 }, EDIT_ROLES);

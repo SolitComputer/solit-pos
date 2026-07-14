@@ -6,6 +6,7 @@ import {
   ROUTE_PERMISSIONS,
   ROLE_DEFAULT_REDIRECT,
   UserRole,
+  verifyAttendanceCookie,
 } from "@/lib/auth";
 import {
   expandRolesWithParents,
@@ -63,17 +64,20 @@ function isWithinSystemHours(): boolean {
   return hour >= SYSTEM_OPEN_HOUR && hour < SYSTEM_CLOSE_HOUR;
 }
 
-function hasAttendanceBypass(request: NextRequest, userId: string): boolean {
-  const faceAttended = request.cookies.get("face_attended")?.value;
-  const faceVerified = request.cookies.get("face_verified")?.value;
-  const attendanceSkipped = request.cookies.get("attendance_skipped")?.value;
-  const dayOffToday = request.cookies.get("day_off_today")?.value;
-  return (
-    faceAttended === userId ||
-    faceVerified === userId ||
-    attendanceSkipped === userId ||
-    dayOffToday === userId
-  );
+async function hasAttendanceBypass(
+  request: NextRequest,
+  userId: string
+): Promise<boolean> {
+  const values = [
+    request.cookies.get("face_attended")?.value,
+    request.cookies.get("face_verified")?.value,
+    request.cookies.get("attendance_skipped")?.value,
+    request.cookies.get("day_off_today")?.value,
+  ];
+  for (const v of values) {
+    if (await verifyAttendanceCookie(v, userId)) return true;
+  }
+  return false;
 }
 
 const SESSION_COOKIES = [
@@ -113,9 +117,25 @@ function getAutoLogoutThreshold(): number {
   return Math.floor(thresholdUTC / 1000);
 }
 
+const IDENTITY_HEADERS = [
+  "x-user-id",
+  "x-user-role",
+  "x-user-roles",
+  "x-user-name",
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const url = request.nextUrl.clone();
+
+  // ── Strip client-supplied identity headers (anti-spoof) ────────────────────
+  // Tanpa ini, siapa pun bisa kirim header `x-user-roles: ADMIN` dan route yang
+  // baca header itu akan percaya. Kita bikin salinan header request yang bersih;
+  // satu-satunya sumber identitas yang tepercaya adalah JWT yang kita verifikasi.
+  const requestHeaders = new Headers(request.headers);
+  for (const h of IDENTITY_HEADERS) requestHeaders.delete(h);
+  const forward = () =>
+    NextResponse.next({ request: { headers: requestHeaders } });
   if (url.searchParams.has("_cb")) {
     url.searchParams.delete("_cb");
     return NextResponse.redirect(url);
@@ -128,7 +148,7 @@ export async function middleware(request: NextRequest) {
       const user = await verifyToken(token);
       if (user) {
         const exempt = isAttendanceExempt(user.role as string);
-        const hasAttended = hasAttendanceBypass(request, user.id);
+        const hasAttended = await hasAttendanceBypass(request, user.id);
         if (!exempt && isWithinSystemHours() && !hasAttended) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
@@ -143,7 +163,7 @@ export async function middleware(request: NextRequest) {
         );
       }
     }
-    return NextResponse.next();
+    return forward();
   }
 
   if (pathname === "/") {
@@ -151,28 +171,28 @@ export async function middleware(request: NextRequest) {
   }
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return forward();
   }
 
   if (pathname.startsWith("/face-verify")) {
     if (!token) return NextResponse.redirect(new URL("/login", request.url));
-    return NextResponse.next();
+    return forward();
   }
 
   if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return forward();
   }
 
   if (FACE_API_WHITELIST.some((p) => pathname.startsWith(p))) {
     if (!token) return NextResponse.json({ success: false }, { status: 401 });
-    return NextResponse.next();
+    return forward();
   }
 
   if (isCronRoute(pathname)) {
     const cronSecret = request.headers.get("x-cron-secret");
     if (cronSecret) {
       if (cronSecret === process.env.CRON_SECRET) {
-        return NextResponse.next();
+        return forward();
       }
       return NextResponse.json(
         { success: false, error: "Invalid cron secret" },
@@ -250,7 +270,7 @@ export async function middleware(request: NextRequest) {
   // ── Attendance / face-verify gate ─────────────────────────────────────────
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
-    const hasAttended = hasAttendanceBypass(request, user.id);
+    const hasAttended = await hasAttendanceBypass(request, user.id);
     if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
@@ -293,11 +313,26 @@ export async function middleware(request: NextRequest) {
   // ── Inject user headers untuk API routes ──────────────────────────────────
   // NOTE: header pakai roles ASLI (bukan effective) supaya API tahu role sebenarnya.
   // Permission check di API dilakukan di withAuth() yang juga expand parent.
-  const response = NextResponse.next();
-  response.headers.set("x-user-id", user.id);
-  response.headers.set("x-user-role", user.role);
-  response.headers.set("x-user-roles", userRoles.join(","));
-  response.headers.set("x-user-name", user.name);
+  // PENTING: header di-set pada REQUEST yang diteruskan (requestHeaders), bukan
+  // pada response. `requestHeaders` sudah dibersihkan dari salinan kiriman client
+  // di awal middleware, jadi route hanya melihat identitas tepercaya dari JWT.
+  requestHeaders.set("x-user-id", user.id);
+  requestHeaders.set("x-user-role", user.role);
+  requestHeaders.set("x-user-roles", userRoles.join(","));
+  requestHeaders.set("x-user-name", encodeURIComponent(user.name));
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Refresh throttle cookie force-logout (kalau barusan dicek ke DB).
+  if (shouldRefreshFlCookie) {
+    response.cookies.set("fl_check", String(Math.floor(Date.now() / 1000)), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 3600,
+    });
+  }
+
   return response;
 }
 

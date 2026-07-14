@@ -44,20 +44,30 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
+    // Hanya update kolom yang benar-benar dikirim, supaya PUT parsial tidak
+    // menimpa field lain jadi null / NaN (mis. selling_price = Math.round(NaN)).
+    const updatePayload: Record<string, unknown> = {};
+    const FIELDS = [
+      "laptop_name", "brand", "cpu", "ram", "storage",
+      "gpu", "display", "condition_note", "notes",
+    ] as const;
+    for (const f of FIELDS) {
+      if (body[f] !== undefined) updatePayload[f] = body[f];
+    }
+    if (body.selling_price !== undefined && body.selling_price !== null) {
+      const price = Math.round(Number(body.selling_price));
+      if (!Number.isFinite(price)) {
+        return NextResponse.json(
+          { success: false, message: "Harga jual tidak valid" },
+          { status: 400 }
+        );
+      }
+      updatePayload.selling_price = price;
+    }
+
     const { data, error } = await supabase
       .from("laptops")
-      .update({
-        laptop_name: body.laptop_name,
-        brand: body.brand,
-        cpu: body.cpu,
-        ram: body.ram,
-        storage: body.storage,
-        gpu: body.gpu,
-        display: body.display,
-        condition_note: body.condition_note,
-        selling_price: Math.round(Number(body.selling_price)),
-        notes: body.notes,
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select()
       .single();

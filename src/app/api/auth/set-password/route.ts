@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { createClient } from "@supabase/supabase-js";
+import { getJwtSecret } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,12 +11,30 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { userId, password, confirmPassword } = await request.json();
+    const { setupToken, password, confirmPassword } = await request.json();
 
-    if (!userId || !password || !confirmPassword) {
+    if (!setupToken || !password || !confirmPassword) {
       return NextResponse.json(
         { success: false, message: "Semua field wajib diisi" },
         { status: 400 }
+      );
+    }
+
+    // Validasi token setup — satu-satunya sumber userId yang tepercaya.
+    let userId: string;
+    try {
+      const payload = jwt.verify(setupToken, getJwtSecret()) as {
+        sub?: string;
+        purpose?: string;
+      };
+      if (payload.purpose !== "set_password" || !payload.sub) {
+        throw new Error("invalid token");
+      }
+      userId = payload.sub;
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Sesi setup tidak valid atau kedaluwarsa. Silakan login ulang." },
+        { status: 401 }
       );
     }
 

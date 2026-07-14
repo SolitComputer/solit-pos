@@ -1,7 +1,7 @@
 // src/app/api/auth/face-status/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule } from "@/lib/auth";
+import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule, signAttendanceCookie, verifyAttendanceCookie } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
 
@@ -39,9 +39,15 @@ export async function GET() {
       });
     }
 
-    const faceVerified = cookieStore.get("face_verified")?.value;
-    const faceAttended = cookieStore.get("face_attended")?.value;
-    const dayOffCookie = cookieStore.get("day_off_today")?.value;
+    const faceVerified = (await verifyAttendanceCookie(
+      cookieStore.get("face_verified")?.value, user.id
+    )) ? user.id : undefined;
+    const faceAttended = (await verifyAttendanceCookie(
+      cookieStore.get("face_attended")?.value, user.id
+    )) ? user.id : undefined;
+    const dayOffCookie = (await verifyAttendanceCookie(
+      cookieStore.get("day_off_today")?.value, user.id
+    )) ? user.id : undefined;
 
     const nowUTC = new Date();
     const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
@@ -104,7 +110,7 @@ export async function GET() {
         isExempt: false,
       });
 
-      response.cookies.set("day_off_today", user.id, {
+      response.cookies.set("day_off_today", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: getMidnightWIB(),
       });
@@ -149,7 +155,7 @@ export async function GET() {
         manualCreatedByName: createdByName,  // ✅ TAMBAH
       });
 
-      response.cookies.set("face_attended", user.id, {
+      response.cookies.set("face_attended", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: expiry,
       });
@@ -212,7 +218,7 @@ export async function GET() {
     });
 
     if (isTodayDayOff && dayOffCookie !== user.id) {
-      response.cookies.set("day_off_today", user.id, {
+      response.cookies.set("day_off_today", await signAttendanceCookie(user.id), {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/",
@@ -222,11 +228,11 @@ export async function GET() {
 
     if (alreadyAttendedDB && faceAttended !== user.id) {
       const expiry = getMidnightWIB();
-      response.cookies.set("face_attended", user.id, {
+      response.cookies.set("face_attended", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: expiry,
       });
-      response.cookies.set("face_verified", user.id, {
+      response.cookies.set("face_verified", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: expiry,
       });
@@ -257,7 +263,7 @@ export async function POST(request: Request) {
     ));
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set("attendance_skipped", user.id, {
+    response.cookies.set("attendance_skipped", await signAttendanceCookie(user.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax", path: "/",

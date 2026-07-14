@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -160,6 +161,9 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         { status: 400 }
       );
     }
+
+    // 5b. Batalkan catatan outflow aksesoris jika ada
+    await cancelOutflowByInvoice(invoice);
 
     // ── 6. Void warranty jika ada ─────────────────────────────────────────
     let warrantyVoided = false;

@@ -9,6 +9,7 @@ import {
     isModalAwalActive,
     isManualIncomeCategory,
 } from "@/lib/cashflow";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getAdmin(): SupabaseClient {
     return createClient(
@@ -261,23 +262,26 @@ export const GET = withAuth(async () => {
         console.error("[cashflow sync]", e);
     }
 
-    const { data, error } = await supabase
-        .from("cashflow_entries")
-        .select(`
-            *,
-            created_by_user:users!cashflow_entries_created_by_fkey(id, name),
-            audited_by_user:users!cashflow_entries_audited_by_fkey(id, name)
-        `)
-        .order("tanggal", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false });
-
-    if (error) {
+    // fetchAllRows: hindari truncation 1000 baris yang bikin saldo salah hitung.
+    let rawAll: any[];
+    try {
+        rawAll = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("cashflow_entries")
+                .select(`
+                    *,
+                    created_by_user:users!cashflow_entries_created_by_fkey(id, name),
+                    audited_by_user:users!cashflow_entries_audited_by_fkey(id, name)
+                `)
+                .order("tanggal", { ascending: false })
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: false })
+                .range(from, to)
+        );
+    } catch (error: any) {
         console.error("[cashflow GET]", error);
-        return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        return NextResponse.json({ success: false, message: error?.message ?? "Gagal memuat cashflow" }, { status: 500 });
     }
-
-    const rawAll = data ?? [];
 
     const txSourceIds = Array.from(
         new Set(

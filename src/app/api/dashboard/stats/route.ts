@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
@@ -74,19 +75,20 @@ async function handler(req: NextRequest) {
     const weekStartRange = wibDateToUTCRange(weekStart);
     const weekEndRange = wibDateToUTCRange(today);
 
+    // Pakai fetchAllRows agar tidak terpotong di 1000 baris (undercount omzet).
     const [
-      { data: todayTransactions },
-      { data: laptops },
-      { data: weeklyTransactions },
-      { data: yesterdayTransactions },
+      todayTransactions,
+      laptops,
+      weeklyTransactions,
+      yesterdayTransactions,
     ] = await Promise.all([
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end),
-      supabase.from("laptops").select("*").eq("status", "SIAP_JUAL").gt("qty", 0),
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", weekStartRange.start).lt("paid_at", weekEndRange.end),
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", yesterdayRange.start).lt("paid_at", yesterdayRange.end),
+      fetchAllRows((f, t) => supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end).range(f, t)),
+      fetchAllRows((f, t) => supabase.from("laptops").select("*").eq("status", "SIAP_JUAL").gt("qty", 0).range(f, t)),
+      fetchAllRows((f, t) => supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", weekStartRange.start).lt("paid_at", weekEndRange.end).range(f, t)),
+      fetchAllRows((f, t) => supabase.from("transactions").select("*").eq("status", "PAID")
+        .gte("paid_at", yesterdayRange.start).lt("paid_at", yesterdayRange.end).range(f, t)),
     ]);
 
     // ── BATCH FETCH purchase_price dari laptop_units ──────────────────────

@@ -91,7 +91,9 @@ export async function GET(req: NextRequest) {
 // POST /api/cc-reports — buat konten baru (judul + brand)
 export async function POST(req: NextRequest) {
   const userId = req.headers.get("x-user-id");
-  const userName = req.headers.get("x-user-name");
+  const rawName = req.headers.get("x-user-name");
+  // x-user-name di-encode (encodeURIComponent) oleh middleware.
+  const userName = rawName ? decodeURIComponent(rawName) : rawName;
 
   let body: any;
   try {
