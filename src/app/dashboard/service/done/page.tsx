@@ -132,8 +132,20 @@ const IconDollar = () => (
 );
 
 const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+const IconCheckLg = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+const IconBan = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
   </svg>
 );
 
@@ -151,51 +163,197 @@ const IconClock = () => (
   </svg>
 );
 
-const IconUser = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
 // ── Stat Card ──────────────────────────────────────────────────────────────────
 function StatCard({
   icon, label, count, gradient, iconBg, borderColor
 }: {
-  icon: React.ReactNode; 
-  label: string; 
-  count: number; 
+  icon: React.ReactNode;
+  label: string;
+  count: number;
   gradient: string;
   iconBg: string;
   borderColor: string;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-xl border ${borderColor} bg-white p-5 transition-all hover:shadow-lg hover:-translate-y-0.5 duration-300`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-3xl font-bold bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+    <div
+      className={`relative overflow-hidden rounded-2xl border ${borderColor} bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg`}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className={`bg-gradient-to-r ${gradient} bg-clip-text text-3xl font-black leading-none tracking-tight tabular-nums text-transparent`}>
             {count}
           </p>
-          <p className="text-xs font-semibold mt-1 text-gray-500">{label}</p>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+            {label}
+          </p>
         </div>
-        <div className={`p-2.5 rounded-lg ${iconBg}`}>
-          <div className="text-white">{icon}</div>
+        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${iconBg} text-white shadow-sm`}>
+          {icon}
         </div>
       </div>
-      <div className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r ${gradient} w-full opacity-20`} />
+      <span className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r ${gradient} opacity-20`} aria-hidden />
     </div>
   );
 }
 
-// ── Skeleton Row ───────────────────────────────────────────────────────────────
+// ── Action Types & Button ──────────────────────────────────────────────────────
+type ActionColor = "emerald" | "rose";
+
+type ActionItem = {
+  key: string;
+  label: string;
+  color: ActionColor;
+  icon: React.ReactNode;
+  onClick: () => void;
+};
+
+const ACTION_VARIANTS: Record<ActionColor, string> = {
+  emerald: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 focus-visible:ring-emerald-300",
+  rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
+};
+
+function ActionBtn({
+  label,
+  color,
+  icon,
+  onClick,
+  size = "sm",
+  block = false,
+}: {
+  label: string;
+  color: ActionColor;
+  icon: React.ReactNode;
+  onClick: () => void;
+  /** sm = di dalam tabel · md = di dalam card (target sentuh mobile) */
+  size?: "sm" | "md";
+  block?: boolean;
+}) {
+  const sizing =
+    size === "md"
+      ? "h-9 px-3 text-xs"
+      : "h-7 px-3 text-[11px] min-w-[92px]";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border
+        font-bold tracking-tight transition-all duration-150
+        outline-none focus-visible:ring-2 focus-visible:ring-offset-1
+        active:scale-95
+        ${block ? "w-full" : ""}
+        ${sizing}
+        ${ACTION_VARIANTS[color]}
+      `}
+    >
+      <span className="shrink-0">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Grup tombol aksi — dipakai di dua tempat:
+ * - variant="table" → 1 baris, rata kanan, TIDAK pernah wrap
+ * - variant="card"  → grid full-width, tombol sejajar & mudah dipencet di HP
+ */
+function ActionGroup({
+  actions,
+  variant,
+}: {
+  actions: ActionItem[];
+  variant: "table" | "card";
+}) {
+  if (actions.length === 0) return null;
+
+  if (variant === "card") {
+    const cols = actions.length >= 2 ? "grid-cols-2" : "grid-cols-1";
+    return (
+      <div className={`grid ${cols} gap-2`}>
+        {actions.map(a => (
+          <ActionBtn key={a.key} label={a.label} color={a.color} icon={a.icon} onClick={a.onClick} size="md" block />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-nowrap items-center justify-end gap-1.5">
+      {actions.map(a => (
+        <ActionBtn key={a.key} label={a.label} color={a.color} icon={a.icon} onClick={a.onClick} size="sm" />
+      ))}
+    </div>
+  );
+}
+
+// ── Payment Value (dipakai tabel & card) ───────────────────────────────────────
+function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
+  const alignCls = align === "right" ? "items-end text-right" : "";
+
+  if (order.payment_amount) {
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-emerald-600">{fmtRupiah(order.payment_amount)}</p>
+        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+          {order.payment_method || "CASH"}
+        </p>
+      </div>
+    );
+  }
+
+  if (order.status === "GAGAL_DIPERBAIKI") {
+    return <span className="text-xs font-medium text-gray-300">—</span>;
+  }
+
+  const est = Number(order.estimasi_harga ?? 0);
+  const sp = Number(order.biaya_sparepart ?? 0);
+  const total = est + sp;
+
+  if (total > 0) {
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(total)}</p>
+        <p className="mt-0.5 text-[10px] font-medium text-amber-500">estimasi · belum dibayar</p>
+      </div>
+    );
+  }
+
+  return <span className="text-xs font-medium text-amber-500">Konfirmasi saat diambil</span>;
+}
+
+// ── Skeletons ──────────────────────────────────────────────────────────────────
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[48, 96, 80, 88, 64, 64, 80, 64, 100].map((w, i) => (
-        <td key={i} className="px-4 py-4">
-          <div className="h-3 rounded-full bg-gradient-to-r from-gray-100 to-gray-50 animate-pulse" style={{ width: w }} />
+      {[28, 110, 130, 130, 80, 100, 100, 80, 190].map((w, i) => (
+        <td key={i} className="px-4 py-4 first:pl-5 last:pr-5">
+          <div
+            className="h-3 animate-pulse rounded-full bg-gradient-to-r from-gray-100 to-gray-50"
+            style={{ width: w }}
+          />
         </td>
       ))}
     </tr>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl border border-gray-200/60 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-32 animate-pulse rounded-full bg-gray-100" />
+          <div className="h-3 w-24 animate-pulse rounded-full bg-gray-100" />
+        </div>
+        <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100" />
+      </div>
+      <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-gray-100" />
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+        <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+      </div>
+    </div>
   );
 }
 
@@ -260,7 +418,7 @@ export default function DonePage() {
     );
     refresh();
   };
-  
+
   const openTidakJadiDialog = (order: ServiceOrder) => {
     setDialog({
       open: true,
@@ -272,6 +430,36 @@ export default function DonePage() {
       confirmClass: "bg-rose-600 hover:bg-rose-700",
       requireReason: true,
     });
+  };
+
+  /**
+   * Sumber tunggal daftar tombol aksi per order.
+   * Kombinasi tombol PERSIS sama seperti sebelumnya:
+   * - "Diambil" selalu ada
+   * - "Tidak Jadi" hanya untuk status DONE
+   */
+  const getActions = (o: ServiceOrder): ActionItem[] => {
+    const actions: ActionItem[] = [
+      {
+        key: "diambil",
+        label: "Diambil",
+        color: "emerald",
+        icon: <IconCheck />,
+        onClick: () => handleDiambilClick(o),
+      },
+    ];
+
+    if (o.status === "DONE") {
+      actions.push({
+        key: "tidak_jadi",
+        label: "Tidak Jadi",
+        color: "rose",
+        icon: <IconBan />,
+        onClick: () => openTidakJadiDialog(o),
+      });
+    }
+
+    return actions;
   };
 
   const handlePaymentConfirm = async (payment: {
@@ -303,52 +491,56 @@ export default function DonePage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
-        <div className="bg-white/70 backdrop-blur-md border-b border-gray-200/60 px-6 py-5 sticky top-0 z-20">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+        <div className="sticky top-0 z-20 border-b border-gray-200/60 bg-white/70 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
                 <IconCheckCircle />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-                  Selesai & Gagal
+
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-black tracking-tight text-slate-800">
+                  Selesai &amp; Gagal
                 </h1>
-                <div className="flex items-center gap-2 mt-0.5">
+
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   {connected ? (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       </span>
-                      <span className="text-[10px] font-semibold text-emerald-700">Live</span>
-                    </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Live</span>
+                    </span>
                   ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded-full">
-                      <span className="w-2 h-2 rounded-full bg-gray-300" />
-                      <span className="text-[10px] font-semibold text-gray-400">Polling</span>
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-0.5">
+                      <span className="h-2 w-2 rounded-full bg-gray-300" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Polling</span>
+                    </span>
                   )}
                   <span className="text-gray-300">·</span>
-                  <span className="text-xs font-medium text-gray-400">
+                  <span className="truncate text-xs font-semibold text-gray-400 tabular-nums">
                     {orders.length} order menunggu diambil
                   </span>
                 </div>
               </div>
             </div>
+
             <button
+              type="button"
               onClick={refresh}
-              className="p-2.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all"
               title="Refresh"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-gray-400 outline-none transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-gray-300 active:scale-95"
             >
               <IconRefresh />
             </button>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
 
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatCard
               icon={<IconCheckCircle />}
               label="Selesai — menunggu diambil"
@@ -367,182 +559,249 @@ export default function DonePage() {
             />
           </div>
 
-          {/* ── Table Area ──────────────────────────────────────────────────── */}
+          {/* ── Content ─────────────────────────────────────────────────────── */}
           {loading ? (
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
-                      {COLUMNS.map(h => (
-                        <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap first:pl-5">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4].map(i => <SkeletonRow key={i} />)}
-                  </tbody>
-                </table>
+            <>
+              {/* Desktop skeleton */}
+              <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
+                        {COLUMNS.map(h => (
+                          <th
+                            key={h}
+                            className="whitespace-nowrap px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[1, 2, 3, 4].map(i => <SkeletonRow key={i} />)}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Mobile skeleton */}
+              <div className="space-y-3 lg:hidden">
+                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+              </div>
+            </>
           ) : orders.length === 0 ? (
             /* ── Empty State ── */
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm">
-              <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-dashed border-emerald-200 flex items-center justify-center mb-6 text-emerald-400">
+            <div className="rounded-2xl border border-gray-200/60 bg-white shadow-sm">
+              <div className="flex flex-col items-center justify-center px-6 py-20 text-center sm:py-24">
+                <div className="mb-6 grid h-20 w-20 place-items-center rounded-2xl border-2 border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-400">
                   <IconEmptyCheck />
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">Belum Ada Order Selesai</h3>
-                <p className="text-sm text-gray-400 mt-2 max-w-md leading-relaxed">
+                <h3 className="text-lg font-black tracking-tight text-slate-800">Belum Ada Order Selesai</h3>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-gray-400">
                   Order yang sudah selesai atau gagal diperbaiki akan muncul di sini untuk dikonfirmasi pengambilan.
                 </p>
               </div>
             </div>
           ) : (
-            /* ── Main Table ── */
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
-                      {COLUMNS.map((h, i) => (
-                        <th
-                          key={h}
-                          className={`px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap ${i === 0 ? 'pl-5' : ''}`}
+            <>
+              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+              <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
+                        {COLUMNS.map((h, i) => (
+                          <th
+                            key={h}
+                            className={`
+                              whitespace-nowrap px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
+                              ${i === 0 ? "pl-5" : ""}
+                              ${i === COLUMNS.length - 1 ? "pr-5 text-right" : "text-left"}
+                            `}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-50">
+                      {orders.map((o, idx) => (
+                        <tr
+                          key={o.id}
+                          className="group cursor-pointer transition-colors duration-150 hover:bg-indigo-50/30"
+                          onClick={() => setDetailId(o.id)}
                         >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {orders.map((o, idx) => (
-                      <tr
-                        key={o.id}
-                        className="hover:bg-indigo-50/20 transition-colors duration-150 cursor-pointer group"
-                        onClick={() => setDetailId(o.id)}
-                      >
-                        {/* # */}
-                        <td className="pl-5 pr-4 py-4">
-                          <span className="text-xs font-mono font-bold text-gray-300 group-hover:text-gray-500 transition">
-                            {String(idx + 1).padStart(2, "0")}
-                          </span>
-                        </td>
-
-                        {/* Pelanggan */}
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-slate-800 text-sm leading-tight">{o.nama}</p>
-                          <p className="text-xs text-gray-400 mt-0.5 font-medium">{o.no_hp}</p>
-                        </td>
-
-                        {/* Laptop */}
-                        <td className="px-4 py-4 min-w-[150px]">
-                          <p className="font-semibold text-gray-700 text-sm leading-tight">{o.type_laptop}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
-                          </p>
-                        </td>
-
-                        {/* Selesai */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="text-xs text-gray-400 font-medium">{formatDate(o.tanggal_selesai)}</span>
-                        </td>
-
-                        {/* Total Waktu */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <IconClock />
-                            <span className="text-xs font-semibold text-gray-600">
-                              {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
+                          {/* No */}
+                          <td className="py-4 pl-5 pr-4 align-middle">
+                            <span className="font-mono text-xs font-black tabular-nums text-gray-300 transition group-hover:text-gray-500">
+                              {String(idx + 1).padStart(2, "0")}
                             </span>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Teknisi */}
-                        <td className="px-4 py-4">
-                          {o.dikerjakan_by_user?.name ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center shrink-0">
-                                <span className="text-[9px] font-bold text-indigo-700 uppercase">
-                                  {o.dikerjakan_by_user.name.charAt(0)}
+                          {/* Pelanggan */}
+                          <td className="px-4 py-4 align-middle">
+                            <p className="text-sm font-bold leading-tight text-slate-800">{o.nama}</p>
+                            <p className="mt-0.5 text-xs font-medium tabular-nums text-gray-400">{o.no_hp}</p>
+                          </td>
+
+                          {/* Laptop */}
+                          <td className="min-w-[160px] px-4 py-4 align-middle">
+                            <p className="text-sm font-semibold leading-tight text-gray-700">{o.type_laptop}</p>
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
+                            </p>
+                          </td>
+
+                          {/* Selesai */}
+                          <td className="whitespace-nowrap px-4 py-4 align-middle">
+                            <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_selesai)}</span>
+                          </td>
+
+                          {/* Total Waktu */}
+                          <td className="whitespace-nowrap px-4 py-4 align-middle">
+                            <span className="inline-flex items-center gap-1.5 text-gray-500">
+                              <IconClock />
+                              <span className="text-xs font-bold tabular-nums text-gray-600">
+                                {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
+                              </span>
+                            </span>
+                          </td>
+
+                          {/* Teknisi */}
+                          <td className="px-4 py-4 align-middle">
+                            {o.dikerjakan_by_user?.name ? (
+                              <div className="flex items-center gap-2">
+                                <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-indigo-100 to-purple-100">
+                                  <span className="text-[9px] font-black uppercase text-indigo-700">
+                                    {o.dikerjakan_by_user.name.charAt(0)}
+                                  </span>
+                                </div>
+                                <span className="whitespace-nowrap text-xs font-semibold text-gray-600">
+                                  {o.dikerjakan_by_user.name}
                                 </span>
                               </div>
-                              <span className="text-xs text-gray-600 font-medium">{o.dikerjakan_by_user.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-300 font-medium">—</span>
-                          )}
-                        </td>
-
-                     {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
-                        <td className="px-4 py-4 min-w-[130px]">
-                          {o.payment_amount ? (
-                            <div className="flex flex-col">
-                              <p className="text-xs font-bold text-emerald-600">{fmtRupiah(o.payment_amount)}</p>
-                              <p className="text-[10px] text-gray-400 mt-0.5 font-medium">{o.payment_method || "CASH"}</p>
-                            </div>
-                          ) : (() => {
-                            const est = Number(o.estimasi_harga ?? 0);
-                            const sp = Number(o.biaya_sparepart ?? 0);
-                            const total = est + sp;
-                            if (o.status === "GAGAL_DIPERBAIKI") {
-                              return <span className="text-xs font-medium text-gray-300">—</span>;
-                            }
-                            if (total > 0) {
-                              return (
-                                <div className="flex flex-col">
-                                  <p className="text-xs font-bold text-indigo-600 tabular-nums">{fmtRupiah(total)}</p>
-                                  <p className="text-[10px] text-amber-500 mt-0.5 font-medium">estimasi · belum dibayar</p>
-                                </div>
-                              );
-                            }
-                            return <span className="text-xs font-medium text-amber-500">Konfirmasi saat diambil</span>;
-                          })()}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-4">
-                          <ServiceStatusBadge status={o.status} />
-                        </td>
-
-                        {/* Aksi */}
-                        <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              onClick={() => handleDiambilClick(o)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-                            >
-                              <IconCheck />
-                              Diambil
-                            </button>
-                            {o.status === "DONE" && (
-                              <button
-                                onClick={() => openTidakJadiDialog(o)}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-                              >
-                                Tidak Jadi
-                              </button>
+                            ) : (
+                              <span className="text-xs font-medium text-gray-300">—</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </td>
+
+                          {/* Payment — kalau belum dibayar, tampilkan ekspektasi (estimasi + sparepart) */}
+                          <td className="min-w-[140px] px-4 py-4 align-middle">
+                            <PaymentValue order={o} />
+                          </td>
+
+                          {/* Status */}
+                          <td className="whitespace-nowrap px-4 py-4 align-middle">
+                            <ServiceStatusBadge status={o.status} />
+                          </td>
+
+                          {/* Aksi — selalu 1 baris, rata kanan, lebar tombol seragam */}
+                          <td
+                            className="w-px whitespace-nowrap py-4 pl-4 pr-5 align-middle"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <ActionGroup actions={getActions(o)} variant="table" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gradient-to-r from-slate-50/40 to-white px-5 py-3">
+                  <p className="text-xs font-medium text-gray-400">
+                    💡 Klik baris untuk melihat detail lengkap
+                  </p>
+                  <p className="text-xs font-bold text-gray-400">
+                    Total: <span className="tabular-nums text-slate-800">{orders.length}</span> order
+                  </p>
+                </div>
               </div>
 
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gradient-to-r from-slate-50/30 to-white">
-                <p className="text-xs text-gray-400 font-medium">
-                  💡 Klik baris untuk melihat detail lengkap
-                </p>
-                <p className="text-xs font-semibold text-gray-400">
-                  Total: <span className="text-slate-800">{orders.length}</span> order
-                </p>
+              {/* ── Mobile / Tablet: Card List ──────────────────────────────── */}
+              <div className="space-y-3 lg:hidden">
+                {orders.map((o, idx) => (
+                  <div
+                    key={o.id}
+                    onClick={() => setDetailId(o.id)}
+                    className="cursor-pointer overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm transition-all active:scale-[0.99]"
+                  >
+                    {/* Head */}
+                    <div className="flex items-start justify-between gap-3 px-4 pt-4">
+                      <div className="flex min-w-0 items-start gap-2.5">
+                        <span className="mt-0.5 shrink-0 rounded-md bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-black tabular-nums text-gray-400">
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold leading-tight text-slate-800">{o.nama}</p>
+                          <p className="mt-0.5 text-xs font-medium tabular-nums text-gray-400">{o.no_hp}</p>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <ServiceStatusBadge status={o.status} />
+                      </div>
+                    </div>
+
+                    {/* Laptop */}
+                    <div className="mt-3 px-4">
+                      <p className="text-sm font-semibold leading-tight text-gray-700">{o.type_laptop}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-4">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1 text-gray-500">
+                        <IconClock />
+                        <span className="text-xs font-bold tabular-nums text-gray-600">
+                          {getDuration(o.tanggal_masuk, o.tanggal_selesai)}
+                        </span>
+                      </span>
+
+                      <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_selesai)}</span>
+
+                      {o.dikerjakan_by_user?.name && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gradient-to-br from-indigo-100 to-purple-100">
+                            <span className="text-[8px] font-black uppercase text-indigo-700">
+                              {o.dikerjakan_by_user.name.charAt(0)}
+                            </span>
+                          </span>
+                          <span className="text-xs font-semibold text-gray-600">{o.dikerjakan_by_user.name}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Payment */}
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-50 px-4 pt-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                        Payment
+                      </span>
+                      <PaymentValue order={o} align="right" />
+                    </div>
+
+                    {/* Aksi — grid full-width, tinggi seragam */}
+                    <div
+                      className="mt-3 border-t border-gray-50 bg-slate-50/40 px-4 py-3"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <ActionGroup actions={getActions(o)} variant="card" />
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between px-1 pt-1">
+                  <p className="text-xs font-medium text-gray-400">💡 Ketuk kartu untuk detail</p>
+                  <p className="text-xs font-bold text-gray-400">
+                    Total: <span className="tabular-nums text-slate-800">{orders.length}</span> order
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -576,17 +835,20 @@ export default function DonePage() {
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
               onClick={() => setPickupChoice({ open: false, order: null })}
             />
-            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
 
               {/* Modal Header */}
-              <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
+              <div className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white px-6 py-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/20">
                     <IconInfo />
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold text-slate-800 leading-tight">Konfirmasi Pengambilan</h2>
-                    <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-black leading-tight tracking-tight text-slate-800">
+                      Konfirmasi Pengambilan
+                    </h2>
+                    <p className="mt-0.5 truncate text-xs font-medium text-gray-400">
                       {pickupChoice.order.nama} · {pickupChoice.order.type_laptop}
                     </p>
                   </div>
@@ -596,46 +858,50 @@ export default function DonePage() {
               {/* Modal Body */}
               <div className="px-6 py-6">
                 {/* Warning banner */}
-                <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-100 rounded-xl mb-6">
-                  <div className="p-1 bg-rose-100 rounded-lg shrink-0 mt-0.5">
+                <div className="mb-6 flex items-start gap-3 rounded-xl border border-rose-100 bg-gradient-to-r from-rose-50 to-pink-50 p-4">
+                  <div className="mt-0.5 shrink-0 rounded-lg bg-rose-100 p-1 text-rose-600">
                     <IconInfo />
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-rose-800">Perhatian</p>
-                    <p className="text-xs text-rose-600 leading-relaxed mt-0.5">
-                      Laptop ini <strong className="font-bold">gagal diperbaiki</strong>. Apakah ada biaya diagnosa / penanganan yang perlu ditagihkan?
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-rose-800">Perhatian</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-rose-600">
+                      Laptop ini <strong className="font-black">gagal diperbaiki</strong>. Apakah ada biaya diagnosa / penanganan yang perlu ditagihkan?
                     </p>
                   </div>
                 </div>
 
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Pilih Opsi Pengambilan</p>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                  Pilih Opsi Pengambilan
+                </p>
 
                 <div className="space-y-3">
                   {/* Dengan payment */}
                   <button
+                    type="button"
                     onClick={handleGagalWithPayment}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-all group"
+                    className="group flex w-full items-center gap-3 rounded-xl border-2 border-gray-200 px-4 py-3.5 text-left outline-none transition-all hover:border-emerald-300 hover:bg-emerald-50/50 focus-visible:ring-2 focus-visible:ring-emerald-300 active:scale-[0.99]"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:shadow-lg group-hover:shadow-emerald-500/30 transition-all">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/20 transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/30">
                       <IconDollar />
                     </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-slate-800">Ada Biaya</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Isi nominal biaya diagnosa / penanganan</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-800">Ada Biaya</p>
+                      <p className="mt-0.5 text-xs text-gray-400">Isi nominal biaya diagnosa / penanganan</p>
                     </div>
                   </button>
 
                   {/* Tanpa payment */}
                   <button
+                    type="button"
                     onClick={handleGagalWithoutPayment}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-all group"
+                    className="group flex w-full items-center gap-3 rounded-xl border-2 border-gray-200 px-4 py-3.5 text-left outline-none transition-all hover:border-gray-300 hover:bg-gray-50/50 focus-visible:ring-2 focus-visible:ring-gray-300 active:scale-[0.99]"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center shadow-md shadow-gray-400/20 group-hover:shadow-lg group-hover:shadow-gray-400/30 transition-all">
-                      <IconCheck />
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 text-white shadow-md shadow-gray-400/20 transition-all group-hover:shadow-lg group-hover:shadow-gray-400/30">
+                      <IconCheckLg />
                     </div>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-slate-800">Gratis / Tanpa Biaya</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Laptop langsung dikembalikan ke pelanggan</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-800">Gratis / Tanpa Biaya</p>
+                      <p className="mt-0.5 text-xs text-gray-400">Laptop langsung dikembalikan ke pelanggan</p>
                     </div>
                   </button>
                 </div>
@@ -644,8 +910,9 @@ export default function DonePage() {
               {/* Modal Footer */}
               <div className="px-6 pb-6">
                 <button
+                  type="button"
                   onClick={() => setPickupChoice({ open: false, order: null })}
-                  className="w-full py-2.5 text-sm font-semibold text-gray-400 hover:text-gray-600 transition rounded-xl hover:bg-gray-50"
+                  className="h-10 w-full rounded-xl text-sm font-bold text-gray-400 outline-none transition hover:bg-gray-50 hover:text-gray-600 focus-visible:ring-2 focus-visible:ring-gray-300"
                 >
                   Batal
                 </button>
@@ -658,23 +925,27 @@ export default function DonePage() {
         {toast && (
           <div
             className={`
-              fixed bottom-8 right-8 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl
-              text-sm font-semibold text-white transition-all animate-in slide-in-from-right-5 duration-300
-              ${toast.type === "success" 
-                ? "bg-gradient-to-r from-emerald-500 to-teal-600" 
+              fixed bottom-6 left-4 right-4 z-50 flex items-center gap-3 rounded-2xl px-5 py-3.5
+              text-sm font-bold text-white shadow-xl ring-1 ring-black/5
+              transition-all animate-in slide-in-from-right-5 duration-300
+              sm:bottom-8 sm:left-auto sm:right-8 sm:max-w-md
+              ${toast.type === "success"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-600"
                 : "bg-gradient-to-r from-rose-500 to-pink-600"}
             `}
           >
-            {toast.type === "success" ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
-            {toast.msg}
+            <span className="shrink-0">
+              {toast.type === "success" ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              )}
+            </span>
+            <span className="leading-snug">{toast.msg}</span>
           </div>
         )}
       </div>
