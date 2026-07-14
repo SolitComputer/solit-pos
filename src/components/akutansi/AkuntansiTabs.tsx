@@ -5,6 +5,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
+import BukuBesar from "./BukuBesar";
+import Neraca from "./Neraca";
 
 type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi";
 
@@ -43,11 +45,10 @@ export default function AkuntansiTabs({ period }: { period: string }) {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 min-w-[110px] h-9 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-              tab === t.key
+            className={`flex-1 min-w-[110px] h-9 rounded-lg text-xs font-bold transition whitespace-nowrap ${tab === t.key
                 ? "bg-gray-900 text-white"
                 : "text-gray-500 hover:bg-gray-50"
-            }`}
+              }`}
           >
             {t.label}
           </button>
@@ -57,6 +58,10 @@ export default function AkuntansiTabs({ period }: { period: string }) {
       {/* Content */}
       {tab === "jurnal" ? (
         <JurnalUmum period={period} />
+      ) : tab === "buku-besar" ? (
+        <BukuBesar period={period} />
+      ) : tab === "neraca" ? (
+        <Neraca period={period} />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="text-4xl mb-3 opacity-40">🚧</div>

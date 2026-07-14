@@ -1,0 +1,174 @@
+// src/app/api/akutansi/buku-besar/route.ts
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
+import { AKUNTANSI_ROLES } from "@/lib/permissions";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { isValidPeriod, isValidAccount, accountName } from "@/lib/accounting";
+
+function getAdmin(): SupabaseClient {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
+
+interface LineRow {
+  id: string;
+  entry_id: string;
+  account_code: string;
+  side: "DEBIT" | "KREDIT";
+  nominal: number;
+}
+
+interface EntryRow {
+  id: string;
+  tanggal: string;
+  keterangan: string;
+  ref: string | null;
+}
+
+export const GET = withAuth(async (req) => {
+  const url = new URL(req.url);
+  const period = url.searchParams.get("period") ?? "";
+  const accountCode = url.searchParams.get("account_code") ?? "";
+
+  if (!isValidPeriod(period))
+    return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
+  if (!accountCode || !isValidAccount(accountCode))
+    return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
+
+  const supabase = getAdmin();
+
+  try {
+    // ── 0) Saldo awal MANUAL (one-time input) — nilai dasar sebelum periode manapun ──
+    // Rumus normal balance: DEBIT = +nominal, KREDIT = -nominal.
+    const { data: openingRow, error: openingErr } = await supabase
+      .from("journal_opening_balances")
+      .select("side, nominal")
+      .eq("account_code", accountCode)
+      .maybeSingle();
+
+    if (openingErr) throw openingErr;
+
+    const openingSigned = openingRow
+      ? openingRow.side === "DEBIT"
+        ? Number(openingRow.nominal)
+        : -Number(openingRow.nominal)
+      : 0;
+
+    // ── 1) Saldo awal: jumlahkan semua mutasi akun ini SEBELUM periode ini ──
+    const { data: priorEntries, error: priorEntryErr } = await supabase
+      .from("journal_entries")
+      .select("id")
+      .lt("period", period);
+
+    if (priorEntryErr) throw priorEntryErr;
+
+    const priorEntryIds = (priorEntries ?? []).map((e: any) => e.id as string);
+
+    let mutasiSebelumPeriode = 0;
+    if (priorEntryIds.length > 0) {
+      const { data: priorLines, error: priorLineErr } = await supabase
+        .from("journal_lines")
+        .select("side, nominal")
+        .eq("account_code", accountCode)
+        .in("entry_id", priorEntryIds);
+
+      if (priorLineErr) throw priorLineErr;
+
+      mutasiSebelumPeriode = (priorLines ?? []).reduce((s: number, l: any) => {
+        return s + (l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal));
+      }, 0);
+    }
+
+    // Saldo awal periode berjalan = saldo awal manual + akumulasi mutasi periode-periode sebelumnya
+    const saldoAwal = openingSigned + mutasiSebelumPeriode;
+
+    // ── 2) Semua entry di periode berjalan ──
+    const { data: periodEntries, error: entryErr } = await supabase
+      .from("journal_entries")
+      .select("id, tanggal, keterangan, ref")
+      .eq("period", period)
+      .order("tanggal", { ascending: true });
+
+    if (entryErr) throw entryErr;
+
+    const entryMap = new Map<string, EntryRow>();
+    for (const e of (periodEntries ?? []) as EntryRow[]) entryMap.set(e.id, e);
+    const periodEntryIds = Array.from(entryMap.keys());
+
+    // ── 3) Semua baris jurnal di entry-entry tsb (untuk hitung Ref lawan akun) ──
+    let allLines: LineRow[] = [];
+    if (periodEntryIds.length > 0) {
+      const { data: linesData, error: lineErr } = await supabase
+        .from("journal_lines")
+        .select("id, entry_id, account_code, side, nominal")
+        .in("entry_id", periodEntryIds);
+
+      if (lineErr) throw lineErr;
+      allLines = (linesData ?? []) as LineRow[];
+    }
+
+    // Map: entry_id -> daftar kode akun lawan (selain akun yang sedang dibuka)
+    const counterMap = new Map<string, string[]>();
+    for (const l of allLines) {
+      if (l.account_code === accountCode) continue;
+      const arr = counterMap.get(l.entry_id) ?? [];
+      if (!arr.includes(l.account_code)) arr.push(l.account_code);
+      counterMap.set(l.entry_id, arr);
+    }
+
+    // ── 4) Baris milik akun yang sedang dibuka, urut tanggal lalu insert order ──
+    const ownLines = allLines
+      .filter((l) => l.account_code === accountCode)
+      .sort((a, b) => {
+        const ea = entryMap.get(a.entry_id)!;
+        const eb = entryMap.get(b.entry_id)!;
+        const t = new Date(ea.tanggal).getTime() - new Date(eb.tanggal).getTime();
+        if (t !== 0) return t;
+        return ea.id.localeCompare(eb.id);
+      });
+
+    let running = saldoAwal;
+    const lines = ownLines.map((l) => {
+      const entry = entryMap.get(l.entry_id)!;
+      const debit = l.side === "DEBIT" ? Number(l.nominal) : 0;
+      const kredit = l.side === "KREDIT" ? Number(l.nominal) : 0;
+      running += debit - kredit;
+      const ref = (counterMap.get(l.entry_id) ?? []).join(", ");
+      return {
+        id: l.id,
+        tanggal: entry.tanggal,
+        keterangan: entry.keterangan,
+        ref,
+        debit,
+        kredit,
+        saldo_debit: running >= 0 ? running : 0,
+        saldo_kredit: running < 0 ? Math.abs(running) : 0,
+      };
+    });
+
+    const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+    const totalKredit = lines.reduce((s, l) => s + l.kredit, 0);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        account: { code: accountCode, name: accountName(accountCode) },
+        saldo_awal: saldoAwal,
+        opening_balance: openingRow
+          ? { side: openingRow.side, nominal: Number(openingRow.nominal) }
+          : null,
+        lines,
+        totals: { debit: totalDebit, kredit: totalKredit, saldo_akhir: running },
+      },
+    });
+  } catch (error: any) {
+    console.error("[buku-besar GET]", error);
+    return NextResponse.json(
+      { success: false, message: error?.message ?? "Gagal memuat buku besar" },
+      { status: 500 }
+    );
+  }
+}, AKUNTANSI_ROLES);

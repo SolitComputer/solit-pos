@@ -1,5 +1,5 @@
 "use client";
-// src/components/akuntansi/JurnalUmum.tsx
+// src/components/akutansi/JurnalUmum.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -230,20 +230,13 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 })}
                             </div>
 
-                            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex gap-2">
+                            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
                                 <button
                                     onClick={() => confirmItems(pending.filter((d) => selected.has(key(d))))}
                                     disabled={busy || selected.size === 0}
-                                    className="flex-1 h-9 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 transition disabled:opacity-40"
+                                    className="w-full h-9 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 transition disabled:opacity-40"
                                 >
                                     Konfirmasi Terpilih ({selected.size})
-                                </button>
-                                <button
-                                    onClick={() => confirmItems(pending)}
-                                    disabled={busy}
-                                    className="flex-1 h-9 rounded-lg bg-white border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-100 transition disabled:opacity-40"
-                                >
-                                    Konfirmasi Semua
                                 </button>
                             </div>
                         </>
@@ -267,6 +260,19 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </button>
             </div>
 
+            {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
+            {!loading && filtered.length > 0 && (
+                <div className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total</span>
+                    <span className="text-sm font-black text-gray-900 font-mono">
+                        Debit&nbsp; {rp(totalDebit)}
+                    </span>
+                    <span className="text-sm font-black text-gray-900 font-mono">
+                        Kredit&nbsp; {rp(totalKredit)}
+                    </span>
+                </div>
+            )}
+
             {/* ── Tabel Jurnal Umum ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -281,6 +287,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Aksi</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             {loading ? (
                                 Array.from({ length: 4 }).map((_, i) => (
@@ -404,19 +411,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 })
                             )}
                         </tbody>
-
-                        {!loading && filtered.length > 0 && (
-                            <tfoot>
-                                <tr className="border-t-2 border-gray-300 bg-gray-50">
-                                    <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase">
-                                        Total
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">{rp(totalDebit)}</td>
-                                    <td className="px-4 py-3 text-right text-sm font-black text-gray-900 font-mono">{rp(totalKredit)}</td>
-                                    <td />
-                                </tr>
-                            </tfoot>
-                        )}
                     </table>
                 </div>
             </div>
