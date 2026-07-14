@@ -202,51 +202,166 @@ function StatCard({
   accentColor: string;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-xl border ${borderColor} px-5 py-4 bg-white transition-all hover:shadow-md`}>
-      <div className={`absolute top-0 left-0 w-1 h-full rounded-l-xl ${accentColor}`} />
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-3xl font-bold tracking-tight ${color}`}>{count}</p>
-          <p className="text-xs font-semibold mt-1 text-gray-500">{label}</p>
+    <div
+      className={`relative overflow-hidden rounded-2xl border ${borderColor} bg-white px-5 py-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5`}
+    >
+      <span className={`absolute inset-y-0 left-0 w-1 ${accentColor}`} aria-hidden />
+      <div className="flex items-center justify-between gap-4 pl-2">
+        <div className="min-w-0">
+          <p className={`text-3xl font-black tracking-tight tabular-nums leading-none ${color}`}>
+            {count}
+          </p>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+            {label}
+          </p>
         </div>
-        <div className={`p-2 rounded-lg ${bgColor}`}>
-          <div className={color}>{icon}</div>
+        <div className={`shrink-0 grid place-items-center w-11 h-11 rounded-xl ${bgColor} ${color}`}>
+          {icon}
         </div>
       </div>
     </div>
   );
 }
 
-// ── Action Button ─────────────────────────────────────────────────────────────
-function ActionBtn({ label, color, onClick }: { label: string; color: "blue" | "green" | "orange" | "rose" | "purple"; onClick: () => void }) {
-  const variants = {
-    blue: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200",
-    green: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200",
-    orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200",
-    rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200",
-    purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200",
-  };
+// ── Action Types & Button ─────────────────────────────────────────────────────
+type ActionColor = "blue" | "green" | "orange" | "rose" | "purple";
+
+type ActionItem = {
+  label: string;
+  color: ActionColor;
+  onClick: () => void;
+};
+
+const ACTION_VARIANTS: Record<ActionColor, string> = {
+  blue: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 focus-visible:ring-blue-300",
+  green: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 focus-visible:ring-emerald-300",
+  orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200 focus-visible:ring-orange-300",
+  rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
+  purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 focus-visible:ring-purple-300",
+};
+
+function ActionBtn({
+  label,
+  color,
+  onClick,
+  size = "sm",
+  block = false,
+}: {
+  label: string;
+  color: ActionColor;
+  onClick: () => void;
+  /** sm = di dalam tabel · md = di dalam card (mobile, target sentuh lebih besar) */
+  size?: "sm" | "md";
+  /** block = lebar penuh mengikuti grid parent */
+  block?: boolean;
+}) {
+  const sizing =
+    size === "md"
+      ? "h-9 px-3 text-xs"
+      : "h-7 px-3 text-[11px] min-w-[72px]";
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${variants[color]} hover:scale-105 active:scale-95`}
+      className={`
+        inline-flex items-center justify-center whitespace-nowrap rounded-lg border
+        font-bold tracking-tight transition-all duration-150
+        outline-none focus-visible:ring-2 focus-visible:ring-offset-1
+        active:scale-95
+        ${block ? "w-full" : ""}
+        ${sizing}
+        ${ACTION_VARIANTS[color]}
+      `}
     >
       {label}
     </button>
   );
 }
 
-// ── Skeleton Row ──────────────────────────────────────────────────────────────
+/**
+ * Grup tombol aksi — dipakai di dua tempat:
+ * - variant="table" → 1 baris, rata kanan, TIDAK pernah wrap (flex-nowrap)
+ * - variant="card"  → grid full-width, tombol sejajar & mudah dipencet di HP
+ */
+function ActionGroup({
+  actions,
+  variant,
+}: {
+  actions: ActionItem[];
+  variant: "table" | "card";
+}) {
+  if (actions.length === 0) return null;
+
+  if (variant === "card") {
+    const cols = actions.length >= 3 ? "grid-cols-3" : "grid-cols-2";
+    return (
+      <div className={`grid ${cols} gap-2`}>
+        {actions.map(a => (
+          <ActionBtn key={a.label} label={a.label} color={a.color} onClick={a.onClick} size="md" block />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-nowrap items-center justify-end gap-1.5">
+      {actions.map(a => (
+        <ActionBtn key={a.label} label={a.label} color={a.color} onClick={a.onClick} size="sm" />
+      ))}
+    </div>
+  );
+}
+
+// ── Skeletons ─────────────────────────────────────────────────────────────────
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-50">
-      {[40, 80, 70, 140, 60, 50, 60, 70, 60, 90].map((w, i) => (
-        <td key={i} className="px-4 py-4">
+      {[28, 110, 130, 170, 90, 60, 100, 90, 80, 150].map((w, i) => (
+        <td key={i} className="px-4 py-4 first:pl-5 last:pr-5">
           <div className="h-3 rounded-full bg-gray-100 animate-pulse" style={{ width: w }} />
         </td>
       ))}
     </tr>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl border border-gray-200/60 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-2">
+          <div className="h-3 w-32 animate-pulse rounded-full bg-gray-100" />
+          <div className="h-3 w-24 animate-pulse rounded-full bg-gray-100" />
+        </div>
+        <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100" />
+      </div>
+      <div className="mt-4 h-3 w-full animate-pulse rounded-full bg-gray-100" />
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+        <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+      </div>
+    </div>
+  );
+}
+
+// ── Estimasi cell (dipakai tabel & card) ──────────────────────────────────────
+function EstimasiValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
+  const est = Number(order.estimasi_harga ?? 0);
+  const sp = Number(order.biaya_sparepart ?? 0);
+  const total = est + sp;
+
+  if (total <= 0) return <span className="text-xs font-medium text-gray-300">—</span>;
+
+  return (
+    <div className={`flex flex-col ${align === "right" ? "items-end text-right" : ""}`}>
+      <span className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(total)}</span>
+      {sp > 0 && (
+        <span className="mt-0.5 text-[10px] font-medium text-gray-400">
+          jasa {fmtRupiah(est) ?? "Rp 0"} + part {fmtRupiah(sp)}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -339,6 +454,36 @@ export default function AntrianPage() {
     }
   };
 
+  /**
+   * Sumber tunggal daftar tombol aksi per status.
+   * Kombinasi tombol PERSIS sama dengan versi sebelumnya — hanya dipindah ke satu tempat
+   * supaya tabel (desktop) dan card (mobile) selalu konsisten.
+   */
+  const getActions = (o: ServiceOrder): ActionItem[] => {
+    if (!canAction) return [];
+
+    switch (o.status) {
+      case "ANTRIAN":
+        return [
+          { label: "Mulai", color: "blue", onClick: () => openPriceDialog(o, "mulai") },
+          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+        ];
+      case "SEDANG_DIKERJAKAN":
+        return [
+          { label: "Sparepart", color: "orange", onClick: () => openPriceDialog(o, "sparepart") },
+          { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
+          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+        ];
+      case "MENUNGGU_SPAREPART":
+        return [
+          { label: "Lanjut", color: "purple", onClick: () => openPriceDialog(o, "mulai") },
+          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+        ];
+      default:
+        return [];
+    }
+  };
+
   const handlePriceConfirm = async (price: number, reason?: string) => {
     const body: Record<string, unknown> = { action: priceDialog.action };
     if (priceDialog.action === "mulai") body.estimasi_harga = price;
@@ -391,51 +536,57 @@ export default function AntrianPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
 
         {/* ── Top Header ──────────────────────────────────────────────────────── */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/60 px-6 py-5 sticky top-0 z-20">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="sticky top-0 z-20 border-b border-gray-200/60 bg-white/80 backdrop-blur-md">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#ffffff] to-[#ffffff] flex items-center justify-center shadow-lg shadow-[#1a1a2e]/20">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-[#1a1a2e] shadow-sm">
                 <IconWrench />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-[#1a1a2e] tracking-tight">
+
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-black tracking-tight text-[#1a1a2e]">
                   Antrian Servis
                 </h1>
-                <div className="flex items-center gap-2 mt-0.5">
+
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   {connected ? (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-full">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       </span>
-                      <span className="text-[10px] font-semibold text-emerald-700">Live</span>
-                    </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Live</span>
+                    </span>
                   ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded-full">
-                      <span className="w-2 h-2 rounded-full bg-gray-300" />
-                      <span className="text-[10px] font-semibold text-gray-400">Polling</span>
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2 py-0.5">
+                      <span className="h-2 w-2 rounded-full bg-gray-300" />
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Polling</span>
+                    </span>
                   )}
                   <span className="text-gray-300">·</span>
-                  <span className="text-xs font-medium text-gray-400">
+                  <span className="text-xs font-semibold text-gray-400 tabular-nums">
                     {orders.length} order aktif
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button
+                type="button"
                 onClick={refresh}
-                className="p-2.5 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all"
                 title="Refresh"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-gray-400 outline-none transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-gray-300 active:scale-95"
               >
                 <IconRefresh />
               </button>
+
               {canCreate && (
                 <button
+                  type="button"
                   onClick={() => setFormOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-[#1a1a2e]/30 transition-all hover:scale-[1.02] active:scale-95"
+                  className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] px-5 text-sm font-bold text-white shadow-sm outline-none transition-all hover:shadow-lg hover:shadow-[#1a1a2e]/30 focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/40 focus-visible:ring-offset-2 active:scale-95 sm:flex-none"
                 >
                   <IconPlus />
                   Buat Formulir
@@ -445,10 +596,10 @@ export default function AntrianPage() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
 
           {/* ── Stat Cards ──────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
               icon={<IconQueue />}
               label="Antrian"
@@ -478,41 +629,53 @@ export default function AntrianPage() {
             />
           </div>
 
-          {/* ── Table ────────────────────────────────────────────────────────── */}
+          {/* ── Loading ──────────────────────────────────────────────────────── */}
           {loading ? (
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/80">
-                      {COLUMNS.map(h => (
-                        <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap first:pl-5">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
-                  </tbody>
-                </table>
+            <>
+              {/* Desktop skeleton */}
+              <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/80">
+                        {COLUMNS.map(h => (
+                          <th
+                            key={h}
+                            className="whitespace-nowrap px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[1, 2, 3, 4, 5].map(i => <SkeletonRow key={i} />)}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Mobile skeleton */}
+              <div className="space-y-3 lg:hidden">
+                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+              </div>
+            </>
           ) : orders.length === 0 ? (
             /* ── Empty State ── */
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm">
-              <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-                <div className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center mb-6 text-gray-300">
+            <div className="rounded-2xl border border-gray-200/60 bg-white shadow-sm">
+              <div className="flex flex-col items-center justify-center px-6 py-20 text-center sm:py-24">
+                <div className="mb-6 grid h-20 w-20 place-items-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-300">
                   <IconClipboard />
                 </div>
-                <h3 className="text-lg font-bold text-[#1a1a2e]">Antrian Kosong</h3>
-                <p className="text-sm text-gray-400 mt-2 max-w-md leading-relaxed">
+                <h3 className="text-lg font-black tracking-tight text-[#1a1a2e]">Antrian Kosong</h3>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-gray-400">
                   Semua order sudah selesai, atau belum ada order servis yang masuk hari ini.
                 </p>
                 {canCreate && (
                   <button
+                    type="button"
                     onClick={() => setFormOpen(true)}
-                    className="mt-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-[#1a1a2e]/30 transition-all hover:scale-[1.02] active:scale-95"
+                    className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] px-6 text-sm font-bold text-white shadow-sm outline-none transition-all hover:shadow-lg hover:shadow-[#1a1a2e]/30 focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/40 focus-visible:ring-offset-2 active:scale-95"
                   >
                     <IconPlus />
                     Buat Formulir Baru
@@ -521,140 +684,210 @@ export default function AntrianPage() {
               </div>
             </div>
           ) : (
-            /* ── Main Table ── */
-            <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gradient-to-r from-gray-50/80 to-white">
-                      {COLUMNS.map((h, i) => (
-                        <th
-                          key={h}
-                          className={`px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap ${i === 0 ? 'pl-5' : ''}`}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {queue.map((o, idx) => (
-                      <tr
-                        key={o.id}
-                        className="hover:bg-blue-50/30 transition-colors duration-150 cursor-pointer group"
-                        onClick={() => setDetailId(o.id)}
-                      >
-                        <td className="pl-5 pr-4 py-4">
-                          <span className="text-xs font-mono font-bold text-gray-300 group-hover:text-gray-500 transition">
+            <>
+              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+              <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gradient-to-r from-gray-50/90 to-white">
+                        {COLUMNS.map((h, i) => (
+                          <th
+                            key={h}
+                            className={`
+                              whitespace-nowrap px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
+                              ${i === 0 ? "pl-5" : ""}
+                              ${i === COLUMNS.length - 1 ? "pr-5 text-right" : "text-left"}
+                            `}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-50">
+                      {queue.map((o, idx) => {
+                        const actions = getActions(o);
+                        return (
+                          <tr
+                            key={o.id}
+                            className="group cursor-pointer transition-colors duration-150 hover:bg-blue-50/40"
+                            onClick={() => setDetailId(o.id)}
+                          >
+                            {/* # */}
+                            <td className="py-4 pl-5 pr-4 align-middle">
+                              <span className="font-mono text-xs font-black tabular-nums text-gray-300 transition group-hover:text-gray-500">
+                                {String(idx + 1).padStart(2, "0")}
+                              </span>
+                            </td>
+
+                            {/* Pelanggan */}
+                            <td className="px-4 py-4 align-middle">
+                              <p className="text-sm font-bold leading-tight text-[#1a1a2e]">{o.nama}</p>
+                              <p className="mt-0.5 text-xs font-medium tabular-nums text-gray-400">{o.no_hp}</p>
+                            </td>
+
+                            {/* Laptop */}
+                            <td className="min-w-[160px] px-4 py-4 align-middle">
+                              <p className="text-sm font-semibold leading-tight text-gray-700">{o.type_laptop}</p>
+                              <p className="mt-0.5 text-xs text-gray-400">
+                                {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
+                              </p>
+                            </td>
+
+                            {/* Keluhan */}
+                            <td className="max-w-[220px] px-4 py-4 align-middle">
+                              <p className="line-clamp-2 text-xs leading-relaxed text-gray-500">{o.keluhan}</p>
+                            </td>
+
+                            {/* Masuk */}
+                            <td className="whitespace-nowrap px-4 py-4 align-middle">
+                              <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_masuk)}</span>
+                            </td>
+
+                            {/* Durasi */}
+                            <td className="whitespace-nowrap px-4 py-4 align-middle">
+                              <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums ${getDurationColor(o.tanggal_masuk)}`}>
+                                {getDuration(o.tanggal_masuk)}
+                              </span>
+                            </td>
+
+                            {/* Teknisi */}
+                            <td className="px-4 py-4 align-middle">
+                              {o.dikerjakan_by_user?.name ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-purple-100 to-purple-200">
+                                    <span className="text-[9px] font-black uppercase text-purple-700">
+                                      {o.dikerjakan_by_user.name.charAt(0)}
+                                    </span>
+                                  </div>
+                                  <span className="whitespace-nowrap text-xs font-semibold text-gray-600">
+                                    {o.dikerjakan_by_user.name}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs font-medium text-gray-300">—</span>
+                              )}
+                            </td>
+
+                            {/* Estimasi = estimasi_harga + biaya_sparepart */}
+                            <td className="min-w-[130px] whitespace-nowrap px-4 py-4 align-middle">
+                              <EstimasiValue order={o} />
+                            </td>
+
+                            {/* Status */}
+                            <td className="whitespace-nowrap px-4 py-4 align-middle">
+                              <ServiceStatusBadge status={o.status} />
+                            </td>
+
+                            {/* Aksi — selalu 1 baris, rata kanan, lebar tombol seragam */}
+                            <td
+                              className="w-px whitespace-nowrap py-4 pl-4 pr-5 align-middle"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <ActionGroup actions={actions} variant="table" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/40 px-5 py-3">
+                  <p className="text-xs font-medium text-gray-400">
+                    💡 Klik baris untuk melihat detail lengkap
+                  </p>
+                  <p className="text-xs font-bold text-gray-400">
+                    Total: <span className="tabular-nums text-[#1a1a2e]">{orders.length}</span> order
+                  </p>
+                </div>
+              </div>
+
+              {/* ── Mobile / Tablet: Card List ──────────────────────────────── */}
+              <div className="space-y-3 lg:hidden">
+                {queue.map((o, idx) => {
+                  const actions = getActions(o);
+                  return (
+                    <div
+                      key={o.id}
+                      onClick={() => setDetailId(o.id)}
+                      className="cursor-pointer overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm transition-all active:scale-[0.99]"
+                    >
+                      {/* Head */}
+                      <div className="flex items-start justify-between gap-3 px-4 pt-4">
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <span className="mt-0.5 shrink-0 rounded-md bg-gray-50 px-1.5 py-0.5 font-mono text-[10px] font-black tabular-nums text-gray-400">
                             {String(idx + 1).padStart(2, "0")}
                           </span>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-[#1a1a2e] text-sm leading-tight">{o.nama}</p>
-                          <p className="text-xs text-gray-400 mt-0.5 font-medium">{o.no_hp}</p>
-                        </td>
-
-                        <td className="px-4 py-4 min-w-[150px]">
-                          <p className="font-semibold text-gray-700 text-sm leading-tight">{o.type_laptop}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
-                          </p>
-                        </td>
-
-                        <td className="px-4 py-4 max-w-[200px]">
-                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{o.keluhan}</p>
-                        </td>
-
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="text-xs text-gray-400 font-medium">{formatDate(o.tanggal_masuk)}</span>
-                        </td>
-
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${getDurationColor(o.tanggal_masuk)}`}>
-                            {getDuration(o.tanggal_masuk)}
-                          </span>
-                        </td>
-
-<td className="px-4 py-4">
-                          {o.dikerjakan_by_user?.name ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shrink-0">
-                                <span className="text-[9px] font-bold text-purple-700 uppercase">
-                                  {o.dikerjakan_by_user.name.charAt(0)}
-                                </span>
-                              </div>
-                              <span className="text-xs text-gray-600 font-medium">{o.dikerjakan_by_user.name}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-300 font-medium">—</span>
-                          )}
-                        </td>
-
-                        {/* Estimasi = estimasi_harga + biaya_sparepart (running total sebelum payment final) */}
-                        <td className="px-4 py-4 whitespace-nowrap min-w-[120px]">
-                          {(() => {
-                            const est = Number(o.estimasi_harga ?? 0);
-                            const sp = Number(o.biaya_sparepart ?? 0);
-                            const total = est + sp;
-                            if (total <= 0) return <span className="text-xs text-gray-300 font-medium">—</span>;
-                            return (
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold text-indigo-600 tabular-nums">{fmtRupiah(total)}</span>
-                                {sp > 0 && (
-                                  <span className="text-[10px] text-gray-400 mt-0.5">
-                                    jasa {fmtRupiah(est) ?? "Rp 0"} + part {fmtRupiah(sp)}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </td>
-
-                        <td className="px-4 py-4">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold leading-tight text-[#1a1a2e]">{o.nama}</p>
+                            <p className="mt-0.5 text-xs font-medium tabular-nums text-gray-400">{o.no_hp}</p>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
                           <ServiceStatusBadge status={o.status} />
-                        </td>
+                        </div>
+                      </div>
 
-                        <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
-                          {canAction && (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {o.status === "ANTRIAN" && (
-                                <>
-                                  <ActionBtn label="Mulai" color="blue" onClick={() => openPriceDialog(o, "mulai")} />
-                                  <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
-                                </>
-                              )}
-                              {o.status === "SEDANG_DIKERJAKAN" && (
-                                <>
-                                  <ActionBtn label="Sparepart" color="orange" onClick={() => openPriceDialog(o, "sparepart")} />
-                                  <ActionBtn label="Selesai" color="green" onClick={() => openDialog(o, "done")} />
-                                  <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
-                                </>
-                              )}
-                              {o.status === "MENUNGGU_SPAREPART" && (
-                                <>
-                                  <ActionBtn label="Lanjut" color="purple" onClick={() => openPriceDialog(o, "mulai")} />
-                                  <ActionBtn label="Gagal" color="rose" onClick={() => openDialog(o, "gagal_diperbaiki")} />
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      {/* Laptop + keluhan */}
+                      <div className="mt-3 px-4">
+                        <p className="text-sm font-semibold leading-tight text-gray-700">{o.type_laptop}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {[o.cpu, o.ram].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-gray-500">{o.keluhan}</p>
+                      </div>
 
-              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
-                <p className="text-xs text-gray-400 font-medium">
-                  💡 Klik baris untuk melihat detail lengkap
-                </p>
-                <p className="text-xs font-semibold text-gray-400">
-                  Total: <span className="text-[#1a1a2e]">{orders.length}</span> order
-                </p>
+                      {/* Meta */}
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 px-4">
+                        <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums ${getDurationColor(o.tanggal_masuk)}`}>
+                          {getDuration(o.tanggal_masuk)}
+                        </span>
+                        <span className="text-xs font-medium text-gray-400">{formatDate(o.tanggal_masuk)}</span>
+
+                        {o.dikerjakan_by_user?.name && (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gradient-to-br from-purple-100 to-purple-200">
+                              <span className="text-[8px] font-black uppercase text-purple-700">
+                                {o.dikerjakan_by_user.name.charAt(0)}
+                              </span>
+                            </span>
+                            <span className="text-xs font-semibold text-gray-600">{o.dikerjakan_by_user.name}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Estimasi */}
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-50 px-4 pt-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                          Estimasi
+                        </span>
+                        <EstimasiValue order={o} align="right" />
+                      </div>
+
+                      {/* Aksi — grid full-width, tinggi seragam, mudah dipencet */}
+                      {actions.length > 0 && (
+                        <div
+                          className="mt-3 border-t border-gray-50 bg-gray-50/40 px-4 py-3"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <ActionGroup actions={actions} variant="card" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="flex items-center justify-between px-1 pt-1">
+                  <p className="text-xs font-medium text-gray-400">💡 Ketuk kartu untuk detail</p>
+                  <p className="text-xs font-bold text-gray-400">
+                    Total: <span className="tabular-nums text-[#1a1a2e]">{orders.length}</span> order
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -701,13 +934,17 @@ export default function AntrianPage() {
         {toast && (
           <div
             className={`
-              fixed bottom-8 right-8 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl
-              text-sm font-semibold text-white transition-all animate-in slide-in-from-right-5 duration-300
+              fixed bottom-6 left-4 right-4 z-50 flex items-center gap-3 rounded-2xl px-5 py-3.5
+              text-sm font-bold text-white shadow-xl ring-1 ring-black/5
+              transition-all animate-in slide-in-from-right-5 duration-300
+              sm:bottom-8 sm:left-auto sm:right-8 sm:max-w-md
               ${toast.type === "success" ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a]" : "bg-gradient-to-r from-rose-500 to-rose-600"}
             `}
           >
-            {toast.type === "success" ? <IconCheck /> : <IconX />}
-            {toast.msg}
+            <span className="shrink-0">
+              {toast.type === "success" ? <IconCheck /> : <IconX />}
+            </span>
+            <span className="leading-snug">{toast.msg}</span>
           </div>
         )}
       </div>
