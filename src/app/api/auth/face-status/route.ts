@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,7 +160,15 @@ export async function GET() {
     const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
     const alreadyAttendedDB = Array.isArray(todaySuccess) ? todaySuccess.length > 0 : Boolean(todaySuccess);
 
-    const schedule = await resolveShiftConfigFromDB(user.id, supabase);
+    const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
+    const override = await resolveScheduleOverride(supabase, user.id, todayDate);
+
+    const schedule = override
+      ? { ...baseSchedule, ...toAuthScheduleShape(override) }
+      : baseSchedule;
+
+    const effectiveShift = override ? override.shift : userShift;
+
     const timeStatus = isAttendanceTimeForSchedule(schedule);
 
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -186,18 +195,18 @@ export async function GET() {
       isAttendanceTime: isAttendanceTimeNow,
       isTodayDayOff,
       isDayOff: isTodayDayOff,
-      shift: userShift,
+      shift: effectiveShift,
       reason,
       openAt,
       closeAt,
       lateAt,
       isExempt: false,
-      scheduleSource: schedule.source,
+      scheduleSource: override ? "SHIFT_SCHEDULE" : schedule.source,
       scheduleToday: {
         openAt: `${pad(schedule.start.h)}:${pad(schedule.start.m)}`,
         closeAt: `${pad(schedule.end.h)}:${pad(schedule.end.m)}`,
         lateAt: `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)}`,
-        source: schedule.source,
+        source: override ? "SHIFT_SCHEDULE" : schedule.source,
       },
       manualAlreadyExists: false,
     });

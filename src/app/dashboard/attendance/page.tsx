@@ -8,6 +8,8 @@ import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
 import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
+import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
+import { ShiftScheduleTab } from "./ShiftScheduleTab";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -2541,6 +2543,38 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
     );
 }
 
+function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSaved }: {
+    users: UserInfo[];
+    schedules: ShiftScheduleRow[];   // ✅ NEW
+    calYear: number; calMonth: number;
+    onClose: () => void; onSaved: () => void | Promise<void>;
+}) {
+    return (
+        <ModalShell
+            onClose={onClose}
+            headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
+            title="⏰ Jadwal Shift per Tanggal"
+            subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan · ${schedules.length} jadwal aktif`}
+            wide
+            footer={
+                <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+                    Tutup
+                </button>
+            }
+        >
+            <div className="overflow-y-auto flex-1 px-6 py-5 bg-[#F7F7F8]">
+                <ShiftScheduleTab
+                    users={users}
+                    schedules={schedules}
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onSaved={onSaved}
+                />
+            </div>
+        </ModalShell>
+    );
+}
+
 export default function AttendanceDashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -2622,6 +2656,18 @@ export default function AttendanceDashboardPage() {
     const [salaryModalPklOnly, setSalaryModalPklOnly] = useState<boolean | undefined>(undefined);
     const [showMonthlyOffModal, setShowMonthlyOffModal] = useState(false);
     const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
+    const [showShiftScheduleModal, setShowShiftScheduleModal] = useState(false);
+    const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
+
+    const fetchShiftSchedules = useCallback(async (y: number, m: number) => {
+        try {
+            const r = await fetch(`/api/attendance/shift-schedule?year=${y}&month=${m + 1}`);
+            const d = await r.json();
+            if (d.success) setShiftSchedules(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch shift schedules:", err);
+        }
+    }, []);
 
     const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
@@ -2817,6 +2863,7 @@ export default function AttendanceDashboardPage() {
             fetchSalaries(),
             fetchAllowances(),
             fetchLeaveData(year, month), // ✅ FIX: sama seperti di atas
+            fetchShiftSchedules(year, month),   // ✅ tambah baris ini
         ];
         Promise.all(tasks).finally(() => setLoading(false));
     }, [
@@ -2831,6 +2878,7 @@ export default function AttendanceDashboardPage() {
         fetchSalaries,
         fetchAllowances,
         fetchLeaveData,
+        fetchShiftSchedules,
     ]);
 
     useEffect(() => {
@@ -2880,7 +2928,8 @@ export default function AttendanceDashboardPage() {
             fetchAllUsers(),
             fetchSalaries(),
             fetchAllowances(),
-            fetchLeaveData(year, month), // ✅ FIX: jangan gate ke admin doang, biar perhitungan cuti sama-sama akurat di akun biasa
+            fetchLeaveData(year, month),
+            fetchShiftSchedules(year, month),
         ];
         Promise.all(tasks).finally(() => setLoading(false));
         if (userCanViewSalary(currentUser)) {
@@ -3035,6 +3084,36 @@ export default function AttendanceDashboardPage() {
     const uniqueUsers = useMemo(() => { if (allUsers.length > 0) return allUsers.map(u => u.name).sort(); return [...new Set(mergedAttendances.map(a => a.user_name))].sort(); }, [allUsers, mergedAttendances]);
     const salaryMap = useMemo(() => { const m: Record<string, UserSalary> = {}; salaries.forEach(s => m[s.user_id] = s); return m; }, [salaries]);
 
+    // ✅ Shift efektif per (user, tanggal): jadwal > shift user > PAGI
+    const schedulesByUser = useMemo(() => {
+        const m: Record<string, ShiftScheduleRow[]> = {};
+        shiftSchedules.forEach(s => { (m[s.user_id] ??= []).push(s); });
+        return m;
+    }, [shiftSchedules]);
+
+    const effectiveShiftFor = useCallback((userId: string, dk: string) => {
+        const sched = pickSchedule(schedulesByUser[userId] ?? [], dk);
+        if (sched) {
+            const base = SHIFT_DEFAULTS[sched.shift];
+            const custom = sched.open_hour != null && sched.late_hour != null && sched.close_hour != null;
+            return {
+                shift: sched.shift,
+                fromSchedule: true,
+                open: custom ? sched.open_hour! * 60 + (sched.open_minute ?? 0) : base.open_hour * 60 + base.open_minute,
+                late: custom ? sched.late_hour! * 60 + (sched.late_minute ?? 0) : base.late_hour * 60 + base.late_minute,
+                close: custom ? sched.close_hour! * 60 + (sched.close_minute ?? 0) : base.close_hour * 60 + base.close_minute,
+            };
+        }
+        const shift = (allUsers.find(u => u.id === userId)?.shift ?? "PAGI") as "PAGI" | "SORE";
+        const base = SHIFT_DEFAULTS[shift];
+        return {
+            shift,
+            fromSchedule: false,
+            open: base.open_hour * 60 + base.open_minute,
+            late: base.late_hour * 60 + base.late_minute,
+            close: base.close_hour * 60 + base.close_minute,
+        };
+    }, [schedulesByUser, allUsers]);
 
     const userSummary = useMemo(() => {
         type UserStat = {
@@ -3256,19 +3335,13 @@ export default function AttendanceDashboardPage() {
 
             if (isToday) {
                 const totalMinNow = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-                const userLastAttendance = mergedAttendances.find(a => a.user_id === u.id);
-                const shift = u.shift ?? "PAGI";
-                const SHIFT_TIMES = {
-                    PAGI: { open: 7 * 60 + 30, late: 8 * 60, close: 12 * 60 },
-                    SORE: { open: 14 * 60, late: 16 * 60, close: 18 * 60 },
-                } as const;
-                const times = SHIFT_TIMES[shift as keyof typeof SHIFT_TIMES] ?? SHIFT_TIMES.PAGI;
+                const times = effectiveShiftFor(u.id, selectedDate); // ✅ hormati jadwal
 
                 if (totalMinNow < times.open) {
                     attendanceStatus = "WITHIN_TIME";
                 } else if (totalMinNow > times.close) {
                     attendanceStatus = "ABSENT_CONFIRMED";
-                } else if (totalMinNow >= times.open && totalMinNow < times.late) {
+                } else if (totalMinNow < times.late) {
                     attendanceStatus = "POTENTIALLY_LATE";
                 } else {
                     attendanceStatus = "LATE_MORNING";
@@ -3288,7 +3361,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [selectedDate, allUsers, mergedAttendances, manualMap, isDayOffForUser, leaveData, calYear, calMonth]);
+    }, [selectedDate, allUsers, mergedAttendances, manualMap, isDayOffForUser, leaveData, calYear, calMonth, effectiveShiftFor]);
 
     const selectedAbsentKaryawan = useMemo(
         () => selectedAbsentUsers.filter(u => !isPKLRole(u.role)),
@@ -3581,6 +3654,16 @@ export default function AttendanceDashboardPage() {
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
                                     📅 Atur Libur
+                                </button>
+                                {/* ✅ NEW */}
+                                <button
+                                    onClick={async () => {
+                                        if (allUsers.length === 0) await fetchAllUsers();
+                                        setShowShiftScheduleModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
+                                >
+                                    ⏰ Jadwal Shift
                                 </button>
                             </>
                         )}
@@ -4048,6 +4131,25 @@ export default function AttendanceDashboardPage() {
                                                                         </div>
                                                                     </td>
                                                                 )}
+                                                            {/* ✅ Kolom Shift — resolve per tanggal record */}
+                                                            <td className="px-4 py-4 text-center">
+                                                                {(() => {
+                                                                    const eff = effectiveShiftFor(userId, dateKey);
+                                                                    return (
+                                                                        <div className="flex flex-col items-center gap-0.5">
+                                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.shift === "PAGI"
+                                                                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                                                : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                                                                }`}>
+                                                                                {eff.shift === "PAGI" ? "🌅" : "🌆"} {eff.shift}
+                                                                            </span>
+                                                                            {eff.fromSchedule && (
+                                                                                <span className="text-[8px] font-bold text-violet-500">📅 jadwal</span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
@@ -4236,15 +4338,33 @@ export default function AttendanceDashboardPage() {
                                                     )}
                                                     {canManage && (
                                                         <td className="px-4 py-4 text-center">
-                                                            {(isAdmin || u.userId !== currentUser?.id) ? (
-                                                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShiftModalUserId(u.userId); setShowShiftModal(true); }}
-                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-all whitespace-nowrap"
-                                                                    title={`Atur jadwal shift ${u.name}`}>
-                                                                    ⏰ Shift
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-gray-200 text-sm font-black">—</span>
-                                                            )}
+                                                            {(() => {
+                                                                const eff = effectiveShiftFor(u.userId, thisMonthKey === todayKey.slice(0, 7)
+                                                                    ? todayKey
+                                                                    : `${calYear}-${pad2(calMonth + 1)}-${pad2(new Date(calYear, calMonth + 1, 0).getDate())}`);
+                                                                return (
+                                                                    <div className="flex flex-col items-center gap-1">
+                                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.shift === "PAGI"
+                                                                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                                            : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                                                            }`}>
+                                                                            {eff.shift === "PAGI" ? "🌅" : "🌆"} {eff.shift}
+                                                                        </span>
+                                                                        {eff.fromSchedule && (
+                                                                            <span className="text-[8px] font-bold text-violet-500">📅 dari jadwal</span>
+                                                                        )}
+                                                                        {(isAdmin || u.userId !== currentUser?.id) && (
+                                                                            <button
+                                                                                onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setShiftModalUserId(u.userId); setShowShiftModal(true); }}
+                                                                                className="text-[9px] font-bold text-gray-400 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                                title={`Atur shift default ${u.name}`}
+                                                                            >
+                                                                                ⚙️ Default
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                     )}
                                                 </tr>
@@ -5634,6 +5754,24 @@ export default function AttendanceDashboardPage() {
                         fetchAllDateOffs();
                         fetchAllDateWorks();
                         fetchDayOffs();
+                    }}
+                />
+            )}
+            {showShiftScheduleModal && canManage && (
+                <ShiftScheduleModal
+                    users={
+                        (isAdmin || isFullAccessMulti(userRoles))
+                            ? allUsers
+                            : allUsers.filter(u => (getEffectiveSubordinates(userRoles) as string[]).includes(u.role))
+                    }
+                    schedules={shiftSchedules}                  
+                    calYear={calYear}
+                    calMonth={calMonth}
+                    onClose={() => setShowShiftScheduleModal(false)}
+                    onSaved={async () => {
+                        await fetchShiftSchedules(calYear, calMonth);  // ✅ await → Ringkasan & list sinkron
+                        await fetchAttendance();
+                        fetchTodayStatus();
                     }}
                 />
             )}

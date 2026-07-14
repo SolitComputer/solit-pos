@@ -9,6 +9,7 @@ import {
   isAttendanceTimeForSchedule,
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,8 +82,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ Resolusi jadwal dari DB — mendukung user_shift_config + per-hari custom
-    const schedule = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
+    const baseSchedule = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
+    const scheduleOverride = await resolveScheduleOverride(
+      supabaseAdmin,
+      user.id,
+      todayDateCheck
+    );
+
+    const schedule = scheduleOverride
+      ? { ...baseSchedule, ...toAuthScheduleShape(scheduleOverride) }
+      : baseSchedule;
+
     const timeCheck = isAttendanceTimeForSchedule(schedule);
 
     if (!timeCheck.allowed) {
@@ -108,7 +118,9 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single();
 
-    const userShift = (userFullData?.shift ?? "PAGI") as "PAGI" | "SORE";
+    const userShift = (scheduleOverride?.shift
+      ?? userFullData?.shift
+      ?? "PAGI") as "PAGI" | "SORE";
 
     // Hitung weight berdasarkan schedule yang sudah diresolved
     const { weight } = calcAttendanceWeightFromSchedule(
