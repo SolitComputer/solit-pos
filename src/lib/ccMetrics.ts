@@ -1,5 +1,5 @@
 // src/lib/ccMetrics.ts
-export type SyncStatus = "OK" | "ERROR" | "UNSUPPORTED" | "PENDING";
+export type SyncStatus = "OK" | "PARTIAL" | "ERROR" | "UNSUPPORTED" | "PENDING";
 
 export interface ParsedPost {
     platform: string;
@@ -9,8 +9,21 @@ export interface ParsedPost {
 /** Platform yang metriknya bisa ditarik otomatis dari link */
 export const AUTO_SYNC_PLATFORMS = ["YouTube", "Instagram", "TikTok"] as const;
 
+/** Metrik dianggap basi kalau lebih tua dari ini (menit) */
+export const AUTO_SYNC_STALE_MINUTES = 30;
+
 export function isAutoSyncPlatform(platform: string): boolean {
     return (AUTO_SYNC_PLATFORMS as readonly string[]).includes(platform);
+}
+
+export function isStale(
+    lastSyncedAt?: string | null,
+    minutes: number = AUTO_SYNC_STALE_MINUTES
+): boolean {
+    if (!lastSyncedAt) return true;
+    const t = new Date(lastSyncedAt).getTime();
+    if (Number.isNaN(t)) return true;
+    return Date.now() - t > minutes * 60_000;
 }
 
 function safeUrl(raw: string): URL | null {
@@ -23,10 +36,17 @@ function safeUrl(raw: string): URL | null {
     }
 }
 
+export function isInstagramStory(raw: string): boolean {
+    const url = safeUrl(raw);
+    if (!url) return false;
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    return host.endsWith("instagram.com") && /^\/stories(\/|$)/.test(url.pathname);
+}
+
 /**
  * Deteksi platform + ID konten dari URL posting.
  * externalId = null → platform kedeteksi tapi ID belum bisa diambil
- * (contoh: shortlink vt.tiktok.com yang butuh redirect resolve di server).
+ * (shortlink vt.tiktok.com / instagram.com/share/... → di-resolve di server).
  */
 export function parsePostUrl(raw: string): ParsedPost | null {
     const url = safeUrl(raw);
@@ -49,6 +69,10 @@ export function parsePostUrl(raw: string): ParsedPost | null {
 
     // ── Instagram (externalId = shortcode) ─────────────────────────────────────
     if (host.endsWith("instagram.com")) {
+        // story & share-link → tidak punya shortcode langsung
+        if (/^\/(?:stories|share)(\/|$)/.test(path)) {
+            return { platform: "Instagram", externalId: null };
+        }
         const m = path.match(/\/(?:p|reel|reels|tv)\/([\w-]+)/);
         return { platform: "Instagram", externalId: m?.[1] ?? null };
     }
@@ -76,6 +100,7 @@ export function parsePostUrl(raw: string): ParsedPost | null {
 
 export const SYNC_STATUS_META: Record<SyncStatus, { label: string; className: string }> = {
     OK: { label: "Auto ✓", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+    PARTIAL: { label: "Sebagian", className: "bg-amber-50 text-amber-800 ring-1 ring-amber-300" },
     PENDING: { label: "Belum sync", className: "bg-gray-100 text-gray-500 ring-1 ring-gray-200" },
     ERROR: { label: "Gagal sync", className: "bg-red-50 text-red-600 ring-1 ring-red-200" },
     UNSUPPORTED: { label: "Manual", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },

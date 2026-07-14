@@ -3,7 +3,8 @@
 
 import { useState } from "react";
 import {
-  type CCReport, type CCPosting, CC_STATUS_META, CC_PLATFORMS, PLATFORM_COLOR,
+  type CCReport, type CCPosting, type CCBrand,
+  CC_STATUS_META, CC_PLATFORMS, PLATFORM_COLOR, CC_BRANDS, BRAND_META, DEFAULT_BRAND,
   computeStatus, canStartPosting, canFinish, isoToLocalInput, localInputToIso, durationLabel,
 } from "@/lib/ccReports";
 import { parsePostUrl, isAutoSyncPlatform, SYNC_STATUS_META, type SyncStatus } from "@/lib/ccMetrics";
@@ -52,6 +53,17 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   });
 
   const [saving, setSaving] = useState(false);
+  const [brand, setBrand] = useState<CCBrand>(report.brand ?? DEFAULT_BRAND);
+
+  const changeBrand = async (b: CCBrand) => {
+    const prev = brand;
+    setBrand(b);
+    try {
+      await patch({ brand: b });
+    } catch {
+      setBrand(prev);
+    }
+  };
 
   const patch = async (payload: Record<string, unknown>) => {
     setSaving(true);
@@ -128,9 +140,35 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-black tracking-tight text-gray-900">{report.title}</h2>
-              <span className={`mt-1.5 inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${meta.className}`}>
-                {meta.label}
-              </span>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${meta.className}`}>
+                  {meta.label}
+                </span>
+
+                {/* ✅ Brand tujuan — bisa diubah kapan saja */}
+                <div className="relative">
+                  <span
+                    className="pointer-events-none absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
+                    style={{ background: BRAND_META[brand].color }}
+                  />
+                  <select
+                    value={brand}
+                    onChange={(e) => changeBrand(e.target.value as CCBrand)}
+                    disabled={saving}
+                    className="appearance-none rounded-md border border-gray-200 bg-white py-0.5 pl-6 pr-6 text-[11px] font-bold text-gray-700 outline-none transition focus:ring-2 focus:ring-gray-900/10 disabled:opacity-50"
+                  >
+                    {CC_BRANDS.map((b) => (
+                      <option key={b} value={b}>{BRAND_META[b].label}</option>
+                    ))}
+                  </select>
+                  <svg
+                    className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400"
+                    width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </div>
             </div>
             <button
               onClick={onClose}

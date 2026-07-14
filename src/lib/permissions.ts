@@ -131,7 +131,10 @@ export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MAR
 export const ALL_UNITS_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
 ];
-
+// ─── Akuntansi ────────────────────────────────────────────────────────────────
+export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+/** Yang boleh konfirmasi / edit / hapus jurnal */
+export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 // ─── Preparation Roles ────────────────────────────────────────────────────────
 
 const PKL_PREP_ROLES: UserRole[] = [
@@ -427,6 +430,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ── To-Do List — ADMIN & PROGRAMMER only ──────────────────────────────────
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
+
+  "/dashboard/akutansi": [...AKUNTANSI_ROLES],
+  "/api/akutansi": [...AKUNTANSI_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
