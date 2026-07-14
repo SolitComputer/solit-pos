@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -72,6 +73,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       .select();
 
     if (error) throw error;
+
+    // Sinkronkan qty parent setelah bulk insert.
+    await recalcLaptopParentQty(supabase, laptopId);
 
     // Ambil nama laptop
     const { data: laptop } = await supabase

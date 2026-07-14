@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
+import { getJwtSecret } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -12,10 +13,7 @@ export async function GET() {
       return NextResponse.json({ success: false }, { status: 401 });
     }
 
-    const raw = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret"
-    ) as Record<string, any>;
+    const raw = jwt.verify(token, getJwtSecret()) as Record<string, any>;
 
     // ✅ Normalize roles: JWT lama hanya punya "role" string
     // JWT baru (setelah implementasi multi-role) punya "roles" array

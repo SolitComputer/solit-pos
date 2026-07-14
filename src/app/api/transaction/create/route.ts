@@ -4,6 +4,7 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { generateInvoice } from "@/lib/invoice";
 import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 import { logActivity } from "@/lib/activityLogger";
+import { recordOutflow } from "@/lib/accessoryOutflow";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -264,6 +265,16 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         for (const [accId, qty] of accQtyById) {
             const { error: decErr } = await supabase.rpc("decrement_accessory_stock", { p_accessory_id: accId, p_qty: qty });
             if (decErr) console.error("[decrement_accessory_stock]", accId, decErr.message);
+
+            await recordOutflow({
+                accessory_id: accId,
+                qty: qty,
+                source_type: "transaction",
+                transaction_invoice: invoice_number,
+                notes: `Penjualan ${invoice_number}`,
+                taken_by_role: "SALES",
+                created_by: user.id
+            });
         }
 
         // 8. Update qty laptop parent

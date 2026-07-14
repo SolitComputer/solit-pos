@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { createClient } from "@supabase/supabase-js";
-import { ROLE_DEFAULT_REDIRECT, UserRole, buildTokenPayload } from "@/lib/auth";
+import { ROLE_DEFAULT_REDIRECT, UserRole, buildTokenPayload, getJwtSecret, signAttendanceCookie } from "@/lib/auth";
 
 // ── Satu instance supabaseAdmin — dipakai di seluruh handler ─────────────────
 // Dipindah ke atas agar bisa dipakai untuk clear force_logout_at setelah login
@@ -108,6 +108,34 @@ export async function POST(request: Request) {
             );
         }
 
+        // ── Rate-limit brute-force ────────────────────────────────────────────────
+        // Blokir kalau ada >= LOCK_THRESHOLD login GAGAL untuk identifier ini dalam
+        // LOCK_WINDOW_MIN menit terakhir. Mencegah tebak password tanpa batas.
+        const LOCK_WINDOW_MIN = 15;
+        const LOCK_THRESHOLD = 5;
+        try {
+            const windowStart = new Date(
+                Date.now() - LOCK_WINDOW_MIN * 60_000
+            ).toISOString();
+            const { count } = await supabaseAdmin
+                .from("login_logs")
+                .select("id", { count: "exact", head: true })
+                .eq("status", "FAILED")
+                .eq("user_email", rawIdentifier)
+                .gte("created_at", windowStart);
+            if ((count ?? 0) >= LOCK_THRESHOLD) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: `Terlalu banyak percobaan gagal. Coba lagi dalam ${LOCK_WINDOW_MIN} menit.`,
+                    },
+                    { status: 429 }
+                );
+            }
+        } catch {
+            // fail-open: kalau cek gagal, jangan block login yang sah
+        }
+
         // ── Cari user: coba phone_number dulu, fallback ke email ─────────────────
         let user: any = null;
 
@@ -174,10 +202,19 @@ export async function POST(request: Request) {
 
         // ── Cek password_set ──────────────────────────────────────────────────────
         if (!user.password_set) {
+            // Token setup singkat & bertanda tangan. set-password WAJIB memakai
+            // token ini, jadi orang yang cuma menebak userId tidak bisa
+            // mengambil alih akun yang belum di-onboarding.
+            const setupToken = jwt.sign(
+                { sub: user.id, purpose: "set_password" },
+                getJwtSecret(),
+                { expiresIn: "15m" }
+            );
             return NextResponse.json({
                 success: false,
                 needSetPassword: true,
                 userId: user.id,
+                setupToken,
                 message: "Silakan buat password Anda terlebih dahulu",
             });
         }
@@ -228,7 +265,7 @@ export async function POST(request: Request) {
             shift: userShift,
         });
 
-        const token = jwt.sign(jwtPayload, process.env.JWT_SECRET || "secret", {
+        const token = jwt.sign(jwtPayload, getJwtSecret(), {
             expiresIn: "7d",
         });
 
@@ -331,11 +368,12 @@ export async function POST(request: Request) {
         });
 
         if (alreadyAttendedToday) {
-            response.cookies.set("face_attended", user.id, cookieOpts);
-            response.cookies.set("face_verified", user.id, cookieOpts);
+            const signed = await signAttendanceCookie(user.id);
+            response.cookies.set("face_attended", signed, cookieOpts);
+            response.cookies.set("face_verified", signed, cookieOpts);
         }
         if (isTodayDayOff) {
-            response.cookies.set("day_off_today", user.id, cookieOpts);
+            response.cookies.set("day_off_today", await signAttendanceCookie(user.id), cookieOpts);
         }
 
         return response;

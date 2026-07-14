@@ -62,6 +62,53 @@ async function syncLaptopParentStats(laptopIds: string[]) {
   }
 }
 
+// ── Helper: lepas SEMUA unit sebuah transaksi kembali ke stok ─────────────────
+// Dipakai saat transaksi dibatalkan (status → CANCELLED) via PUT, supaya stok
+// tidak hilang permanen. Mengumpulkan unit dari semua sumber (unit_ids, unit_id,
+// transaction_items, serial_number) seperti endpoint /restore.
+async function releaseTransactionUnits(before: any, invoice: string) {
+  const unitIdSet = new Set<string>();
+  if (Array.isArray(before?.unit_ids)) for (const u of before.unit_ids) if (u) unitIdSet.add(u);
+  if (before?.unit_id) unitIdSet.add(before.unit_id);
+
+  const { data: txItems } = await supabase
+    .from("transaction_items")
+    .select("unit_id, serial_number")
+    .eq("invoice_number", invoice);
+
+  const sns: string[] = [];
+  for (const it of txItems ?? []) {
+    if (it.unit_id) unitIdSet.add(it.unit_id);
+    if (it.serial_number) sns.push(it.serial_number);
+  }
+  if (Array.isArray(before?.serial_numbers)) sns.push(...before.serial_numbers);
+  if (before?.serial_number) sns.push(before.serial_number);
+
+  const cleanSNs = [...new Set(sns.map((s) => (s ?? "").toString().trim()).filter(Boolean))];
+  if (cleanSNs.length > 0) {
+    const { data } = await supabase.from("laptop_units").select("id").in("serial_number", cleanSNs);
+    for (const u of data ?? []) if (u.id) unitIdSet.add(u.id);
+  }
+
+  const unitIds = [...unitIdSet];
+  if (unitIds.length === 0) return;
+
+  const { data: unitsData } = await supabase
+    .from("laptop_units")
+    .select("laptop_id")
+    .in("id", unitIds);
+  const laptopIds = [
+    ...new Set((unitsData ?? []).map((u) => u.laptop_id).filter(Boolean)),
+  ] as string[];
+
+  await supabase
+    .from("laptop_units")
+    .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+    .in("id", unitIds);
+
+  await syncLaptopParentStats(laptopIds);
+}
+
 // ── Helper: resolusi laptop_units.id dari campuran unit_id + serial_number ─────
 // Kalau ada unit_id kosong/hilang (kasus umum saat "Tukar SN"), di-backfill dari
 // serial_number supaya unit tidak "hilang" dari diff status.
@@ -388,10 +435,33 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         });
       }
 
-      newInventoryPrice = validUpdates.reduce(
-        (sum, p) => sum + Math.round(Number(p.purchase_price) || 0),
-        0
-      );
+      // Recompute inventory_price dari SELURUH unit transaksi (bukan cuma yang
+      // dikirim), supaya edit sebagian unit tidak menghapus modal unit lain.
+      const txUnitIds: string[] = (
+        Array.isArray(body.unit_ids)
+          ? body.unit_ids
+          : Array.isArray(before?.unit_ids)
+            ? before.unit_ids
+            : before?.unit_id
+              ? [before.unit_id]
+              : []
+      ).filter(Boolean);
+
+      if (txUnitIds.length > 0) {
+        const { data: allUnits } = await supabase
+          .from("laptop_units")
+          .select("purchase_price")
+          .in("id", txUnitIds);
+        newInventoryPrice = (allUnits ?? []).reduce(
+          (sum, u) => sum + (Number(u.purchase_price) || 0),
+          0
+        );
+      } else {
+        newInventoryPrice = validUpdates.reduce(
+          (sum, p) => sum + Math.round(Number(p.purchase_price) || 0),
+          0
+        );
+      }
     }
 
     // ── Handle update deal_price per unit di transaction_items ────────
@@ -419,10 +489,23 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         })
       );
 
-      newDealTotal = validDeal.reduce(
-        (s, p) => s + Math.round(Number(p.deal_price) || 0),
-        0
-      );
+      // Recompute total deal dari SELURUH transaction_items (laptop + aksesori),
+      // bukan cuma unit yang dikirim, supaya edit sebagian tidak menjatuhkan total.
+      const { data: allItems } = await supabase
+        .from("transaction_items")
+        .select("deal_price")
+        .eq("invoice_number", invoice);
+      if (allItems && allItems.length > 0) {
+        newDealTotal = allItems.reduce(
+          (s, it) => s + (Number(it.deal_price) || 0),
+          0
+        );
+      } else {
+        newDealTotal = validDeal.reduce(
+          (s, p) => s + Math.round(Number(p.deal_price) || 0),
+          0
+        );
+      }
     }
 
     // ── Hitung field other (profit) ──────────────────────────────────
@@ -465,8 +548,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // ── Sync status unit ─────────────────────────────────────────────
+    // PRIORITAS 0: pembatalan transaksi (status → CANCELLED). Lepas SEMUA unit
+    // kembali ke stok, kalau tidak stok hilang permanen (dulu tidak di-handle).
+    const isCancelling =
+      body.status === "CANCELLED" && before?.status !== "CANCELLED";
+    if (isCancelling) {
+      await releaseTransactionUnits(before, invoice);
+    }
     // PRIORITAS 1: by unit_ids (modern, reliable, selalu ada dari form edit)
-    if (body.unit_ids !== undefined) {
+    else if (body.unit_ids !== undefined) {
       const oldIds: string[] = Array.isArray(before?.unit_ids)
         ? before.unit_ids.filter(Boolean)
         : before?.unit_id

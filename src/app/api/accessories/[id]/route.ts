@@ -22,7 +22,7 @@ const EDIT_ROLES: UserRole[] = [
 export const GET = withAuth(async (_req, { params }) => {
     const { id } = await params;
     const { data, error } = await supabaseAdmin
-        .from("accessories").select("*").eq("id", id).maybeSingle();
+        .from("accessories").select("*, units:accessory_units(*)").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ success: false, error: "Tidak ditemukan" }, { status: 404 });
     return NextResponse.json({ success: true, data });

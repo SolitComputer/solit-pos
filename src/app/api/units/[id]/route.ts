@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -62,6 +63,11 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     if (error) throw error;
+
+    // Status unit berubah → sinkronkan qty parent.
+    if (status !== undefined) {
+      await recalcLaptopParentQty(supabase, data?.laptop_id ?? before?.laptop_id);
+    }
 
     await logActivity({
       userId: user.id,
@@ -291,6 +297,9 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
         { status: 500 }
       );
     }
+
+    // Unit dihapus → sinkronkan qty parent.
+    await recalcLaptopParentQty(supabase, unit?.laptop_id);
 
     await logActivity({
       userId: user.id,

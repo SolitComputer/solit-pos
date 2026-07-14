@@ -69,8 +69,22 @@ export function hasAnyRole(
   return userRoles.some(r => (allowed as string[]).includes(r));
 }
 
-const getSecret = () =>
-  new TextEncoder().encode(process.env.JWT_SECRET || "secret");
+/**
+ * Sumber tunggal JWT secret. Hard-fail kalau env tidak diset / terlalu pendek,
+ * supaya tidak pernah jatuh ke konstanta publik "secret" yang bisa dipakai
+ * siapa saja untuk memalsukan token admin.
+ */
+export function getJwtSecret(): string {
+  const s = process.env.JWT_SECRET;
+  if (!s || s.length < 16) {
+    throw new Error(
+      "JWT_SECRET belum diset atau terlalu pendek (min 16 karakter)."
+    );
+  }
+  return s;
+}
+
+const getSecret = () => new TextEncoder().encode(getJwtSecret());
 
 // ── getCurrentUser ────────────────────────────────────────────────────────────
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -338,9 +352,64 @@ export function getAttendanceExpiry(): Date {
   return expiry;
 }
 
-export function hasAttendedToday(cookieStore: any, userId: string): boolean {
-  const attendedCookie = cookieStore.get("face_attended")?.value;
-  return attendedCookie === userId;
+// ── Attendance cookie signing (anti-forge) ─────────────────────────────────────
+// Cookie absensi dulu berisi userId polos, jadi siapa pun bisa memalsukan
+// `Cookie: face_attended=<id-sendiri>` untuk melewati gate absen wajah.
+// Sekarang value = "<userId>.<hmac>" dengan HMAC-SHA256 memakai JWT_SECRET dan
+// di-bind ke hari (WIB), sehingga tidak bisa dipalsukan atau di-replay besoknya.
+// Pakai Web Crypto agar kompatibel di edge runtime (middleware).
+function attendanceDayKeyWIB(): string {
+  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+}
+
+async function attendanceHmac(userId: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(getJwtSecret()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`attendance|${userId}|${attendanceDayKeyWIB()}`)
+  );
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function signAttendanceCookie(userId: string): Promise<string> {
+  return `${userId}.${await attendanceHmac(userId)}`;
+}
+
+export async function verifyAttendanceCookie(
+  value: string | undefined | null,
+  userId: string
+): Promise<boolean> {
+  if (!value) return false;
+  const dot = value.lastIndexOf(".");
+  if (dot <= 0) return false;
+  if (value.slice(0, dot) !== userId) return false;
+  const mac = value.slice(dot + 1);
+  const expected = await attendanceHmac(userId);
+  if (mac.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < mac.length; i++) {
+    diff |= mac.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+export async function hasAttendedToday(
+  cookieStore: any,
+  userId: string
+): Promise<boolean> {
+  return verifyAttendanceCookie(
+    cookieStore.get("face_attended")?.value,
+    userId
+  );
 }
 
 // ── withAuth ──────────────────────────────────────────────────────────────────

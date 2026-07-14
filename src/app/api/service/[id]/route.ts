@@ -5,6 +5,7 @@ import { SERVICE_VIEW_ROLES, SERVICE_TEKNISI_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import type { ServiceStatus } from "@/types/service";
 import type { UserRole } from "@/lib/permissions";
+import { recordOutflow } from "@/lib/accessoryOutflow";
 
 function getAdmin() {
   return createClient(
@@ -80,6 +81,7 @@ export async function PATCH(
     payment_amount,
     payment_note,
     payment_method,
+    accessories_used,
   } = body as {
     action: string;
     alasan?: string;
@@ -89,6 +91,7 @@ export async function PATCH(
     payment_amount?: number;
     payment_note?: string;
     payment_method?: string;
+    accessories_used?: { accessory_id: string; unit_id?: string; qty: number }[];
   };
 
   const supabase = getAdmin();
@@ -158,6 +161,28 @@ export async function PATCH(
       logCatatan = payment_amount
         ? `Selesai · Biaya: Rp ${payment_amount.toLocaleString("id-ID")}`
         : "Pekerjaan selesai";
+
+      if (accessories_used && accessories_used.length > 0) {
+        for (const acc of accessories_used) {
+          if (acc.unit_id) {
+            await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
+          }
+          await recordOutflow({
+            accessory_id: acc.accessory_id,
+            unit_id: acc.unit_id || null,
+            source_type: "service",
+            service_id: id,
+            qty: acc.qty,
+            notes: `Dipakai untuk servis ${current.no_urut || id}`,
+            taken_by_role: "TEKNISI",
+            created_by: user.id,
+          });
+          await supabase.rpc("decrement_accessory_stock", {
+            p_accessory_id: acc.accessory_id,
+            p_qty: acc.qty,
+          });
+        }
+      }
       break;
 
     case "gagal_diperbaiki":

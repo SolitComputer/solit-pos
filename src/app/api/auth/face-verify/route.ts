@@ -7,6 +7,7 @@ import {
   calcAttendanceWeightFromSchedule,
   resolveShiftConfigFromDB,
   isAttendanceTimeForSchedule,
+  signAttendanceCookie,
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,7 +35,7 @@ function parseDevice(ua: string): string {
   return `${browser} — ${os}`;
 }
 
-function setAttendanceCookies(response: NextResponse, userId: string, expiry: Date) {
+async function setAttendanceCookies(response: NextResponse, userId: string, expiry: Date) {
   const opts = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -42,8 +43,9 @@ function setAttendanceCookies(response: NextResponse, userId: string, expiry: Da
     path: "/",
     expires: expiry,
   };
-  response.cookies.set("face_verified", userId, opts);
-  response.cookies.set("face_attended", userId, opts);
+  const signed = await signAttendanceCookie(userId);
+  response.cookies.set("face_verified", signed, opts);
+  response.cookies.set("face_attended", signed, opts);
 }
 
 export async function POST(request: Request) {
@@ -98,6 +100,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { embedding, attemptCount = 1, latitude, longitude, accuracy } = body;
 
+    // Validasi embedding: harus array 128 angka valid (finite).
+    // Tanpa ini, `embedding: []` bikin euclideanDistance = 0 → dianggap match
+    // → bypass verifikasi wajah.
+    if (
+      !Array.isArray(embedding) ||
+      embedding.length !== 128 ||
+      !embedding.every((n) => typeof n === "number" && Number.isFinite(n))
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Data wajah tidak valid" },
+        { status: 400 }
+      );
+    }
+
     const ua = request.headers.get("user-agent") ?? "";
     const device = parseDevice(ua);
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
@@ -137,7 +153,7 @@ export async function POST(request: Request) {
         alreadyAttended: true,
         firstCheckIn: alreadyToday.created_at,
       });
-      setAttendanceCookies(response, user.id, expiry);
+      await setAttendanceCookies(response, user.id, expiry);
       return response;
     }
 
@@ -184,7 +200,7 @@ export async function POST(request: Request) {
       message: "Absen wajah berhasil",
       distance,
     });
-    setAttendanceCookies(response, user.id, expiry);
+    await setAttendanceCookies(response, user.id, expiry);
     return response;
   } catch (err: any) {
     console.error("EXCEPTION di face-verify POST:", err);
@@ -204,7 +220,7 @@ export async function PUT(request: Request) {
     const expiry = getAttendanceExpiry();
     const response = NextResponse.json({ success: true, message: "Dilanjutkan tanpa absen" });
 
-    response.cookies.set("attendance_skipped", user.id, {
+    response.cookies.set("attendance_skipped", await signAttendanceCookie(user.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,

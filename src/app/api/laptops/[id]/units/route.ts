@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -48,14 +49,16 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       received_at,
     } = body;
 
-    // Cek duplikat SN sebelum insert
-    const { data: existing } = await supabase
+    // Cek duplikat SN sebelum insert.
+    // Pakai limit(1) tanpa .single() — .single() error (dan lolos) kalau SN
+    // justru sudah terduplikasi (>1 baris).
+    const { data: existingRows } = await supabase
       .from("laptop_units")
       .select("id")
       .eq("serial_number", serial_number)
-      .single();
+      .limit(1);
 
-    if (existing) {
+    if (existingRows && existingRows.length > 0) {
       return NextResponse.json(
         { success: false, message: `Serial number "${serial_number}" sudah terdaftar` },
         { status: 409 }
@@ -80,6 +83,9 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       .single();
 
     if (error) throw error;
+
+    // Sinkronkan qty parent setelah menambah unit.
+    await recalcLaptopParentQty(supabase, id);
 
     const { data: laptop } = await supabase
       .from("laptops")

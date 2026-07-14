@@ -6,8 +6,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
+import RiwayatKeluarContent from "@/components/accessories/RiwayatKeluarContent";
 
-type TabKey = "laptops" | "accessories";
+type TabKey = "laptops" | "accessories" | "outflows";
 
 interface TabDef {
   key: TabKey;
@@ -29,7 +30,44 @@ const TABS: TabDef[] = [
     roles: [],
     icon: "ti-devices",
   },
+  {
+    key: "outflows",
+    label: "Riwayat Keluar",
+    roles: [],
+    icon: "ti-history",
+  },
 ];
+
+function getTabIcon(icon: string, className: string) {
+  switch (icon) {
+    case "ti-device-laptop":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case "ti-devices":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+          <circle cx="8" cy="12" r="0.5" fill="currentColor" />
+          <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+          <circle cx="16" cy="12" r="0.5" fill="currentColor" />
+        </svg>
+      );
+    case "ti-history":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 export default function DataBarangPage() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -93,16 +131,14 @@ export default function DataBarangPage() {
   return (
     <DashboardLayout>
       {/* ── STICKY HEADER ─────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200">
-
+      <div className="sticky top-4 z-30 bg-white/90 backdrop-blur-md border border-gray-200 rounded-2xl shadow-sm mb-6 overflow-hidden">
         {/* Top row: identity + badge */}
-        <div className="flex items-center justify-between px-5 sm:px-7 pt-5 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Icon */}
-            <div className="w-9 h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md">
               <svg
-                width="17"
-                height="17"
+                className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="white"
@@ -117,24 +153,24 @@ export default function DataBarangPage() {
             </div>
 
             {/* Title + subtitle */}
-            <div>
-              <h1 className="text-[14.5px] font-semibold text-gray-900 tracking-tight leading-none">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-none truncate">
                 Data Barang
               </h1>
-              <p className="text-[11.5px] text-gray-400 mt-[3px] font-normal">
+              <p className="text-[11.5px] text-gray-400 mt-1 font-normal truncate">
                 Laptop &amp; aksesoris dalam satu tempat
               </p>
             </div>
           </div>
 
           {/* Kategori badge */}
-          <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-3 py-1 font-normal tabular-nums">
+          <span className="inline-flex self-start sm:self-auto text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 font-medium tabular-nums">
             {visibleTabs.length} kategori
           </span>
         </div>
 
         {/* ── Tab strip — underline style ─────────────────────── */}
-        <div className="flex overflow-x-auto scrollbar-hide px-5 sm:px-7 border-t border-gray-100">
+        <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6 border-t border-gray-100 bg-gray-50/30">
           {visibleTabs.map((tab) => {
             const isActive = tab.key === activeTab;
             return (
@@ -151,32 +187,7 @@ export default function DataBarangPage() {
                 ]
                   .join(" ")}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={isActive ? "opacity-80" : "opacity-40"}
-                >
-                  {tab.icon === "ti-device-laptop" ? (
-                    <>
-                      <rect x="2" y="3" width="20" height="14" rx="2" />
-                      <line x1="8" y1="21" x2="16" y2="21" />
-                      <line x1="12" y1="17" x2="12" y2="21" />
-                    </>
-                  ) : (
-                    <>
-                      <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-                      <circle cx="8" cy="12" r="0.5" fill="currentColor" />
-                      <circle cx="12" cy="12" r="0.5" fill="currentColor" />
-                      <circle cx="16" cy="12" r="0.5" fill="currentColor" />
-                    </>
-                  )}
-                </svg>
+                {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-80" : "opacity-40"}`)}
                 {tab.label}
               </button>
             );
@@ -185,8 +196,11 @@ export default function DataBarangPage() {
       </div>
 
       {/* ── KONTEN TAB ────────────────────────────────────────── */}
-      {activeTab === "laptops" && <LaptopsContent />}
-      {activeTab === "accessories" && <AccessoriesContent />}
+      <div>
+        {activeTab === "laptops" && <LaptopsContent />}
+        {activeTab === "accessories" && <AccessoriesContent />}
+        {activeTab === "outflows" && <RiwayatKeluarContent />}
+      </div>
 
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }

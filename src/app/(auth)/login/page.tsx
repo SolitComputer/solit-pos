@@ -21,7 +21,7 @@ function LoginInner() {
   const [error, setError] = useState("");
 
   // Set password form
-  const [userId, setUserId] = useState("");
+  const [setupToken, setSetupToken] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [showNewPw, setShowNewPw] = useState(false);
@@ -57,7 +57,7 @@ function LoginInner() {
       const result = await res.json();
 
       if (result.needSetPassword) {
-        setUserId(result.userId);
+        setSetupToken(result.setupToken ?? "");
         setStage("set-password");
         return;
       }
@@ -100,7 +100,7 @@ function LoginInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId,
+          setupToken,
           password: newPw,
           confirmPassword: confirmPw,
         }),

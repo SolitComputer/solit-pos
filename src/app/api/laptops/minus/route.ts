@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
@@ -61,6 +62,11 @@ async function putHandler(req: NextRequest, ctx: any, user: AuthUser) {
         { success: false, message: error.message },
         { status: 400 }
       );
+    }
+
+    // Status unit berubah → sinkronkan qty parent.
+    if (updateData.status !== undefined) {
+      await recalcLaptopParentQty(supabase, data?.laptop_id);
     }
 
     return NextResponse.json({ success: true, data });
