@@ -335,7 +335,7 @@ export const config = {
     "/api/cc-reports/:path*",
     "/dashboard/todos/:path*",
     "/api/todos/:path*",
-     "/dashboard/akuntansi/:path*",
+    "/dashboard/akuntansi/:path*",
     "/api/akutansi/:path*",
   ],
 };

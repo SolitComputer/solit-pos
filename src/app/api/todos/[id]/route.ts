@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyToken } from "@/lib/auth";
 
 const TODO_ROLES = ["ADMIN", "PROGRAMMER"];
+// Role yang boleh edit/delete todo milik orang lain
+const ADMIN_ROLES = ["ADMIN", "PROGRAMMER"];
 
 function getSupabase() {
     return createClient(
@@ -19,10 +21,14 @@ async function getAuthedUser(request: NextRequest) {
     if (!user) return null;
     const roles: string[] = (user as any).roles ?? [user.role];
     if (!roles.some((r) => TODO_ROLES.includes(r))) return null;
-    return user;
+    return { ...user, roles };
 }
 
-// PATCH /api/todos/[id] — update (toggle done, edit title, dll)
+function isAdmin(user: { roles: string[] }): boolean {
+    return user.roles.some((r) => ADMIN_ROLES.includes(r));
+}
+
+// PATCH /api/todos/[id]
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -33,7 +39,6 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Whitelist field yang boleh diupdate
     const allowed = ["title", "description", "is_done", "priority", "due_date"];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
@@ -53,12 +58,25 @@ export async function PATCH(
 
     const supabase = getSupabase();
 
-    // Pastikan todo ini milik user yang sedang login
+    // Cek ownership dulu
+    const { data: existing } = await supabase
+        .from("todos")
+        .select("user_id")
+        .eq("id", id)
+        .single();
+
+    if (!existing) return NextResponse.json({ error: "Todo tidak ditemukan" }, { status: 404 });
+
+    // Hanya pemilik atau admin yang boleh edit
+    const isOwner = existing.user_id === user.id;
+    if (!isOwner && !isAdmin(user)) {
+        return NextResponse.json({ error: "Tidak memiliki akses untuk mengedit todo ini" }, { status: 403 });
+    }
+
     const { data, error } = await supabase
         .from("todos")
         .update(updates)
         .eq("id", id)
-        .eq("user_id", user.id) // ownership check
         .select()
         .single();
 
@@ -79,14 +97,27 @@ export async function DELETE(
     const { id } = await params;
     const supabase = getSupabase();
 
-    const { error, count } = await supabase
+    // Cek ownership dulu
+    const { data: existing } = await supabase
         .from("todos")
-        .delete({ count: "exact" })
+        .select("user_id")
         .eq("id", id)
-        .eq("user_id", user.id); // ownership check
+        .single();
+
+    if (!existing) return NextResponse.json({ error: "Todo tidak ditemukan" }, { status: 404 });
+
+    // Hanya pemilik atau admin yang boleh hapus
+    const isOwner = existing.user_id === user.id;
+    if (!isOwner && !isAdmin(user)) {
+        return NextResponse.json({ error: "Tidak memiliki akses untuk menghapus todo ini" }, { status: 403 });
+    }
+
+    const { error } = await supabase
+        .from("todos")
+        .delete()
+        .eq("id", id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (count === 0) return NextResponse.json({ error: "Todo tidak ditemukan" }, { status: 404 });
 
     return NextResponse.json({ success: true });
 }

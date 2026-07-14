@@ -23,20 +23,24 @@ async function getAuthedUser(request: NextRequest) {
     return user;
 }
 
-// GET /api/todos — fetch semua todo milik user
+// GET /api/todos — fetch SEMUA todos dari semua user (shared board)
 export async function GET(request: NextRequest) {
     const user = await getAuthedUser(request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter"); // "all" | "active" | "done"
-    const priority = searchParams.get("priority"); // "low" | "medium" | "high"
+    const filter = searchParams.get("filter");
+    const priority = searchParams.get("priority");
 
     const supabase = getSupabase();
+
+    // Join dengan users untuk ambil nama author
     let query = supabase
         .from("todos")
-        .select("*")
-        .eq("user_id", user.id)
+        .select(`
+            *,
+            author:users!todos_user_id_fkey(id, name)
+        `)
         .order("is_done", { ascending: true })
         .order("priority", { ascending: false })
         .order("created_at", { ascending: false });
@@ -48,10 +52,18 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ todos: data });
+    // Flatten: tambah author_name, tandai is_own untuk kontrol edit/delete di client
+    const todos = (data ?? []).map((t: any) => ({
+        ...t,
+        author_name: t.author?.name ?? null,
+        is_own: t.user_id === user.id,
+        author: undefined,
+    }));
+
+    return NextResponse.json({ todos });
 }
 
-// POST /api/todos — create todo baru
+// POST /api/todos — create todo baru (milik user sendiri)
 export async function POST(request: NextRequest) {
     const user = await getAuthedUser(request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -80,5 +92,19 @@ export async function POST(request: NextRequest) {
         .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ todo: data }, { status: 201 });
+
+    // Ambil nama user yang baru bikin
+    const { data: userData } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", user.id)
+        .single();
+
+    return NextResponse.json({
+        todo: {
+            ...data,
+            author_name: userData?.name ?? null,
+            is_own: true,
+        }
+    }, { status: 201 });
 }
