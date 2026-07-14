@@ -15,6 +15,7 @@ function getCorsHeaders(origin: string): Record<string, string> {
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Max-Age": "86400",
+        Vary: "Origin",
     };
 }
 
@@ -52,9 +53,17 @@ export async function GET(req: NextRequest) {
             .neq("status", "VOID")
             .order("created_at", { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
-        if (error || !data) {
+        if (error) {
+            console.error("[WARRANTY CHECK] Supabase error:", error.message);
+            return NextResponse.json(
+                { success: false, message: "Gagal mengambil data garansi" },
+                { status: 500, headers: corsHeaders }
+            );
+        }
+
+        if (!data) {
             return NextResponse.json(
                 { success: false, message: `Garansi untuk SN "${sn}" tidak ditemukan` },
                 { status: 404, headers: corsHeaders }

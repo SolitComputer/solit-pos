@@ -45,7 +45,7 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <p className="text-gray-600 text-sm font-medium mb-5">{message}</p>
+        <p className="text-gray-600 text-sm font-medium mb-5 leading-relaxed">{message}</p>
         <button onClick={onClose} className="w-full h-10 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-900 transition">OK</button>
       </div>
     </div>
@@ -168,20 +168,20 @@ function RestoreModal({
   const currentLabel = statusLabelMap[item.status] ?? item.status;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[92dvh] flex flex-col">
         {/* Header */}
-        <div className={`px-5 py-4 ${isPending ? "bg-red-700" : "bg-gray-800"}`}>
+        <div className={`px-5 py-4 flex-shrink-0 ${isPending ? "bg-red-700" : "bg-gray-800"}`}>
           <p className="font-semibold text-white text-sm">
             {isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}
           </p>
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-3">
+        <div className="p-5 space-y-3 overflow-y-auto flex-1">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-            <p className="font-bold mb-1">
+            <p className="font-bold mb-1 leading-relaxed">
               {isPending
                 ? `Batalkan pesanan "${currentLabel}" untuk ${item.customer_name}?`
                 : `Konfirmasi restore untuk ${item.customer_name}?`}
@@ -203,19 +203,79 @@ function RestoreModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+        <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+            className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition active:scale-[0.98]"
           >
             Batal
           </button>
           <button
             onClick={onConfirm}
             disabled={restoring}
-            className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60"
+            className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition disabled:opacity-60 active:scale-[0.98]"
           >
             {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CONFIRM PAYMENT MODAL — shared component ────────────────────────
+// Dipakai bersama oleh TransactionCard (mobile) & TransactionTableRow (desktop)
+// agar tidak ada duplikasi markup. Logic tetap di parent lewat props.
+function ConfirmPaymentModal({
+  item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, onConfirm, onClose,
+}: {
+  item: any;
+  confirmSN: string;
+  setConfirmSN: (v: string) => void;
+  confirmError: string;
+  setConfirmError: (v: string) => void;
+  confirming: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-green-700 px-5 py-4">
+          <p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p>
+        </div>
+        <div className="p-5 space-y-4">
+          {item.status === "RESERVED" && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500">Serial Number</label>
+              <input
+                type="text"
+                value={confirmSN}
+                onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
+                placeholder="Masukkan SN..."
+                className="w-full h-11 sm:h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition"
+                autoFocus
+              />
+            </div>
+          )}
+          {confirmError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>
+          )}
+        </div>
+        <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50">
+          <button
+            onClick={() => { onClose(); setConfirmError(""); }}
+            className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition active:scale-[0.98]"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={confirming}
+            className="flex-1 h-11 sm:h-10 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition disabled:opacity-60 active:scale-[0.98]"
+          >
+            {confirming ? "Memproses..." : "Konfirmasi"}
           </button>
         </div>
       </div>
@@ -266,7 +326,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
           return (
             <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-2.5 py-1.5`}>
               <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>{meta.icon} {meta.label}</p>
-              <p className={`text-xs font-bold ${c.text} font-mono`}>{fmt(amount)}</p>
+              <p className={`text-xs font-bold ${c.text} font-mono tabular-nums`}>{fmt(amount)}</p>
             </div>
           );
         })}
@@ -275,11 +335,11 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   }
 
   return (
-    <div className="flex items-center gap-1 mt-1 flex-wrap">
+    <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
       {entries.map(({ meta, amount }, i) => {
         const c = colorMap[meta.color] ?? colorMap.gray;
         return (
-          <span key={i} className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap`}>
+          <span key={i} className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap tabular-nums`}>
             {meta.icon} {fmt(amount)}
           </span>
         );
@@ -383,7 +443,7 @@ function TableRowSkeleton() {
 
 function MobileSkeletonList() {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {Array.from({ length: 5 }).map((_, i) => (<MobileCardSkeleton key={i} />))}
     </div>
   );
@@ -490,20 +550,29 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const customerTypeBadge = getCustomerTypeBadge(item.customer_type ?? "");
   const timeStr = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
+  // Hitung jumlah tombol aksi agar grid tidak pecah / ada sel kosong
+  const actionCount =
+    (item.payment_photo ? 1 : 0) +
+    (canEditTransaction ? 1 : 0) +
+    (isPending && canEditTransaction ? 1 : 0) +
+    (canRestore ? 1 : 0) +
+    1; // receipt selalu ada
+  const actionGridCols = actionCount >= 3 ? "grid-cols-3" : actionCount === 2 ? "grid-cols-2" : "grid-cols-1";
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-gray-900">{item.customer_name}</h3>
-            <p className="text-xs text-gray-500 font-mono mt-0.5">{item.invoice_number}</p>
+            <h3 className="text-sm font-bold text-gray-900 leading-snug break-words">{item.customer_name}</h3>
+            <p className="text-xs text-gray-500 font-mono mt-0.5 break-all">{item.invoice_number}</p>
           </div>
           <span className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
             {STATUS_LABEL[item.status] ?? item.status}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] text-gray-500 font-medium">📅 {formatDate(item.created_at)}</span>
           <span className="text-gray-300">·</span>
           <span className="text-[11px] text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded-md">🕐 {timeStr}</span>
@@ -515,8 +584,8 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       <div className="px-4 py-3 space-y-3">
         {item.source_platform && (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-gray-500">Platform</span>
-            <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[10px] ${platformBadge.color}`}>{platformBadge.text}</span>
+            <span className="text-xs text-gray-500 flex-shrink-0">Platform</span>
+            <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[10px] whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
           </div>
         )}
         {item.customer_type && item.customer_type !== "UMUM" && (
@@ -526,15 +595,15 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         )}
         {item.sales_name && (
           <div className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
-            <span className="text-xs font-bold text-gray-900 flex-1">👤 {item.sales_name}</span>
+            <span className="text-xs font-bold text-gray-900 flex-1 min-w-0 truncate">👤 {item.sales_name}</span>
             {item.employee_role && (
-              <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap">{item.employee_role}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-200 text-blue-800 font-bold whitespace-nowrap flex-shrink-0">{item.employee_role}</span>
             )}
           </div>
         )}
 
         {/* Laptop Info */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <p className="text-xs font-semibold text-gray-700">💻 Laptop</p>
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
@@ -543,9 +612,9 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                 <div className="space-y-2">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx} className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">{g.unit_count}x</span>
-                        <p className="text-xs font-bold text-gray-900 leading-snug">{g.laptop_name}</p>
+                      <div className="flex items-start gap-1.5 mb-1.5">
+                        <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
+                        <p className="text-xs font-bold text-gray-900 leading-snug min-w-0">{g.laptop_name}</p>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
@@ -561,7 +630,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               );
             }
             return (
-              <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5">
+              <div className="bg-gray-50 rounded-lg p-2.5 space-y-1.5 border border-gray-100">
                 <p className="text-xs font-bold text-gray-900 leading-snug">{item.laptop_name || "—"}</p>
                 {(item.cpu || item.ram || item.storage || item.gpu) && (
                   <div className="flex flex-wrap gap-1.5">
@@ -586,14 +655,14 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2.5 border border-blue-200">
             <p className="text-[10px] text-blue-600 font-semibold mb-1">💰 Harga Jual</p>
-            <p className="text-sm font-bold text-blue-900 truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
+            <p className="text-sm font-bold text-blue-900 truncate tabular-nums">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
           </div>
           {item.other !== undefined && item.other !== null && (
             <div className={`bg-gradient-to-br rounded-lg p-2.5 border ${item.other > 0 ? "from-emerald-50 to-emerald-100 border-emerald-200" : item.other < 0 ? "from-red-50 to-red-100 border-red-200" : "from-gray-50 to-gray-100 border-gray-200"}`}>
               <p className={`text-[10px] font-semibold mb-1 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-600"}`}>
                 {item.other > 0 ? "📈 Profit" : item.other < 0 ? "📉 Loss" : "➖ Break Even"}
               </p>
-              <p className={`text-sm font-bold truncate ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"}`}>
+              <p className={`text-sm font-bold truncate tabular-nums ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-900"}`}>
                 {item.other > 0 ? "+" : ""}{item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
               </p>
             </div>
@@ -613,10 +682,10 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       {/* Action Buttons */}
       <div className="px-4 py-3 border-t border-gray-100 space-y-2">
         {showDetails && (
-          <div className="bg-gray-50 rounded-lg p-2.5 text-xs space-y-1.5 mb-2 border border-gray-200">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Invoice:</span>
-              <span className="font-mono font-bold text-gray-900">{item.invoice_number}</span>
+          <div className="bg-gray-50 rounded-lg p-3 text-xs space-y-2 mb-2 border border-gray-200">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 flex-shrink-0">Invoice:</span>
+              <span className="font-mono font-bold text-gray-900 break-all text-right">{item.invoice_number}</span>
             </div>
             {(() => {
               const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
@@ -629,52 +698,52 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
                 </div>
               );
             })()}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Waktu:</span>
-              <span className="font-mono font-bold text-gray-900">{formatDateTime(item.created_at)}</span>
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 flex-shrink-0">Waktu:</span>
+              <span className="font-mono font-bold text-gray-900 text-right">{formatDateTime(item.created_at)}</span>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <button onClick={() => setShowDetails(!showDetails)} className="h-9 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition">
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setShowDetails(!showDetails)} className="h-10 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition active:scale-[0.98]">
             {showDetails ? "Sembunyikan" : "Info"} Detail
           </button>
-          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition">
+          <button onClick={() => onRowClick?.(item)} className="h-10 rounded-lg bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 transition active:scale-[0.98]">
             🔍 Lihat Laptop
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className={`grid ${actionGridCols} gap-2`}>
           {item.payment_photo && (
-            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition" title="Bukti pembayaran">
-              <span className="text-lg">📸</span><span className="text-[9px] font-semibold">Bukti</span>
+            <button onClick={() => onPhotoClick(item.payment_photo)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition active:scale-[0.97]" title="Bukti pembayaran">
+              <span className="text-lg leading-none">📸</span><span className="text-[9px] font-semibold">Bukti</span>
             </button>
           )}
           {canEditTransaction && (
-            <a href={`/payment/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition" title="Edit transaksi">
-              <span className="text-lg">✏️</span><span className="text-[9px] font-semibold">Edit</span>
+            <a href={`/payment/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition active:scale-[0.97]" title="Edit transaksi">
+              <span className="text-lg leading-none">✏️</span><span className="text-[9px] font-semibold">Edit</span>
             </a>
           )}
           {/* ✅ Tombol Lunas: hanya muncul saat isPending */}
           {isPending && canEditTransaction && (
-            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition" title="Konfirmasi lunas">
-              <span className="text-lg">✅</span><span className="text-[9px] font-semibold">Lunas</span>
+            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition active:scale-[0.97]" title="Konfirmasi lunas">
+              <span className="text-lg leading-none">✅</span><span className="text-[9px] font-semibold">Lunas</span>
             </button>
           )}
           {/* ✅ Tombol Restore/Batalkan: muncul untuk PAID dan semua status pending */}
           {canRestore && (
             <button
               onClick={() => setShowRestoreModal(true)}
-              className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition"
+              className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition active:scale-[0.97]"
               title={isPending ? "Batalkan pesanan" : "Restore transaksi"}
             >
-              <span className="text-lg">↩️</span>
+              <span className="text-lg leading-none">↩️</span>
               <span className="text-[9px] font-semibold">{isPending ? "Batal" : "Restore"}</span>
             </button>
           )}
-          <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="Lihat receipt">
-            <span className="text-lg">📄</span><span className="text-[9px] font-semibold">Receipt</span>
+          <a href={`/receipt/${item.invoice_number}`} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition active:scale-[0.97]" title="Lihat receipt">
+            <span className="text-lg leading-none">📄</span><span className="text-[9px] font-semibold">Receipt</span>
           </a>
         </div>
       </div>
@@ -693,24 +762,16 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       )}
 
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-green-700 px-5 py-4"><p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p></div>
-            <div className="p-5 space-y-4">
-              {item.status === "RESERVED" && (
-                <input type="text" value={confirmSN} onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }} placeholder="Masukkan SN..." className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition" autoFocus />
-              )}
-              {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>}
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => { setShowConfirmModal(false); setConfirmError(""); }} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleConfirmPayment} disabled={confirming} className="flex-1 h-10 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition disabled:opacity-60">
-                {confirming ? "Memproses..." : "Konfirmasi"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmPaymentModal
+          item={item}
+          confirmSN={confirmSN}
+          setConfirmSN={setConfirmSN}
+          confirmError={confirmError}
+          setConfirmError={setConfirmError}
+          confirming={confirming}
+          onConfirm={handleConfirmPayment}
+          onClose={() => setShowConfirmModal(false)}
+        />
       )}
     </div>
   );
@@ -729,26 +790,28 @@ function getOriginalStatus(item: any): "RESERVED" | "HELD" | null {
 }
 
 function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
+  const HEAD = "px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap sticky top-0 bg-gray-50 z-10";
+
   return (
     <div className="bg-white rounded-xl border border-gray-300 shadow-lg overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100dvh-320px)]">
         <table className="w-full border-collapse" style={{ minWidth: "1680px" }}>
           <thead>
             <tr className="border-b-2 border-gray-200 bg-gray-50">
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[90px]">Status</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">Nota & Waktu</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Customer</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Kontak</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Sales</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[180px]">Laptop</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[140px]">CPU</th>
-              <th className="px-3 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[150px]">SN</th>
-              <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Harga Jual</th>
-              <th className="px-3 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[110px]">Margin</th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[130px]">Metode</th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Sumber</th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[100px]">Toko</th>
-              <th className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap w-[120px]">Aksi</th>
+              <th className={`${HEAD} text-left w-[90px]`}>Status</th>
+              <th className={`${HEAD} text-left w-[140px]`}>Nota &amp; Waktu</th>
+              <th className={`${HEAD} text-left w-[130px]`}>Customer</th>
+              <th className={`${HEAD} text-left w-[110px]`}>Kontak</th>
+              <th className={`${HEAD} text-left w-[110px]`}>Sales</th>
+              <th className={`${HEAD} text-left w-[180px] whitespace-normal`}>Laptop</th>
+              <th className={`${HEAD} text-left w-[140px]`}>CPU</th>
+              <th className={`${HEAD} text-left w-[150px]`}>SN</th>
+              <th className={`${HEAD} text-right w-[120px]`}>Harga Jual</th>
+              <th className={`${HEAD} text-right w-[110px]`}>Margin</th>
+              <th className={`${HEAD} text-center w-[130px]`}>Metode</th>
+              <th className={`${HEAD} text-center w-[100px]`}>Sumber</th>
+              <th className={`${HEAD} text-center w-[100px]`}>Toko</th>
+              <th className={`${HEAD} text-center w-[120px]`}>Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -843,7 +906,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
     const grouped: any[] = item.grouped_items ?? [];
     if (grouped.length > 1) {
       return (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {grouped.map((g: any, idx: number) => (
             <div key={idx} className="flex items-start gap-1.5">
               <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{g.unit_count}x</span>
@@ -860,7 +923,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
       );
     }
     return (
-      <div className="space-y-0.5">
+      <div className="space-y-1">
         <div className="text-[10px] font-bold text-gray-900 leading-snug break-words" style={{ minWidth: 0 }}>{item.laptop_name || "—"}</div>
         {(item.ram || item.storage) && (
           <div className="flex items-center gap-1 flex-wrap">
@@ -897,10 +960,10 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
 
   return (
     <>
-      <tr className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer" onClick={() => onRowClick?.(item)}>
-        <td className="px-3 py-2.5"><StatusBadge item={item} /></td>
-        <td className="px-3 py-2.5">
-          <div className="space-y-0.5">
+      <tr className="hover:bg-blue-50/40 transition-colors duration-100 group cursor-pointer align-top" onClick={() => onRowClick?.(item)}>
+        <td className="px-3 py-3"><StatusBadge item={item} /></td>
+        <td className="px-3 py-3">
+          <div className="space-y-1">
             <div className="text-[11px] font-bold text-gray-800 font-mono tracking-wide leading-tight">{item.invoice_number}</div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-gray-400">{datePart}</span>
@@ -909,9 +972,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             </div>
           </div>
         </td>
-        <td className="px-3 py-2.5">
-          <div className="space-y-0.5">
-            <div className="text-[11px] font-bold text-gray-900 leading-tight">{item.customer_name}</div>
+        <td className="px-3 py-3">
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold text-gray-900 leading-snug">{item.customer_name}</div>
             {item.customer_type && item.customer_type !== "UMUM" && (
               <span className="inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 whitespace-nowrap">
                 {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
@@ -919,20 +982,20 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             )}
           </div>
         </td>
-        <td className="px-3 py-2.5">
-          {item.customer_phone ? <span className="text-[10px] font-medium text-gray-600">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
+        <td className="px-3 py-3">
+          {item.customer_phone ? <span className="text-[10px] font-medium text-gray-600 whitespace-nowrap">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3">
           {item.sales_name ? (
-            <div className="space-y-0.5">
-              <div className="text-[10px] font-bold text-gray-800 leading-tight">{item.sales_name}</div>
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-gray-800 leading-snug">{item.sales_name}</div>
               {item.employee_role && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] bg-blue-100 text-blue-700 font-bold whitespace-nowrap">{item.employee_role}</span>}
             </div>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5">{renderLaptopCell()}</td>
-        <td className="px-3 py-2.5">{renderCpuCell()}</td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3">{renderLaptopCell()}</td>
+        <td className="px-3 py-3">{renderCpuCell()}</td>
+        <td className="px-3 py-3">
           {(() => {
             const grouped: any[] = item.grouped_items ?? [];
             if (grouped.length > 1) {
@@ -950,17 +1013,17 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-        <td className="px-3 py-2.5 text-right">
-          <span className="text-[11px] font-bold text-gray-900 font-mono">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
+        <td className="px-3 py-3 text-right">
+          <span className="text-[11px] font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
-        <td className="px-3 py-2.5 text-right">
+        <td className="px-3 py-3 text-right">
           {item.other !== undefined && item.other !== null ? (
-            <span className={`text-[11px] font-bold font-mono ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"}`}>
+            <span className={`text-[11px] font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-600" : "text-gray-400"}`}>
               {item.other > 0 ? "+" : ""}{item.other ? `Rp${item.other.toLocaleString("id-ID")}` : "Rp0"}
             </span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5 text-center">
+        <td className="px-3 py-3 text-center">
           <div className="flex flex-col items-center gap-1">
             <div className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-100 border border-gray-200 whitespace-nowrap">
               {payStyle.icon}
@@ -969,12 +1032,12 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             <PaymentBreakdown item={item} size="sm" />
           </div>
         </td>
-        <td className="px-3 py-2.5 text-center">
+        <td className="px-3 py-3 text-center">
           {item.source_platform ? (
             <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap border ${platformBadge.color}`}>{platformBadge.text.replace(/^[^\s]+ /, "")}</span>
           ) : <span className="text-[10px] text-gray-300">—</span>}
         </td>
-        <td className="px-3 py-2.5 text-center">
+        <td className="px-3 py-3 text-center">
           {(() => {
             const badge = getCompanyBadge(item.company_name ?? "");
             return (
@@ -984,7 +1047,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
             );
           })()}
         </td>
-        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center gap-0.5">
             {item.payment_photo && (
               <button onClick={() => onPhotoClick(item.payment_photo)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-150" title="Bukti pembayaran">
@@ -1033,24 +1096,16 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
       )}
 
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
-          <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-green-700 px-5 py-4"><p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p></div>
-            <div className="p-5 space-y-4">
-              {item.status === "RESERVED" && (
-                <input type="text" value={confirmSN} onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }} placeholder="Masukkan SN..." className="w-full h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 transition" autoFocus />
-              )}
-              {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{confirmError}</div>}
-            </div>
-            <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-              <button onClick={() => { setShowConfirmModal(false); setConfirmError(""); }} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-              <button onClick={handleConfirmPayment} disabled={confirming} className="flex-1 h-10 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition disabled:opacity-60">
-                {confirming ? "Memproses..." : "Konfirmasi"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmPaymentModal
+          item={item}
+          confirmSN={confirmSN}
+          setConfirmSN={setConfirmSN}
+          confirmError={confirmError}
+          setConfirmError={setConfirmError}
+          confirming={confirming}
+          onConfirm={handleConfirmPayment}
+          onClose={() => setShowConfirmModal(false)}
+        />
       )}
     </>
   );
@@ -1076,29 +1131,31 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between flex-shrink-0 bg-gradient-to-r from-gray-50 to-white">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
+        {/* Header */}
+        <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-shrink-0 bg-gradient-to-r from-gray-50 to-white">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>{STATUS_LABEL[item.status] ?? item.status}</span>
               {isMulti && <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">{grouped.length} Laptop</span>}
             </div>
-            <h2 className="font-bold text-gray-800 text-base">{item.customer_name}</h2>
-            <p className="text-xs text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
+            <h2 className="font-bold text-gray-800 text-base leading-snug break-words">{item.customer_name}</h2>
+            <p className="text-xs text-gray-400 font-mono mt-0.5 break-all">{item.invoice_number}</p>
             <p className="text-xs text-gray-400 mt-0.5">📅 {formatDateShort(item.created_at)}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-4 sm:px-5 py-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Customer</p>
-              <p className="text-sm font-bold text-gray-800">{item.customer_name}</p>
+              <p className="text-sm font-bold text-gray-800 break-words">{item.customer_name}</p>
               {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5">📱 {item.customer_phone}</p>}
               {item.customer_type && item.customer_type !== "UMUM" && (
-                <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                <span className="inline-flex items-center mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
                   {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
                 </span>
               )}
@@ -1107,8 +1164,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
               <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1">Sales</p>
               {item.sales_name ? (
                 <>
-                  <p className="text-sm font-bold text-gray-800">{item.sales_name}</p>
-                  {item.employee_role && <span className="inline-flex items-center mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}
+                  <p className="text-sm font-bold text-gray-800 break-words">{item.sales_name}</p>
+                  {item.employee_role && <span className="inline-flex items-center mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}
                 </>
               ) : <p className="text-sm text-gray-300">—</p>}
             </div>
@@ -1121,8 +1178,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                 <div key={idx} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <div className="px-3.5 py-2.5 bg-gray-50 border-b border-gray-100 flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 leading-snug">{g.laptop_name}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
+                      <p className="text-sm font-bold text-gray-800 leading-snug break-words">{g.laptop_name}</p>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
                         {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
                         {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
                         {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold border border-blue-200">{g.storage}</span>}
@@ -1132,7 +1189,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                     {isMulti && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0">{g.unit_count}x</span>}
                   </div>
                   {g.serial_numbers?.length > 0 && (
-                    <div className="px-3.5 py-2 border-b border-gray-100">
+                    <div className="px-3.5 py-2.5 border-b border-gray-100">
                       <p className="text-[10px] text-gray-400 font-semibold mb-1.5">Serial Number</p>
                       <div className="flex flex-wrap gap-1">
                         {g.serial_numbers.map((sn: string, i: number) => (
@@ -1143,17 +1200,17 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   )}
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Harga Deal</p>
-                        <p className="text-xs font-bold text-blue-700 font-mono">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p>
+                        <p className="text-xs font-bold text-blue-700 font-mono tabular-nums truncate">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Modal</p>
-                        <p className="text-xs font-bold text-gray-700 font-mono">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
+                        <p className="text-xs font-bold text-gray-700 font-mono tabular-nums truncate">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Margin</p>
-                        <p className={`text-xs font-bold font-mono ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <p className={`text-xs font-bold font-mono tabular-nums truncate ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}
                         </p>
                       </div>
@@ -1172,35 +1229,35 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">💰 Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 space-y-2.5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-gray-500">Total Harga Jual</span>
-                <span className="text-sm font-bold text-gray-900 font-mono">Rp{totalDeal.toLocaleString("id-ID")}</span>
+                <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
               </div>
               {Number(item.dp_amount) > 0 && (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-500">DP</span>
-                  <span className="text-sm font-bold text-blue-700 font-mono">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                  <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
                 </div>
               )}
               {canSeeFinancials && totalMargin !== 0 && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-600">Total Margin</span>
-                  <span className={`text-sm font-bold font-mono ${totalMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  <span className={`text-sm font-bold font-mono tabular-nums ${totalMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {totalMargin >= 0 ? "+" : ""}Rp{Math.abs(totalMargin).toLocaleString("id-ID")}
                   </span>
                 </div>
               )}
               <div className="pt-1 space-y-1.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-500">Metode</span>
-                  <span className="text-xs font-bold text-gray-700">{payStyle.text}</span>
+                  <span className="text-xs font-bold text-gray-700 text-right">{payStyle.text}</span>
                 </div>
                 <PaymentBreakdown item={item} size="md" />
               </div>
               {item.source_platform && (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-500">Platform</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${platformBadge.color}`}>{platformBadge.text}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
                 </div>
               )}
             </div>
@@ -1209,14 +1266,15 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
           {item.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
               <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wide mb-1">Catatan</p>
-              <p className="text-xs text-amber-900">{item.notes}</p>
+              <p className="text-xs text-amber-900 leading-relaxed break-words">{item.notes}</p>
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
-          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">📄 Receipt</a>
-          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition">✏️ Edit</a>
+        {/* Footer */}
+        <div className="px-4 sm:px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2 flex-shrink-0 bg-white">
+          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition active:scale-[0.98]">📄 Receipt</a>
+          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition active:scale-[0.98]">✏️ Edit</a>
         </div>
       </div>
     </div>
@@ -1387,6 +1445,11 @@ export default function Page() {
     sourcePlatform !== "ALL" ||
     companyName !== "ALL";
 
+  const activeFilterCount = [
+    status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo,
+    paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL",
+  ].filter(Boolean).length;
+
   const resetFilters = () => {
     setSearch("");
     setStatus("ALL");
@@ -1528,7 +1591,6 @@ export default function Page() {
         });
       }
 
-
       const headerRow = ws.getRow(1);
       headerRow.height = 30;
       headerRow.eachCell((cell, colNum) => {
@@ -1593,47 +1655,48 @@ export default function Page() {
         <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} />
       )}
 
-      <div className={`${isMobile ? "px-4" : "max-w-[1600px] mx-auto px-6"} py-6 space-y-5`}>
+      <div className={`${isMobile ? "px-4" : "max-w-[1600px] mx-auto px-6"} py-5 sm:py-6 space-y-4 sm:space-y-5`}>
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <div className="w-1.5 h-7 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-1.5 h-7 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full flex-shrink-0" />
               <h1 className={`${isMobile ? "text-xl" : "text-2xl"} font-bold text-gray-900`}>Riwayat Transaksi</h1>
             </div>
-            <p className="text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
+            <p className="text-xs sm:text-sm text-gray-500 ml-5">Kelola dan pantau semua transaksi penjualan</p>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             {!isLoading && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-2 rounded-lg border border-blue-200">
-                <span className="text-sm font-bold text-gray-900">📊 {filteredTransactions.length}</span>
+              <div className="flex-1 sm:flex-none flex items-center justify-center bg-gradient-to-r from-blue-50 to-indigo-50 px-3 h-10 rounded-lg border border-blue-200">
+                <span className="text-sm font-bold text-gray-900 whitespace-nowrap tabular-nums">📊 {filteredTransactions.length}</span>
               </div>
             )}
             {!isLoading && filteredTransactions.length > 0 && (
               <button
                 onClick={handleExportExcel}
                 disabled={isExporting}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-emerald-200 rounded-lg text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition group disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 h-10 bg-white border border-emerald-200 rounded-lg text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition group disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
                 title="Export ke Excel"
               >
                 {isExporting ? (
                   <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    <span className="hidden sm:inline">Mengekspor...</span>
+                    <span>Mengekspor...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                       <polyline points="14 2 14 8 20 8" />
                       <polyline points="8 13 12 17 16 13" />
                       <line x1="12" y1="17" x2="12" y2="11" />
                     </svg>
-                    <span className="hidden sm:inline">Export Excel</span>
+                    <span>Export Excel</span>
                   </>
                 )}
               </button>
@@ -1643,8 +1706,8 @@ export default function Page() {
 
         {/* ── Banner deep-link dari Cashflow ── */}
         {focusInvoice && (
-          <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-            <p className="text-xs text-amber-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-xs text-amber-800 leading-relaxed">
               🔗 Transaksi dari <b>Cashflow</b>{" "}
               <span className="font-mono text-amber-600">({focusInvoice})</span>
               {/* Customer diambil dari datanya sendiri — tidak dikirim lewat URL,
@@ -1661,7 +1724,7 @@ export default function Page() {
                 setFocusInvoice(null);
                 window.history.replaceState({}, "", "/dashboard/transactions");
               }}
-              className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold whitespace-nowrap"
+              className="text-[11px] text-amber-700 hover:text-amber-900 font-semibold whitespace-nowrap self-start sm:self-auto"
             >
               ✕ Tampilkan semua
             </button>
@@ -1669,45 +1732,61 @@ export default function Page() {
         )}
 
         {/* ── Search + Filter ── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3">
-          <div className="flex gap-2">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Search */}
             <div className="relative flex-1">
-              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input
                 type="text"
                 placeholder="Cari nota, customer, WA, laptop, CPU, SN..."
-                className="w-full border border-gray-200 rounded-lg h-10 pl-10 pr-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                className="w-full border border-gray-200 rounded-lg h-11 sm:h-10 pl-10 pr-9 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-            </div>
-            <button
-              onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {sortOrder === "newest"
-                  ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
-                  : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>}
-              </svg>
-              <span className="hidden sm:inline text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              Filter
-              {hasActiveFilter && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold">
-                  {[status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL"].filter(Boolean).length}
-                </span>
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               )}
-            </button>
+            </div>
+
+            {/* Tombol sort + filter — sebaris di HP */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 h-11 sm:h-10 rounded-lg border border-gray-200 text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-50 active:scale-[0.98]"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                  {sortOrder === "newest"
+                    ? <><line x1="12" y1="20" x2="12" y2="4" /><polyline points="6 10 12 4 18 10" /></>
+                    : <><line x1="12" y1="4" x2="12" y2="20" /><polyline points="18 14 12 20 6 14" /></>}
+                </svg>
+                <span className="text-xs">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 h-11 sm:h-10 rounded-lg border text-sm font-semibold transition active:scale-[0.98] ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                <span className="text-xs">Filter</span>
+                {hasActiveFilter && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold flex-shrink-0">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* ── Filter Panel ── */}
@@ -1720,7 +1799,7 @@ export default function Page() {
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                   {["ALL", "PAID", "RESERVED", "PENDING", "CANCELLED"].map((s) => (
                     <button key={s} onClick={() => setStatus(s)}
-                      className={`h-8 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-9 sm:h-8 rounded-lg text-xs font-semibold border transition active:scale-[0.97] ${status === s ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {s === "ALL" ? "Semua" : s === "RESERVED" ? "DP" : STATUS_LABEL[s] ?? s}
                     </button>
                   ))}
@@ -1730,20 +1809,20 @@ export default function Page() {
               {/* Tanggal */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Rentang Tanggal</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Dari</label>
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
+                      className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                   <div className="relative">
                     <label className="absolute -top-1.5 left-2.5 bg-white px-1 text-[10px] font-semibold text-gray-400 z-10">Sampai</label>
                     <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
-                      className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
+                      className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition" />
                   </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-1.5 text-[11px] text-gray-400 hover:text-red-500 transition">
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="mt-2 text-[11px] text-gray-400 hover:text-red-500 transition">
                     ✕ Hapus filter tanggal
                   </button>
                 )}
@@ -1759,7 +1838,7 @@ export default function Page() {
                       const isActive = sourcePlatform === p;
                       return (
                         <button key={p as string} onClick={() => setSourcePlatform(p as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-9 sm:h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap active:scale-[0.97] ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {p === "ALL" ? "Semua" : badge?.text ?? (p as string)}
                         </button>
                       );
@@ -1778,7 +1857,7 @@ export default function Page() {
                       const isActive = paymentMethod === m;
                       return (
                         <button key={m as string} onClick={() => setPaymentMethod(m as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-9 sm:h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap active:scale-[0.97] ${isActive ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {m === "ALL" ? "Semua" : style?.text ?? (m as string)}
                         </button>
                       );
@@ -1790,7 +1869,7 @@ export default function Page() {
               {/* ── Filter Perusahaan ── */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-2 block">Perusahaan / Nama Toko</label>
-                <div className="flex gap-1.5">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5">
                   {[
                     { value: "ALL", label: "Semua", icon: "🏢", desc: null },
                     { value: "solit", label: "Solit 03", icon: "💼", desc: "Solit 03, Solit, dll" },
@@ -1801,7 +1880,7 @@ export default function Page() {
                       key={c.value}
                       onClick={() => setCompanyName(c.value)}
                       title={c.desc ?? undefined}
-                      className={`h-9 px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center gap-1.5 ${companyName === c.value
+                      className={`h-10 sm:h-9 px-3 sm:px-4 rounded-xl text-xs font-bold border transition whitespace-nowrap inline-flex items-center justify-center gap-1.5 active:scale-[0.97] ${companyName === c.value
                         ? "bg-gray-900 text-white border-gray-900"
                         : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                         }`}
@@ -1812,7 +1891,7 @@ export default function Page() {
                   ))}
                 </div>
                 {companyName !== "ALL" && (
-                  <p className="text-[10px] text-gray-400 mt-1.5">
+                  <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
                     Menampilkan transaksi toko:{" "}
                     <span className="font-semibold text-gray-600">
                       {companyName === "solit" ? "Solit 03" : companyName === "sotech" ? "Sotech" : "On Point"}
@@ -1827,7 +1906,7 @@ export default function Page() {
               {hasActiveFilter && (
                 <button
                   onClick={resetFilters}
-                  className="w-full h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium"
+                  className="w-full h-10 sm:h-8 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition font-medium active:scale-[0.98]"
                 >
                   ✕ Reset semua filter
                 </button>
@@ -1840,7 +1919,7 @@ export default function Page() {
         {isLoading ? (
           isMobile ? <MobileSkeletonList /> : <DesktopSkeletonTable />
         ) : paginatedTransactions.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+          <div className="bg-white rounded-xl border border-gray-200 py-12 sm:py-16 px-4 text-center">
             <div className="text-5xl mb-4 opacity-40">🔍</div>
             <p className="text-gray-500 text-sm font-medium">Tidak ada transaksi ditemukan</p>
             {hasActiveFilter && (
@@ -1850,7 +1929,7 @@ export default function Page() {
             )}
           </div>
         ) : isMobile ? (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {paginatedTransactions.map((item) => (
               <TransactionCard
                 key={item.id}
@@ -1878,31 +1957,33 @@ export default function Page() {
 
         {/* ── Pagination ── */}
         {!isLoading && filteredTransactions.length > itemsPerPage && (
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between gap-2 pt-1">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+              className="flex items-center gap-1.5 px-3 h-10 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium active:scale-[0.98]"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-              Sebelumnya
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0"><polyline points="15 18 9 12 15 6" /></svg>
+              <span className="hidden sm:inline">Sebelumnya</span>
             </button>
+
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400">Halaman</span>
-              <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{currentPage}</span>
-              <span className="text-xs text-gray-400">dari {totalPages}</span>
+              <span className="text-xs text-gray-400 hidden sm:inline">Halaman</span>
+              <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg tabular-nums">{currentPage}</span>
+              <span className="text-xs text-gray-400 tabular-nums">dari {totalPages}</span>
             </div>
+
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium"
+              className="flex items-center gap-1.5 px-3 h-10 rounded-lg border border-gray-200 text-sm bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50 transition font-medium active:scale-[0.98]"
             >
-              Selanjutnya
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+              <span className="hidden sm:inline">Selanjutnya</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
         )}
       </div>
     </DashboardLayout>
   );
-} 
+}
