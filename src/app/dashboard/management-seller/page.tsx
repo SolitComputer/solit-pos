@@ -1,7 +1,8 @@
 "use client";
 // src/app/dashboard/management-seller/page.tsx
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 
@@ -53,14 +54,20 @@ interface PicCandidate {
 type Tab = "USER" | "PEDAGANG";
 type Scope = "ACTIVE" | "ARCHIVED";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Utils ─────────────────────────────────────────────────────────────────────
+const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
+
+/** Ring fokus konsisten untuk aksesibilitas keyboard (tanpa mengubah warna brand). */
+const FOCUS_RING =
+  "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/25 focus-visible:ring-offset-1 focus-visible:ring-offset-white";
+
 const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
     : "—";
 
 const daysDiff = (nextISO: string) =>
@@ -86,6 +93,27 @@ const waLink = (f: Followup) =>
     buildWaMessage(f)
   )}`;
 
+// ── ExternalLink ──────────────────────────────────────────────────────────────
+// Dibangun via createElement supaya tag anchor tidak rusak saat copy-paste,
+// sekaligus jadi satu tempat untuk rel/target yang aman.
+function ExternalLink({
+  href,
+  className,
+  title,
+  children,
+}: {
+  href: string;
+  className?: string;
+  title?: string;
+  children: ReactNode;
+}) {
+  return createElement(
+    "a",
+    { href, target: "_blank", rel: "noopener noreferrer", className, title },
+    children
+  );
+}
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const WaIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -94,7 +122,7 @@ const WaIcon = ({ size = 14 }: { size?: number }) => (
 );
 
 const ArchiveIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <rect x="3" y="4" width="18" height="4" rx="1" />
     <path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8" />
     <path d="M10 12h4" />
@@ -102,31 +130,37 @@ const ArchiveIcon = () => (
 );
 
 const RefreshIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
   </svg>
 );
 
 const CheckIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M20 6L9 17l-5-5" />
   </svg>
 );
 
 const PhoneIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012.18 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.15a16 16 0 006.02 6.02l1.51-1.52a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
   </svg>
 );
 
 const BackIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M19 12H5M12 5l-7 7 7 7" />
   </svg>
 );
 
+const ArrowRightIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 12h14M12 5l7 7-7 7" />
+  </svg>
+);
+
 const UploadIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
@@ -134,7 +168,7 @@ const UploadIcon = () => (
 );
 
 const TrashIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
     <path d="M10 11v6M14 11v6" />
@@ -142,17 +176,38 @@ const TrashIcon = () => (
 );
 
 const LockIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0110 0v4" />
   </svg>
 );
 
+const SearchIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg
-    width="12" height="12" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2.5" aria-hidden="true"
-    className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={cx("transition-transform duration-200", open && "rotate-180")}
   >
     <path d="M6 9l6 6 6-6" />
   </svg>
@@ -160,8 +215,10 @@ const ChevronIcon = ({ open }: { open: boolean }) => (
 
 const Spinner = ({ dark = false }: { dark?: boolean }) => (
   <span
-    className={`w-3.5 h-3.5 border-2 rounded-full animate-spin inline-block flex-shrink-0 ${dark ? "border-gray-300 border-t-gray-600" : "border-white/30 border-t-white"
-      }`}
+    className={cx(
+      "w-3.5 h-3.5 border-2 rounded-full animate-spin inline-block flex-shrink-0",
+      dark ? "border-gray-300 border-t-gray-600" : "border-white/30 border-t-white"
+    )}
   />
 );
 
@@ -176,8 +233,10 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   const isPedagang = type === "PEDAGANG";
   return (
     <div
-      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
-        }`}
+      className={cx(
+        "w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0",
+        isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+      )}
     >
       {initials || "?"}
     </div>
@@ -190,32 +249,32 @@ function StatusBadge({ f, scope }: { f: Followup; scope: Scope }) {
 
   if (scope === "ARCHIVED") {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-        Diarsipkan
+      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 sm:px-2.5 h-6 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block flex-shrink-0" />
+        Arsip
       </span>
     );
   }
   if (f.is_due) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 sm:px-2.5 h-6 rounded-full bg-red-50 text-red-600 border border-red-200 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block flex-shrink-0" />
         Perlu FU{diff < 0 ? ` · ${Math.abs(diff)}h telat` : ""}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 sm:px-2.5 h-6 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block flex-shrink-0" />
       {diff <= 0 ? "Hari ini" : `${diff}h lagi`}
     </span>
   );
 }
 
 // ── Stat Pill ─────────────────────────────────────────────────────────────────
-function StatPill({ children }: { children: React.ReactNode }) {
+function StatPill({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 max-w-full text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
+    <span className="inline-flex items-center gap-1 max-w-full h-6 text-[10px] font-semibold text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2 whitespace-nowrap overflow-hidden">
       {children}
     </span>
   );
@@ -225,11 +284,17 @@ function StatPill({ children }: { children: React.ReactNode }) {
 function InfoCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="min-w-0 rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
-      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 truncate">
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1 truncate">
         {label}
       </p>
-      <p className="text-xs font-bold text-gray-800 leading-snug truncate">{value}</p>
-      {sub && <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate">{sub}</p>}
+      <p className="text-xs font-bold text-gray-800 leading-snug truncate tabular-nums">{value}</p>
+      {sub ? (
+        <p className="text-[9px] text-gray-400 mt-0.5 font-mono truncate">{sub}</p>
+      ) : (
+        <p className="text-[9px] text-transparent mt-0.5 select-none" aria-hidden="true">
+          &nbsp;
+        </p>
+      )}
     </div>
   );
 }
@@ -261,6 +326,14 @@ function PicAccessDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, []);
+
   const groups = useMemo(
     () => [
       {
@@ -284,15 +357,20 @@ function PicAccessDropdown({
       <button
         onClick={() => setOpen((o) => !o)}
         title="Atur siapa yang boleh follow-up"
-        className={`h-10 px-3 inline-flex items-center gap-2 rounded-xl border text-xs font-bold transition-all active:scale-[0.98] ${error
-          ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
-          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-          }`}
+        aria-expanded={open}
+        aria-haspopup="true"
+        className={cx(
+          "h-11 sm:h-10 px-3 inline-flex items-center gap-2 rounded-xl border text-xs font-bold transition-all active:scale-[0.98]",
+          FOCUS_RING,
+          error
+            ? "bg-red-50 border-red-200 text-red-600 hover:bg-red-100"
+            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+        )}
       >
-        <span>{error ? "⚠️" : "🔐"}</span>
-        <span className="hidden xs:inline sm:inline">Akses PIC</span>
+        <span aria-hidden="true">{error ? "⚠️" : "🔐"}</span>
+        <span>Akses PIC</span>
         {!error && (
-          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black">
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black tabular-nums">
             {activeCount}
           </span>
         )}
@@ -300,7 +378,7 @@ function PicAccessDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-[18rem] bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
+        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[min(19rem,calc(100vw-2rem))] bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
             <p className="text-xs font-black text-gray-900">Izin Follow-up</p>
             <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
@@ -308,7 +386,7 @@ function PicAccessDropdown({
             </p>
           </div>
 
-          <div className="max-h-[60vh] sm:max-h-72 overflow-y-auto py-2 overscroll-contain">
+          <div className="max-h-[55vh] sm:max-h-72 overflow-y-auto py-2 overscroll-contain">
             {loading ? (
               <div className="px-4 py-6 text-center text-xs text-gray-400">Memuat…</div>
             ) : error ? (
@@ -318,7 +396,10 @@ function PicAccessDropdown({
                 <p className="text-[10px] text-gray-400 leading-relaxed mb-3">{error}</p>
                 <button
                   onClick={onRetry}
-                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+                  className={cx(
+                    "text-[11px] font-bold px-3 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition",
+                    FOCUS_RING
+                  )}
                 >
                   Coba lagi
                 </button>
@@ -330,7 +411,7 @@ function PicAccessDropdown({
             ) : (
               groups.map((g) =>
                 g.items.length === 0 ? null : (
-                  <div key={g.label} className="mb-1">
+                  <div key={g.label} className="mb-1 last:mb-0">
                     <p className="px-4 py-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                       {g.label}
                     </p>
@@ -341,13 +422,18 @@ function PicAccessDropdown({
                           key={p.user_id}
                           onClick={() => onToggle(p.user_id, !p.is_active)}
                           disabled={saving}
-                          className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 transition-colors disabled:opacity-50 text-left"
+                          className={cx(
+                            "w-full min-h-[52px] px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 text-left",
+                            FOCUS_RING
+                          )}
                         >
                           <span
-                            className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center flex-shrink-0 transition-all ${p.is_active
-                              ? "bg-emerald-600 border-emerald-600 text-white"
-                              : "bg-white border-gray-300"
-                              }`}
+                            className={cx(
+                              "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
+                              p.is_active
+                                ? "bg-emerald-600 border-emerald-600 text-white"
+                                : "bg-white border-gray-300"
+                            )}
                           >
                             {saving ? (
                               <Spinner dark={!p.is_active} />
@@ -360,8 +446,10 @@ function PicAccessDropdown({
                               {p.name}
                             </span>
                             <span
-                              className={`block text-[10px] ${p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
-                                }`}
+                              className={cx(
+                                "block text-[10px] truncate",
+                                p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
+                              )}
                             >
                               {p.is_active ? "Boleh follow-up" : "Nonaktif"}
                             </span>
@@ -386,27 +474,30 @@ function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boole
     return (
       <div
         title={f.lock_reason ?? `Hanya ${f.closed_by ?? "PIC"} yang bisa chat customer ini`}
-        className={`h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-semibold" : "w-10"
-          }`}
+        className={cx(
+          "h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed select-none flex-shrink-0",
+          fullWidth ? "flex-1 min-w-0 text-xs font-semibold px-3" : "w-11 sm:w-10"
+        )}
       >
         <LockIcon />
-        {fullWidth && <span>Chat WA (Terkunci)</span>}
+        {fullWidth && <span className="truncate">Chat WA (Terkunci)</span>}
       </div>
     );
   }
 
   return (
-    <a
+    <ExternalLink
       href={waLink(f)}
-      target="_blank"
-      rel="noopener noreferrer"
       title="Buka WhatsApp"
-      className={`h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0 ${fullWidth ? "flex-1 text-xs font-bold" : "w-10"
-        }`}
+      className={cx(
+        "h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0",
+        FOCUS_RING,
+        fullWidth ? "flex-1 min-w-0 text-xs font-bold px-3" : "w-11 sm:w-10"
+      )}
     >
       <WaIcon />
-      {fullWidth && <span>Chat WA</span>}
-    </a>
+      {fullWidth && <span className="truncate">Chat WA</span>}
+    </ExternalLink>
   );
 }
 
@@ -427,18 +518,21 @@ function TandaiFuButton({
       onClick={() => onFollowup(f.id)}
       disabled={processing}
       title={
-        isUnowned
-          ? "FU sekaligus klaim customer ini sebagai milikmu"
-          : "Tandai sudah follow-up"
+        isUnowned ? "FU sekaligus klaim customer ini sebagai milikmu" : "Tandai sudah follow-up"
       }
-      className={`flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold transition-all duration-150 ${processing
-        ? "bg-blue-400 opacity-70 cursor-not-allowed"
-        : isUnowned
-          ? "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
-          : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
-        }`}
+      className={cx(
+        "flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold px-3 transition-all duration-150",
+        FOCUS_RING,
+        processing
+          ? "bg-blue-400 opacity-70 cursor-not-allowed"
+          : isUnowned
+            ? "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
+            : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+      )}
     >
-      {processing ? <Spinner /> : isUnowned ? <span>🙋</span> : <PhoneIcon />}
+      <span className="flex-shrink-0 inline-flex">
+        {processing ? <Spinner /> : isUnowned ? <span aria-hidden="true">🙋</span> : <PhoneIcon />}
+      </span>
       <span className="truncate">{isUnowned ? "Klaim & FU" : "Follow-up"}</span>
     </button>
   );
@@ -492,43 +586,55 @@ function BuktiFuUploader({
       {preview ? (
         <div className="relative rounded-xl overflow-hidden border border-blue-200 bg-blue-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Bukti FU" className="w-full max-h-40 sm:max-h-48 object-contain" />
+          <img
+            src={preview}
+            alt="Bukti FU"
+            className="w-full h-32 sm:h-44 object-contain bg-blue-50"
+          />
           <button
             onClick={() => {
               onChange(null);
               if (inputRef.current) inputRef.current.value = "";
             }}
-            className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-md"
+            className={cx(
+              "absolute top-2 right-2 w-9 h-9 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-md",
+              FOCUS_RING
+            )}
             title="Hapus gambar"
+            aria-label="Hapus gambar"
           >
             <TrashIcon />
           </button>
           <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-blue-100">
             <p className="text-[10px] font-bold text-blue-600 truncate">🖼️ {value?.name}</p>
-            <p className="text-[9px] text-gray-400 mt-0.5">
+            <p className="text-[9px] text-gray-400 mt-0.5 tabular-nums">
               {value ? (value.size / 1024).toFixed(0) + " KB" : ""}
             </p>
           </div>
         </div>
       ) : (
-        <div
+        <button
+          type="button"
           onClick={() => inputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
-          className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 group"
+          className={cx(
+            "w-full border-2 border-dashed border-gray-200 rounded-xl px-4 py-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 active:bg-blue-50 transition-all duration-200 group",
+            FOCUS_RING
+          )}
         >
-          <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-2.5 transition-colors text-gray-500">
+          <span className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-2.5 transition-colors text-gray-500">
             <UploadIcon />
-          </div>
-          <p className="text-xs font-bold text-gray-700 group-hover:text-blue-700 transition-colors">
+          </span>
+          <span className="block text-xs font-bold text-gray-700 group-hover:text-blue-700 transition-colors">
             Upload Screenshot Bukti FU
-          </p>
-          <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
-            Klik atau drag &amp; drop gambar ke sini
+          </span>
+          <span className="block text-[10px] text-gray-400 mt-1 leading-relaxed">
+            Ketuk untuk pilih dari galeri
             <br />
             JPG, PNG, WEBP · Maks. 5 MB
-          </p>
-        </div>
+          </span>
+        </button>
       )}
 
       <input
@@ -538,6 +644,33 @@ function BuktiFuUploader({
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
+    </div>
+  );
+}
+
+// ── Baris ringkasan di modal ──────────────────────────────────────────────────
+function SummaryRow({
+  label,
+  children,
+  mono = false,
+}: {
+  label: string;
+  children: ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
+        {label}
+      </span>
+      <span
+        className={cx(
+          "text-xs font-black text-gray-800 truncate text-right",
+          mono && "font-mono font-bold text-gray-700"
+        )}
+      >
+        {children}
+      </span>
     </div>
   );
 }
@@ -576,6 +709,26 @@ function ConfirmFollowupModal({
     return () => URL.revokeObjectURL(url);
   }, [buktiFu]);
 
+  // Kunci scroll body saat modal terbuka (mencegah "scroll bocor" di HP)
+  useEffect(() => {
+    if (!followup) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [followup]);
+
+  // ESC untuk menutup (desktop)
+  useEffect(() => {
+    if (!followup || processing) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [followup, processing, onCancel]);
+
   if (!followup) return null;
 
   const firstName = (followup.customer_name || "").split(" ")[0] || "Customer";
@@ -595,22 +748,30 @@ function ConfirmFollowupModal({
       />
 
       {/* Bottom-sheet di HP, dialog tengah di laptop */}
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] sm:max-h-[88vh] flex flex-col">
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] sm:max-h-[88vh] flex flex-col">
         {/* Progress bar */}
         <div className="flex h-1 bg-gray-100 flex-shrink-0">
           <div
-            className={`h-full bg-blue-600 transition-all duration-300 ${step === 1 ? "w-1/2" : "w-full"
-              }`}
+            className={cx(
+              "h-full bg-blue-600 transition-all duration-300",
+              step === 1 ? "w-1/2" : "w-full"
+            )}
           />
         </div>
 
-        {/* Grip handle — hanya di HP */}
-        <div className="sm:hidden flex justify-center pt-2.5 pb-1 flex-shrink-0">
+        {/* Grip handle — hanya di HP, bisa diketuk untuk menutup */}
+        <button
+          type="button"
+          onClick={!processing ? onCancel : undefined}
+          aria-label="Tutup"
+          className="sm:hidden w-full flex justify-center pt-3 pb-1.5 flex-shrink-0"
+        >
           <span className="w-10 h-1 rounded-full bg-gray-200" />
-        </div>
+        </button>
 
-        <div className="px-5 pt-4 sm:pt-5 pb-6 sm:pb-5 overflow-y-auto overscroll-contain">
-          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-4">
+        {/* ── Body scrollable ── */}
+        <div className="px-4 sm:px-5 pt-3 sm:pt-5 pb-4 overflow-y-auto overscroll-contain flex-1">
+          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-3 sm:mb-4">
             Langkah {step} dari 2
           </p>
 
@@ -627,13 +788,13 @@ function ConfirmFollowupModal({
                   >
                     {followup.customer_name}
                   </h2>
-                  <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
+                  <p className="text-xs text-gray-400 font-medium mt-0.5 truncate tabular-nums">
                     {followup.customer_phone}
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 mb-4">
+              <div className="rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-3 mb-4">
                 <p className="text-xs font-semibold text-blue-700 leading-relaxed">
                   Apakah kamu sudah melakukan follow-up ke{" "}
                   <span className="font-black">{firstName}</span>?
@@ -644,33 +805,7 @@ function ConfirmFollowupModal({
                 </p>
               </div>
 
-              <div className="mb-5">
-                <BuktiFuUploader value={buktiFu} onChange={setBuktiFu} />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={onCancel}
-                  disabled={processing}
-                  className="flex-1 h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={!canProceedStep1}
-                  title={!canProceedStep1 ? "Upload bukti FU terlebih dahulu" : ""}
-                  className={`flex-1 h-11 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5 ${canProceedStep1
-                    ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
-                    : "bg-blue-200 cursor-not-allowed"
-                    }`}
-                >
-                  Lanjut
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+              <BuktiFuUploader value={buktiFu} onChange={setBuktiFu} />
             </>
           ) : (
             <>
@@ -684,7 +819,7 @@ function ConfirmFollowupModal({
               </div>
 
               {buktiFu && previewUrl && (
-                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-3">
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border border-emerald-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewUrl} alt="Bukti FU" className="w-full h-full object-cover" />
@@ -694,7 +829,7 @@ function ConfirmFollowupModal({
                       Bukti FU
                     </p>
                     <p className="text-xs font-bold text-emerald-800 truncate">{buktiFu.name}</p>
-                    <p className="text-[9px] text-emerald-500 mt-0.5">
+                    <p className="text-[9px] text-emerald-500 mt-0.5 tabular-nums">
                       {(buktiFu.size / 1024).toFixed(0)} KB · Siap diupload
                     </p>
                   </div>
@@ -704,56 +839,25 @@ function ConfirmFollowupModal({
                 </div>
               )}
 
-              <div className="space-y-2 mb-5">
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                    Customer
-                  </span>
-                  <span className="text-xs font-black text-gray-800 truncate">
-                    {followup.customer_name}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                    Tipe
-                  </span>
-                  <span className="text-xs font-black text-gray-800">
-                    {followup.seller_type === "PEDAGANG" ? "🏷️ Pedagang" : "🙋 User"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                    Jadwal baru
-                  </span>
-                  <span className="text-xs font-black text-blue-600 text-right">
-                    +{intervalDays} hari dari sekarang
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                    Total FU
-                  </span>
-                  <span className="text-xs font-black text-gray-800">
-                    {followup.followup_count + 1}× (setelah ini)
-                  </span>
-                </div>
-
+              <div className="space-y-2 mb-4">
+                <SummaryRow label="Customer">{followup.customer_name}</SummaryRow>
+                <SummaryRow label="Tipe">
+                  {followup.seller_type === "PEDAGANG" ? "🏷️ Pedagang" : "🙋 User"}
+                </SummaryRow>
+                <SummaryRow label="Jadwal baru">
+                  <span className="text-blue-600">+{intervalDays} hari dari sekarang</span>
+                </SummaryRow>
+                <SummaryRow label="Total FU">
+                  {followup.followup_count + 1}× (setelah ini)
+                </SummaryRow>
                 {followup.invoice_number && (
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-100 px-3.5 py-2.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex-shrink-0">
-                      Invoice
-                    </span>
-                    <span className="text-xs font-mono font-bold text-gray-700 truncate">
-                      {followup.invoice_number}
-                    </span>
-                  </div>
+                  <SummaryRow label="Invoice" mono>
+                    {followup.invoice_number}
+                  </SummaryRow>
                 )}
               </div>
 
-              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-5">
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-3">
                 <p className="text-xs font-black text-amber-800 leading-relaxed">
                   ⚠️ Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
                 </p>
@@ -763,32 +867,120 @@ function ConfirmFollowupModal({
                   depan.
                 </p>
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStep(1)}
-                  disabled={processing}
-                  title="Kembali — ganti bukti FU"
-                  className="h-11 w-11 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-[0.98] transition-all flex items-center justify-center flex-shrink-0 disabled:opacity-40"
-                >
-                  <BackIcon />
-                </button>
-
-                <button
-                  onClick={() => buktiFu && onConfirm(buktiFu)}
-                  disabled={processing || !buktiFu}
-                  className={`flex-1 min-w-0 h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 ${processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                >
-                  {processing ? <Spinner /> : <CheckIcon />}
-                  <span className="truncate">
-                    {processing ? "Menyimpan..." : "Ya, Sudah FU — Simpan"}
-                  </span>
-                </button>
-              </div>
             </>
           )}
         </div>
+
+        {/* ── Footer sticky — tombol selalu kelihatan tanpa perlu scroll ── */}
+        <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">
+          {step === 1 ? (
+            <div className="flex gap-2">
+              <button
+                onClick={onCancel}
+                disabled={processing}
+                className={cx(
+                  "flex-1 h-12 sm:h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40",
+                  FOCUS_RING
+                )}
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => setStep(2)}
+                disabled={!canProceedStep1}
+                title={!canProceedStep1 ? "Upload bukti FU terlebih dahulu" : ""}
+                className={cx(
+                  "flex-1 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5",
+                  FOCUS_RING,
+                  canProceedStep1
+                    ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+                    : "bg-blue-200 cursor-not-allowed"
+                )}
+              >
+                Lanjut
+                <ArrowRightIcon />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStep(1)}
+                disabled={processing}
+                title="Kembali — ganti bukti FU"
+                aria-label="Kembali"
+                className={cx(
+                  "h-12 w-12 sm:h-11 sm:w-11 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-[0.98] transition-all flex items-center justify-center flex-shrink-0 disabled:opacity-40",
+                  FOCUS_RING
+                )}
+              >
+                <BackIcon />
+              </button>
+
+              <button
+                onClick={() => buktiFu && onConfirm(buktiFu)}
+                disabled={processing || !buktiFu}
+                className={cx(
+                  "flex-1 min-w-0 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 px-3",
+                  FOCUS_RING,
+                  processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                )}
+              >
+                <span className="flex-shrink-0 inline-flex">
+                  {processing ? <Spinner /> : <CheckIcon />}
+                </span>
+                <span className="truncate">
+                  {processing ? "Menyimpan..." : "Ya, Sudah FU — Simpan"}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PIC block di dalam kartu ──────────────────────────────────────────────────
+function PicBlock({ f }: { f: Followup }) {
+  // picName: pakai closed_by atau last_followup_by sebagai fallback data lama
+  const picName = f.closed_by ?? f.last_followup_by ?? null;
+  const hasHistory = !!picName;
+
+  if (f.pic_user_id || hasHistory) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
+        <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+          {(picName ?? "?").charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] font-bold text-violet-400 uppercase tracking-wider leading-none mb-1">
+            PIC Follow-up
+          </p>
+          <p className="text-xs font-black text-violet-800 leading-tight truncate">
+            {picName ?? "Belum tercatat"}
+          </p>
+        </div>
+        {f.is_owner && f.pic_user_id && (
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
+            Kamu
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
+      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
+        🙋
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider leading-none mb-1">
+          PIC Follow-up
+        </p>
+        <p className="text-xs font-bold text-emerald-700 leading-tight truncate">
+          Belum ada — kamu bisa klaim!
+        </p>
       </div>
     </div>
   );
@@ -815,38 +1007,47 @@ function FollowupCard({
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
   const isDue = f.is_due && scope === "ACTIVE";
+  const picLabel = f.last_followup_by ?? f.closed_by ?? "—";
+  const nextLabel = diff <= 0 ? "hari ini" : `${diff}h lagi`;
 
   return (
     <div
-      className={`relative h-full bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md ${isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
-        }`}
+      className={cx(
+        "relative h-full bg-white rounded-2xl border overflow-hidden flex flex-col transition-all duration-200 sm:hover:shadow-lg sm:hover:-translate-y-0.5",
+        isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
+      )}
     >
-      {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400 rounded-t-2xl" />}
+      {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400" />}
 
       {/* ── Card Header ── */}
-      <div className={`px-4 pb-3 border-b border-gray-100 ${isDue ? "pt-4" : "pt-3.5"}`}>
-        <div className="flex items-start gap-3">
+      <div
+        className={cx("px-3.5 sm:px-4 pb-3 border-b border-gray-100", isDue ? "pt-4" : "pt-3.5")}
+      >
+        <div className="flex items-start gap-2.5 sm:gap-3">
           <Avatar name={f.customer_name} type={f.seller_type} />
+
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-bold text-gray-900 leading-tight truncate">
-                  {f.customer_name}
-                </h3>
-                <p className="text-[11px] text-gray-400 font-medium mt-1 leading-none truncate">
-                  {f.customer_phone}
-                </p>
-              </div>
-              <StatusBadge f={f} scope={scope} />
-            </div>
+            <h3 className="text-sm font-bold text-gray-900 leading-tight truncate">
+              {f.customer_name}
+            </h3>
+            <p className="text-[11px] text-gray-400 font-medium mt-1 leading-none truncate tabular-nums">
+              {f.customer_phone}
+            </p>
+          </div>
+
+          <div className="flex-shrink-0">
+            <StatusBadge f={f} scope={scope} />
           </div>
         </div>
+
         <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
           <span
-            className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${isPedagang
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : "bg-blue-50 text-blue-700 border-blue-200"
-              }`}
+            className={cx(
+              "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border",
+              isPedagang
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-blue-50 text-blue-700 border-blue-200"
+            )}
           >
             {isPedagang ? "🏷️ Pedagang" : "🙋 User"}
           </span>
@@ -858,52 +1059,8 @@ function FollowupCard({
       </div>
 
       {/* ── Card Body ── */}
-      <div className="px-4 py-3.5 flex-1 space-y-3">
-        {/* PIC Follow-up */}
-        {/* picName: pakai closed_by atau last_followup_by sebagai fallback data lama */}
-        {(() => {
-          const picName = f.closed_by ?? f.last_followup_by ?? null;
-          const hasHistory = !!picName;
-
-          if (f.pic_user_id || hasHistory) {
-            return (
-              <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
-                <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
-                  {(picName ?? "?").charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest leading-none mb-1">
-                    PIC Follow-up
-                  </p>
-                  <p className="text-xs font-black text-violet-800 leading-tight truncate">
-                    {picName ?? "Belum tercatat"}
-                  </p>
-                </div>
-                {f.is_owner && f.pic_user_id && (
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
-                    Kamu
-                  </span>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
-                🙋
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none mb-1">
-                  PIC Follow-up
-                </p>
-                <p className="text-xs font-bold text-emerald-700 leading-tight">
-                  Belum ada — kamu bisa klaim!
-                </p>
-              </div>
-            </div>
-          );
-        })()}
+      <div className="px-3.5 sm:px-4 py-3 sm:py-3.5 flex-1 space-y-2.5 sm:space-y-3">
+        <PicBlock f={f} />
 
         <div className="grid grid-cols-2 gap-2">
           <InfoCell
@@ -915,28 +1072,36 @@ function FollowupCard({
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          <StatPill>🛒 {f.purchase_count}× beli</StatPill>
-          <StatPill>📞 {f.followup_count}× FU</StatPill>
+          <StatPill>
+            <span className="tabular-nums">🛒 {f.purchase_count}× beli</span>
+          </StatPill>
+          <StatPill>
+            <span className="tabular-nums">📞 {f.followup_count}× FU</span>
+          </StatPill>
           {f.last_followup_by && (
             <StatPill>
-              <span className="truncate max-w-[140px]">👤 FU terakhir: {f.last_followup_by}</span>
+              <span className="truncate max-w-[120px] sm:max-w-[140px]">
+                👤 FU terakhir: {f.last_followup_by}
+              </span>
             </StatPill>
           )}
           {f.last_followup_proof_url && (
-            <a
+            <ExternalLink
               href={f.last_followup_proof_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 hover:bg-blue-100 transition"
+              title="Lihat bukti follow-up"
+              className={cx(
+                "inline-flex items-center gap-1 h-6 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2 hover:bg-blue-100 transition",
+                FOCUS_RING
+              )}
             >
               🖼️ Lihat bukti
-            </a>
+            </ExternalLink>
           )}
         </div>
       </div>
 
       {/* ── Card Actions ── */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
+      <div className="px-3.5 sm:px-4 py-3 border-t border-gray-100 bg-gray-50/40 flex items-center gap-2">
         {scope === "ACTIVE" ? (
           <>
             <WaChatButton f={f} />
@@ -947,22 +1112,25 @@ function FollowupCard({
               ) : (
                 <button
                   disabled
-                  title={`Sudah FU oleh ${f.last_followup_by ?? f.closed_by ?? "PIC"}. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
-                  className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none px-3"
+                  title={`Sudah FU oleh ${picLabel}. Jadwal berikutnya ${fmtDate(f.next_followup_at)}`}
+                  className="flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-1.5 rounded-xl bg-white text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none px-3"
                 >
                   <span className="flex-shrink-0">
                     <CheckIcon />
                   </span>
+                  {/* HP: ringkas. Laptop: lengkap dengan nama PIC */}
                   <span className="truncate">
-                    Sudah FU · {f.last_followup_by ?? f.closed_by ?? "—"} ·{" "}
-                    {diff <= 0 ? "hari ini" : `${diff}h lagi`}
+                    Sudah FU
+                    <span className="hidden sm:inline"> · {picLabel}</span>
+                    {" · "}
+                    {nextLabel}
                   </span>
                 </button>
               )
             ) : (
               <div
                 title={f.lock_reason ?? "Kamu tidak berwenang follow-up customer ini"}
-                className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none"
+                className="flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 text-gray-400 text-xs font-semibold border border-gray-200 cursor-not-allowed select-none px-3"
               >
                 <LockIcon />
                 <span className="truncate">FU Terkunci</span>
@@ -974,7 +1142,11 @@ function FollowupCard({
                 onClick={() => onArchive(f.id)}
                 disabled={processing}
                 title="Arsipkan (stop follow-up)"
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-150 disabled:opacity-40 flex-shrink-0"
+                aria-label="Arsipkan"
+                className={cx(
+                  "h-11 w-11 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-100 hover:border-gray-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 flex-shrink-0",
+                  FOCUS_RING
+                )}
               >
                 <ArchiveIcon />
               </button>
@@ -987,9 +1159,14 @@ function FollowupCard({
               <button
                 onClick={() => onReactivate(f.id)}
                 disabled={processing}
-                className="flex-1 min-w-0 h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold hover:bg-gray-900 transition-all duration-150 disabled:opacity-50"
+                className={cx(
+                  "flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold px-3 hover:bg-gray-900 active:scale-[0.98] transition-all duration-150 disabled:opacity-50",
+                  FOCUS_RING
+                )}
               >
-                {processing ? <Spinner /> : <RefreshIcon />}
+                <span className="flex-shrink-0 inline-flex">
+                  {processing ? <Spinner /> : <RefreshIcon />}
+                </span>
                 <span className="truncate">Aktifkan Lagi</span>
               </button>
             )}
@@ -1009,43 +1186,86 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-        { emoji: "🗂️", label: "Total Arsip", value: total, danger: false },
-        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-      ]
+          { emoji: "🗂️", label: "Total Arsip", short: "Arsip", value: total, danger: false },
+          {
+            emoji: "📞",
+            label: "Total Follow-up",
+            short: "Total FU",
+            value: totalFU,
+            danger: false,
+          },
+        ]
       : [
-        { emoji: "👥", label: "Customer", value: total, danger: false },
-        { emoji: "🔴", label: "Perlu Follow-up", value: totalDue, danger: totalDue > 0 },
-        { emoji: "📞", label: "Total Follow-up", value: totalFU, danger: false },
-      ];
+          { emoji: "👥", label: "Customer", short: "Customer", value: total, danger: false },
+          {
+            emoji: "🔴",
+            label: "Perlu Follow-up",
+            short: "Perlu FU",
+            value: totalDue,
+            danger: totalDue > 0,
+          },
+          {
+            emoji: "📞",
+            label: "Total Follow-up",
+            short: "Total FU",
+            value: totalFU,
+            danger: false,
+          },
+        ];
 
   return (
-    <div className={`grid gap-2 sm:gap-3 ${scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3"}`}>
+    <div
+      className={cx("grid gap-2 sm:gap-3", scope === "ARCHIVED" ? "grid-cols-2" : "grid-cols-3")}
+    >
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-2xl border px-2.5 py-2.5 sm:px-4 sm:py-3.5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3 transition-colors ${c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
-            }`}
+          className={cx(
+            "rounded-2xl border px-3 py-2.5 sm:px-4 sm:py-3.5 flex flex-col justify-center gap-1.5 sm:flex-row sm:items-center sm:gap-3 transition-colors",
+            c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+          )}
         >
-          <div
-            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-sm sm:text-base flex-shrink-0 ${c.danger ? "bg-red-100" : "bg-gray-100"
-              }`}
+          {/* HP: emoji + angka satu baris. Laptop: kembali ke layout ikon-kiri. */}
+          <div className="flex items-center gap-2 sm:contents">
+            <div
+              className={cx(
+                "w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-base flex-shrink-0",
+                c.danger ? "bg-red-100" : "bg-gray-100"
+              )}
+            >
+              {c.emoji}
+            </div>
+
+            <div className="min-w-0 sm:w-full">
+              {/* Label panjang hanya di laptop */}
+              <p
+                className={cx(
+                  "hidden sm:block text-[9px] font-bold uppercase tracking-widest leading-tight mb-1 truncate",
+                  c.danger ? "text-red-400" : "text-gray-400"
+                )}
+              >
+                {c.label}
+              </p>
+              <p
+                className={cx(
+                  "text-lg sm:text-xl font-black leading-none tabular-nums",
+                  c.danger ? "text-red-600" : "text-gray-900"
+                )}
+              >
+                {c.value}
+              </p>
+            </div>
+          </div>
+
+          {/* Label versi HP — pendek supaya tidak terpotong di 3 kolom */}
+          <p
+            className={cx(
+              "sm:hidden text-[9px] font-bold uppercase tracking-wider leading-tight truncate",
+              c.danger ? "text-red-400" : "text-gray-400"
+            )}
           >
-            {c.emoji}
-          </div>
-          <div className="min-w-0 w-full">
-            <p
-              className={`text-[9px] font-bold uppercase tracking-widest leading-tight mb-1 truncate ${c.danger ? "text-red-400" : "text-gray-400"
-                }`}
-            >
-              {c.label}
-            </p>
-            <p
-              className={`text-base sm:text-xl font-black leading-none ${c.danger ? "text-red-600" : "text-gray-900"
-                }`}
-            >
-              {c.value}
-            </p>
-          </div>
+            {c.short}
+          </p>
         </div>
       ))}
     </div>
@@ -1056,20 +1276,20 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden animate-pulse">
-      <div className="px-4 pt-3.5 pb-3 border-b border-gray-100">
+      <div className="px-3.5 sm:px-4 pt-3.5 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-100 rounded-xl flex-shrink-0" />
+          <div className="w-10 h-10 bg-gray-100 rounded-xl flex-shrink-0" />
           <div className="flex-1 space-y-1.5">
             <div className="flex items-start justify-between gap-2">
-              <div className="h-4 w-32 bg-gray-100 rounded-lg" />
-              <div className="h-5 w-20 bg-gray-100 rounded-full" />
+              <div className="h-4 w-28 bg-gray-100 rounded-lg" />
+              <div className="h-5 w-16 bg-gray-100 rounded-full" />
             </div>
             <div className="h-3 w-24 bg-gray-100 rounded" />
           </div>
         </div>
         <div className="mt-2.5 h-4 w-28 bg-gray-100 rounded-full" />
       </div>
-      <div className="px-4 py-3.5 space-y-3">
+      <div className="px-3.5 sm:px-4 py-3.5 space-y-3">
         <div className="h-12 bg-gray-100 rounded-xl" />
         <div className="grid grid-cols-2 gap-2">
           <div className="h-14 bg-gray-100 rounded-xl" />
@@ -1080,8 +1300,8 @@ function SkeletonCard() {
           <div className="h-6 w-16 bg-gray-100 rounded-lg" />
         </div>
       </div>
-      <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/40">
-        <div className="h-10 bg-gray-100 rounded-xl" />
+      <div className="px-3.5 sm:px-4 py-3 border-t border-gray-100 bg-gray-50/40">
+        <div className="h-11 sm:h-10 bg-gray-100 rounded-xl" />
       </div>
     </div>
   );
@@ -1177,8 +1397,6 @@ export default function ManagementSellerPage() {
     if (canManage || canManagePic) loadPics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canManage, canManagePic]);
-
-  const activePics = useMemo(() => pics.filter((p) => p.is_active), [pics]);
 
   // ── Toggle checklist akses PIC (Admin) — optimistic ──
   const togglePic = async (userId: string, next: boolean) => {
@@ -1301,23 +1519,23 @@ export default function ManagementSellerPage() {
 
   return (
     <DashboardLayout>
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-8 space-y-4 sm:space-y-6">
         {/* ── Header ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-[3px] h-6 sm:h-7 bg-gray-900 rounded-full flex-shrink-0" />
+              <span className="w-[3px] h-6 sm:h-7 bg-gray-900 rounded-full flex-shrink-0" />
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight truncate">
                 Management Seller
               </h1>
             </div>
-            <p className="text-xs text-gray-400 ml-[18px] font-medium">
+            <p className="text-[11px] sm:text-xs text-gray-400 ml-[18px] font-medium">
               User tiap 7 hari &nbsp;·&nbsp; Pedagang tiap 3 hari
             </p>
           </div>
 
-          {/* Di HP: 1 baris penuh & tidak mepet. Di laptop: nempel kanan header */}
-          <div className="flex items-center gap-2 sm:flex-shrink-0">
+          {/* HP: satu baris penuh, tidak mepet. Laptop: nempel kanan header */}
+          <div className="flex items-center gap-2 lg:flex-shrink-0">
             {canManagePic && (
               <PicAccessDropdown
                 pics={pics}
@@ -1329,33 +1547,43 @@ export default function ManagementSellerPage() {
               />
             )}
 
-            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 ml-auto sm:ml-0">
+            <div className="flex bg-gray-100 rounded-xl p-1 gap-0.5 ml-auto lg:ml-0">
               {(["ACTIVE", "ARCHIVED"] as Scope[]).map((s) => (
                 <button
                   key={s}
                   onClick={() => setScope(s)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${scope === s
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                    }`}
+                  aria-pressed={scope === s}
+                  className={cx(
+                    "h-9 sm:h-8 px-4 sm:px-3.5 rounded-lg text-xs font-bold transition-all duration-150",
+                    FOCUS_RING,
+                    scope === s
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
                 >
                   {s === "ACTIVE" ? "Aktif" : "Arsip"}
                 </button>
               ))}
             </div>
           </div>
-        </div>
+        </header>
 
         {/* ── Summary Bar ── */}
         {!loading && <SummaryBar items={items} scope={scope} />}
 
         {/* ── Toolbar: Tabs + Search ── */}
-        <div className="space-y-3 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
+        <div className="space-y-2.5 lg:flex lg:items-center lg:gap-3 lg:space-y-0">
           {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 sm:flex-1 sm:min-w-0">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:flex-1 lg:min-w-0">
             {(
               [
-                { key: "USER" as Tab, label: "User", icon: "🙋", count: userItems.length, due: userDue },
+                {
+                  key: "USER" as Tab,
+                  label: "User",
+                  icon: "🙋",
+                  count: userItems.length,
+                  due: userDue,
+                },
                 {
                   key: "PEDAGANG" as Tab,
                   label: "Pedagang",
@@ -1370,33 +1598,43 @@ export default function ManagementSellerPage() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  className={`relative flex items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden ${isActive
-                    ? "bg-gray-900 border-gray-900 shadow-md"
-                    : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                    }`}
+                  aria-pressed={isActive}
+                  className={cx(
+                    "relative flex items-center gap-2 sm:gap-3 px-2.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden active:scale-[0.99]",
+                    FOCUS_RING,
+                    isActive
+                      ? "bg-gray-900 border-gray-900 shadow-md"
+                      : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  )}
                 >
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                    <div
-                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 ${isActive ? "bg-white/10" : "bg-gray-100"
-                        }`}
+                  <span
+                    className={cx(
+                      "w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-xl flex-shrink-0",
+                      isActive ? "bg-white/10" : "bg-gray-100"
+                    )}
+                  >
+                    {t.icon}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cx(
+                        "block text-[13px] sm:text-sm font-bold leading-tight truncate",
+                        isActive ? "text-white" : "text-gray-900"
+                      )}
                     >
-                      {t.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <p
-                        className={`text-sm font-bold leading-tight truncate ${isActive ? "text-white" : "text-gray-900"
-                          }`}
-                      >
-                        {t.label}
-                      </p>
-                      <p className="text-[10px] font-medium mt-0.5 text-gray-400 truncate">
-                        {t.count} customer
-                      </p>
-                    </div>
-                  </div>
+                      {t.label}
+                    </span>
+                    <span className="block text-[10px] font-medium mt-0.5 text-gray-400 truncate tabular-nums">
+                      {t.count} customer
+                    </span>
+                  </span>
+
+                  {/* HP: badge angka saja. Laptop: "3 FU" */}
                   {scope === "ACTIVE" && t.due > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-red-500 text-white flex-shrink-0">
-                      {t.due} FU
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[10px] font-bold rounded-full bg-red-500 text-white flex-shrink-0 tabular-nums">
+                      {t.due}
+                      <span className="hidden sm:inline">&nbsp;FU</span>
                     </span>
                   )}
                 </button>
@@ -1404,33 +1642,31 @@ export default function ManagementSellerPage() {
             })}
           </div>
 
-          {/* Search — sejajar tab di laptop, full-width di HP */}
-          <div className="relative sm:w-72 sm:flex-shrink-0">
-            <svg
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+          {/* Search — full-width di HP, sejajar tab di laptop.
+              text-base (16px) di HP supaya iOS Safari tidak auto-zoom saat input difokus. */}
+          <div className="relative lg:w-80 lg:flex-shrink-0">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <SearchIcon />
+            </span>
             <input
               type="text"
+              inputMode="search"
               placeholder="Cari nama, HP, atau invoice…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl h-11 pl-10 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
+              aria-label="Cari customer"
+              className="w-full border border-gray-200 rounded-xl h-12 sm:h-11 pl-10 pr-11 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition"
+                className={cx(
+                  "absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition",
+                  FOCUS_RING
+                )}
                 aria-label="Hapus pencarian"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <CloseIcon />
               </button>
             )}
           </div>
@@ -1438,13 +1674,13 @@ export default function ManagementSellerPage() {
 
         {/* ── Content ── */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 py-16 sm:py-20 px-6 text-center">
+          <div className="bg-white rounded-2xl border border-gray-200 py-14 sm:py-20 px-6 text-center">
             <div className="text-4xl sm:text-5xl mb-4 opacity-25">
               {scope === "ARCHIVED" ? "🗂️" : search.trim() ? "🔍" : "✅"}
             </div>
@@ -1458,23 +1694,27 @@ export default function ManagementSellerPage() {
             {search.trim() && (
               <button
                 onClick={() => setSearch("")}
-                className="mt-3 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition"
+                className={cx(
+                  "mt-3 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition py-2 px-3",
+                  FOCUS_RING
+                )}
               >
                 Hapus pencarian
               </button>
             )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 sm:space-y-4">
             {scope === "ACTIVE" && dueCount > 0 && (
-              <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+              <div className="flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-                <p className="text-xs text-red-600 font-semibold">
+                <p className="text-[11px] sm:text-xs text-red-600 font-semibold tabular-nums">
                   {dueCount} customer perlu segera di-follow-up
                 </p>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 items-stretch">
               {visible.map((f) => (
                 <FollowupCard
                   key={f.id}
