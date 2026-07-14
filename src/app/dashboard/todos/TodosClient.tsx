@@ -28,7 +28,8 @@ interface Todo {
     due_date: string | null;
     created_at: string;
     updated_at: string;
-    // items di-load secara lazy saat expand
+    author_name: string | null;
+    is_own: boolean;
     items?: TodoItem[];
     items_loaded?: boolean;
 }
@@ -628,6 +629,21 @@ function TodoItemCard({
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
+                    {/* Author info — tampil di atas title */}
+                    {todo.author_name && (
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            {/* Avatar inisial */}
+                            <div
+                                className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-white"
+                                style={{ background: todo.is_own ? "#10b981" : "#7c3aed", fontSize: "8px", fontWeight: 800 }}
+                            >
+                                {todo.author_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className={`text-[10px] font-semibold ${todo.is_own ? "text-emerald-600" : "text-violet-600"}`}>
+                                {todo.is_own ? `${todo.author_name} (Kamu)` : todo.author_name}
+                            </span>
+                        </div>
+                    )}
                     <p className={`text-sm font-semibold leading-snug break-words ${todo.is_done ? "line-through text-gray-400" : "text-gray-800"}`}>
                         {todo.title}
                     </p>
@@ -704,32 +720,35 @@ function TodoItemCard({
                     </div>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 mt-0.5">
-                    <button
-                        onClick={() => onEdit(todo)}
-                        className="w-7 h-7 rounded-xl flex items-center justify-center text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-all"
-                        aria-label="Edit tugas"
-                        title="Edit"
-                    >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                    </button>
-                    <button
-                        onClick={() => onDelete(todo.id)}
-                        className="w-7 h-7 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                        aria-label="Hapus tugas"
-                        title="Hapus"
-                    >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                        </svg>
-                    </button>
-                </div>
+                {/* Action buttons — hanya tampil kalau milik sendiri */}
+                {todo.is_own && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 mt-0.5">
+                        <button
+                            onClick={() => onEdit(todo)}
+                            className="w-7 h-7 rounded-xl flex items-center justify-center text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-all"
+                            aria-label="Edit tugas"
+                            title="Edit"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => onDelete(todo.id)}
+                            className="w-7 h-7 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                            aria-label="Hapus tugas"
+                            title="Hapus"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
             </div>
+
 
             {/* Checklist panel (expandable) */}
             {expanded && (
@@ -1047,7 +1066,7 @@ export default function TodosClient() {
             setTodos((prev) =>
                 prev.map((t) =>
                     t.id === editTarget.id
-                        ? { ...result.todo, items: t.items, items_loaded: t.items_loaded }
+                        ? { ...result.todo, items: t.items, items_loaded: t.items_loaded, author_name: t.author_name, is_own: t.is_own }
                         : t
                 )
             );
@@ -1108,11 +1127,12 @@ export default function TodosClient() {
     };
 
     const handleClearDone = async () => {
-        const doneIds = todos.filter((t) => t.is_done).map((t) => t.id);
+        // Hanya hapus todo selesai yang milik sendiri
+        const doneIds = todos.filter((t) => t.is_done && t.is_own).map((t) => t.id);
         if (doneIds.length === 0) return;
         try {
             await Promise.all(doneIds.map((id) => fetch(`/api/todos/${id}`, { method: "DELETE" })));
-            setTodos((prev) => prev.filter((t) => !t.is_done));
+            setTodos((prev) => prev.filter((t) => !(t.is_done && t.is_own)));
             setExpandedIds((prev) => {
                 const next = new Set(prev);
                 doneIds.forEach((id) => next.delete(id));
@@ -1124,7 +1144,8 @@ export default function TodosClient() {
         }
     };
 
-    const doneTodos = todos.filter((t) => t.is_done);
+    // Hanya todo selesai milik sendiri yang bisa dibersihkan
+    const doneTodos = todos.filter((t) => t.is_done && t.is_own);
 
     const content = (
         <>

@@ -1,4 +1,3 @@
-// C:\Users\SOLIT\Documents\SOLIT_POS\solit-pos\src\app\api\todos\[id]\items\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyToken } from "@/lib/auth";
@@ -20,10 +19,14 @@ async function getAuthedUser(request: NextRequest) {
     if (!user) return null;
     const roles: string[] = (user as any).roles ?? [user.role];
     if (!roles.some((r) => TODO_ROLES.includes(r))) return null;
-    return user;
+    return { ...user, roles };
 }
 
-// GET /api/todos/[id]/items — fetch semua checklist items milik todo ini
+function isAdmin(user: { roles: string[] }): boolean {
+    return user.roles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
+}
+
+// GET /api/todos/[id]/items — siapapun yang punya akses TODO bisa lihat items
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -34,12 +37,11 @@ export async function GET(
     const { id: todo_id } = await params;
     const supabase = getSupabase();
 
-    // Verifikasi todo milik user ini
+    // Verifikasi todo ada (tanpa ownership check — semua bisa lihat)
     const { data: todo, error: todoErr } = await supabase
         .from("todos")
         .select("id")
         .eq("id", todo_id)
-        .eq("user_id", user.id)
         .single();
 
     if (todoErr || !todo) {
@@ -57,7 +59,7 @@ export async function GET(
     return NextResponse.json({ items: data ?? [] });
 }
 
-// POST /api/todos/[id]/items — tambah checklist item baru
+// POST /api/todos/[id]/items — hanya pemilik todo atau admin yang boleh tambah item
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -74,19 +76,23 @@ export async function POST(
 
     const supabase = getSupabase();
 
-    // Verifikasi todo milik user ini
+    // Cek todo ada & ownership
     const { data: todo, error: todoErr } = await supabase
         .from("todos")
-        .select("id")
+        .select("id, user_id")
         .eq("id", todo_id)
-        .eq("user_id", user.id)
         .single();
 
     if (todoErr || !todo) {
         return NextResponse.json({ error: "Todo tidak ditemukan" }, { status: 404 });
     }
 
-    // Ambil posisi tertinggi saat ini + 1
+    // Hanya pemilik atau admin yang boleh tambah sub-task
+    const isOwner = todo.user_id === user.id;
+    if (!isOwner && !isAdmin(user)) {
+        return NextResponse.json({ error: "Hanya pemilik todo yang boleh menambah sub-task" }, { status: 403 });
+    }
+
     const { data: last } = await supabase
         .from("todo_items")
         .select("position")
