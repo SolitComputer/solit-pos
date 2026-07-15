@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
-import RiwayatKeluarContent from "@/components/accessories/RiwayatKeluarContent";
+
 
 type TabKey = "laptops" | "accessories" | "outflows";
 
@@ -30,12 +30,7 @@ const TABS: TabDef[] = [
     roles: [],
     icon: "ti-devices",
   },
-  {
-    key: "outflows",
-    label: "Riwayat Keluar",
-    roles: [],
-    icon: "ti-history",
-  },
+ 
 ];
 
 function getTabIcon(icon: string, className: string) {
@@ -199,7 +194,7 @@ export default function DataBarangPage() {
       <div>
         {activeTab === "laptops" && <LaptopsContent />}
         {activeTab === "accessories" && <AccessoriesContent />}
-        {activeTab === "outflows" && <RiwayatKeluarContent />}
+     
       </div>
 
       <style jsx global>{`

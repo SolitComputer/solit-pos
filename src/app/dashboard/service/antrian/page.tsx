@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import ServiceFormModal from "@/components/service/ServiceFormModal";
 import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
 import ServicePriceDialog from "@/components/service/ServicePriceDialog";
+import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
@@ -76,6 +77,17 @@ type PriceDialogState = {
 const PRICE_DIALOG_CLOSED: PriceDialogState = {
   open: false, orderId: "", action: "", title: "", description: "",
   confirmLabel: "", priceLabel: "", defaultPrice: 0, withReason: false,
+};
+
+type SparepartDialogState = {
+  open: boolean;
+  orderId: string;
+  orderName: string;
+  orderType: string;
+  defaultPrice: number;
+};
+const SPAREPART_DIALOG_CLOSED: SparepartDialogState = {
+  open: false, orderId: "", orderName: "", orderType: "", defaultPrice: 0
 };
 
 function useAntrianRealtime() {
@@ -372,6 +384,7 @@ export default function AntrianPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [priceDialog, setPriceDialog] = useState<PriceDialogState>(PRICE_DIALOG_CLOSED);
+  const [sparepartDialog, setSparepartDialog] = useState<SparepartDialogState>(SPAREPART_DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -436,20 +449,12 @@ export default function AntrianPage() {
         withReason: false,
       });
     } else {
-      setPriceDialog({
+      setSparepartDialog({
         open: true,
         orderId: order.id,
-        action: "sparepart",
-        title: "Menunggu Sparepart",
-        description: `Masukkan biaya sparepart & keterangan untuk "${order.nama} — ${order.type_laptop}".`,
-        confirmLabel: "Tandai Menunggu Sparepart",
-        confirmClass: "bg-orange-600 hover:bg-orange-700",
-        priceLabel: "Biaya Sparepart",
-        defaultPrice: Number(order.biaya_sparepart ?? 0),
-        withReason: true,
-        reasonLabel: "Keterangan Sparepart",
-        reasonPlaceholder: "Contoh: Butuh baterai 14.8V 4400mAh untuk Acer Aspire",
-        reasonRequired: true,
+        orderName: order.nama,
+        orderType: order.type_laptop,
+        defaultPrice: Number(order.biaya_sparepart ?? 0)
       });
     }
   };
@@ -500,6 +505,30 @@ export default function AntrianPage() {
     if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
     setPriceDialog(PRICE_DIALOG_CLOSED);
     showToast(priceDialog.action === "mulai" ? "✅ Pengerjaan dimulai!" : "✅ Ditandai menunggu sparepart.");
+    refresh();
+  };
+
+  const handleSparepartConfirm = async (payload: { price: number; reason?: string; accessory_id?: string; unit_id?: string }) => {
+    const body: Record<string, unknown> = { 
+      action: "sparepart",
+      biaya_sparepart: payload.price,
+      alasan: payload.reason,
+      accessories_used: payload.accessory_id ? [{
+        accessory_id: payload.accessory_id,
+        unit_id: payload.unit_id,
+        qty: 1
+      }] : undefined
+    };
+
+    const res = await fetch(`/api/service/${sparepartDialog.orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
+    setSparepartDialog(SPAREPART_DIALOG_CLOSED);
+    showToast("🎉 Ditandai menunggu sparepart.");
     refresh();
   };
 
@@ -926,6 +955,16 @@ export default function AntrianPage() {
           reasonRequired={priceDialog.reasonRequired}
           onCancel={() => setPriceDialog(PRICE_DIALOG_CLOSED)}
           onConfirm={handlePriceConfirm}
+        />
+
+        <ServiceSparepartDialog
+          open={sparepartDialog.open}
+          orderId={sparepartDialog.orderId}
+          orderName={sparepartDialog.orderName}
+          orderType={sparepartDialog.orderType}
+          defaultPrice={sparepartDialog.defaultPrice}
+          onCancel={() => setSparepartDialog(SPAREPART_DIALOG_CLOSED)}
+          onConfirm={handleSparepartConfirm}
         />
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />

@@ -137,6 +137,28 @@ export async function PATCH(
       logCatatan = biaya_sparepart
         ? `Menunggu sparepart · Biaya: Rp ${Number(biaya_sparepart).toLocaleString("id-ID")}${alasan ? ` · ${alasan}` : ""}`
         : (alasan ? `Menunggu sparepart: ${alasan}` : "Menunggu sparepart");
+
+      if (accessories_used && accessories_used.length > 0) {
+        for (const acc of accessories_used) {
+          if (acc.unit_id) {
+            await supabase.from("accessory_units").update({ status: "KELUAR" }).eq("id", acc.unit_id);
+          }
+          await recordOutflow({
+            accessory_id: acc.accessory_id,
+            unit_id: acc.unit_id || null,
+            source_type: "service",
+            service_id: id,
+            qty: acc.qty,
+            notes: `Dipakai untuk servis ${current.no_urut || id}`,
+            taken_by_role: "TEKNISI",
+            created_by: user.id,
+          });
+          await supabase.rpc("decrement_accessory_stock", {
+            p_accessory_id: acc.accessory_id,
+            p_qty: acc.qty,
+          });
+        }
+      }
       break;
 
     case "done":
