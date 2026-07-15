@@ -92,6 +92,8 @@ const ALL_ROLES: UserRole[] = [
   "CUSTOMER_SERVICE",
 ];
 
+export const ALL_STATIC_ROLES: string[] = [...ALL_ROLES];
+
 const SALES_ACCESS: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",

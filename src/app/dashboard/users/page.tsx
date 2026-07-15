@@ -6,6 +6,7 @@ import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
+import RoleAccessManager from "@/components/users/RoleAccessManager";
 
 interface User {
   id: string;
@@ -126,6 +127,8 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
 };
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
+const ROLE_MANAGER_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
@@ -784,6 +787,8 @@ export default function UsersPage() {
   const [confirmResetPwUser, setConfirmResetPwUser] = useState<User | null>(null);
   const [resettingPw, setResettingPw] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isRoleManager, setIsRoleManager] = useState(false);
+  const [mainTab, setMainTab] = useState<"users" | "roles">("users");
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"karyawan" | "pkl">("karyawan");
@@ -810,6 +815,7 @@ export default function UsersPage() {
       setIsAdmin(admin);
       setIsKepala(kepala);
       setCurrentUserInfo({ id: u.id, name: u.name, role: u.role });
+      setIsRoleManager(userRoles.some((r) => ROLE_MANAGER_ROLES.has(r)));
     });
   }, []);
 
@@ -1045,6 +1051,39 @@ export default function UsersPage() {
               <StatCard icon="⚠️" value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
                 accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
             </div>
+          )}
+
+          {isRoleManager && (
+            <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
+              <div className="flex gap-1.5">
+                {([
+                  { key: "users", label: "Daftar User", emoji: "👥" },
+                  { key: "roles", label: "Role & Hak Akses", emoji: "🔐" },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setMainTab(t.key)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
+                    style={
+                      mainTab === t.key
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        : { background: "#f5f7ff", color: "#64748b" }
+                    }
+                  >
+                    <span>{t.emoji}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {mainTab === "roles" && isRoleManager ? (
+            <RoleAccessManager />
+          ) : (
+            <>
+              {/* ── SEMUA JSX YANG SUDAH ADA SEKARANG (stat cards, tab karyawan/pkl, list user, dst) ── */}
+            </>
           )}
 
           {/* ── Tab Karyawan / PKL ── */}
