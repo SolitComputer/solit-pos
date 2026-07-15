@@ -135,8 +135,15 @@ export const ALL_UNITS_ROLES: UserRole[] = [
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 /** Yang boleh konfirmasi / edit / hapus jurnal */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
-// ─── Preparation Roles ────────────────────────────────────────────────────────
 
+// ─── Pengambilan Barang (Item Outflow) ────────────────────────────────────
+export const ITEM_OUTFLOW_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "TEKNISI", "KEPALA_TEKNISI",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];
+
+// ─── Preparation Roles ────────────────────────────────────────────────────────
 const PKL_PREP_ROLES: UserRole[] = [
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -245,6 +252,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
   "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
   "/dashboard/units": [...ALL_UNITS_ROLES],
+  "/api/item-outflows": [...ITEM_OUTFLOW_ROLES],
   "/dashboard/laptops": [
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",

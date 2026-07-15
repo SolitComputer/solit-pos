@@ -13,6 +13,7 @@ export type LogEntity =
   | "unit"
   | "transaction"
   | "warranty"
+  | "item_outflow"
   | "seller_followup"
   | "seller_followup_pic"   // ← NEW: audit trail checklist akses PIC
   | "preparation"

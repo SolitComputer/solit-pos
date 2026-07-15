@@ -360,6 +360,7 @@ export const config = {
     "/api/group-chat",
     "/api/service/:path*",
     "/api/accessories/:path*",
+    "/api/item-outflows/:path*",
     "/dashboard/accessories/:path*",
     "/api/seller-followups/:path*",
     "/api/seller-pics/:path*",

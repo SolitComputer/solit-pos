@@ -6,6 +6,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
+import OutflowsContent from "./OutflowsContent";
+import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 
 
 type TabKey = "laptops" | "accessories" | "outflows";
@@ -30,7 +32,12 @@ const TABS: TabDef[] = [
     roles: [],
     icon: "ti-devices",
   },
- 
+  {
+    key: "outflows",
+    label: "Pengambilan Barang",
+    roles: ITEM_OUTFLOW_ROLES, // ← tab hanya tampil utk role yg diizinkan
+    icon: "ti-history",
+  },
 ];
 
 function getTabIcon(icon: string, className: string) {
@@ -55,8 +62,8 @@ function getTabIcon(icon: string, className: string) {
     case "ti-history":
       return (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
         </svg>
       );
     default:
@@ -80,8 +87,8 @@ export default function DataBarangPage() {
           Array.isArray(data.user?.roles) && data.user.roles.length > 0
             ? data.user.roles
             : data.user?.role
-            ? [data.user.role]
-            : [];
+              ? [data.user.role]
+              : [];
         setUserRoles(roles as UserRole[]);
       } catch {
         setUserRoles([]);
@@ -194,7 +201,7 @@ export default function DataBarangPage() {
       <div>
         {activeTab === "laptops" && <LaptopsContent />}
         {activeTab === "accessories" && <AccessoriesContent />}
-     
+        {activeTab === "outflows" && <OutflowsContent />}
       </div>
 
       <style jsx global>{`

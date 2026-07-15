@@ -121,8 +121,6 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
 
     const nom = Math.round(Number(nominal));
 
-    // ✅ FIX: nominal 0 DIIZINKAN saat edit (koreksi entry salah input).
-    //    Yang ditolak hanya non-numerik atau negatif.
     if (!Number.isFinite(nom) || nom < 0)
         return NextResponse.json(
             { success: false, message: "Nominal tidak valid (tidak boleh negatif)" },
