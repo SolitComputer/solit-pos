@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidAccount } from "@/lib/accounting";
+import { isValidAccountDb } from "@/lib/chartOfAccounts";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -17,10 +17,11 @@ function getAdmin(): SupabaseClient {
 // Cek apakah akun ini sudah punya saldo awal manual atau belum.
 export const GET = withAuth(async (req) => {
   const accountCode = new URL(req.url).searchParams.get("account_code") ?? "";
-  if (!accountCode || !isValidAccount(accountCode))
+  const supabase = getAdmin();
+
+  if (!accountCode || !(await isValidAccountDb(supabase, accountCode)))
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
 
-  const supabase = getAdmin();
   const { data, error } = await supabase
     .from("journal_opening_balances")
     .select("account_code, side, nominal, created_at, created_by_user:users(id, name)")
@@ -49,14 +50,14 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     nominal: number;
   };
 
-  if (!account_code || !isValidAccount(account_code))
+  const supabase = getAdmin();
+
+  if (!account_code || !(await isValidAccountDb(supabase, account_code)))
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
   if (side !== "DEBIT" && side !== "KREDIT")
     return NextResponse.json({ success: false, message: "Sisi saldo harus DEBIT/KREDIT" }, { status: 400 });
   if (!Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
     return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
-
-  const supabase = getAdmin();
 
   const { data: existing, error: checkErr } = await supabase
     .from("journal_opening_balances")

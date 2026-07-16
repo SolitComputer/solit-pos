@@ -1,3 +1,4 @@
+// src/app/api/akutansi/jurnal/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES, AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
@@ -5,13 +6,13 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   DraftLine,
   isBalanced,
-  isValidAccount,
   isValidPeriod,
   mergeLines,
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
+import { getAccountMap } from "@/lib/chartOfAccounts";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -100,8 +101,11 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   if (!Array.isArray(lines) || lines.length < 2)
     return NextResponse.json({ success: false, message: "Minimal 2 baris (debit & kredit)" }, { status: 400 });
 
+  const supabase = getAdmin();
+  const accountMap = await getAccountMap(supabase);
+
   for (const l of lines) {
-    if (!isValidAccount(l.account_code))
+    if (!accountMap.has(l.account_code))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (l.side !== "DEBIT" && l.side !== "KREDIT")
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });
@@ -115,8 +119,6 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       { success: false, message: "Jurnal tidak balance — total debit harus sama dengan total kredit" },
       { status: 400 }
     );
-
-  const supabase = getAdmin();
 
   const { data: entry, error: entryErr } = await supabase
     .from("journal_entries")

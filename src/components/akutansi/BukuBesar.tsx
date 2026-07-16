@@ -2,9 +2,15 @@
 // src/components/akutansi/BukuBesar.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
+import { ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER, AccountType } from "@/lib/accounting";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface AccountOption {
+    code: string;
+    name: string;
+    type: AccountType;
+}
+
 interface LedgerLine {
     id: string;
     tanggal: string;
@@ -50,12 +56,35 @@ function getNormalSide(code: string): NormalSide {
 }
 
 export default function BukuBesar({ period }: { period: string }) {
-    const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
+    const [accounts, setAccounts] = useState<AccountOption[]>([]);
+    const [accountsLoading, setAccountsLoading] = useState(true);
+    const [accountCode, setAccountCode] = useState<string>("");
     const [search, setSearch] = useState("");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showOpeningModal, setShowOpeningModal] = useState(false);
+
+    // ── Load daftar akun dari chart_of_accounts (Supabase) ──
+    useEffect(() => {
+        let cancelled = false;
+        setAccountsLoading(true);
+        fetch("/api/akutansi/accounts")
+            .then((r) => r.json())
+            .then((j) => {
+                if (cancelled) return;
+                if (j.success) {
+                    setAccounts(j.data);
+                    setAccountCode((prev) => prev || j.data[0]?.code || "");
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setAccountsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const load = useCallback(async () => {
         if (!accountCode) return;
@@ -98,9 +127,9 @@ export default function BukuBesar({ period }: { period: string }) {
 
     const filteredAccounts = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return ACCOUNTS;
-        return ACCOUNTS.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
-    }, [search]);
+        if (!q) return accounts;
+        return accounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
+    }, [search, accounts]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -117,8 +146,10 @@ export default function BukuBesar({ period }: { period: string }) {
                 <select
                     value={accountCode}
                     onChange={(e) => setAccountCode(e.target.value)}
-                    className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white"
+                    disabled={accountsLoading}
+                    className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white disabled:opacity-50"
                 >
+                    {accountsLoading && <option>Memuat akun...</option>}
                     {ACCOUNT_TYPE_ORDER.map((type) => {
                         const accs = filteredAccounts.filter((a) => a.type === type);
                         if (accs.length === 0) return null;
@@ -158,8 +189,8 @@ export default function BukuBesar({ period }: { period: string }) {
                         {normalSide && (
                             <span
                                 className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${normalSide === "DEBIT"
-                                        ? "bg-blue-50 text-blue-600 border-blue-200"
-                                        : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                                    ? "bg-blue-50 text-blue-600 border-blue-200"
+                                    : "bg-emerald-50 text-emerald-600 border-emerald-200"
                                     }`}
                             >
                                 Normal: {normalSide === "DEBIT" ? "Debit" : "Kredit"}
@@ -439,8 +470,8 @@ function OpeningBalanceModal({
                                 type="button"
                                 onClick={() => setSide("DEBIT")}
                                 className={`h-10 rounded-lg text-sm font-bold border transition ${side === "DEBIT"
-                                        ? "bg-blue-600 text-white border-blue-600"
-                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
                             >
                                 Debit
@@ -449,8 +480,8 @@ function OpeningBalanceModal({
                                 type="button"
                                 onClick={() => setSide("KREDIT")}
                                 className={`h-10 rounded-lg text-sm font-bold border transition ${side === "KREDIT"
-                                        ? "bg-emerald-600 text-white border-emerald-600"
-                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
                             >
                                 Kredit
