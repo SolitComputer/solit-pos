@@ -1,8 +1,16 @@
 // src/app/layout.tsx
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google"; // 1. Ubah import menjadi Plus Jakarta Sans
 import { Toaster } from "sonner";
 import "./globals.css";
 import NetworkStatus from "@/components/ui/NetworkStatus";
+
+// 2. Inisialisasi font Plus Jakarta Sans dan buat variabelnya
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plus-jakarta",
+});
 
 export const metadata: Metadata = {
   title: "Solit POS",
@@ -39,7 +47,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body>
+      {/* 3. Masukkan variabel font Plus Jakarta Sans */}
+      <body className={`${plusJakartaSans.variable} font-sans antialiased`}>
         {/* ✅ Disable Next.js auto scroll-to-top saat navigasi */}
         <script
           dangerouslySetInnerHTML={{
