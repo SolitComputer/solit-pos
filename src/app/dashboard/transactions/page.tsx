@@ -550,7 +550,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             <p className="text-[10px] text-blue-500 font-semibold mb-0.5">Harga Jual</p>
             <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
           </div>
-          {item.other !== undefined && item.other !== null && (
+          {item.has_modal === false ? (
+            <div className="rounded-xl p-2.5 ring-1 bg-amber-50 ring-amber-100">
+              <p className="text-[10px] font-semibold mb-0.5 text-amber-600">⚠️ Modal</p>
+              <p className="text-xs font-bold text-amber-700 leading-snug">Belum di-set</p>
+            </div>
+          ) : item.other !== undefined && item.other !== null && (
             <div className={`rounded-xl p-2.5 ring-1 ${item.other > 0 ? "bg-emerald-50 ring-emerald-100" : item.other < 0 ? "bg-red-50 ring-red-100" : "bg-gray-50 ring-gray-100"}`}>
               <p className={`text-[10px] font-semibold mb-0.5 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-400"}`}>
                 {item.other > 0 ? "📈 Profit" : item.other < 0 ? "📉 Loss" : "➖ BEP"}
@@ -872,7 +877,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
         <td className="px-4 py-3.5 text-right">
-          {item.other !== undefined && item.other !== null ? (
+          {item.has_modal === false ? (
+            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
+              ⚠️ Belum di-set modal
+            </span>
+          ) : item.other !== undefined && item.other !== null ? (
             <span className={`text-sm font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-300"}`}>
               {item.other > 0 ? "+" : ""}Rp{(item.other ?? 0).toLocaleString("id-ID")}
             </span>
@@ -948,6 +957,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
   const isMulti = grouped.length > 1;
   const totalDeal = Number(item.deal_price ?? item.amount ?? 0);
   const totalMargin = Number(item.other ?? 0);
+  const totalModal = grouped.reduce((s, g) => s + Number(g.purchase_price_total ?? 0), 0);
+  const totalJual = grouped.reduce((s, g) => s + Number(g.selling_price_total ?? 0), 0);
 
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -1025,10 +1036,25 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                     </div>
                   )}
                   {canSeeFinancials && (
-                    <div className="px-3.5 py-2.5 grid grid-cols-3 gap-2">
+                    <div className="px-3.5 py-2.5 grid grid-cols-4 gap-2">
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Modal</p>
+                        {g.has_modal === false ? (
+                          <p className="text-[10px] font-bold text-amber-600">⚠️ Belum di-set</p>
+                        ) : (
+                          <p className="text-xs font-bold text-gray-700 font-mono tabular-nums">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
+                        )}
+                      </div>
+                      <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Jual</p><p className="text-xs font-bold text-violet-700 font-mono tabular-nums">Rp{(g.selling_price_total ?? 0).toLocaleString("id-ID")}</p></div>
                       <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Deal</p><p className="text-xs font-bold text-blue-700 font-mono tabular-nums">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p></div>
-                      <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Modal</p><p className="text-xs font-bold text-gray-700 font-mono tabular-nums">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p></div>
-                      <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Margin</p><p className={`text-xs font-bold font-mono tabular-nums ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}</p></div>
+                      <div>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Margin</p>
+                        {g.has_modal === false ? (
+                          <p className="text-[10px] font-bold text-amber-600">—</p>
+                        ) : (
+                          <p className={`text-xs font-bold font-mono tabular-nums ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1045,8 +1071,24 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">💰 Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2.5">
+              {canSeeFinancials && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Total Harga Modal</span>
+                  {item.has_modal === false ? (
+                    <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
+                  ) : (
+                    <span className="text-sm font-bold text-gray-700 font-mono tabular-nums">Rp{totalModal.toLocaleString("id-ID")}</span>
+                  )}
+                </div>
+              )}
+              {canSeeFinancials && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Total Harga Jual</span>
+                  <span className="text-sm font-bold text-violet-700 font-mono tabular-nums">Rp{totalJual.toLocaleString("id-ID")}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Total Harga Jual</span>
+                <span className="text-xs text-gray-500">Total Harga Deal</span>
                 <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
               </div>
               {Number(item.dp_amount) > 0 && (
@@ -1055,7 +1097,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
                 </div>
               )}
-              {canSeeFinancials && totalMargin !== 0 && (
+              {canSeeFinancials && item.has_modal === false && (
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                  <span className="text-xs font-semibold text-gray-700">Total Margin</span>
+                  <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
+                </div>
+              )}
+              {canSeeFinancials && item.has_modal !== false && totalMargin !== 0 && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
                   <span className={`text-sm font-bold font-mono tabular-nums ${totalMargin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
