@@ -14,6 +14,8 @@ import TrackingStatusBadge from "@/components/preparation/TrackingStatusBadge";
 import DeliveryVoiceHT from "@/components/preparation/DeliveryVoiceHT";
 import { supabase } from "@/services/supabase";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import ReassignModal from "@/components/preparation/ReassignModal";
+import ManualStatusModal from "@/components/preparation/ManualStatusModal";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
@@ -424,6 +426,8 @@ export default function PreparationDetailPage() {
     const [showDone, setShowDone] = useState(false);
     const [showDispatch, setShowDispatch] = useState(false);
     const [showStart, setShowStart] = useState(false);
+    const [showReassign, setShowReassign] = useState(false);
+    const [showManualStatus, setShowManualStatus] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
     const [points, setPoints] = useState<TrackPoint[]>([]);
@@ -1156,19 +1160,36 @@ export default function PreparationDetailPage() {
                             )}
                         </div>
                     )}
-                    {canForceComplete && (order.status === "DIKIRIM" || order.status === "MENUNGGU_PENGANTAR") && (
-                        <div className="bg-[#1a1a2e] rounded-2xl p-4 flex items-center gap-3">
-                            <span className="text-xl">🛠️</span>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-bold text-white">Override Supervisor</p>
-                                <p className="text-[11px] text-gray-300 mt-0.5">Pengantar belum menyelesaikan perjalanan? Tandai selesai manual.</p>
+                    {canForceComplete && order.delivery_method === "PENGANTARAN" && (
+                        <div className="bg-[#1a1a2e] rounded-2xl p-4 space-y-3">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xl">🛠️</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold text-white">Override Supervisor</p>
+                                    <p className="text-[11px] text-gray-300 mt-0.5">Khusus Admin & Kepala Sales — pindah pengantar atau ubah status manual.</p>
+                                </div>
                             </div>
-                            <button onClick={forceComplete} disabled={actionLoading}
-                                className="h-9 px-4 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition disabled:opacity-50 flex-shrink-0">
-                                {actionLoading ? "..." : "✅ Selesaikan"}
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                {(order.status === "DIKIRIM" || order.status === "MENUNGGU_PENGANTAR") && (
+                                    <button onClick={forceComplete} disabled={actionLoading}
+                                        className="h-9 px-4 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition disabled:opacity-50">
+                                        {actionLoading ? "..." : "✅ Selesaikan"}
+                                    </button>
+                                )}
+                                {(order.status === "MENUNGGU_PENGANTAR" || order.status === "DIKIRIM") && (
+                                    <button onClick={() => setShowReassign(true)}
+                                        className="h-9 px-4 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition">
+                                        🔄 Pindah Pengantar
+                                    </button>
+                                )}
+                                <button onClick={() => setShowManualStatus(true)}
+                                    className="h-9 px-4 bg-gray-600 text-white rounded-xl text-xs font-bold hover:bg-gray-700 transition">
+                                    🛠️ Ubah Status Manual
+                                </button>
+                            </div>
                         </div>
                     )}
+
                 </div>
             </main>
 
@@ -1179,6 +1200,24 @@ export default function PreparationDetailPage() {
                     defaultAddress={order.delivery_address}
                     onClose={() => setShowStart(false)}
                     onConfirm={async p => { await handleStartTrip(p); setShowStart(false); }}
+                />
+            )}
+            {showReassign && (
+                <ReassignModal
+                    orderId={order.id}
+                    currentDriverId={order.delivery_user_id}
+                    currentDriverName={order.delivery_user_name}
+                    onClose={() => setShowReassign(false)}
+                    onReassigned={fetchOrder}
+                />
+            )}
+            {showManualStatus && (
+                <ManualStatusModal
+                    orderId={order.id}
+                    currentStatus={order.status}
+                    hasReturnStarted={!!order.return_started_at}
+                    onClose={() => setShowManualStatus(false)}
+                    onChanged={fetchOrder}
                 />
             )}
             {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
