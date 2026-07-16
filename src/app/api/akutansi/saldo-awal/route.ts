@@ -22,7 +22,8 @@ async function accountExists(supabase: SupabaseClient, code: string): Promise<bo
 }
 
 // ── GET /api/akutansi/saldo-awal?account_code=110 ────────────────────────────
-// Cek apakah akun ini sudah punya saldo awal manual atau belum.
+// Cek apakah akun ini sudah punya saldo awal manual atau belum, plus status
+// koreksi: kalau `updated_at` terisi -> sudah pernah dikoreksi minimal 1x.
 export const GET = withAuth(async (req) => {
   const accountCode = new URL(req.url).searchParams.get("account_code") ?? "";
   const supabase = getAdmin();
@@ -32,7 +33,10 @@ export const GET = withAuth(async (req) => {
 
   const { data, error } = await supabase
     .from("journal_opening_balances")
-    .select("account_code, side, nominal, created_at, created_by_user:users!journal_opening_balances_created_by_fkey(id, name)")
+    // ← tambahan: updated_at, updated_by_user (penanda sudah/belum dikoreksi)
+    .select(
+      "account_code, side, nominal, created_at, updated_at, created_by_user:users!journal_opening_balances_created_by_fkey(id, name), updated_by_user:users!journal_opening_balances_updated_by_fkey(id, name)"
+    )
     .eq("account_code", accountCode)
     .maybeSingle();
 
@@ -93,7 +97,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       nominal: Number(nominal),
       created_by: user.id,
     })
-    .select("account_code, side, nominal, created_at")
+    // ← tambahan: updated_at ikut diselect (akan null saat baru diinput -> "Original")
+    .select("account_code, side, nominal, created_at, updated_at")
     .single();
 
   if (insertErr) {
@@ -163,7 +168,10 @@ export const PUT = withAuth(async (req, _ctx, user: any) => {
       updated_at: new Date().toISOString(),
     })
     .eq("account_code", account_code)
-    .select("account_code, side, nominal, created_at")
+    // ← tambahan: updated_at + updated_by_user diselect balik supaya badge "Dikoreksi" langsung update tanpa reload manual
+    .select(
+      "account_code, side, nominal, created_at, updated_at, updated_by_user:users!journal_opening_balances_updated_by_fkey(id, name)"
+    )
     .single();
 
   if (updateErr) {
