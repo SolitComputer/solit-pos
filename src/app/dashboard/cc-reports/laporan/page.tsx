@@ -19,9 +19,11 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "ALL", label: "Semua" },
   { key: "BELUM_SELESAI", label: "Belum Mulai" },
   { key: "PROSES", label: "Menunggu Edit" },
+  { key: "REVISI", label: "Revisi" },
   { key: "SIAP_POSTING", label: "Siap Posting" },
   { key: "POSTED", label: "Sudah Posting" },
   { key: "SELESAI", label: "Selesai" },
+  { key: "BATAL", label: "Batal" },
 ];
 
 const LIMIT = 20;
@@ -214,11 +216,10 @@ export default function CCLaporanPage() {
                 <button
                   key={b.key}
                   onClick={() => setBrand(b.key)}
-                  className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${
-                    active
+                  className={`flex items-center justify-center gap-1.5 rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${active
                       ? "border-gray-900 bg-gray-900 text-white shadow-sm"
                       : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800"
-                  }`}
+                    }`}
                 >
                   <span
                     className="h-2 w-2 flex-shrink-0 rounded-full ring-1 ring-white/40"
@@ -235,9 +236,8 @@ export default function CCLaporanPage() {
             <div className="flex flex-wrap gap-1 rounded-xl border border-gray-200 p-1">
               {FILTERS.map((f) => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                    filter === f.key ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
-                  }`}>
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${filter === f.key ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-50"
+                    }`}>
                   {f.label}
                 </button>
               ))}
@@ -268,6 +268,7 @@ export default function CCLaporanPage() {
                     <th className="px-5 py-3">Judul Konten</th>
                     <th className="px-4 py-3">Brand</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Device</th>
                     <th className="px-4 py-3 text-center">Take</th>
                     <th className="px-4 py-3 text-center">Edit</th>
                     <th className="px-4 py-3 text-center">Platform</th>
@@ -279,14 +280,14 @@ export default function CCLaporanPage() {
                   {loading ? (
                     [...Array(5)].map((_, i) => (
                       <tr key={i} className="border-b border-gray-50">
-                        <td colSpan={8} className="px-5 py-4">
+                        <td colSpan={9} className="px-5 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100" />
                         </td>
                       </tr>
                     ))
                   ) : withStatus.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-16 text-center text-sm text-gray-400">
+                      <td colSpan={9} className="px-5 py-16 text-center text-sm text-gray-400">
                         {debouncedQ || filter !== "ALL" || brand !== "ALL"
                           ? "Tidak ada konten yang cocok dengan filter."
                           : "Belum ada konten. Tambah judul di atas untuk mulai."}
@@ -312,6 +313,9 @@ export default function CCLaporanPage() {
                             <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${meta.className}`}>
                               {meta.label}
                             </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-600">
+                            {r.device?.trim() ? r.device : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-3.5 text-center"><Dot done={r.take_done} /></td>
                           <td className="px-4 py-3.5 text-center"><Dot done={r.edit_done} /></td>

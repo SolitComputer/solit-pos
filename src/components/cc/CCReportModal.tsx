@@ -29,6 +29,9 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const canPost = canStartPosting(report);
   const finished = Boolean(report.posting_done);
   const readyToFinish = canFinish(report);
+  // ✅ Bisa ditandai revisi selama sudah lewat tahap Edit & belum sedang direvisi —
+  //    berlaku juga saat status POSTED / SELESAI, bukan cuma SIAP_POSTING.
+  const isRevisable = canPost && status !== "REVISI";
 
   const [tab, setTab] = useState<Tab>(
     report.edit_done ? "posting" : report.take_done ? "edit" : "take"
@@ -39,6 +42,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
     talent: report.talent ?? "",
     location: report.location ?? "",
     equipment: report.equipment ?? "",
+    device: report.device ?? "",
     take_start: isoToLocalInput(report.take_start),
     take_end: isoToLocalInput(report.take_end),
     take_received_editor: isoToLocalInput(report.take_received_editor),
@@ -87,6 +91,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
       talent: take.talent,
       location: take.location,
       equipment: take.equipment,
+      device: take.device,
       take_start: localInputToIso(take.take_start),
       take_end: localInputToIso(take.take_end),
       take_received_editor: localInputToIso(take.take_received_editor),
@@ -100,9 +105,21 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
       edit_start: localInputToIso(edit.edit_start),
       edit_end: localInputToIso(edit.edit_end),
       ready_folder_link: edit.ready_folder_link,
-      ...(markDone ? { edit_done: true } : {}),
+      ...(markDone ? { edit_done: true, needs_revision: false } : {}),
     });
     if (markDone) setTab("posting"); // ✅ langsung lempar ke posting
+  };
+
+  const markRevision = async () => {
+    const msg = finished
+      ? "Tandai konten ini perlu revisi? Status Selesai akan dibuka kembali, dan Posting tetap bisa diakses."
+      : "Tandai konten ini perlu revisi? Tab Editing akan menandai catatan, Posting tetap bisa diakses.";
+    if (!confirm(msg)) return;
+    await patch({
+      needs_revision: true,
+      ...(finished ? { posting_done: false } : {}), // ✅ reopen otomatis kalau sudah Selesai
+    });
+    setTab("edit");
   };
 
   const toggleFinish = async () => {
@@ -115,13 +132,22 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Hapus konten "${report.title}"? Semua data posting ikut terhapus.`)) return;
-    const res = await fetch(`/api/cc-reports/${report.id}`, { method: "DELETE" });
-    const json = await res.json();
-    if (json.success) {
-      onChanged();
-      onClose();
-    } else alert(json.error ?? "Gagal menghapus");
+    if (!confirm(`Batalkan konten "${report.title}"? Status akan berubah menjadi "Batal" — data tidak dihapus.`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/cc-reports/${report.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_cancelled: true }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        onChanged();
+        onClose();
+      } else alert(json.error ?? "Gagal membatalkan konten");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const steps = [
@@ -245,6 +271,10 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                 <Field label="Alat yang Dipakai">
                   <input className={INPUT} value={take.equipment} onChange={(e) => setTake({ ...take, equipment: e.target.value })} />
                 </Field>
+                <Field label="Device">
+                  <input className={INPUT} placeholder="cth: iPhone 15 Pro, Sony A7III"
+                    value={take.device} onChange={(e) => setTake({ ...take, device: e.target.value })} />
+                </Field>
                 <Field label="Mulai">
                   <input type="datetime-local" className={INPUT} value={take.take_start} onChange={(e) => setTake({ ...take, take_start: e.target.value })} />
                 </Field>
@@ -280,6 +310,11 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
           {/* ── EDIT ── */}
           {tab === "edit" && (
             <div className="space-y-4 rounded-2xl bg-white p-4 ring-1 ring-gray-100">
+              {report.needs_revision && (
+                <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-medium text-red-800">
+                  Konten ini ditandai <b>perlu revisi</b>. Perbarui hasil edit sesuai catatan, lalu tandai Edit selesai lagi untuk menghapus status Revisi. Posting tetap bisa diakses selama proses ini.
+                </div>
+              )}
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium text-blue-800">
                 Tahap <b>Editing</b> adalah gerbang menuju Posting. Selesaikan tahap ini untuk membuka tab Posting.
               </div>
@@ -328,16 +363,18 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               saving={saving}
               onToggleFinish={toggleFinish}
               onChanged={onChanged}
+              onMarkRevision={markRevision}
+              isRevisable={isRevisable}
             />
           )}
         </div>
 
         {/* Footer */}
-        {canManage && (
+        {canManage && !report.is_cancelled && (
           <div className="border-t border-gray-100 bg-white p-3">
-            <button onClick={handleDelete}
-              className="w-full rounded-xl py-2 text-sm font-bold text-red-600 transition hover:bg-red-50">
-              Hapus Konten
+            <button onClick={handleDelete} disabled={saving}
+              className="w-full rounded-xl py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-40">
+              Batalkan Konten
             </button>
           </div>
         )}
@@ -358,6 +395,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 /* ── Sub-komponen posting ─────────────────────────────────────────────────── */
 function PostingSection({
   report, canPost, finished, readyToFinish, saving, onToggleFinish, onChanged,
+  onMarkRevision, isRevisable,
 }: {
   report: CCReport;
   canPost: boolean;
@@ -366,6 +404,8 @@ function PostingSection({
   saving: boolean;
   onToggleFinish: () => void;
   onChanged: () => void;
+  onMarkRevision: () => void;
+  isRevisable: boolean;
 }) {
   const [postings, setPostings] = useState<CCPosting[]>(report.postings ?? []);
   const [platform, setPlatform] = useState<string>("Instagram");
@@ -476,6 +516,15 @@ function PostingSection({
 
   return (
     <div className="space-y-3">
+      {isRevisable && (
+        <button
+          onClick={onMarkRevision}
+          className="w-full rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
+        >
+          {finished ? "⟲ Buka & Tandai Perlu Revisi" : "⟲ Tandai Perlu Revisi"}
+        </button>
+      )}
+
       {/* Banner selesai */}
       {finished && (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
