@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
-import { FileText, Inbox, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LedgerLine {
@@ -238,7 +237,7 @@ export default function BukuBesar({ period }: { period: string }) {
                     {data.opening_balance ? (
                         <>
                             <div className="flex items-center gap-2 text-xs">
-                                <FileText className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-400">🔒</span>
                                 <span className="text-gray-600">
                                     Saldo awal manual akun ini:{" "}
                                     <b className="text-gray-900 font-mono">
@@ -252,9 +251,9 @@ export default function BukuBesar({ period }: { period: string }) {
                             </div>
                             <button
                                 onClick={() => setShowOpeningModal(true)}
-                                className="h-8 px-3 rounded-lg bg-gray-700 text-white text-[11px] font-bold hover:bg-gray-800 transition whitespace-nowrap shrink-0 flex items-center gap-1.5"
+                                className="h-8 px-3 rounded-lg bg-gray-700 text-white text-[11px] font-bold hover:bg-gray-800 transition whitespace-nowrap shrink-0"
                             >
-                                Koreksi
+                                ✏️ Koreksi
                             </button>
                         </>
                     ) : (
@@ -348,8 +347,8 @@ export default function BukuBesar({ period }: { period: string }) {
 
                                     {data.lines.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="py-14 text-center">
-                                                <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
+                                            <td colSpan={8} className="py-14 text-center">
+                                                <div className="text-4xl mb-3 opacity-40">📘</div>
                                                 <p className="text-sm text-gray-500 font-medium">Belum ada mutasi di periode ini</p>
                                                 <p className="text-xs text-gray-400 mt-1">
                                                     Konfirmasi data di Jurnal Umum agar muncul di sini.
@@ -512,16 +511,16 @@ function OpeningBalanceModal({
                         </h3>
                         <p className="text-[11px] text-gray-400 mt-0.5">{accountLabel}</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100">✕</button>
                 </div>
 
                 <div className="p-5 space-y-4">
                     <div className={`rounded-xl px-3 py-2.5 text-[11px] leading-relaxed border ${isEdit ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"
                         }`}>
                         {isEdit ? (
-                            <>Ini <b>koreksi</b> saldo awal yang sudah tersimpan. Perubahan langsung mempengaruhi saldo berjalan di semua periode setelahnya — pastikan nominal & sisinya sudah benar.</>
+                            <>⚠️ Ini <b>koreksi</b> saldo awal yang sudah tersimpan. Perubahan langsung mempengaruhi saldo berjalan di semua periode setelahnya — pastikan nominal & sisinya sudah benar.</>
                         ) : (
-                            <>Saldo awal hanya bisa diinput <b>1 kali</b> secara normal, tapi bisa dikoreksi lagi kapan saja lewat tombol "Koreksi" kalau ada kesalahan.</>
+                            <>⚠️ Saldo awal hanya bisa diinput <b>1 kali</b> secara normal, tapi bisa dikoreksi lagi kapan saja lewat tombol "Koreksi" kalau ada kesalahan.</>
                         )}
                     </div>
 
@@ -620,7 +619,7 @@ function SaldoBadge({
                     : undefined
             }
         >
-            <span>{isAbnormal ? "" : ""}</span>
+            <span>{isAbnormal ? "⚠️" : "💰"}</span>
             <span>{isDebit ? "D" : "K"}</span>
         </span>
     );
