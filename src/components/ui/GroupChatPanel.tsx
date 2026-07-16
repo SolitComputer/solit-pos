@@ -8,6 +8,9 @@ import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
 import { Inbox, Clock, FileText } from "lucide-react";
+import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
+import { GroupInfoModal } from "@/components/ui/GroupInfoModal";
+import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
 
 const supabase = getSupabaseClient();
 
@@ -1227,6 +1230,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const [isScrolledUp, setIsScrolledUp] = useState(false);
     const [users, setUsers] = useState<UserOption[]>([]);
 
+    const [activeGroupId, setActiveGroupId] = useState<string>(DEFAULT_GROUP_ID);
+    const activeGroupIdRef = useRef(DEFAULT_GROUP_ID);
+    useEffect(() => { activeGroupIdRef.current = activeGroupId; }, [activeGroupId]);
+
+    const [customGroups, setCustomGroups] = useState<any[]>([]);
+    const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [canCreateGroup, setCanCreateGroup] = useState(false);
+    const [showGroupInfo, setShowGroupInfo] = useState(false);
+
     const usersRef = useRef<UserOption[]>([]);
     const messagesDataRef = useRef<GroupMessage[]>([]);
     useEffect(() => { usersRef.current = users; }, [users]);
@@ -1279,6 +1291,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             .catch(() => { });
     }, [currentUser.id]);
 
+    useEffect(() => {
+        fetch("/api/chat-groups").then(r => r.json()).then(data => {
+            if (data.success) setCustomGroups(data.groups);
+        }).catch(() => { });
+        fetch("/api/chat-groups/addable-members").then(r => r.json()).then(data => {
+            if (data.success) setCanCreateGroup(data.can_create);
+        }).catch(() => { });
+    }, []);
+
     // ── Ambil presence dari /api/presence (sumber sama dgn OnlineUsersPanel) + refresh tiap 30 dtk ──
     const fetchPresence = useCallback(async () => {
         try {
@@ -1311,7 +1332,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     const fetchMessages = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/group-chat?limit=30");
+            const res = await fetch(`/api/group-chat?limit=30&group_id=${activeGroupId}`);
             const data = await res.json();
             if (data.success) {
                 setMessages(data.messages);
@@ -1320,7 +1341,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [activeGroupId]);
 
     useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
@@ -1340,7 +1361,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         const scrollEl = messagesRef.current;
         const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
         try {
-            const res = await fetch(`/api/group-chat?limit=40&before=${encodeURIComponent(oldest)}`);
+            const res = await fetch(`/api/group-chat?limit=40&before=${encodeURIComponent(oldest)}&group_id=${activeGroupId}`);
             const data = await res.json();
             if (data.success && data.messages.length > 0) {
                 setMessages(prev => [...data.messages, ...prev]);
@@ -1354,7 +1375,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         } finally {
             setLoadingMore(false);
         }
-    }, [hasMore, loadingMore, messages]);
+    }, [hasMore, loadingMore, messages, activeGroupId]);
 
     useEffect(() => {
         if (!loading && messages.length > 0) {
@@ -1395,6 +1416,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 { event: "INSERT", schema: "public", table: "group_messages" },
                 async (payload) => {
                     const incoming = payload.new as GroupMessage;
+                    if ((incoming as any).group_id !== activeGroupIdRef.current) return;
                     let enriched: GroupMessage = incoming;
 
                     if (!incoming.sender_name || !incoming.sender_role) {
@@ -1481,7 +1503,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const res = await fetch("/api/group-chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content, reply_to_id: replyTo?.id ?? null }),
+                body: JSON.stringify({ group_id: activeGroupId, content, reply_to_id: replyTo?.id ?? null }),
             });
             const data = await res.json();
             if (data.success) {
@@ -1492,7 +1514,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         } catch {
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
-    }, [currentUser, replyTo]);
+    }, [currentUser, replyTo, activeGroupId]);
 
     const sendAttachment = useCallback(async (file: File, caption: string) => {
         const tempId = `temp-${Date.now()}`;
@@ -1533,6 +1555,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    group_id: activeGroupId,
                     content: caption,
                     reply_to_id: replyTo?.id ?? null,
                     attachment_url: uploadData.url,
@@ -1552,7 +1575,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             if (previewUrl) URL.revokeObjectURL(previewUrl);
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
-    }, [currentUser, replyTo]);
+    }, [currentUser, replyTo, activeGroupId]);
 
     const sendVoiceNote = useCallback(async (blob: Blob) => {
         const tempId = `temp-${Date.now()}`;
@@ -1593,6 +1616,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             const res = await fetch("/api/group-chat", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    group_id: activeGroupId,
                     content: "",
                     reply_to_id: optimistic.reply_to_id,
                     attachment_url: upData.url,
@@ -1614,7 +1638,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             URL.revokeObjectURL(previewUrl);
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
-    }, [currentUser, replyTo]);
+    }, [currentUser, replyTo, activeGroupId]);
 
     const deleteMessage = useCallback(async (messageId: string) => {
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true } : m));
@@ -1746,8 +1770,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     {/* BARU: entri grup — klik untuk balik ke All Team Solit dari sidebar */}
                     <button
-                        onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser ? "bg-indigo-50" : "hover:bg-slate-50"}`}
+                        onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); setActiveGroupId(DEFAULT_GROUP_ID); }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID ? "bg-indigo-50" : "hover:bg-slate-50"}`}
                         style={{ borderBottom: "1px solid #f0f0f8" }}>
                         <div className="relative flex-shrink-0"
                             style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", boxShadow: "0 2px 6px rgba(99,102,241,0.35)" }}>
@@ -1759,8 +1783,39 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 Grup chat seluruh tim{onlineCount > 0 ? ` · ${onlineCount} online` : ""}
                             </p>
                         </div>
-                        {!embeddedDMUser && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                        {!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
                     </button>
+
+                    {canCreateGroup && (
+                        <button onClick={() => setShowCreateGroup(true)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all hover:bg-slate-50 flex-shrink-0"
+                            style={{ borderBottom: "1px solid #f0f0f8" }}>
+                            <div className="flex items-center justify-center flex-shrink-0"
+                                style={{ width: 34, height: 34, borderRadius: 11, background: "#eef2ff", border: "1px dashed #a5b4fc" }}>
+                                <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                </svg>
+                            </div>
+                            <p className="text-[12px] font-bold text-indigo-600">Buat Grup Baru</p>
+                        </button>
+                    )}
+
+                    {customGroups.map(g => (
+                        <button key={g.id}
+                            onClick={() => { setActiveGroupId(g.id); setEmbeddedDMUser(null); setMobileView("chat"); }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${activeGroupId === g.id ? "bg-indigo-50" : "hover:bg-slate-50"}`}
+                            style={{ borderBottom: "1px solid #f0f0f8" }}>
+                            <div className="flex items-center justify-center flex-shrink-0 text-white font-black text-xs"
+                                style={{ width: 34, height: 34, borderRadius: 11, background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                                {g.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-bold text-slate-800 truncate">{g.name}</p>
+                                <p className="text-[9.5px] text-slate-400 truncate">{g.my_role === "owner" ? "Kamu pembuat grup" : "Grup"}</p>
+                            </div>
+                            {activeGroupId === g.id && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                        </button>
+                    ))}
 
                     {/* Member list */}
                     <div className="flex-1 overflow-y-auto py-2">
@@ -1887,10 +1942,23 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             </div>
                         </div>
 
-                        <div className="flex-1 min-w-0 z-10">
+                        <div
+                            className={`flex-1 min-w-0 z-10 ${activeGroupId !== DEFAULT_GROUP_ID ? "cursor-pointer" : ""}`}
+                            onClick={() => { if (activeGroupId !== DEFAULT_GROUP_ID) setShowGroupInfo(true); }}>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-sm font-black text-white tracking-tight">All Team Solit</h2>
-                                <Clock className="w-4 h-4 inline" />
+                                <h2 className="text-sm font-black text-white tracking-tight">
+                                    {activeGroupId === DEFAULT_GROUP_ID ? "All Team Solit" : customGroups.find(g => g.id === activeGroupId)?.name ?? "Grup"}
+                                </h2>
+                                {activeGroupId === DEFAULT_GROUP_ID ? (
+                                    <Clock className="w-4 h-4 inline" />
+                                ) : (
+                                    <span style={{ fontSize: 14 }}>💬</span>
+                                )}
+                                {activeGroupId !== DEFAULT_GROUP_ID && (
+                                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                )}
                             </div>
                             <div className="flex items-center gap-2 mt-1 min-w-0">
                                 <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
@@ -2126,6 +2194,24 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                 )}
 
             </div>
+
+            {showCreateGroup && (
+                <CreateGroupModal
+                    onClose={() => setShowCreateGroup(false)}
+                    onCreated={(g) => {
+                        setCustomGroups(prev => [g, ...prev]);
+                        setActiveGroupId(g.id);
+                        setShowCreateGroup(false);
+                    }}
+                />
+            )}
+
+            {showGroupInfo && activeGroupId !== DEFAULT_GROUP_ID && (
+                <GroupInfoModal
+                    groupId={activeGroupId}
+                    onClose={() => setShowGroupInfo(false)}
+                />
+            )}
 
             <style jsx global>{`
                 @keyframes highlightMsg {

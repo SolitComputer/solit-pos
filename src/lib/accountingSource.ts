@@ -20,7 +20,8 @@ export interface JournalDraft {
   source_type: DerivedSourceType;
   source_id: string;
   source_category: string | null;
-  tanggal: string;          // YYYY-MM-DD (WIB)
+  tanggal: string;          // YYYY-MM-DD (WIB) — dipakai untuk grouping/tampilan
+  sort_ts: string;          // ISO timestamp presisi — dipakai untuk urutan yang stabil & tidak acak
   keterangan: string;
   ref: string | null;
   lines: DraftLine[];
@@ -45,7 +46,8 @@ async function buildTransactionDrafts(
     )
     .in("status", ["PAID", "HELD", "PACKING", "RESERVED"])
     .gte("created_at", startISO)
-    .lt("created_at", endISO);
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("[akuntansi] fetch transactions:", error.message);
@@ -84,8 +86,8 @@ async function buildTransactionDrafts(
       Array.isArray(t.unit_ids) && t.unit_ids.length > 0
         ? t.unit_ids
         : t.unit_id
-        ? [t.unit_id]
-        : [];
+          ? [t.unit_id]
+          : [];
 
     let modal = 0;
     const sns: string[] = [];
@@ -143,6 +145,7 @@ async function buildTransactionDrafts(
       source_id: t.invoice_number as string,
       source_category: "PENJUALAN_LAPTOP",
       tanggal: jakartaDate(t.created_at as string),
+      sort_ts: t.created_at as string,
       keterangan,
       ref: null,
       lines: merged,
@@ -162,7 +165,7 @@ async function buildServiceDrafts(
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
-      "id, nama, type_laptop, payment_amount, payment_method, biaya_sparepart, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
+      "id, nama, type_laptop, payment_amount, payment_method, biaya_sparepart, status, tanggal_masuk, tanggal_selesai, tanggal_diambil, created_at"
     )
     .in("status", ["DONE", "SUDAH_DIAMBIL"])
     .not("payment_amount", "is", null)
@@ -199,11 +202,16 @@ async function buildServiceDrafts(
 
     const merged = mergeLines(lines);
 
+    // Timestamp presisi untuk sorting: pakai created_at kalau ada, fallback ke
+    // tanggal jam 00:00 supaya tetap konsisten kalau kolomnya null di baris tertentu.
+    const sortTs = (s.created_at as string) || `${tanggal}T00:00:00+07:00`;
+
     drafts.push({
       source_type: "SERVICE",
       source_id: String(s.id),
       source_category: "SERVICE",
       tanggal,
+      sort_ts: sortTs,
       keterangan: `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}`,
       ref: null,
       lines: merged,
@@ -223,7 +231,7 @@ async function buildCashflowDrafts(
 ): Promise<JournalDraft[]> {
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
-    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method")
+    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, created_at")
     .eq("direction", "OUT")
     .gte("tanggal", startDate)
     .lt("tanggal", endDateExclusive);
@@ -246,11 +254,14 @@ async function buildCashflowDrafts(
 
     const merged = mergeLines(lines);
 
+    const sortTs = (e.created_at as string) || `${e.tanggal}T00:00:00+07:00`;
+
     drafts.push({
       source_type: "CASHFLOW",
       source_id: String(e.id),
       source_category: e.category as string,
       tanggal: e.tanggal as string,
+      sort_ts: sortTs,
       keterangan: cashflowKeterangan(e),
       ref: null,
       lines: merged,
@@ -275,7 +286,13 @@ export async function buildDraftsForPeriod(
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
   ]);
 
-  return [...tx, ...svc, ...cf].sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+  // Urut deterministik: tanggal dulu (ascending), lalu sort_ts (timestamp presisi,
+  // ascending) sebagai tie-break — bukan lagi bergantung urutan Promise.all yang
+  // tidak konsisten antar-request.
+  return [...tx, ...svc, ...cf].sort((a, b) => {
+    if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
+    return a.sort_ts.localeCompare(b.sort_ts);
+  });
 }
 
 /** Semua source yang SUDAH masuk jurnal (lintas periode, anti double-post) */

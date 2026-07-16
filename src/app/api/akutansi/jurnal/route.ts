@@ -1,3 +1,4 @@
+// src/app/api/akutansi/jurnal/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES, AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
@@ -5,14 +6,12 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   DraftLine,
   isBalanced,
-  isValidAccount,
   isValidPeriod,
   mergeLines,
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
-import { ACCOUNTS } from "@/lib/accounting";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -28,6 +27,11 @@ const ENTRY_SELECT = `
   updated_by_user:users!journal_entries_updated_by_fkey(id, name),
   lines:journal_lines(*)
 `;
+
+async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
+  const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
+  return !!data;
+}
 
 // ── GET /api/akuntansi/jurnal?period=2026-07 ─────────────────────────────────
 export const GET = withAuth(async (req) => {
@@ -49,7 +53,6 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  // Urutkan baris: DEBIT dulu, lalu KREDIT (sesuai tampilan jurnal umum)
   const entries = (data ?? []).map((e: any) => ({
     ...e,
     lines: [...(e.lines ?? [])].sort((a: any, b: any) => {
@@ -81,11 +84,7 @@ export const GET = withAuth(async (req) => {
   });
 }, AKUNTANSI_ROLES);
 
-async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
-  const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
-  return !!data;
-}
-
+// ── POST /api/akuntansi/jurnal — jurnal MANUAL ───────────────────────────────
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
   const { tanggal, keterangan, ref, source_category, lines } = body as {
@@ -105,9 +104,10 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   if (!Array.isArray(lines) || lines.length < 2)
     return NextResponse.json({ success: false, message: "Minimal 2 baris (debit & kredit)" }, { status: 400 });
 
-  const supabaseCheck = getAdmin();
+  const supabase = getAdmin();
+
   for (const l of lines) {
-    if (!(await isValidAccountAnywhere(supabaseCheck, l.account_code)))
+    if (!(await isValidAccountAnywhere(supabase, l.account_code)))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (l.side !== "DEBIT" && l.side !== "KREDIT")
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });
@@ -121,8 +121,6 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       { success: false, message: "Jurnal tidak balance — total debit harus sama dengan total kredit" },
       { status: 400 }
     );
-
-  const supabase = getAdmin();
 
   const { data: entry, error: entryErr } = await supabase
     .from("journal_entries")
