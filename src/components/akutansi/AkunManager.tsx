@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER, PROTECTED_ACCOUNT_CODES } from "@/lib/accounting";
+import { ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
 
 interface AccountRow {
     code: string;
@@ -37,10 +37,12 @@ export default function AkunManager() {
         return () => clearTimeout(t);
     }, [toast]);
 
-    const isProtected = (code: string) => PROTECTED_ACCOUNT_CODES.includes(code);
-
     const handleDelete = async (acc: AccountRow) => {
-        if (!confirm(`Hapus akun "${acc.code} · ${acc.name}"?\n\nTidak bisa dihapus kalau sudah pernah dipakai di jurnal.`)) return;
+        const warning = acc.is_builtin
+            ? `⚠️ "${acc.code} · ${acc.name}" adalah akun BAWAAN sistem. Kalau akun ini masih dipakai untuk pencatatan otomatis (transaksi/service/cashflow), transaksi baru akan GAGAL tercatat setelah dihapus. Yakin tetap hapus?`
+            : `Hapus akun "${acc.code} · ${acc.name}"?\n\nTidak bisa dihapus kalau sudah pernah dipakai di jurnal.`;
+
+        if (!confirm(warning)) return;
         try {
             const res = await fetch(`/api/akutansi/accounts/${acc.code}`, { method: "DELETE" });
             const json = await res.json();
@@ -66,8 +68,8 @@ export default function AkunManager() {
                 </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800 leading-relaxed">
-                ℹ️ Semua akun sekarang bisa diedit (nama &amp; tipe). Kode berlabel 🔒 dipakai sistem untuk pencatatan otomatis dari transaksi/service/cashflow — tidak bisa dihapus, tapi tetap bisa diedit namanya.
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 leading-relaxed">
+                ⚠️ Semua akun (termasuk bawaan) sekarang bisa diedit — nama, tipe, <b>maupun kode</b> — dan dihapus. Mengubah/menghapus akun yang dipakai sistem untuk pencatatan otomatis (110, 410, dst) bisa membuat transaksi baru gagal tercatat. Berhati-hatilah.
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex gap-2">
@@ -109,42 +111,36 @@ export default function AkunManager() {
                             ) : filtered.length === 0 ? (
                                 <tr><td colSpan={5} className="py-14 text-center text-sm text-gray-400">Tidak ada akun ditemukan</td></tr>
                             ) : (
-                                filtered.map((a) => {
-                                    const protectedCode = isProtected(a.code);
-                                    return (
-                                        <tr key={a.code} className="hover:bg-blue-50/30 transition border-b border-gray-50">
-                                            <td className="px-4 py-2.5 text-[12px] font-mono font-bold text-gray-800">
-                                                {a.code} {protectedCode && <span title="Dipakai auto-posting sistem">🔒</span>}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-[12px] text-gray-800">{a.name}</td>
-                                            <td className="px-4 py-2.5 text-[11px] text-gray-500">{ACCOUNT_TYPE_LABEL[a.type as keyof typeof ACCOUNT_TYPE_LABEL] ?? a.type}</td>
-                                            <td className="px-4 py-2.5 text-center">
-                                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${a.is_builtin ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-violet-50 text-violet-700 border-violet-200"}`}>
-                                                    {a.is_builtin ? "Bawaan" : "Custom"}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <button
-                                                        onClick={() => { setEditing(a); setShowForm(true); }}
-                                                        title="Edit akun"
-                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
-                                                    >
-                                                        ✏️
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(a)}
-                                                        disabled={protectedCode}
-                                                        title={protectedCode ? "Dipakai auto-posting sistem — tidak bisa dihapus" : "Hapus akun"}
-                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
+                                filtered.map((a) => (
+                                    <tr key={a.code} className="hover:bg-blue-50/30 transition border-b border-gray-50">
+                                        <td className="px-4 py-2.5 text-[12px] font-mono font-bold text-gray-800">{a.code}</td>
+                                        <td className="px-4 py-2.5 text-[12px] text-gray-800">{a.name}</td>
+                                        <td className="px-4 py-2.5 text-[11px] text-gray-500">{ACCOUNT_TYPE_LABEL[a.type as keyof typeof ACCOUNT_TYPE_LABEL] ?? a.type}</td>
+                                        <td className="px-4 py-2.5 text-center">
+                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${a.is_builtin ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-violet-50 text-violet-700 border-violet-200"}`}>
+                                                {a.is_builtin ? "Bawaan" : "Custom"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => { setEditing(a); setShowForm(true); }}
+                                                    title="Edit akun"
+                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(a)}
+                                                    title="Hapus akun"
+                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>
@@ -180,16 +176,27 @@ function AccountFormModal({
 
     const submit = async () => {
         setError("");
-        if (!isEdit && !/^\d{2,6}$/.test(code.trim())) return setError("Kode akun harus angka 2-6 digit");
+        if (!/^\d{2,6}$/.test(code.trim())) return setError("Kode akun harus angka 2-6 digit");
         if (!name.trim()) return setError("Nama akun wajib diisi");
+
+        if (isEdit && code.trim() !== account!.code) {
+            const ok = confirm(
+                `⚠️ Kamu mengubah kode akun dari "${account!.code}" menjadi "${code.trim()}".\n\nSemua mutasi jurnal yang sudah tercatat pakai kode "${account!.code}" akan ikut dipindah ke kode baru. Yakin lanjut?`
+            );
+            if (!ok) return;
+        }
 
         setSaving(true);
         try {
             const url = isEdit ? `/api/akutansi/accounts/${account!.code}` : "/api/akutansi/accounts";
+            const body = isEdit
+                ? { name: name.trim(), type, new_code: code.trim() !== account!.code ? code.trim() : undefined }
+                : { code: code.trim(), name: name.trim(), type };
+
             const res = await fetch(url, {
                 method: isEdit ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(isEdit ? { name: name.trim(), type } : { code: code.trim(), name: name.trim(), type }),
+                body: JSON.stringify(body),
             });
             const json = await res.json();
             if (!json.success) { setError(json.message ?? "Gagal menyimpan"); return; }
@@ -216,11 +223,14 @@ function AccountFormModal({
                         <input
                             value={code}
                             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                            disabled={isEdit}
                             placeholder="cth: 195"
-                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono disabled:bg-gray-50 disabled:text-gray-400"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono"
                         />
-                        {isEdit && <p className="text-[10px] text-gray-400 mt-1">Kode tidak bisa diubah setelah dibuat.</p>}
+                        {isEdit && (
+                            <p className="text-[10px] text-amber-600 mt-1">
+                                ⚠️ Mengubah kode akan memindahkan semua mutasi jurnal terkait ke kode baru.
+                            </p>
+                        )}
                     </div>
 
                     <div>
