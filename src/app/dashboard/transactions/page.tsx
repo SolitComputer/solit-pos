@@ -147,6 +147,8 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
   if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
   if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 ring-1 ring-purple-200" };
+  if (cn.includes("zenit.id")) return { label: "Zenit.id", color: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" };
+  if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 ring-1 ring-teal-200" };
   if (!company || company.trim() === "") return { label: "—", color: "bg-gray-50 text-gray-300" };
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
 }
@@ -1195,6 +1197,8 @@ export default function Page() {
         if (q === "sotech") return cn.includes("sotech");
         if (q === "solit") return cn.includes("solit") && !cn.includes("sotech") && !cn.includes("onpoint") && !cn.includes("on point");
         if (q === "onpoint") return cn.includes("onpoint") || cn.includes("on point");
+        if (q === "zenit.id") return cn.includes("zenit.id");
+        if (q === "zenit") return cn.includes("zenit") && !cn.includes("zenit.id");
         return cn === q;
       });
     }
@@ -1524,6 +1528,8 @@ export default function Page() {
                     { value: "solit", label: "Solit 03" },
                     { value: "sotech", label: "Sotech" },
                     { value: "onpoint", label: "On Point" },
+                    { value: "zenit", label: "Zenit" },
+                    { value: "zenit.id", label: "Zenit.id" },
                   ].map((c) => (
                     <button key={c.value} onClick={() => setCompanyName(c.value)}
                       className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${companyName === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
