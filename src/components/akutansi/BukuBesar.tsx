@@ -50,12 +50,20 @@ function getNormalSide(code: string): NormalSide {
 }
 
 export default function BukuBesar({ period }: { period: string }) {
+    const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
     const [search, setSearch] = useState("");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showOpeningModal, setShowOpeningModal] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/akutansi/accounts")
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setAllAccounts(j.data); })
+            .catch(() => { });
+    }, []);
 
     const load = useCallback(async () => {
         if (!accountCode) return;
@@ -98,9 +106,9 @@ export default function BukuBesar({ period }: { period: string }) {
 
     const filteredAccounts = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return ACCOUNTS;
-        return ACCOUNTS.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
-    }, [search]);
+        if (!q) return allAccounts;
+        return allAccounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
+    }, [search, allAccounts]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -158,8 +166,8 @@ export default function BukuBesar({ period }: { period: string }) {
                         {normalSide && (
                             <span
                                 className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${normalSide === "DEBIT"
-                                        ? "bg-blue-50 text-blue-600 border-blue-200"
-                                        : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                                    ? "bg-blue-50 text-blue-600 border-blue-200"
+                                    : "bg-emerald-50 text-emerald-600 border-emerald-200"
                                     }`}
                             >
                                 Normal: {normalSide === "DEBIT" ? "Debit" : "Kredit"}
@@ -187,20 +195,27 @@ export default function BukuBesar({ period }: { period: string }) {
                         }`}
                 >
                     {data.opening_balance ? (
-                        <div className="flex items-center gap-2 text-xs">
-                            <span className="text-gray-400">🔒</span>
-                            <span className="text-gray-600">
-                                Saldo awal manual akun ini:{" "}
-                                <b className="text-gray-900 font-mono">
-                                    {rp(data.opening_balance.nominal)}
-                                </b>{" "}
-                                di sisi{" "}
-                                <b className={data.opening_balance.side === "DEBIT" ? "text-blue-700" : "text-emerald-700"}>
-                                    {data.opening_balance.side === "DEBIT" ? "Debit" : "Kredit"}
-                                </b>{" "}
-                                — sudah terkunci, tidak bisa diubah lagi.
-                            </span>
-                        </div>
+                        <>
+                            <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-400">🔒</span>
+                                <span className="text-gray-600">
+                                    Saldo awal manual akun ini:{" "}
+                                    <b className="text-gray-900 font-mono">
+                                        {rp(data.opening_balance.nominal)}
+                                    </b>{" "}
+                                    di sisi{" "}
+                                    <b className={data.opening_balance.side === "DEBIT" ? "text-blue-700" : "text-emerald-700"}>
+                                        {data.opening_balance.side === "DEBIT" ? "Debit" : "Kredit"}
+                                    </b>
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setShowOpeningModal(true)}
+                                className="h-8 px-3 rounded-lg bg-gray-700 text-white text-[11px] font-bold hover:bg-gray-800 transition whitespace-nowrap shrink-0"
+                            >
+                                ✏️ Koreksi
+                            </button>
+                        </>
                     ) : (
                         <>
                             <span className="text-xs text-amber-800">
@@ -351,11 +366,12 @@ export default function BukuBesar({ period }: { period: string }) {
                 </div>
             </div>
 
-            {/* ── Modal Set Saldo Awal ── */}
+            {/* ── Modal Set/Edit Saldo Awal ── */}
             {showOpeningModal && data && (
                 <OpeningBalanceModal
                     accountCode={data.account.code}
                     accountLabel={`${data.account.code} · ${data.account.name}`}
+                    existing={data.opening_balance}
                     onClose={() => setShowOpeningModal(false)}
                     onSaved={() => {
                         setShowOpeningModal(false);
@@ -368,19 +384,23 @@ export default function BukuBesar({ period }: { period: string }) {
 }
 
 // ─── Modal: Set Saldo Awal (hanya bisa sekali input) ──────────────────────────
+// ─── Modal: Set/Edit Saldo Awal ────────────────────────────────────────────
 function OpeningBalanceModal({
     accountCode,
     accountLabel,
+    existing,
     onClose,
     onSaved,
 }: {
     accountCode: string;
     accountLabel: string;
+    existing: OpeningBalance | null;
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const [side, setSide] = useState<"DEBIT" | "KREDIT">("DEBIT");
-    const [nominal, setNominal] = useState<number>(0);
+    const isEdit = !!existing;
+    const [side, setSide] = useState<"DEBIT" | "KREDIT">(existing?.side ?? "DEBIT");
+    const [nominal, setNominal] = useState<number>(existing?.nominal ?? 0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -389,15 +409,18 @@ function OpeningBalanceModal({
         if (!nominal || nominal <= 0) return setError("Nominal harus lebih dari 0");
 
         const ok = confirm(
-            `Yakin input saldo awal "${accountLabel}" sebesar ${rp(nominal)} di sisi ${side === "DEBIT" ? "Debit" : "Kredit"
-            }?\n\nData ini HANYA BISA DIINPUT SEKALI dan tidak bisa diubah/dihapus lagi setelah disimpan.`
+            isEdit
+                ? `Yakin KOREKSI saldo awal "${accountLabel}" menjadi ${rp(nominal)} di sisi ${side === "DEBIT" ? "Debit" : "Kredit"
+                }?\n\n⚠️ Ini akan mengubah saldo berjalan di seluruh periode setelahnya. Pastikan sudah benar.`
+                : `Yakin input saldo awal "${accountLabel}" sebesar ${rp(nominal)} di sisi ${side === "DEBIT" ? "Debit" : "Kredit"
+                }?`
         );
         if (!ok) return;
 
         setSaving(true);
         try {
             const res = await fetch("/api/akutansi/saldo-awal", {
-                method: "POST",
+                method: isEdit ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ account_code: accountCode, side, nominal }),
             });
@@ -420,16 +443,22 @@ function OpeningBalanceModal({
             <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col">
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div>
-                        <h3 className="font-bold text-gray-900 text-sm">Set Saldo Awal</h3>
+                        <h3 className="font-bold text-gray-900 text-sm">
+                            {isEdit ? "Koreksi Saldo Awal" : "Set Saldo Awal"}
+                        </h3>
                         <p className="text-[11px] text-gray-400 mt-0.5">{accountLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100">✕</button>
                 </div>
 
                 <div className="p-5 space-y-4">
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-[11px] text-amber-800 leading-relaxed">
-                        ⚠️ Saldo awal hanya bisa diinput <b>1 kali</b> per akun dan tidak bisa diubah / dihapus lagi
-                        setelah disimpan. Pastikan nominal &amp; sisinya sudah benar sebelum submit.
+                    <div className={`rounded-xl px-3 py-2.5 text-[11px] leading-relaxed border ${isEdit ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"
+                        }`}>
+                        {isEdit ? (
+                            <>⚠️ Ini <b>koreksi</b> saldo awal yang sudah tersimpan. Perubahan langsung mempengaruhi saldo berjalan di semua periode setelahnya — pastikan nominal & sisinya sudah benar.</>
+                        ) : (
+                            <>⚠️ Saldo awal hanya bisa diinput <b>1 kali</b> secara normal, tapi bisa dikoreksi lagi kapan saja lewat tombol "Koreksi" kalau ada kesalahan.</>
+                        )}
                     </div>
 
                     <div>
@@ -439,8 +468,8 @@ function OpeningBalanceModal({
                                 type="button"
                                 onClick={() => setSide("DEBIT")}
                                 className={`h-10 rounded-lg text-sm font-bold border transition ${side === "DEBIT"
-                                        ? "bg-blue-600 text-white border-blue-600"
-                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
                             >
                                 Debit
@@ -449,8 +478,8 @@ function OpeningBalanceModal({
                                 type="button"
                                 onClick={() => setSide("KREDIT")}
                                 className={`h-10 rounded-lg text-sm font-bold border transition ${side === "KREDIT"
-                                        ? "bg-emerald-600 text-white border-emerald-600"
-                                        : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                                    ? "bg-emerald-600 text-white border-emerald-600"
+                                    : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
                             >
                                 Kredit
@@ -485,9 +514,10 @@ function OpeningBalanceModal({
                     <button
                         onClick={submit}
                         disabled={saving || !nominal}
-                        className="flex-1 h-10 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40"
+                        className={`flex-1 h-10 text-white rounded-xl text-sm font-bold disabled:opacity-40 ${isEdit ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800"
+                            }`}
                     >
-                        {saving ? "Menyimpan..." : "Simpan Saldo Awal"}
+                        {saving ? "Menyimpan..." : isEdit ? "Simpan Koreksi" : "Simpan Saldo Awal"}
                     </button>
                 </div>
             </div>

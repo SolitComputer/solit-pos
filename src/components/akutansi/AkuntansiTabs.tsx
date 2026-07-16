@@ -7,14 +7,16 @@ import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
 import Neraca from "./Neraca";
+import AkunManager from "./AkunManager";
 
-type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi";
+type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "jurnal", label: "Jurnal Umum" },
   { key: "buku-besar", label: "Buku Besar" },
   { key: "neraca", label: "Neraca" },
   { key: "laba-rugi", label: "Laba Rugi" },
+  { key: "akun", label: "Kelola Akun" }, // tambah baris ini
 ];
 
 export default function AkuntansiTabs({ period }: { period: string }) {
@@ -46,8 +48,8 @@ export default function AkuntansiTabs({ period }: { period: string }) {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex-1 min-w-[110px] h-9 rounded-lg text-xs font-bold transition whitespace-nowrap ${tab === t.key
-                ? "bg-gray-900 text-white"
-                : "text-gray-500 hover:bg-gray-50"
+              ? "bg-gray-900 text-white"
+              : "text-gray-500 hover:bg-gray-50"
               }`}
           >
             {t.label}
@@ -62,6 +64,8 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         <BukuBesar period={period} />
       ) : tab === "neraca" ? (
         <Neraca period={period} />
+      ) : tab === "akun" ? (
+        <AkunManager />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="text-4xl mb-3 opacity-40">🚧</div>

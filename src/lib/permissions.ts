@@ -137,6 +137,20 @@ export const ALL_UNITS_ROLES: UserRole[] = [
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 /** Yang boleh konfirmasi / edit / hapus jurnal */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+export function humanizeRoleKey(role: string): string {
+  return role
+    .split("_")
+    .map((w) => (w.length ? w[0] + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+export function getLegacyPageAccess(role: string, pageRoute: string): boolean {
+  const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
+    .filter((r) => pageRoute === r || pageRoute.startsWith(r + "/"))
+    .sort((a, b) => b.length - a.length)[0];
+ 
+  if (!matchedRoute) return true;
+  return (ROUTE_PERMISSIONS[matchedRoute] as string[]).includes(role);
+}
 
 // ─── Pengambilan Barang (Item Outflow) ────────────────────────────────────
 export const ITEM_OUTFLOW_ROLES: UserRole[] = [

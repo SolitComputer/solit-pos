@@ -17,33 +17,53 @@ export async function GET(request: Request) {
 
     const scope = await getAttendanceScope(supabase, user);
 
-    let query = supabase
-      .from("face_verifications")
-      .select(`
-        *,
-        users!inner (
-          id,
-          name,
-          role,
-          shift
-        )
-      `)
-      .in("status", ["SUCCESS"])
-      .order("created_at", { ascending: true });
+    // ✅ FIX: Supabase/PostgREST default limit = 1000 baris/request.
+    // Query lama tanpa .range() menyebabkan data terbaru (termasuk hari ini)
+    // kepotong begitu total baris SUCCESS di tabel lewat 1000, karena
+    // diurutkan ascending (lama → baru). Sekarang di-paginate sampai habis.
+    const PAGE_SIZE = 1000;
+    let allData: any[] = [];
+    let from = 0;
 
-    if (!scope.all) {
-      query = query.in("user_id", scope.visibleIds);
+    while (true) {
+      let query = supabase
+        .from("face_verifications")
+        .select(`
+          *,
+          users!inner (
+            id,
+            name,
+            role,
+            shift
+          )
+        `)
+        .in("status", ["SUCCESS"])
+        .order("created_at", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (!scope.all) {
+        query = query.in("user_id", scope.visibleIds);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Supabase error:", error);
+        return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+      }
+
+      if (!data || data.length === 0) break;
+      allData = allData.concat(data);
+
+      if (data.length < PAGE_SIZE) break; // halaman terakhir
+      from += PAGE_SIZE;
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("Supabase error:", error);
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-    }
-
+    // Dedup logic TIDAK diubah — tetap ambil kejadian SUCCESS pertama
+    // per user per hari (jam kedatangan asli), hanya sumber datanya
+    // sekarang lengkap (tidak terpotong lagi).
     const seen = new Set<string>();
-    const deduplicated = (data ?? []).filter((item: any) => {
+    const deduplicated = allData.filter((item: any) => {
       const wibDate = new Date(new Date(item.created_at).getTime() + 7 * 60 * 60 * 1000)
         .toISOString().slice(0, 10);
       const key = `${item.user_id}_${wibDate}`;
