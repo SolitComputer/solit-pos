@@ -358,6 +358,7 @@ export const config = {
     "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",
+    "/api/chat-groups/:path*",
     "/api/service/:path*",
     "/api/accessories/:path*",
     "/api/item-outflows/:path*",

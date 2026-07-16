@@ -309,6 +309,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/api/group-chat": ALL_ROLES.filter(r => !r.startsWith("PKL")),
+  "/api/chat-groups": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/api/push/subscribe": [...ALL_ROLES],
 
   "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],

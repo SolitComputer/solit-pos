@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { isGroupMember } from "@/lib/chatGroups";
+import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
 
 export const runtime = "nodejs";
 
@@ -11,6 +13,7 @@ const MAX_LIMIT = 100;
 
 const MESSAGE_SELECT = `
   id,
+  group_id,
   sender_id,
   sender_name,
   sender_role,
@@ -35,6 +38,12 @@ const MESSAGE_SELECT = `
 // ── GET ──────────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { searchParams } = new URL(req.url);
+    const groupId = searchParams.get("group_id") || DEFAULT_GROUP_ID;
+
+    const isMember = await isGroupMember(groupId, user.id);
+    if (!isMember) {
+        return NextResponse.json({ success: false, message: "Kamu bukan anggota grup ini" }, { status: 403 });
+    }
 
     const singleId = searchParams.get("id");
     if (singleId) {
@@ -42,6 +51,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             .from("group_messages")
             .select(MESSAGE_SELECT)
             .eq("id", singleId)
+            .eq("group_id", groupId)
             .maybeSingle();
 
         if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -55,6 +65,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     let query = supabaseAdmin
         .from("group_messages")
         .select(MESSAGE_SELECT)
+        .eq("group_id", groupId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -80,6 +91,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
 
     const {
+        group_id,
         content,
         reply_to_id,
         attachment_url,
@@ -87,6 +99,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         attachment_name,
         attachment_size,
     } = body;
+
+    const groupId = group_id || DEFAULT_GROUP_ID;
+    const isMember = await isGroupMember(groupId, user.id);
+    if (!isMember) {
+        return NextResponse.json({ success: false, message: "Kamu bukan anggota grup ini" }, { status: 403 });
+    }
 
     // Wajib ada salah satu: teks atau attachment
     if (!content?.trim() && !attachment_url) {
@@ -101,7 +119,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     if (reply_to_id) {
         const { data: replyMsg } = await supabaseAdmin
-            .from("group_messages").select("id").eq("id", reply_to_id).maybeSingle();
+            .from("group_messages").select("id").eq("id", reply_to_id).eq("group_id", groupId).maybeSingle();
         if (!replyMsg) {
             return NextResponse.json({ success: false, message: "Pesan yang direply tidak ditemukan" }, { status: 404 });
         }
@@ -110,6 +128,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { data, error } = await supabaseAdmin
         .from("group_messages")
         .insert({
+            group_id: groupId,
             sender_id: user.id,
             sender_name: user.name,
             sender_role: user.role,
@@ -139,8 +158,8 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
                     : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
             await sendPushBroadcast(senderId, {
-                title: "All Team Solit",              
-                body: `${senderName}: ${pushBody}`,   
+                title: "All Team Solit",
+                body: `${senderName}: ${pushBody}`,
                 tag: "group-chat",
                 url: "/dashboard/users",
                 requireInteraction: false,
