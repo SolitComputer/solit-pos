@@ -1,7 +1,14 @@
-// src/app/api/transaction/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth } from "@/lib/auth";
+
+function splitSerials(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.filter(Boolean).map((s: string) => String(s).trim()).filter(Boolean);
+  if (typeof raw === "string" && raw.trim()) {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
 
 async function handler(req: NextRequest) {
   try {
@@ -61,6 +68,37 @@ async function handler(req: NextRequest) {
       selling_price?: number;
     }>();
 
+    const allSerials = new Set<string>();
+    for (const trx of transactions) {
+      for (const sn of splitSerials(trx.serial_numbers)) allSerials.add(sn);
+      for (const sn of splitSerials(trx.serial_number)) allSerials.add(sn);
+    }
+
+    const serialUnitMap = new Map<string, string>(); // serial_number -> unit_id
+
+    if (allSerials.size > 0) {
+      const { data: unitsBySN } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price, serial_number, laptop_id, selling_price")
+        .in("serial_number", Array.from(allSerials));
+
+      for (const u of unitsBySN ?? []) {
+        if (!u.serial_number) continue;
+        serialUnitMap.set(u.serial_number, u.id);
+        allUnitIds.add(u.id);
+        if (u.laptop_id) allLaptopIds.add(u.laptop_id);
+        if (!unitMap.has(u.id)) {
+          unitMap.set(u.id, {
+            purchase_price: Number(u.purchase_price ?? 0),
+            serial_number: u.serial_number,
+            laptop_id: u.laptop_id ?? undefined,
+            selling_price: Number(u.selling_price ?? 0),
+          });
+        }
+      }
+    }
+
+
     if (allUnitIds.size > 0) {
       const { data: units } = await supabase
         .from("laptop_units")
@@ -101,19 +139,26 @@ async function handler(req: NextRequest) {
       }
     }
 
-    // ── Enrich setiap transaksi ───────────────────────────────────────────────
     const enriched = transactions.map((trx: any) => {
       const dealPrice = Number(trx.deal_price ?? trx.amount ?? 0);
 
       const unitIds: string[] =
         Array.isArray(trx.unit_ids) && trx.unit_ids.length > 0
-          ? trx.unit_ids
+          ? [...trx.unit_ids.filter(Boolean)]
           : trx.unit_id ? [trx.unit_id] : [];
 
-      // ✅ Ambil transaction_items untuk transaksi ini
+      const resolvedIdSet = new Set(unitIds);
+      const trxSerials = [...splitSerials(trx.serial_numbers), ...splitSerials(trx.serial_number)];
+      for (const sn of trxSerials) {
+        const uid = serialUnitMap.get(sn);
+        if (uid && !resolvedIdSet.has(uid)) {
+          resolvedIdSet.add(uid);
+          unitIds.push(uid);
+        }
+      }
+
       const items = txItemsMap.get(trx.invoice_number) ?? [];
 
-      // ✅ Build Map: unit_id → deal_price dari transaction_items
       const itemDealPriceMap = new Map<string, number>();
       for (const item of items) {
         if (item.unit_id) itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
@@ -130,21 +175,22 @@ async function handler(req: NextRequest) {
         allocated_deal_price: number;
         unit_count: number;
       }>();
-
+      // ── SESUDAH ──
       let totalPurchasePrice = 0;
+      let matchedAnyUnit = false;
       const allSerialNumbers: string[] = [];
 
       for (const uid of unitIds) {
         const unitData = unitMap.get(uid);
         if (!unitData) continue;
 
+        matchedAnyUnit = true;
         totalPurchasePrice += unitData.purchase_price;
         if (unitData.serial_number) allSerialNumbers.push(unitData.serial_number);
 
         const laptopId = unitData.laptop_id ?? trx.laptop_id ?? "unknown";
         const specs = laptopMap.get(laptopId);
 
-        // ✅ Deal price per unit dari transaction_items, fallback proporsional
         const unitDealPrice = itemDealPriceMap.get(uid) ?? 0;
 
         if (!laptopGroups.has(laptopId)) {
@@ -196,6 +242,7 @@ async function handler(req: NextRequest) {
       const hasTxItems = items.length > 0;
       const totalAllocated = grouped_items.reduce((s, g) => s + g.allocated_deal_price, 0);
 
+      // ── SESUDAH ──
       const grouped_items_with_margin = grouped_items.map(g => {
         let finalDealPrice = g.allocated_deal_price;
 
@@ -210,21 +257,29 @@ async function handler(req: NextRequest) {
           }
         }
 
-        // ✅ Single laptop: selalu pakai full deal_price
         if (grouped_items.length === 1) {
           finalDealPrice = dealPrice;
         }
 
-        const margin = finalDealPrice - g.purchase_price_total;
+        const hasModal = g.purchase_price_total > 0;
+        const margin = hasModal ? finalDealPrice - g.purchase_price_total : 0;
         return {
           ...g,
           allocated_deal_price: finalDealPrice,
           margin,
+          has_modal: hasModal,
         };
       });
-
       const laptopSpecs = trx.laptop_id ? laptopMap.get(trx.laptop_id) : undefined;
-      const totalMargin = totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
+
+      const storedInventoryPrice = Number(trx.inventory_price ?? 0);
+
+      const finalInventoryPrice = matchedAnyUnit ? totalPurchasePrice : storedInventoryPrice;
+
+      const hasModal = finalInventoryPrice > 0;
+      const totalMargin = hasModal
+        ? dealPrice - finalInventoryPrice
+        : 0;
 
       return {
         ...trx,
@@ -238,7 +293,8 @@ async function handler(req: NextRequest) {
           ? allSerialNumbers
           : trx.serial_numbers ?? (trx.serial_number ? [trx.serial_number] : []),
         other: totalMargin,
-        purchase_price_current: totalPurchasePrice,
+        has_modal: hasModal,
+        purchase_price_current: finalInventoryPrice,
         grouped_items: grouped_items_with_margin,
         is_multi_laptop: grouped_items.length > 1,
       };

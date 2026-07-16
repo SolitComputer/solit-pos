@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { invalidateDynamicPermissionCache } from "@/lib/dynamicPermissions";
+import { ALL_STATIC_ROLES, humanizeRoleKey } from "@/lib/permissions";
 
 // Hanya 3 role ini yang boleh membuat/mengubah role & hak akses.
 const ROLE_MANAGER_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -13,11 +14,16 @@ function isRoleManager(user: AuthUser): boolean {
 }
 
 function isValidKey(key: string): boolean {
-  // UPPER_SNAKE_CASE, 3-40 char, tidak boleh diawali angka.
   return /^[A-Z][A-Z0-9_]{2,39}$/.test(key);
 }
 
-// ── GET — daftar semua dynamic role ────────────────────────────────────────
+const LEGACY_LABEL_OVERRIDES: Record<string, string> = {
+  PKL: "PKL (Umum)",
+  ASISTEN_CEO: "Asisten CEO",
+  CC: "Content Creator",
+};
+
+// ── GET — daftar semua dynamic role + daftar role bawaan (legacy) ──────────
 async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
   if (!isRoleManager(user)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
@@ -27,7 +33,14 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     .select("id,key,label,icon,badge_bg,badge_text,badge_border,is_pkl,parent_role,created_at")
     .order("label");
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, roles: data ?? [] });
+
+  // ✅ Role bawaan (hardcode di permissions.ts) — otomatis terdeteksi, tidak perlu dibuat manual.
+  const legacyRoles = ALL_STATIC_ROLES.map((key) => ({
+    key,
+    label: LEGACY_LABEL_OVERRIDES[key] ?? humanizeRoleKey(key),
+  })).sort((a, b) => a.label.localeCompare(b.label));
+
+  return NextResponse.json({ success: true, roles: data ?? [], legacyRoles });
 }
 
 // ── POST — buat role baru ──────────────────────────────────────────────────
@@ -54,6 +67,13 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   if (!isValidKey(normalizedKey)) {
     return NextResponse.json(
       { success: false, message: "Key harus UPPER_SNAKE_CASE, 3-40 karakter, huruf di depan" },
+      { status: 400 }
+    );
+  }
+  // ✅ Cegah bikin dynamic role dengan key yang sudah dipakai role bawaan.
+  if (ALL_STATIC_ROLES.includes(normalizedKey)) {
+    return NextResponse.json(
+      { success: false, message: "Key ini sudah dipakai role bawaan sistem" },
       { status: 400 }
     );
   }
@@ -115,9 +135,7 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, role: data });
 }
 
-// ── DELETE — hapus role (dan permission-nya via FK cascade di role_page_permissions? ────
-// NOTE: role_page_permissions tidak FK ke dynamic_roles (role_key juga dipakai role lama),
-// jadi kita hapus manual baris permission-nya juga.
+// ── DELETE — hapus role custom ─────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   if (!isRoleManager(user)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
@@ -129,7 +147,6 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const { data: role } = await supabaseAdmin.from("dynamic_roles").select("key").eq("id", id).maybeSingle();
   if (!role) return NextResponse.json({ success: false, message: "Role tidak ditemukan" }, { status: 404 });
 
-  // Cegah hapus role yang masih dipakai user (biar tidak ada user "hantu" tanpa akses).
   const { data: usersWithRole } = await supabaseAdmin
     .from("users")
     .select("id")

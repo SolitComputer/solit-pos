@@ -12,6 +12,7 @@ import {
   totalOf,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
+import { ACCOUNTS } from "@/lib/accounting";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -80,7 +81,11 @@ export const GET = withAuth(async (req) => {
   });
 }, AKUNTANSI_ROLES);
 
-// ── POST /api/akuntansi/jurnal — jurnal MANUAL ───────────────────────────────
+async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
+  const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
+  return !!data;
+}
+
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
   const { tanggal, keterangan, ref, source_category, lines } = body as {
@@ -100,8 +105,9 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   if (!Array.isArray(lines) || lines.length < 2)
     return NextResponse.json({ success: false, message: "Minimal 2 baris (debit & kredit)" }, { status: 400 });
 
+  const supabaseCheck = getAdmin();
   for (const l of lines) {
-    if (!isValidAccount(l.account_code))
+    if (!(await isValidAccountAnywhere(supabaseCheck, l.account_code)))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (l.side !== "DEBIT" && l.side !== "KREDIT")
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });

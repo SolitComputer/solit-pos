@@ -37,8 +37,11 @@ async function snapshot(supabase: SupabaseClient, id: string) {
   return data;
 }
 
-// ── PUT /api/akuntansi/jurnal/[id] — edit jurnal ─────────────────────────────
-// ⚠️ Edit di sini TIDAK menyentuh transactions / service_orders / cashflow_entries.
+async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
+  const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
+  return !!data;
+}
+
 export const PUT = withAuth(async (req, ctx, user: any) => {
   const { id } = await ctx.params;
   if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
@@ -58,8 +61,9 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!Array.isArray(lines) || lines.length < 2)
     return NextResponse.json({ success: false, message: "Minimal 2 baris (debit & kredit)" }, { status: 400 });
 
+  const supabaseCheck = getAdmin();
   for (const l of lines) {
-    if (!isValidAccount(l.account_code))
+    if (!(await isValidAccountAnywhere(supabaseCheck, l.account_code)))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) <= 0)
       return NextResponse.json({ success: false, message: "Nominal harus > 0" }, { status: 400 });

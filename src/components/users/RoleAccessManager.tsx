@@ -4,6 +4,14 @@
 //
 // Tab "Role & Hak Akses" di halaman /dashboard/users.
 // Hanya dirender kalau isRoleManager true (dicek di parent: ADMIN/PROGRAMMER/ASISTEN_CEO).
+//
+// Ada 2 kategori role di sini:
+// 1. Role Bawaan (legacy) — daftar UserRole hardcode dari lib/permissions.ts.
+//    Tidak bisa dibuat/dihapus di sini, tapi begitu diklik, matrix hak akses
+//    OTOMATIS TER-ISI dari ROUTE_PERMISSIONS yang sudah ada di kode, supaya
+//    admin langsung lihat kondisi saat ini tanpa setting manual dari nol.
+// 2. Role Custom — dibuat lewat tombol "+ Buat Role", disimpan di tabel
+//    dynamic_roles, matrix-nya kosong sampai admin isi sendiri.
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -17,6 +25,11 @@ interface DynamicRoleRow {
   badge_border: string;
   is_pkl: boolean;
   parent_role: string | null;
+}
+
+interface LegacyRoleRow {
+  key: string;
+  label: string;
 }
 
 interface AppPageRow {
@@ -34,6 +47,10 @@ interface PermRow {
   can_edit: boolean;
   can_delete: boolean;
 }
+
+type SelectedRole =
+  | { kind: "dynamic"; key: string; label: string; icon: string }
+  | { kind: "legacy"; key: string; label: string; icon: string };
 
 const EMPTY_PERM: Omit<PermRow, "page_key"> = {
   can_view: false,
@@ -158,7 +175,7 @@ function CreateRoleModal({
           </label>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
-              Warisi akses dari role lain (opsional)
+              Warisi akses dari role custom lain (opsional)
             </label>
             <select
               value={parentRole}
@@ -193,15 +210,18 @@ function CreateRoleModal({
 }
 
 export default function RoleAccessManager() {
-  const [roles, setRoles] = useState<DynamicRoleRow[]>([]);
+  const [dynamicRoles, setDynamicRoles] = useState<DynamicRoleRow[]>([]);
+  const [legacyRoles, setLegacyRoles] = useState<LegacyRoleRow[]>([]);
   const [pages, setPages] = useState<AppPageRow[]>([]);
-  const [selectedRole, setSelectedRole] = useState<DynamicRoleRow | null>(null);
+  const [selectedRole, setSelectedRole] = useState<SelectedRole | null>(null);
   const [permMap, setPermMap] = useState<Record<string, Omit<PermRow, "page_key">>>({});
+  const [autoDetected, setAutoDetected] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [loadingMatrix, setLoadingMatrix] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [legacySearch, setLegacySearch] = useState("");
 
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
 
@@ -210,7 +230,10 @@ export default function RoleAccessManager() {
     try {
       const res = await fetch("/api/admin/roles");
       const data = await res.json();
-      if (data.success) setRoles(data.roles);
+      if (data.success) {
+        setDynamicRoles(data.roles);
+        setLegacyRoles(data.legacyRoles ?? []);
+      }
     } finally {
       setLoadingRoles(false);
     }
@@ -227,7 +250,7 @@ export default function RoleAccessManager() {
     loadPages();
   }, []);
 
-  const loadMatrixFor = async (role: DynamicRoleRow) => {
+  const loadMatrixFor = async (role: SelectedRole) => {
     setSelectedRole(role);
     setLoadingMatrix(true);
     try {
@@ -243,6 +266,7 @@ export default function RoleAccessManager() {
             can_delete: row.can_delete,
           };
         }
+        setAutoDetected(!!data.autoDetected);
       }
       setPermMap(map);
     } finally {
@@ -254,13 +278,11 @@ export default function RoleAccessManager() {
     setPermMap((prev) => {
       const current = prev[pageKey] ?? { ...EMPTY_PERM };
       const next = { ...current, [field]: !current[field] };
-      // Kalau matiin "view", matiin juga create/edit/delete (tidak masuk akal bisa edit tanpa view).
       if (field === "can_view" && !next.can_view) {
         next.can_create = false;
         next.can_edit = false;
         next.can_delete = false;
       }
-      // Kalau nyalain create/edit/delete, otomatis nyalain view juga.
       if (field !== "can_view" && next[field]) {
         next.can_view = true;
       }
@@ -304,6 +326,7 @@ export default function RoleAccessManager() {
         showToast(data.message ?? "Gagal menyimpan", "err");
         return;
       }
+      setAutoDetected(false);
       showToast(`Hak akses "${selectedRole.label}" berhasil disimpan`, "ok");
     } catch {
       showToast("Terjadi kesalahan", "err");
@@ -322,83 +345,143 @@ export default function RoleAccessManager() {
     return Array.from(groups.entries());
   }, [pages]);
 
+  const filteredLegacyRoles = useMemo(() => {
+    if (!legacySearch.trim()) return legacyRoles;
+    const q = legacySearch.toLowerCase();
+    return legacyRoles.filter((r) => r.label.toLowerCase().includes(q) || r.key.toLowerCase().includes(q));
+  }, [legacyRoles, legacySearch]);
+
   return (
     <div className="space-y-4">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {showCreate && (
-        <CreateRoleModal existingRoles={roles} onClose={() => setShowCreate(false)} onCreated={loadRoles} />
+        <CreateRoleModal existingRoles={dynamicRoles} onClose={() => setShowCreate(false)} onCreated={loadRoles} />
       )}
 
       <div className="flex gap-5 items-start">
-        {/* ── Daftar role ── */}
-        <div className="w-72 flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
-            <p className="text-[11px] font-bold text-slate-500">Role Custom ({roles.length})</p>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-white"
-              style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}
-            >
-              + Buat Role
-            </button>
+        {/* ── Daftar role (Bawaan + Custom) ── */}
+        <div className="w-72 flex-shrink-0 space-y-3">
+          {/* Role Bawaan (legacy, auto-detect) */}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="px-4 py-3.5 border-b border-slate-100">
+              <p className="text-[11px] font-bold text-slate-500">Role Bawaan Sistem ({legacyRoles.length})</p>
+              <p className="text-[9.5px] text-slate-400 mt-0.5">Otomatis terdeteksi dari kode — klik untuk lihat akses saat ini</p>
+              <input
+                value={legacySearch}
+                onChange={(e) => setLegacySearch(e.target.value)}
+                placeholder="Cari role..."
+                className="w-full h-8 mt-2 rounded-lg px-2.5 text-[11px] border border-slate-200 bg-slate-50"
+              />
+            </div>
+            {loadingRoles ? (
+              <div className="p-4 text-xs text-slate-400">Memuat...</div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto">
+                {filteredLegacyRoles.map((r) => (
+                  <button
+                    key={r.key}
+                    onClick={() => loadMatrixFor({ kind: "legacy", key: r.key, label: r.label, icon: "🏷️" })}
+                    className={`w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-2 border-b border-slate-50 transition ${
+                      selectedRole?.key === r.key ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="flex-1 truncate">{r.label}</span>
+                  </button>
+                ))}
+                {filteredLegacyRoles.length === 0 && (
+                  <div className="p-4 text-center text-xs text-slate-400">Tidak ditemukan</div>
+                )}
+              </div>
+            )}
           </div>
-          {loadingRoles ? (
-            <div className="p-4 text-xs text-slate-400">Memuat...</div>
-          ) : roles.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">
-              Belum ada role custom.
-              <br />
-              Klik "Buat Role" untuk mulai.
+
+          {/* Role Custom (dynamic_roles) */}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-[11px] font-bold text-slate-500">Role Custom ({dynamicRoles.length})</p>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-white"
+                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}
+              >
+                + Buat Role
+              </button>
             </div>
-          ) : (
-            <div className="max-h-[60vh] overflow-y-auto">
-              {roles.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => loadMatrixFor(r)}
-                  className={`w-full text-left px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b border-slate-50 transition ${
-                    selectedRole?.id === r.id ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span>{r.icon}</span>
-                  <span className="flex-1 truncate">{r.label}</span>
-                  {r.is_pkl && <span className="text-[9px] font-bold text-amber-600">PKL</span>}
-                </button>
-              ))}
-            </div>
-          )}
+            {loadingRoles ? (
+              <div className="p-4 text-xs text-slate-400">Memuat...</div>
+            ) : dynamicRoles.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400">
+                Belum ada role custom.
+                <br />
+                Klik "Buat Role" untuk mulai.
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto">
+                {dynamicRoles.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => loadMatrixFor({ kind: "dynamic", key: r.key, label: r.label, icon: r.icon })}
+                    className={`w-full text-left px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b border-slate-50 transition ${
+                      selectedRole?.key === r.key ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>{r.icon}</span>
+                    <span className="flex-1 truncate">{r.label}</span>
+                    {r.is_pkl && <span className="text-[9px] font-bold text-amber-600">PKL</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Matrix permission ── */}
         <div className="flex-1 min-w-0 bg-white rounded-2xl border border-slate-100 overflow-hidden">
           {!selectedRole ? (
             <div className="p-10 text-center text-sm text-slate-400">
-              Pilih role di sebelah kiri untuk atur hak akses halaman & aksi.
+              Pilih role di sebelah kiri untuk lihat/atur hak akses halaman & aksi.
             </div>
           ) : loadingMatrix ? (
             <div className="p-10 text-center text-sm text-slate-400">Memuat matrix...</div>
           ) : (
             <>
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-black text-slate-800">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-slate-800 truncate">
                     {selectedRole.icon} {selectedRole.label}
                   </p>
-                  <p className="text-[10.5px] text-slate-400 mt-0.5">
-                    Centang halaman yang boleh diakses, lalu pilih aksi yang diizinkan.
-                  </p>
+                  {autoDetected ? (
+                    <p className="text-[10.5px] mt-0.5 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[9px] border border-amber-200">
+                        OTOMATIS TERDETEKSI
+                      </span>
+                      <span className="text-slate-400">dari kode saat ini — belum pernah disimpan manual</span>
+                    </p>
+                  ) : (
+                    <p className="text-[10.5px] text-slate-400 mt-0.5">
+                      Centang halaman yang boleh diakses, lalu pilih aksi yang diizinkan.
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="h-9 px-4 rounded-xl text-xs font-bold text-white disabled:opacity-50"
+                  className="h-9 px-4 rounded-xl text-xs font-bold text-white disabled:opacity-50 flex-shrink-0"
                   style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
                 >
                   {saving ? "Menyimpan..." : "💾 Simpan"}
                 </button>
               </div>
 
-              <div className="max-h-[60vh] overflow-y-auto">
+              {selectedRole.kind === "legacy" && (
+                <div className="px-5 py-2.5 bg-blue-50/60 border-b border-blue-100 text-[10.5px] text-blue-700 leading-relaxed">
+                  ℹ️ Role ini dikontrol dari kode (<code>permissions.ts</code>). Kolom <b>View</b> di atas mencerminkan
+                  akses yang sekarang berlaku. Kalau disimpan, perubahan di sini akan{" "}
+                  <b>menambah</b> akses tambahan untuk role ini — akses yang sudah ada dari kode tidak akan berkurang.
+                </div>
+              )}
+
+              <div className="max-h-[55vh] overflow-y-auto">
                 {groupedPages.map(([groupLabel, groupPages]) => (
                   <div key={groupLabel} className="border-b border-slate-50">
                     <div className="px-5 py-2 bg-slate-50 flex items-center justify-between">

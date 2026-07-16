@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ACCOUNTS, isValidPeriod } from "@/lib/accounting";
+import { createClient as createClientForAccounts } from "@supabase/supabase-js"; 
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -64,8 +65,19 @@ export const GET = withAuth(async (req) => {
       balanceMap.set(o.account_code, (balanceMap.get(o.account_code) ?? 0) + signed);
     }
 
-    // ── 4) Susun baris sesuai urutan akun yang sudah didefinisikan, skip saldo 0 ──
-    const rows = ACCOUNTS.map((a) => {
+    const { data: customAccounts, error: customErr } = await supabase
+      .from("chart_of_accounts")
+      .select("code, name, type");
+
+    if (customErr) throw customErr;
+
+    const staticCodes = new Set(ACCOUNTS.map((a) => a.code));
+    const allAccountsForNeraca = [
+      ...ACCOUNTS,
+      ...(customAccounts ?? []).filter((a: any) => !staticCodes.has(a.code)),
+    ];
+
+    const rows = allAccountsForNeraca.map((a) => {
       const balance = balanceMap.get(a.code) ?? 0;
       return {
         code: a.code,

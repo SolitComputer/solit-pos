@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidPeriod, isValidAccount, accountName } from "@/lib/accounting";
+import { isValidPeriod } from "@/lib/accounting";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -35,14 +35,21 @@ export const GET = withAuth(async (req) => {
 
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
-  if (!accountCode || !isValidAccount(accountCode))
-    return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
 
   const supabase = getAdmin();
 
+  const { data: accRow } = await supabase
+    .from("chart_of_accounts")
+    .select("name")
+    .eq("code", accountCode)
+    .maybeSingle();
+
+  if (!accountCode || !accRow)
+    return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
+
+  const resolvedName = accRow.name;
+
   try {
-    // ── 0) Saldo awal MANUAL (one-time input) — nilai dasar sebelum periode manapun ──
-    // Rumus normal balance: DEBIT = +nominal, KREDIT = -nominal.
     const { data: openingRow, error: openingErr } = await supabase
       .from("journal_opening_balances")
       .select("side, nominal")
@@ -155,7 +162,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({
       success: true,
       data: {
-        account: { code: accountCode, name: accountName(accountCode) },
+        account: { code: accountCode, name: resolvedName },
         saldo_awal: saldoAwal,
         opening_balance: openingRow
           ? { side: openingRow.side, nominal: Number(openingRow.nominal) }
