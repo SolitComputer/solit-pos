@@ -145,7 +145,7 @@ export default function FaceVerifyPage() {
           setMessage(`Anda berada di luar radius (${distRound}m)`);
         } else {
           addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
-          // ✅ FIX: jika akun baru (needEnroll), langsung ke enroll bukan verify
+          //  FIX: jika akun baru (needEnroll), langsung ke enroll bukan verify
           if (needEnrollState) {
             setStage("enroll");
             setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
@@ -171,7 +171,7 @@ export default function FaceVerifyPage() {
       try {
         addLog("loading models...", "info");
 
-        // ✅ FIX: load model dan face-status DULU, baru cek waktu berdasarkan shift dari server
+        //  FIX: load model dan face-status DULU, baru cek waktu berdasarkan shift dari server
         // Jangan cek waktu di client sebelum tahu shift user
         const [, statusResult] = await Promise.all([
           Promise.all([
@@ -183,7 +183,7 @@ export default function FaceVerifyPage() {
         ]);
 
         if (cancelled) return;
-        addLog("models loaded ✓", "ok");
+        addLog("models loaded ", "ok");
 
         if (!statusResult?.success) {
           window.location.href = "/login";
@@ -194,7 +194,7 @@ export default function FaceVerifyPage() {
         setUserShift(shift);
         setNeedEnrollState(statusResult.needEnroll ?? false);
 
-        // ✅ NEW: simpan jadwal per-akun dari server untuk dipakai di UI
+        //  NEW: simpan jadwal per-akun dari server untuk dipakai di UI
         if (statusResult.scheduleToday) {
           setScheduleInfo({
             openAt: statusResult.scheduleToday.openAt,
@@ -280,7 +280,7 @@ export default function FaceVerifyPage() {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => { });
       }
-      addLog("camera active ✓", "ok");
+      addLog("camera active ", "ok");
       return "ok";
     } catch (err: any) {
       if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
@@ -380,14 +380,14 @@ export default function FaceVerifyPage() {
               const enrollData = await enrollRes.json();
 
               if (enrollData.success) {
-                addLog("enrollment berhasil ✓", "ok");
+                addLog("enrollment berhasil ", "ok");
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
                   setStage("success");
-                  setMessage("Wajah berhasil didaftarkan dan absen tercatat ✓");
+                  setMessage("Wajah berhasil didaftarkan dan absen tercatat ");
                   setTimeout(() => (window.location.href = redirectTo), 1800);
                 } else if (vd.outOfTime) {
-                  // ✅ FIX: pakai reason + jadwal dari server
+                  //  FIX: pakai reason + jadwal dari server
                   setTimeInfo({
                     reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
                     openAt: scheduleInfo?.openAt ?? "",
@@ -410,7 +410,7 @@ export default function FaceVerifyPage() {
 
               if (vd.success) {
                 setStage("success");
-                setMessage("Absen wajah berhasil ✓ Selamat bekerja");
+                setMessage("Absen wajah berhasil  Selamat bekerja");
                 setTimeout(() => (window.location.href = redirectTo), 1500);
               } else if (vd.outOfTime) {
                 setTimeInfo({
@@ -646,7 +646,7 @@ export default function FaceVerifyPage() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 margin: "0 auto 16px", fontSize: 26,
               }}>
-                🏖️
+                
               </div>
               <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
                 Hari Ini Kamu Libur
@@ -924,7 +924,7 @@ export default function FaceVerifyPage() {
             {!isProcessing && (
               <div className="tip-box">
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.7 }}>
-                  💡 Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
+                   Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
                 </div>
               </div>
             )}
@@ -956,8 +956,8 @@ export default function FaceVerifyPage() {
               </div>
               <div className="hud hud-tl"><div>cam·0</div><div className="blink" style={{ color: "rgba(255,255,255,0.45)" }}>● rec</div></div>
               <div className="hud hud-tr"><div>640×480</div><div style={{ color: confColor }}>{confidence}%</div></div>
-              <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? "conf: lock ✓" : "conf: scan"}</div>
-              <div className="hud hud-br">{currentDistance != null ? `📍 ${currentDistance}m` : clockStr}</div>
+              <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? "conf: lock " : "conf: scan"}</div>
+              <div className="hud hud-br">{currentDistance != null ? ` ${currentDistance}m` : clockStr}</div>
               <div className="hold-bar-wrap"><div className="hold-bar-fill" style={{ width: `${holdProgress}%`, background: holdProgress > 80 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)" }} /></div>
               {isProcessing && (<div className="proc-overlay"><div className="spinner" /><div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: 0.3 }}>{message}</div></div>)}
             </div>
@@ -965,7 +965,7 @@ export default function FaceVerifyPage() {
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.25)", marginBottom: 4, letterSpacing: 0.3 }}>
                 <span>confidence</span>
-                <span style={{ color: confColor }}>{confidence}%{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? " — ready ✓" : ""}</span>
+                <span style={{ color: confColor }}>{confidence}%{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? " — ready " : ""}</span>
               </div>
               <div className="pbar-wrap"><div className="pbar-fill" style={{ width: `${confidence}%`, background: confColor }} /></div>
             </div>

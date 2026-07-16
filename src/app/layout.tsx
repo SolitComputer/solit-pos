@@ -49,7 +49,7 @@ export default function RootLayout({
     <html lang="id">
       {/* 3. Masukkan variabel font Plus Jakarta Sans */}
       <body className={`${plusJakartaSans.variable} font-sans antialiased`}>
-        {/* ✅ Disable Next.js auto scroll-to-top saat navigasi */}
+        {/*  Disable Next.js auto scroll-to-top saat navigasi */}
         <script
           dangerouslySetInnerHTML={{
             __html: `history.scrollRestoration = 'manual';`,

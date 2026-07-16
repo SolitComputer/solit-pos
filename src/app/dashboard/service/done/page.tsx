@@ -413,8 +413,8 @@ export default function DonePage() {
     setDialog(DIALOG_CLOSED);
     showToast(
       dialog.action === "diambil_langsung"
-        ? "✅ Laptop berhasil ditandai sudah diambil."
-        : "✅ Order ditandai tidak jadi."
+        ? " Laptop berhasil ditandai sudah diambil."
+        : " Order ditandai tidak jadi."
     );
     refresh();
   };
@@ -477,7 +477,7 @@ export default function DonePage() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || "Gagal");
     setPaymentOrder(null);
-    showToast("✅ Laptop berhasil ditandai sudah diambil & payment tersimpan!");
+    showToast(" Laptop berhasil ditandai sudah diambil & payment tersimpan!");
     refresh();
   };
 
@@ -713,7 +713,7 @@ export default function DonePage() {
                 {/* Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gradient-to-r from-slate-50/40 to-white px-5 py-3">
                   <p className="text-xs font-medium text-gray-400">
-                    💡 Klik baris untuk melihat detail lengkap
+                     Klik baris untuk melihat detail lengkap
                   </p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-slate-800">{orders.length}</span> order
@@ -795,7 +795,7 @@ export default function DonePage() {
                 ))}
 
                 <div className="flex items-center justify-between px-1 pt-1">
-                  <p className="text-xs font-medium text-gray-400">💡 Ketuk kartu untuk detail</p>
+                  <p className="text-xs font-medium text-gray-400"> Ketuk kartu untuk detail</p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-slate-800">{orders.length}</span> order
                   </p>

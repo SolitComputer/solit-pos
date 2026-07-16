@@ -25,7 +25,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const status = report.status ?? computeStatus(report);
   const meta = CC_STATUS_META[status];
 
-  // ✅ Alur baru: posting kebuka HANYA setelah tahap Edit selesai.
+  //  Alur baru: posting kebuka HANYA setelah tahap Edit selesai.
   const canPost = canStartPosting(report);
   const finished = Boolean(report.posting_done);
   const readyToFinish = canFinish(report);
@@ -102,7 +102,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
       ready_folder_link: edit.ready_folder_link,
       ...(markDone ? { edit_done: true } : {}),
     });
-    if (markDone) setTab("posting"); // ✅ langsung lempar ke posting
+    if (markDone) setTab("posting"); //  langsung lempar ke posting
   };
 
   const toggleFinish = async () => {
@@ -145,7 +145,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                   {meta.label}
                 </span>
 
-                {/* ✅ Brand tujuan — bisa diubah kapan saja */}
+                {/*  Brand tujuan — bisa diubah kapan saja */}
                 <div className="relative">
                   <span
                     className="pointer-events-none absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
@@ -192,7 +192,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
             <div className="mt-1.5 flex justify-between text-[10px] font-bold uppercase tracking-wide text-gray-400">
               {steps.map((s) => (
                 <span key={s.label} className={s.done ? "text-emerald-600" : ""}>
-                  {s.done ? "✓ " : ""}{s.label}
+                  {s.done ? " " : ""}{s.label}
                 </span>
               ))}
             </div>
@@ -202,9 +202,9 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
         {/* Tabs */}
         <div className="flex gap-1 border-b border-gray-100 bg-gray-50/70 p-2">
           {([
-            ["take", "🎥 Take", report.take_done, true],
-            ["edit", "✂️ Editing", report.edit_done, true],
-            ["posting", "🚀 Posting", (report.postings?.length ?? 0) > 0, canPost],
+            ["take", " Take", report.take_done, true],
+            ["edit", " Editing", report.edit_done, true],
+            ["posting", " Posting", (report.postings?.length ?? 0) > 0, canPost],
           ] as [Tab, string, boolean, boolean][]).map(([key, text, done, unlocked]) => (
             <button
               key={key}
@@ -216,7 +216,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                     ? "text-gray-500 hover:bg-white/60"
                     : "text-gray-300 hover:bg-white/40"}`}
             >
-              {!unlocked && "🔒 "}{text}{done && tab !== key ? " ✓" : ""}
+              {!unlocked && " "}{text}{done && tab !== key ? " " : ""}
             </button>
           ))}
         </div>
@@ -271,7 +271,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                 </button>
                 <button onClick={() => saveTake(true)} disabled={saving}
                   className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-40">
-                  {report.take_done ? "Update & Tetap Selesai" : "Tandai Take Selesai ✓"}
+                  {report.take_done ? "Update & Tetap Selesai" : "Tandai Take Selesai "}
                 </button>
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                 </button>
                 <button onClick={() => saveEdit(true)} disabled={saving}
                   className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-40">
-                  {report.edit_done ? "Update & Tetap Selesai" : "Tandai Edit Selesai → Posting ✓"}
+                  {report.edit_done ? "Update & Tetap Selesai" : "Tandai Edit Selesai → Posting "}
                 </button>
               </div>
             </div>
@@ -413,7 +413,7 @@ function PostingSection({
       setUrl("");
       await reloadPostings();
 
-      // ✅ error sync TIDAK lagi disembunyikan
+      //  error sync TIDAK lagi disembunyikan
       if (json.message && !json.synced) {
         alert(`Metrik tidak bisa ditarik otomatis:\n\n${json.message}\n\nSilakan isi View/Like/Komen manual.`);
       }
@@ -431,7 +431,7 @@ function PostingSection({
     const json = await res.json();
     await reloadPostings();
 
-    // ✅ kalau link diubah tapi sync gagal → kasih tau
+    //  kalau link diubah tapi sync gagal → kasih tau
     if ("post_url" in patch && json.message && !json.synced) {
       alert(`Metrik tidak bisa ditarik otomatis:\n\n${json.message}`);
     }
@@ -459,11 +459,11 @@ function PostingSection({
     await reloadPostings();
   };
 
-  // ⛔ Gerbang: harus lewat Editing dulu
+  //  Gerbang: harus lewat Editing dulu
   if (!canPost) {
     return (
       <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="mb-1 font-black">🔒 Posting masih terkunci</p>
+        <p className="mb-1 font-black"> Posting masih terkunci</p>
         <p>
           Tahap <b>Editing</b> wajib ditandai selesai dulu.
           {report.take_done
@@ -601,7 +601,7 @@ function PostingSection({
                       type="number"
                       min={0}
                       className={input}
-                      /* ✅ platform auto → readonly (diisi API). Manual → boleh edit walau selesai. */
+                      /*  platform auto → readonly (diisi API). Manual → boleh edit walau selesai. */
                       disabled={auto && st === "OK"}
                       title={auto && st === "OK" ? "Diisi otomatis dari API — klik ↻ Sync untuk update" : undefined}
                       defaultValue={p[mk]}
@@ -625,7 +625,7 @@ function PostingSection({
         })
       )}
 
-      {/* ✅ Tombol SELESAI */}
+      {/*  Tombol SELESAI */}
       {!finished && (
         <button
           onClick={onToggleFinish}
@@ -633,7 +633,7 @@ function PostingSection({
           className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
         >
           {readyToFinish
-            ? "Tandai Konten Selesai ✓"
+            ? "Tandai Konten Selesai "
             : "Tambah minimal 1 posting untuk menyelesaikan"}
         </button>
       )}

@@ -39,7 +39,7 @@ function MinimizedHead({ user, onOpen, onClose }: { user: ChatUser; onOpen: () =
             {/* Tutup */}
             <button onClick={onClose}
                 className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                ✕
+                
             </button>
         </div>
     );

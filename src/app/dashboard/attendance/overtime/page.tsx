@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation"; // ✅ ADD
+import { useRouter, useSearchParams } from "next/navigation"; //  ADD
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2 } from "lucide-react";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -92,7 +93,7 @@ function toWIBDateKey(iso: string) { return new Date(new Date(iso).getTime() + 7
 function initials(name: string) { return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
 function pad2(n: number) { return String(n).padStart(2, "0"); }
 function addDaysToDateStr(dateStr: string, days: number): string {
-  // ✅ FIX: parse manual tanpa Date object biar gak kena masalah timezone.
+  //  FIX: parse manual tanpa Date object biar gak kena masalah timezone.
   // Pakai UTC explicit supaya .toISOString() konsisten dengan input.
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
@@ -147,12 +148,12 @@ function addWatermarkToImage(imageDataUrl: string, callback: (blob: Blob, url: s
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
-  PENDING: { label: "Pending", icon: "⏳", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
-  APPROVED: { label: "Disetujui", icon: "✅", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
-  ONGOING: { label: "Berjalan", icon: "▶", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  COMPLETED: { label: "Selesai", icon: "✓", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  NEED_PROOF: { label: "Upload Foto", icon: "📸", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
-  REJECTED: { label: "Ditolak", icon: "✕", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
+  PENDING: { label: "Pending", icon: "", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
+  APPROVED: { label: "Disetujui", icon: "", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  ONGOING: { label: "Berjalan", icon: "", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
+  COMPLETED: { label: "Selesai", icon: "", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
+  NEED_PROOF: { label: "Upload Foto", icon: "", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+  REJECTED: { label: "Ditolak", icon: "", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
   CANCELLED: { label: "Dibatalkan", icon: "⊘", bg: "bg-gray-50", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
 };
 
@@ -181,7 +182,7 @@ const secondaryBtn = "flex-1 h-10 bg-white border border-gray-200 text-gray-600 
 function ErrorBanner({ msg }: { msg: string }) {
   return (
     <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">
-      <span className="flex-shrink-0 mt-px">⚠️</span>
+      <span className="flex-shrink-0 mt-px"></span>
       <span className="font-medium leading-relaxed">{msg}</span>
     </div>
   );
@@ -240,19 +241,19 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
   const duration = calcDuration(o.actual_start ?? o.scheduled_start, o.actual_end ?? o.scheduled_end);
   return (
     <ModalWrapper onClose={onClose} wide>
-      <ModalHead icon="📋" title="Detail Lemburan" sub={`${o.users?.name} · ${dateStr}`} onClose={onClose} />
+      <ModalHead icon="" title="Detail Lemburan" sub={`${o.users?.name} · ${dateStr}`} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[72vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 flex-wrap">
             <StatusBadge status={o.status} />
             {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />⏰ Terlambat
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" /> Terlambat
               </span>
             )}
             {o.is_holiday && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-purple-50 text-purple-700 border-purple-200">
-                🏖️ Hari Libur
+                 Hari Libur
               </span>
             )}
           </div>
@@ -316,21 +317,21 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
       <ModalFoot>
         <div className="flex-1 flex gap-2 flex-wrap">
           {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm">📸 Upload Foto</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Upload Foto</button>
           )}
           {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm">🏁 Selesai</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
           )}
           {canApproveTarget(currentUser?.role, o.users?.role) && o.status === "PENDING" && (
-            <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm">✅ Setujui</button>
+            <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
           )}
           {canSetPay(currentUser?.role) && (o.status === "COMPLETED" || o.status === "NEED_PROOF") && (
-            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm">💰 {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
+            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
           )}
           {isAdminRole(currentUser?.role) && (
             <>
-              <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all">✏️ Edit</button>
-              <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center transition-all">🗑️</button>
+              <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all"> Edit</button>
+              <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center transition-all"></button>
             </>
           )}
           <button onClick={onClose} className="h-10 px-4 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-all">Tutup</button>
@@ -383,7 +384,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
         <div className="rounded-xl bg-red-50 border border-red-200 p-5 text-center space-y-3">
           <p className="text-sm font-bold text-red-700">{error}</p>
           <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-all shadow-sm">
-            🖼️ Pilih dari Galeri
+             Pilih dari Galeri
             <input type="file" accept="image/*" className="hidden" onChange={e => {
               const file = e.target.files?.[0]; if (!file) return;
               const reader = new FileReader();
@@ -402,7 +403,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
             </div>
           )}
           <button onClick={() => setFacing(p => p === "environment" ? "user" : "environment")}
-            className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-black/50 backdrop-blur-sm flex items-center justify-center text-white text-xs hover:bg-black/70 transition-all">🔄</button>
+            className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-black/50 backdrop-blur-sm flex items-center justify-center text-white text-xs hover:bg-black/70 transition-all"></button>
         </div>
       )}
       {processing && (
@@ -414,7 +415,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
       <div className="flex gap-2.5">
         <button onClick={onCancel} className={secondaryBtn} style={{ flex: "0 0 auto", padding: "0 16px" }}>Batal</button>
         <button onClick={capture} disabled={!ready || processing || !!error} className={primaryBtn}>
-          {processing ? <Spinner /> : <><span>📸</span><span>Ambil Foto</span></>}
+          {processing ? <Spinner /> : <><span></span><span>Ambil Foto</span></>}
         </button>
       </div>
     </div>
@@ -426,7 +427,7 @@ function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overti
   if (!o.proof_photo_url) return null;
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="📷" title="Bukti Lemburan" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon="" title="Bukti Lemburan" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3 max-h-[75vh] overflow-y-auto">
         <img src={o.proof_photo_url} alt="Bukti" className="w-full h-56 object-cover rounded-xl border border-gray-100 shadow-sm" />
         <div className="grid grid-cols-2 gap-2">
@@ -458,13 +459,13 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ FIX: deteksi overnight — jam selesai <= jam mulai = lembur lewat tengah malam (selesai besok)
+  //  FIX: deteksi overnight — jam selesai <= jam mulai = lembur lewat tengah malam (selesai besok)
   const isOvernight = useMemo(() => {
     if (!scheduledStart || !scheduledEnd) return false;
     return scheduledEnd <= scheduledStart;
   }, [scheduledStart, scheduledEnd]);
 
-  // ✅ FIX: tanggal selesai = request_date + 1 hari kalau overnight
+  //  FIX: tanggal selesai = request_date + 1 hari kalau overnight
   const endDateResolved = useMemo(
     () => (isOvernight ? addDaysToDateStr(o.request_date, 1) : o.request_date),
     [isOvernight, o.request_date]
@@ -472,7 +473,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
 
   const approve = async () => {
     if (!scheduledStart || !scheduledEnd) { setError("Jam mulai & selesai wajib diisi"); return; }
-    // ✅ FIX: dulu nolak end <= start (selalu salah untuk overnight). Sekarang cuma tolak kalau SAMA PERSIS (durasi 0).
+    //  FIX: dulu nolak end <= start (selalu salah untuk overnight). Sekarang cuma tolak kalau SAMA PERSIS (durasi 0).
     if (scheduledStart === scheduledEnd) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     setApproving(true); setError("");
     try {
@@ -484,7 +485,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           id: o.id,
           action: "APPROVE",
           scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`,
-          // ✅ FIX: pakai endDateResolved (tanggal+1 saat overnight), bukan o.request_date yang sama
+          //  FIX: pakai endDateResolved (tanggal+1 saat overnight), bukan o.request_date yang sama
           scheduled_end: `${endDateResolved}T${fmt(scheduledEnd)}+07:00`,
         }),
       });
@@ -496,7 +497,7 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="✅" title="Setujui Lemburan" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon="" title="Setujui Lemburan" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[70vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div className="bg-violet-50 border border-violet-100 rounded-xl p-3.5 space-y-2">
@@ -507,10 +508,10 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
             <span className="flex items-center gap-1.5">
               <span className="font-mono font-semibold text-gray-800">{formatTime(o.requested_start)}</span>
               {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start))) && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200">⏰ Terlambat</span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-200"> Terlambat</span>
               )}
               {o.is_holiday && (
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200">🏖️ Hari Libur</span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200"> Hari Libur</span>
               )}
             </span>
           </div>
@@ -525,10 +526,10 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           <div><label className={lbl}>Jam Mulai *</label><input type="time" value={scheduledStart} onChange={e => setScheduledStart(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Selesai *</label><input type="time" value={scheduledEnd} onChange={e => setScheduledEnd(e.target.value)} className={inp} /></div>
         </div>
-        {/* ✅ FIX: indikator overnight, konsisten dgn Edit & Manual modal */}
+        {/*  FIX: indikator overnight, konsisten dgn Edit & Manual modal */}
         {isOvernight && (
           <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
-            <span className="text-sm">🌙</span>
+            <span className="text-sm"><CalendarDays className="w-4 h-4 text-violet-600" /></span>
             <span className="text-xs text-blue-700">
               Lewat tengah malam — selesai dicatat{" "}
               <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
@@ -538,17 +539,17 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : "✅ Setujui & Mulai"}</button>
+        <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : " Setujui & Mulai"}</button>
       </ModalFoot>
     </ModalWrapper>
   );
 }
 
 const REASON_OPTIONS = [
-  { value: "Tugas Mendesak", icon: "🔴", desc: "Harus diselesaikan segera" },
-  { value: "Pekerjaan Belum Selesai", icon: "🟡", desc: "Pekerjaan hari ini belum tuntas" },
-  { value: "Permintaan Atasan", icon: "🔵", desc: "Diminta langsung oleh atasan" },
-  { value: "Lainnya", icon: "✏️", desc: "Alasan lain" },
+  { value: "Tugas Mendesak", icon: "", desc: "Harus diselesaikan segera" },
+  { value: "Pekerjaan Belum Selesai", icon: "", desc: "Pekerjaan hari ini belum tuntas" },
+  { value: "Permintaan Atasan", icon: "", desc: "Diminta langsung oleh atasan" },
+  { value: "Lainnya", icon: "", desc: "Alasan lain" },
 ] as const;
 
 function ReasonGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -624,7 +625,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="📝" title="Ajukan Lemburan" sub={currentUser?.name || "Karyawan"} onClose={onClose} />
+      <ModalHead icon="" title="Ajukan Lemburan" sub={currentUser?.name || "Karyawan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-4 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         {!isHolidayOvertime && (
@@ -644,13 +645,13 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isHolidayOvertime ? "left-[18px]" : "left-0.5"}`} />
           </span>
           <div className="flex-1">
-            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}>🏖️ Lembur di hari libur</p>
+            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur di hari libur</p>
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-violet-200" : "text-gray-400"}`}>Tanggal & jam dideteksi otomatis saat pengajuan</p>
           </div>
         </button>
         {isHolidayOvertime && (
           <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${nowWIB.isLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-            <span className="text-sm">{nowWIB.isLate ? "⏰" : "✅"}</span>
+            <span className="text-sm">{nowWIB.isLate ? "" : ""}</span>
             <div className="text-xs">
               <p className={`font-semibold ${nowWIB.isLate ? "text-amber-700" : "text-emerald-700"}`}>
                 Terdeteksi jam {nowWIB.time} WIB {nowWIB.isLate ? "· Terlambat" : "· Tepat waktu"}
@@ -675,7 +676,7 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
           disabled={submitting || (!isHolidayOvertime && !requestDate) || !reasonType || (isLainnya && !reasonCustom.trim()) || !workDescription.trim()}
           className={primaryBtn}
         >
-          {submitting ? <><Spinner /><span>Mengirim...</span></> : "📝 Ajukan"}
+          {submitting ? <><Spinner /><span>Mengirim...</span></> : " Ajukan"}
         </button>
       </ModalFoot>
     </ModalWrapper>
@@ -717,14 +718,14 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="💰" title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon="" title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[65vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div className="grid grid-cols-2 gap-2">
           {(["PER_JAM", "TETAP"] as const).map(m => (
             <button key={m} type="button" onClick={() => setPayMode(m)}
               className={`py-3 rounded-xl text-xs font-bold border transition-all ${payMode === m ? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-              {m === "PER_JAM" ? "⏱️ Per Jam" : "💰 Tetap"}
+              {m === "PER_JAM" ? "Per Jam" : "Tetap"}
             </button>
           ))}
         </div>
@@ -768,7 +769,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={save} disabled={saving} className={primaryBtn}>{saving ? <Spinner /> : "💾 Simpan"}</button>
+        <button onClick={save} disabled={saving} className={primaryBtn}>{saving ? <Spinner /> : " Simpan"}</button>
       </ModalFoot>
     </ModalWrapper>
   );
@@ -782,10 +783,10 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
   const [uploading, setUploading] = useState(false), [error, setError] = useState("");
   const [photoStep, setPhotoStep] = useState<"idle" | "camera" | "preview">("idle");
 
-  const handleClose = () => { if (mustUpload) { setError("⚠️ Wajib upload foto bukti dulu."); return; } onClose(); };
+  const handleClose = () => { if (mustUpload) { setError(" Wajib upload foto bukti dulu."); return; } onClose(); };
 
   const upload = async () => {
-    if (mustUpload && !photoFile) { setError("⚠️ Foto bukti wajib diupload."); return; }
+    if (mustUpload && !photoFile) { setError(" Foto bukti wajib diupload."); return; }
     setUploading(true); setError("");
     try {
       let photoUrl: string | null = null;
@@ -804,17 +805,17 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
 
   return (
     <ModalWrapper onClose={handleClose} preventClose={mustUpload}>
-      <ModalHead icon={isNeedProof ? "📸" : "🏁"} title={isNeedProof ? "Upload Bukti Lemburan" : "Selesaikan Lemburan"} sub={o.users?.name} onClose={handleClose} noClose={mustUpload} />
+      <ModalHead icon={isNeedProof ? "" : ""} title={isNeedProof ? "Upload Bukti Lemburan" : "Selesaikan Lemburan"} sub={o.users?.name} onClose={handleClose} noClose={mustUpload} />
       <div className="px-5 py-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
         {isNeedProof && (
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5">
-            <p className="font-semibold text-orange-800 text-xs mb-0.5">📸 Foto Bukti Wajib</p>
+            <p className="font-semibold text-orange-800 text-xs mb-0.5"> Foto Bukti Wajib</p>
             <p className="text-[10px] text-orange-700">Upload foto bukti sebelum menutup halaman ini.</p>
           </div>
         )}
         {isAutoCompleted && !isNeedProof && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-            <p className="font-semibold text-amber-800 text-xs mb-0.5">⚡ Waktu Lembur Habis</p>
+            <p className="font-semibold text-amber-800 text-xs mb-0.5"> Waktu Lembur Habis</p>
             <p className="text-[10px] text-amber-700">Lemburanmu selesai otomatis. Wajib upload foto bukti.</p>
           </div>
         )}
@@ -831,7 +832,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
         {photoStep === "idle" && (
           <button onClick={() => setPhotoStep("camera")}
             className={`w-full flex items-center justify-center gap-3 border-2 border-dashed rounded-xl p-7 text-center transition-all group ${mustUpload ? "border-orange-300 bg-orange-50/40 hover:border-orange-400 hover:bg-orange-50/70" : "border-gray-200 hover:border-violet-300 hover:bg-violet-50/20"}`}>
-            <span className="text-2xl">📷</span>
+            <span className="text-2xl"></span>
             <div className="text-left">
               <p className={`text-xs font-semibold ${mustUpload ? "text-orange-700" : "text-gray-700"}`}>Buka Kamera</p>
               <p className={`text-[10px] mt-0.5 ${mustUpload ? "text-orange-500" : "text-gray-400"}`}>{mustUpload ? "Wajib ambil foto bukti" : "Ambil foto bukti lemburan"}</p>
@@ -843,7 +844,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
         <ModalFoot>
           {!mustUpload && <button onClick={onClose} className={secondaryBtn}>Batal</button>}
           <button onClick={upload} disabled={uploading || (mustUpload && !photoFile)} className={primaryBtn}>
-            {uploading ? <Spinner /> : photoFile ? "📸 Upload & Selesai" : mustUpload ? "📷 Ambil Foto Dulu" : "🏁 Selesai"}
+            {uploading ? <Spinner /> : photoFile ? " Upload & Selesai" : mustUpload ? " Ambil Foto Dulu" : " Selesai"}
           </button>
         </ModalFoot>
       )}
@@ -879,7 +880,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     [allUsers, allowedRoles, isFullAdmin]
   );
 
-  // ✅ FIX: kalau endTime <= startTime, anggap overnight, tambah 24 jam
+  //  FIX: kalau endTime <= startTime, anggap overnight, tambah 24 jam
   const isOvernight = useMemo(() => {
     if (!startTime || !endTime) return false;
     return endTime <= startTime;
@@ -893,7 +894,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const previewHours = useMemo(() => {
     if (!startTime || !endTime) return null;
     let diffMs = new Date(`1970-01-01T${endTime}:00`).getTime() - new Date(`1970-01-01T${startTime}:00`).getTime();
-    if (isOvernight) diffMs += 24 * 3600000; // ✅ tambah 1 hari kalau lewat tengah malam
+    if (isOvernight) diffMs += 24 * 3600000; //  tambah 1 hari kalau lewat tengah malam
     const d = diffMs / 3600000;
     return d > 0 ? Math.floor(d) : null;
   }, [startTime, endTime, isOvernight]);
@@ -905,7 +906,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
 
   const submit = async () => {
     if (!targetUserId || !requestDate || !startTime || !endTime || !reasonType || !workDescription.trim()) { setError("Semua field wajib diisi"); return; }
-    // ✅ FIX: cuma tolak kalau jam mulai & selesai SAMA PERSIS (durasi 0), bukan karena beda hari
+    //  FIX: cuma tolak kalau jam mulai & selesai SAMA PERSIS (durasi 0), bukan karena beda hari
     if (startTime === endTime) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     if (reasonType === "Lainnya" && !reasonCustom.trim()) { setError("Jelaskan alasan"); return; }
     setSubmitting(true); setError("");
@@ -921,7 +922,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           request_date: requestDate,
           actual_start_time: startTime,
           actual_end_time: endTime,
-          actual_end_date: endDateResolved, // ✅ FIX: kirim tanggal selesai yang sudah dihitung (beda hari kalau overnight)
+          actual_end_date: endDateResolved, //  FIX: kirim tanggal selesai yang sudah dihitung (beda hari kalau overnight)
           work_description: workDescription.trim(),
           reason: reasonType === "Lainnya" ? reasonCustom.trim() : reasonType,
           proof_photo_url: photoUrl,
@@ -940,7 +941,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   return (
     <ModalWrapper onClose={onClose} wide>
       <ModalHead
-        icon="✏️"
+        icon=""
         title="Input Lembur Manual"
         sub={
           userRoles.some(r => (FULL_ACCESS_ROLES as readonly string[]).includes(r))
@@ -974,11 +975,11 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isHolidayOvertime ? "left-[18px]" : "left-0.5"}`} />
           </span>
           <div className="flex-1">
-            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}>🏖️ Lembur hari libur</p>
+            <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur hari libur</p>
             <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
           </div>
         </button>
-        {/* ✅ Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
+        {/*  Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
         {!isHolidayOvertime && (
           <div className="grid grid-cols-3 gap-2">
             <div><label className={lbl}>Tanggal *</label><input type="date" value={requestDate} onChange={e => setRequestDate(e.target.value)} className={inp} /></div>
@@ -987,7 +988,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </div>
         )}
 
-        {/* ✅ Mode hari libur: kotak khusus muncul di bawah toggle saat diaktifkan */}
+        {/*  Mode hari libur: kotak khusus muncul di bawah toggle saat diaktifkan */}
         {isHolidayOvertime && (
           <div className="bg-purple-50 border border-purple-100 rounded-xl p-3.5 space-y-3">
             <p className="text-[9px] font-bold text-purple-400 uppercase tracking-widest">Jam Lembur Hari Libur</p>
@@ -997,7 +998,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               <div><label className={lbl}>Jam Selesai *</label><input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className={inp} /></div>
             </div>
             <div className={`flex items-center gap-2.5 border rounded-xl px-3.5 py-2.5 ${holidayIsLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
-              <span className="text-sm">{holidayIsLate ? "⏰" : "✅"}</span>
+              <span className="text-sm">{holidayIsLate ? "" : ""}</span>
               <div className="text-xs">
                 <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
                   Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
@@ -1011,11 +1012,11 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
         )}
         {previewHours !== null && (
           <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5">
-            <span className="text-sm">⏱️</span>
+            <Clock className="w-4 h-4 text-violet-600" />
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
-        {/* ✅ FIX: input nominal langsung — nominal tetap tersimpan walau belum upload foto */}
+        {/*  FIX: input nominal langsung — nominal tetap tersimpan walau belum upload foto */}
         <div>
           <label className={lbl}>
             Nominal Bayaran <span className="normal-case font-normal text-gray-400">(opsional)</span>
@@ -1049,14 +1050,14 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-xl border border-gray-100 mb-2 shadow-sm" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700 transition-colors">↺ Ambil Ulang</button></div>
             : photoStep === "camera"
               ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl"></span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && (
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
           <button onClick={submit} disabled={submitting || !targetUserId || !requestDate || !reasonType || !workDescription.trim()} className={primaryBtn}>
-            {submitting ? <><Spinner /><span>Menyimpan...</span></> : "✅ Simpan Lembur"}
+            {submitting ? <><Spinner /><span>Menyimpan...</span></> : " Simpan Lembur"}
           </button>
         </ModalFoot>
       )}
@@ -1080,7 +1081,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   const isLainnya = reasonType === "Lainnya";
 
-  // ✅ FIX: deteksi overnight (jam selesai <= jam mulai → lembur lewat tengah malam)
+  //  FIX: deteksi overnight (jam selesai <= jam mulai → lembur lewat tengah malam)
   const isOvernight = useMemo(() => {
     if (!startTime || !endTime) return false;
     return endTime <= startTime;
@@ -1104,14 +1105,14 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
   const save = async () => {
     if (!requestDate || !startTime || !endTime || !reasonType) { setError("Semua field wajib diisi"); return; }
     if (isLainnya && !reasonCustom.trim()) { setError("Jelaskan alasan lembur"); return; }
-    // ✅ FIX: hanya tolak kalau jam mulai & selesai SAMA PERSIS, bukan karena beda hari (overnight)
+    //  FIX: hanya tolak kalau jam mulai & selesai SAMA PERSIS, bukan karena beda hari (overnight)
     if (startTime === endTime) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
     setSaving(true); setError("");
     try {
       let proofUrl: string | null | undefined = undefined;
       if (photoFile) { const fd = new FormData(); fd.append("file", photoFile); const ur = await fetch("/api/attendance/overtime/upload", { method: "POST", body: fd }); if (!ur.ok) throw new Error((await ur.json()).message || "Upload foto gagal"); proofUrl = (await ur.json()).url; }
       else if (photoPreview === null && o.proof_photo_url) proofUrl = null;
-      // ✅ FIX: isoE pakai endDateResolved (tanggal+1 kalau overnight), bukan requestDate yang sama
+      //  FIX: isoE pakai endDateResolved (tanggal+1 kalau overnight), bukan requestDate yang sama
       const isoS = `${requestDate}T${fmt(startTime)}+07:00`, isoE = `${endDateResolved}T${fmt(endTime)}+07:00`;
       const payload: Record<string, any> = { id: o.id, action: "UPDATE", request_date: requestDate, scheduled_start: isoS, scheduled_end: isoE, actual_start: isoS, actual_end: isoE, reason: isLainnya ? reasonCustom.trim() : reasonType, work_description: workDesc.trim(), status };
       if (proofUrl !== undefined) payload.proof_photo_url = proofUrl;
@@ -1126,7 +1127,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
 
   return (
     <ModalWrapper onClose={onClose} wide>
-      <ModalHead icon="✏️" title="Edit Lembur" sub={o.users?.name ?? "Karyawan"} onClose={onClose} />
+      <ModalHead icon="" title="Edit Lembur" sub={o.users?.name ?? "Karyawan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[78vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
         <div className="grid grid-cols-2 gap-2.5">
@@ -1141,13 +1142,13 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
           </div>
           {prevDur !== null && (
             <div className="mt-2 inline-flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-lg px-3 py-1.5">
-              <span className="text-xs">⏱️</span>
+              <Clock className="w-3.5 h-3.5 text-violet-600" />
               <span className="text-[10px] text-violet-700 font-medium">{prevDur} jam</span>
             </div>
           )}
           {isOvernight && (
             <div className="mt-2 flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
-              <span className="text-sm">🌙</span>
+              <span className="text-sm"><CalendarDays className="w-4 h-4 text-violet-600" /></span>
               <span className="text-xs text-blue-700">
                 Lewat tengah malam — selesai dicatat{" "}
                 <strong>{new Date(endDateResolved + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long" })}</strong>
@@ -1167,14 +1168,14 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
             ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-xl border border-gray-100 mb-2 shadow-sm" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700 transition-colors">↺ Hapus Foto</button></div>
             : photoStep === "camera"
               ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl">📷</span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl"></span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && (
         <ModalFoot>
           <button onClick={onClose} className={secondaryBtn}>Batal</button>
           <button onClick={save} disabled={saving || !requestDate || !startTime || !endTime || !reasonType || (isLainnya && !reasonCustom.trim())} className={primaryBtn}>
-            {saving ? <><Spinner /><span>Menyimpan...</span></> : "💾 Simpan Perubahan"}
+            {saving ? <><Spinner /><span>Menyimpan...</span></> : " Simpan Perubahan"}
           </button>
         </ModalFoot>
       )}
@@ -1198,7 +1199,7 @@ function DeleteConfirmModal({ overtime: o, onClose, onDeleted, canViewPay: showP
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="🗑️" title="Hapus Lembur" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon="" title="Hapus Lembur" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5">
         {error && <ErrorBanner msg={error} />}
         <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2.5">
@@ -1228,7 +1229,7 @@ function DeleteConfirmModal({ overtime: o, onClose, onDeleted, canViewPay: showP
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
         <button onClick={handleDelete} disabled={deleting} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
-          {deleting ? <Spinner /> : "🗑️ Hapus Permanen"}
+          {deleting ? <Spinner /> : " Hapus Permanen"}
         </button>
       </ModalFoot>
     </ModalWrapper>
@@ -1307,7 +1308,7 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
       )}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
-          <span className="text-3xl">📭</span>
+          <span className="text-3xl"></span>
           <p className="text-xs text-gray-400 font-medium">Tidak ada data</p>
         </div>
       ) : (
@@ -1328,10 +1329,10 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
                     <StatusBadge status={o.status} />
                     {(o.is_late === true || (o.is_late == null && o.is_holiday && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start))) && (
-                      <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">⏰ Telat</span>
+                      <span className="text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md"> Telat</span>
                     )}
                     {o.is_holiday && (
-                      <span className="text-[8px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">🏖️ Libur</span>
+                      <span className="text-[8px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md"> Libur</span>
                     )}
                     {isMyUrgent && <span className="text-[8px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">{o.status === "NEED_PROOF" ? "Upload foto" : "Selesaikan"}</span>}
                     {canApproveTarget(currentUser?.role, o.users?.role ?? userId) && o.status === "PENDING" && <span className="text-[8px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md">Perlu acc</span>}
@@ -1409,7 +1410,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
         </div>
       ) : groupedByUser.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2.5">
-          <span className="text-3xl">📭</span>
+          <span className="text-3xl"></span>
           <p className="text-xs font-semibold text-gray-400">Tidak ada data lemburan</p>
           <p className="text-[10px] text-gray-300">Coba ubah filter atau hapus pencarian</p>
         </div>
@@ -1441,7 +1442,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
                       return <span key={s} className={`text-[8px] font-semibold px-1.5 py-0.5 rounded border ${cfg.bg} ${cfg.text} ${cfg.border}`}>{c} {cfg.label}</span>;
                     })}
                     {items.some(o => o.is_holiday) && (
-                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">🏖️ Libur</span>
+                      <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200"> Libur</span>
                     )}
                   </div>
                   {userCanViewPay && totalPay > 0 && (
@@ -1497,7 +1498,7 @@ export default function OvertimePage() {
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
 
-  // ✅ FIX: fetchOvertimes sekarang terima year & month sebagai param
+  //  FIX: fetchOvertimes sekarang terima year & month sebagai param
   // Sebelumnya selalu fetch bulan ini saja, jadi input manual bulan lalu tidak muncul
   const fetchOvertimes = useCallback(async (year?: number, month?: number) => {
     const y = year ?? new Date().getFullYear();
@@ -1513,14 +1514,14 @@ export default function OvertimePage() {
     if (d.success) setAllUsers(d.users || []);
   }, []);
 
-  // ✅ FIX: Helper refetch selalu pakai calendarMonth yang aktif saat itu
+  //  FIX: Helper refetch selalu pakai calendarMonth yang aktif saat itu
   // Dipakai di semua modal onSaved/onDeleted supaya setelah aksi, data yang
   // ditampilkan tetap sesuai bulan yang sedang dilihat user (bukan reset ke bulan ini)
   const refetch = useCallback(() => {
     fetchOvertimes(calendarMonth.year, calendarMonth.month + 1);
   }, [fetchOvertimes, calendarMonth]);
 
-  // ✅ FIX: useEffect fetch data ikut calendarMonth sebagai dependency
+  //  FIX: useEffect fetch data ikut calendarMonth sebagai dependency
   // Setiap kali user navigasi ke bulan lain di kalender, data di-fetch ulang
   useEffect(() => {
     if (currentUser === null) return;
@@ -1545,7 +1546,7 @@ export default function OvertimePage() {
     return () => clearInterval(id);
   }, [overtimes, currentUser]);
 
-  // ✅ FIX: handleAutoComplete pakai refetch() bukan fetchOvertimes() tanpa param
+  //  FIX: handleAutoComplete pakai refetch() bukan fetchOvertimes() tanpa param
   const handleAutoComplete = async (overtime: OvertimeRequest) => {
     if (autoCompletingIds.current.has(overtime.id)) return;
     autoCompletingIds.current.add(overtime.id);
@@ -1616,10 +1617,10 @@ export default function OvertimePage() {
   };
 
   const statCards = [
-    { label: "Total", value: overtimes.length, icon: "📋", color: "text-gray-800", accent: "from-gray-50 to-gray-100/50" },
-    { label: "Pending", value: overtimes.filter(o => o.status === "PENDING").length, icon: "⏳", color: "text-amber-600", accent: "from-amber-50 to-amber-100/30" },
-    { label: "Berjalan", value: overtimes.filter(o => o.status === "ONGOING").length, icon: "▶", color: "text-emerald-600", accent: "from-emerald-50 to-emerald-100/30" },
-    { label: "Selesai", value: overtimes.filter(o => o.status === "COMPLETED").length, icon: "✓", color: "text-blue-600", accent: "from-blue-50 to-blue-100/30" },
+    { label: "Total", value: overtimes.length, icon: <FileText className="w-5 h-5 text-gray-500" />, color: "text-gray-800", accent: "from-gray-50 to-gray-100/50" },
+    { label: "Pending", value: overtimes.filter(o => o.status === "PENDING").length, icon: <Clock className="w-5 h-5 text-amber-500" />, color: "text-amber-600", accent: "from-amber-50 to-amber-100/30" },
+    { label: "Berjalan", value: overtimes.filter(o => o.status === "ONGOING").length, icon: <Loader2 className="w-5 h-5 text-emerald-500" />, color: "text-emerald-600", accent: "from-emerald-50 to-emerald-100/30" },
+    { label: "Selesai", value: overtimes.filter(o => o.status === "COMPLETED").length, icon: <CheckCircle2 className="w-5 h-5 text-blue-500" />, color: "text-blue-600", accent: "from-blue-50 to-blue-100/30" },
   ];
 
   const userCanViewPay = canViewPay(currentUser?.roles ?? currentUser?.role);
@@ -1644,12 +1645,12 @@ export default function OvertimePage() {
               {canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : [])) && (
                 <button onClick={() => setShowManualModal(true)}
                   className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
-                  <span>✏️</span><span className="hidden sm:inline">Input Manual</span>
+                  <span></span><span className="hidden sm:inline">Input Manual</span>
                 </button>
               )}
               <button onClick={() => setShowRequestModal(true)}
                 className="h-9 px-4 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm shadow-violet-200">
-                <span>📝</span><span>Ajukan Lemburan</span>
+                <span><Plus className="w-4 h-4 inline mr-1" /></span><span>Ajukan Lemburan</span>
               </button>
             </div>
           </div>
@@ -1673,7 +1674,7 @@ export default function OvertimePage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-sm flex-shrink-0 shadow-sm">📅</div>
+                <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-sm flex-shrink-0 shadow-sm"><Clock className="w-4 h-4 text-gray-500" /></div>
                 <div>
                   <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Kalender Lembur</p>
                   <p className="font-bold text-gray-900 text-sm">{MONTH_NAMES[calendarMonth.month]} {calendarMonth.year}</p>
@@ -1718,12 +1719,12 @@ export default function OvertimePage() {
             {selectedDate && (
               <div className="px-4 pb-4">
                 <div className="flex items-center gap-3 bg-violet-50 border border-violet-100 rounded-xl px-4 py-2.5">
-                  <span className="text-sm">📌</span>
+                  <span className="text-sm"><CalendarDays className="w-4 h-4 text-violet-600" /></span>
                   <p className="text-xs text-gray-700 flex-1">
                     <span className="font-semibold">{new Date(selectedDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}</span>
                     <span className="text-gray-400 ml-1.5">· {(byDate[selectedDate] || []).length} lemburan</span>
                   </p>
-                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-violet-500 hover:text-violet-700 font-semibold transition-colors">✕ Hapus</button>
+                  <button onClick={() => setSelectedDate(null)} className="text-[10px] text-violet-500 hover:text-violet-700 font-semibold transition-colors"> Hapus</button>
                 </div>
               </div>
             )}
@@ -1744,7 +1745,7 @@ export default function OvertimePage() {
                         : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                       }`}
                   >
-                    <span className="text-sm">{tab === "KARYAWAN" ? "👥" : "🎓"}</span>
+                    <span className="text-sm">{tab === "KARYAWAN" ? "" : ""}</span>
                     <span>{tab === "KARYAWAN" ? "Karyawan" : "PKL"}</span>
                     <span className={`min-w-[22px] h-[22px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-black tabular-nums transition-colors ${active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
                       }`}>
@@ -1787,7 +1788,7 @@ export default function OvertimePage() {
       </div>
 
       {/* ── Modals ── */}
-      {/* ✅ FIX: Semua onSaved/onDeleted pakai refetch() bukan fetchOvertimes() */}
+      {/*  FIX: Semua onSaved/onDeleted pakai refetch() bukan fetchOvertimes() */}
       {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { refetch(); setShowRequestModal(false); }} currentUser={currentUser} />}
       {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { refetch(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
       {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { refetch(); setApproveData(null); }} />}

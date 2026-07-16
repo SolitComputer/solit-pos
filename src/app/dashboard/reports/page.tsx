@@ -8,6 +8,7 @@ import {
   PointElement, LineElement, BarElement,
   Filler, Tooltip, Legend,
 } from "chart.js";
+import { FileText, Medal, Banknote, TrendingUp, ShoppingCart, Calculator, Percent, Award, Laptop, Smartphone } from "lucide-react";
 import { Line, Bar } from "react-chartjs-2";
 
 ChartJS.register(
@@ -136,14 +137,18 @@ function StatCard({
 
 function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   items: RankItem[];
   color: string;
   revenueKey?: string;
 }) {
   if (!items || items.length === 0) return null;
 
-  const medals = ["🥇", "🥈", "🥉"];
+  const medals = [
+    <Medal key="gold" className="w-5 h-5 text-yellow-500 drop-shadow-sm" />,
+    <Medal key="silver" className="w-5 h-5 text-gray-400 drop-shadow-sm" />,
+    <Medal key="bronze" className="w-5 h-5 text-amber-600 drop-shadow-sm" />
+  ];
   const maxVal = items[0]?.[revenueKey as keyof RankItem] as number ?? 1;
 
   return (
@@ -509,32 +514,32 @@ export default function ReportsPage() {
               label="Total Omzet"
               value={fmtRupiah(summary.totalRevenue)}
               sub="Periode terpilih"
-              icon={<span className="text-sm">💰</span>}
+              icon={<Banknote className="w-5 h-5 text-gray-500" />}
               rank={1}
             />
             <StatCard
               label="Total Profit"
               value={fmtRupiah(summary.totalProfit)}
               sub={`Margin ${summary.profitMargin}%`}
-              icon={<span className="text-sm">📈</span>}
+              icon={<TrendingUp className="w-5 h-5 text-gray-500" />}
             />
             <StatCard
               label="Transaksi"
               value={`${summary.totalTrx} trx`}
               sub="Total deal"
-              icon={<span className="text-sm">🛒</span>}
+              icon={<ShoppingCart className="w-5 h-5 text-gray-500" />}
             />
             <StatCard
               label="Rata-rata Deal"
               value={fmtRupiah(summary.avgDeal)}
               sub="Per transaksi"
-              icon={<span className="text-sm">💵</span>}
+              icon={<Calculator className="w-5 h-5 text-gray-500" />}
             />
             <StatCard
               label="Margin Profit"
               value={`${summary.profitMargin}%`}
               sub="Profit / omzet"
-              icon={<span className="text-sm">📊</span>}
+              icon={<Percent className="w-5 h-5 text-gray-500" />}
             />
           </div>
         ) : null}
@@ -588,9 +593,9 @@ export default function ReportsPage() {
         {/* ── RANKING LISTS ── */}
         {(topSales.length > 0 || topLaptop.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <RankList title="Top Sales" icon="🏆" items={topSales} color="bg-gray-50" revenueKey="revenue" />
-            <RankList title="Laptop Terlaris" icon="💻" items={topLaptop} color="bg-gray-50" revenueKey="revenue" />
-            <RankList title="Sumber Penjualan" icon="📱" items={topSource} color="bg-gray-50" revenueKey="revenue" />
+            <RankList title="Top Sales" icon={<Award className="w-5 h-5 text-gray-600" />} items={topSales} color="bg-gray-50" revenueKey="revenue" />
+            <RankList title="Laptop Terlaris" icon={<Laptop className="w-5 h-5 text-gray-600" />} items={topLaptop} color="bg-gray-50" revenueKey="revenue" />
+            <RankList title="Sumber Penjualan" icon={<Smartphone className="w-5 h-5 text-gray-600" />} items={topSource} color="bg-gray-50" revenueKey="revenue" />
           </div>
         )}
 

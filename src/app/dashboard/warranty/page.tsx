@@ -376,10 +376,10 @@ export default function WarrantyPage() {
                     onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
                     className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-all cursor-pointer"
                   >
-                    <option value="ACTIVE">✅ Aktif</option>
-                    <option value="EXPIRING_SOON">⚠️ Segera Berakhir</option>
-                    <option value="EXPIRED">❌ Kadaluarsa</option>
-                    <option value="VOID">🚫 Dibatalkan</option>
+                    <option value="ACTIVE"> Aktif</option>
+                    <option value="EXPIRING_SOON"> Segera Berakhir</option>
+                    <option value="EXPIRED"> Kadaluarsa</option>
+                    <option value="VOID"> Dibatalkan</option>
                   </select>
                 </div>
 

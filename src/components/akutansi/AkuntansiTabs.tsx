@@ -8,6 +8,7 @@ import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
 import Neraca from "./Neraca";
 import AkunManager from "./AkunManager";
+import { Inbox } from "lucide-react";
 
 type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun";
 
@@ -68,7 +69,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         <AkunManager />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
-          <div className="text-4xl mb-3 opacity-40">🚧</div>
+          <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
           <p className="text-sm font-semibold text-gray-600">
             {TABS.find((t) => t.key === tab)?.label} — belum dikerjakan
           </p>

@@ -178,7 +178,7 @@ export default function ScanPage() {
         {/* ── Laptop Info Card ── */}
         <div style={styles.card}>
           <div style={styles.laptopHeader}>
-            <div style={styles.laptopIcon}>💻</div>
+            <div style={styles.laptopIcon}></div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={styles.laptopName}>{laptop.laptop_name}</h2>
               <p style={styles.laptopBrand}>{laptop.brand}</p>
@@ -368,7 +368,7 @@ function AccessoryScanView({
         {/* Card */}
         <div style={styles.card}>
           <div style={styles.laptopHeader}>
-            <div style={styles.laptopIcon}>🎧</div>
+            <div style={styles.laptopIcon}></div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={styles.laptopName}>{acc.name}</h2>
               <p style={styles.laptopBrand}>{acc.brand || acc.category}</p>
@@ -478,7 +478,7 @@ function ScanErrorScreen({ sn, message }: { sn: string; message: string | null }
     <div style={styles.root}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", paddingTop: 60 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}></div>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>Unit Tidak Ditemukan</h2>
           <p style={{ color: "#6b7280", fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
             {message || `Serial number "${sn}" tidak terdaftar dalam sistem`}

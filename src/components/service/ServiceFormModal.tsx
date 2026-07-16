@@ -272,7 +272,7 @@ export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFo
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                 </svg>
               )}
-              {loading ? "Menyimpan..." : "✓ Simpan Formulir"}
+              {loading ? "Menyimpan..." : " Simpan Formulir"}
             </button>
           )}
         </div>

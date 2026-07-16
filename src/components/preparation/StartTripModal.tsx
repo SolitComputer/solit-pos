@@ -137,7 +137,7 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         <div className="bg-[#1a1a2e] px-5 py-4 flex-shrink-0">
-          <p className="font-bold text-white text-sm">🛵 Atur Tujuan & Mulai Antar</p>
+          <p className="font-bold text-white text-sm"> Atur Tujuan & Mulai Antar</p>
           <p className="text-xs text-gray-300 mt-0.5">Isi alamat / link Maps, lalu deteksi tujuan</p>
         </div>
 
@@ -151,14 +151,14 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
               <div className="mt-1 border border-gray-200 rounded-xl overflow-hidden bg-white max-h-56 overflow-y-auto">
                 {results.map((r, i) => (
                   <button key={i} type="button" onClick={() => pick(r)} className="w-full px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">📍 {r.label.split(",").slice(0, 2).join(",")}</p>
+                    <p className="text-sm font-semibold text-gray-800 truncate"> {r.label.split(",").slice(0, 2).join(",")}</p>
                     <p className="text-[11px] text-gray-400 truncate">{r.label}</p>
                   </button>
                 ))}
               </div>
             )}
             <p className="text-[10px] text-gray-400 mt-1">
-              💡 Paste link Google Maps atau ketik alamat, lalu klik &quot;Deteksi Tujuan&quot;.
+               Paste link Google Maps atau ketik alamat, lalu klik &quot;Deteksi Tujuan&quot;.
             </p>
 
             {/* Referensi alamat dari sales — TIDAK mengisi input otomatis */}
@@ -183,7 +183,7 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
                   <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   Mendeteksi lokasi...
                 </>
-              ) : "📍 Deteksi Tujuan"}
+              ) : " Deteksi Tujuan"}
             </button>
           </div>
 
@@ -211,7 +211,7 @@ export default function StartTripModal({ defaultAddress, onClose, onConfirm }: P
         <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
           <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
           <button onClick={confirm} disabled={saving || !selected} className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50">
-            {saving ? "Memulai..." : "🚀 Mulai Antar"}
+            {saving ? "Memulai..." : " Mulai Antar"}
           </button>
         </div>
       </div>

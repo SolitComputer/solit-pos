@@ -53,47 +53,47 @@ export default function ReceiptActions({
 
         const fmtDateStr = fmtDate(pickupDate);
         const warrantyLine = warrantyEnd
-            ? `📅 Berlaku s/d  : ${fmtDate(warrantyEnd)}${warrantyDaysLeft !== undefined && warrantyDaysLeft > 0
+            ? ` Berlaku s/d  : ${fmtDate(warrantyEnd)}${warrantyDaysLeft !== undefined && warrantyDaysLeft > 0
                 ? ` (${warrantyDaysLeft} hari lagi)`
                 : " (Kadaluarsa)"
             }`
             : null;
 
         const lines = [
-            `Halo ${customerName} 👋`,
+            `Halo ${customerName} `,
             ``,
-            `✅ *Pembayaran Berhasil!*`,
-            `Terima kasih sudah berbelanja di *Solit 03* 🙏`,
-            ``,
-            `━━━━━━━━━━━━━━━━━━`,
-            `📋 *Detail Transaksi*`,
-            `━━━━━━━━━━━━━━━━━━`,
-            `📄 Nota           : ${invoiceNumber}`,
-            `💻 Laptop        : ${laptopName}`,
-            serialNumber ? `🔢 Serial No    : ${serialNumber}` : null,
-            `💰 Total           : Rp${amount?.toLocaleString("id-ID")}`,
-            `🏷️ Pembayaran  : ${paymentMethod}`,
-            customerType === "RESELLER" ? `🔄 Tipe             : Reseller` : null,
-            customerType === "MITRA" ? `🤝 Tipe             : Mitra Bisnis` : null,
+            ` *Pembayaran Berhasil!*`,
+            `Terima kasih sudah berbelanja di *Solit 03* `,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
-            `📦 *Info Pengambilan*`,
+            ` *Detail Transaksi*`,
             `━━━━━━━━━━━━━━━━━━`,
-            `📍 Metode       : ${pickupMethod === "DATANG" ? "Datang ke Toko" : "Diantar"}`,
-            fmtDateStr ? `📅 Tanggal     : ${fmtDateStr}` : null,
-            pickupTime ? `⏰ Jam             : ${pickupTime}` : null,
-            softwareRequest ? `💿 Software    : ${softwareRequest}` : null,
+            ` Nota           : ${invoiceNumber}`,
+            ` Laptop        : ${laptopName}`,
+            serialNumber ? ` Serial No    : ${serialNumber}` : null,
+            ` Total           : Rp${amount?.toLocaleString("id-ID")}`,
+            ` Pembayaran  : ${paymentMethod}`,
+            customerType === "RESELLER" ? ` Tipe             : Reseller` : null,
+            customerType === "MITRA" ? ` Tipe             : Mitra Bisnis` : null,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
-            `🛡️ *Garansi Laptop*`,
+            ` *Info Pengambilan*`,
+            `━━━━━━━━━━━━━━━━━━`,
+            ` Metode       : ${pickupMethod === "DATANG" ? "Datang ke Toko" : "Diantar"}`,
+            fmtDateStr ? ` Tanggal     : ${fmtDateStr}` : null,
+            pickupTime ? ` Jam             : ${pickupTime}` : null,
+            softwareRequest ? ` Software    : ${softwareRequest}` : null,
+            ``,
+            `━━━━━━━━━━━━━━━━━━`,
+            ` *Garansi Laptop*`,
             `━━━━━━━━━━━━━━━━━━`,
             warrantyLine,
             ``,
-            `🔍 Cek garansi online:`,
-            `🔗 https://solit03.com/cek-garansi`,
+            ` Cek garansi online:`,
+            ` https://solit03.com/cek-garansi`,
             serialNumber ? `Masukkan SN: *${serialNumber}*` : null,
             ``,
-            `Terima kasih sudah berbelanja di *Solit 03* 🙏`,
+            `Terima kasih sudah berbelanja di *Solit 03* `,
             `_Sawangan, Depok_`,
         ]
             .filter((l) => l !== null)
@@ -158,7 +158,7 @@ export default function ReceiptActions({
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        WA Dibuka ✓
+                        WA Dibuka 
                     </>
                 ) : (
                     <>

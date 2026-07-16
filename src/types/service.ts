@@ -7,7 +7,7 @@ export type ServiceStatus =
   | "DONE"
   | "SUDAH_DIAMBIL"
   | "TIDAK_JADI"
-  | "GAGAL_DIPERBAIKI"; // ✅ NEW
+  | "GAGAL_DIPERBAIKI"; //  NEW
 
 export interface ServiceOrder {
   id: string;
@@ -37,7 +37,7 @@ export interface ServiceOrder {
   tanggal_selesai?: string;
   tanggal_diambil?: string;
 
-  // Payment ✅ NEW
+  // Payment  NEW
   estimasi_harga?: number | null;
   biaya_sparepart?: number | null;
 
@@ -80,7 +80,7 @@ export const STATUS_LABEL: Record<ServiceStatus, string> = {
   DONE: "Selesai",
   SUDAH_DIAMBIL: "Sudah Diambil",
   TIDAK_JADI: "Tidak Jadi",
-  GAGAL_DIPERBAIKI: "Gagal Diperbaiki", // ✅
+  GAGAL_DIPERBAIKI: "Gagal Diperbaiki", // 
 };
 
 export const STATUS_COLOR: Record<ServiceStatus, string> = {
@@ -90,5 +90,5 @@ export const STATUS_COLOR: Record<ServiceStatus, string> = {
   DONE: "bg-green-100 text-green-800 border-green-200",
   SUDAH_DIAMBIL: "bg-gray-100 text-gray-600 border-gray-200",
   TIDAK_JADI: "bg-red-100 text-red-700 border-red-200",
-  GAGAL_DIPERBAIKI: "bg-rose-100 text-rose-700 border-rose-200", // ✅
+  GAGAL_DIPERBAIKI: "bg-rose-100 text-rose-700 border-rose-200", // 
 };

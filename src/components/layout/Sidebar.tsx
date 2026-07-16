@@ -437,7 +437,7 @@ const PREPARATION_SALES_MENU: MenuGroup = {
 const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
-    { name: "Siap Dikirim 🔔", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
+    { name: "Siap Dikirim ", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.deliveryRoute },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
   ],
@@ -485,7 +485,7 @@ const ADMIN_OVERVIEW: MenuGroup = {
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
     { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-    ITEM_AKUNTANSI, // ✅ NEW
+    ITEM_AKUNTANSI, //  NEW
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
     ITEM_CUSTOMER_BIRTHDAY,
@@ -666,7 +666,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         ITEM_CASHFLOW,
-        ITEM_AKUNTANSI, // ✅ NEW
+        ITEM_AKUNTANSI, //  NEW
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
         ITEM_CC_REPORT,
@@ -840,7 +840,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-        ITEM_AKUNTANSI, // ✅ NEW
+        ITEM_AKUNTANSI, //  NEW
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
         ITEM_CC_REPORT,
@@ -1395,12 +1395,12 @@ function SidebarContent({
               <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
             )}
           </div>
-          {onToggleRail && !rail && (
+          {onToggleRail && (
             <button
               onClick={onToggleRail}
-              className="hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-              title="Perkecil sidebar"
-              aria-label="Perkecil sidebar"
+              className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`}
+              title={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
+              aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
             >
               <svg
                 width="15"
@@ -1409,6 +1409,7 @@ function SidebarContent({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.4"
+                style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
               >
                 <polyline points="11 17 6 12 11 7" />
                 <polyline points="18 17 13 12 18 7" />
@@ -1468,26 +1469,7 @@ function SidebarContent({
         )}
       </div>
 
-      {rail && onToggleRail && (
-        <button
-          onClick={onToggleRail}
-          className="hidden lg:flex mx-auto mb-2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-          title="Perbesar sidebar"
-          aria-label="Perbesar sidebar"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-          >
-            <polyline points="13 17 18 12 13 7" />
-            <polyline points="6 17 11 12 6 7" />
-          </svg>
-        </button>
-      )}
+
 
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
@@ -1653,6 +1635,9 @@ export default function Sidebar() {
   const [rail, setRail] = useState(false);
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
+  // Transisi width baru diaktifkan setelah state tersimpan (localStorage) diterapkan,
+  // supaya loncatan awal saat load tidak ikut ke-animasi (bikin flash/kacau).
+  const [hydrated, setHydrated] = useState(false);
   const widthRef = useRef(DEFAULT_W);
   useEffect(() => {
     widthRef.current = width;
@@ -1671,6 +1656,9 @@ export default function Sidebar() {
       const w = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
       if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
     } catch { }
+    // Aktifkan transisi di frame berikutnya, setelah lebar tersimpan diterapkan tanpa animasi.
+    const raf = requestAnimationFrame(() => setHydrated(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
@@ -1880,7 +1868,7 @@ export default function Sidebar() {
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">
-              🔔 {prep.menungguUnacked.length} penyiapan baru — buka antrian
+               {prep.menungguUnacked.length} penyiapan baru — buka antrian
             </span>
           </button>
         </div>
@@ -1899,7 +1887,7 @@ export default function Sidebar() {
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">
-              📦 {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
+               {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
             </span>
           </button>
         </div>
@@ -1908,7 +1896,7 @@ export default function Sidebar() {
       {/* ── Mobile toggle ── */}
       <button
         onClick={() => setOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-xl bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 transition"
+        className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition"
         aria-label="Buka menu"
       >
         <svg
@@ -1945,7 +1933,7 @@ export default function Sidebar() {
       <aside
         style={{
           width: rail ? RAIL_W : width,
-          transition: dragging ? "none" : "width 0.2s ease-out",
+          transition: dragging || !hydrated ? "none" : "width 0.2s ease-out",
         }}
         className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
       >

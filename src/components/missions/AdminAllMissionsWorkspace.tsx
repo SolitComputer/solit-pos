@@ -542,7 +542,7 @@ export default function AdminAllMissionsWorkspace() {
                               <td className="px-4 py-3 whitespace-nowrap">
                                 {m.due_date ? (
                                   <span className={`text-[11px] font-medium ${od ? "text-rose-600" : "text-slate-500"}`}>
-                                    {fmtDate(m.due_date)}{od && " ⏰"}
+                                    {fmtDate(m.due_date)}{od && " (Lewat)"}
                                   </span>
                                 ) : (
                                   <span className="text-[11px] text-slate-400">—</span>
@@ -642,7 +642,7 @@ export default function AdminAllMissionsWorkspace() {
                         <div className={`rounded-lg px-2.5 py-2 ${od ? "bg-rose-50" : "bg-slate-50"}`}>
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tenggat</p>
                           <p className={`text-xs font-semibold ${od ? "text-rose-600" : "text-slate-700"}`}>
-                            {m.due_date ? fmtDate(m.due_date) : "—"}{od && " ⏰"}
+                            {m.due_date ? fmtDate(m.due_date) : "—"}{od && " (Lewat)"}
                           </p>
                         </div>
                       </div>
@@ -673,7 +673,7 @@ export default function AdminAllMissionsWorkspace() {
               )}
               {!hasMore && missions.length > 0 && (
                 <p className="text-center text-[11px] text-slate-400 py-2">
-                  ✓ Semua {fmtCount(missions.length)} misi telah ditampilkan
+                  Semua {fmtCount(missions.length)} misi telah ditampilkan
                 </p>
               )}
             </>

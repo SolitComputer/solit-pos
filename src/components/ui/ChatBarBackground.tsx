@@ -161,7 +161,7 @@ export default function ChatBarBackground() {
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
 
         if (ds.moved) {
-            // ⬅️➡️ SNAP ke tepi terdekat (gaya bubble Android) — tidak berhenti di tengah
+            // SNAP ke tepi terdekat (gaya bubble Android) — tidak berhenti di tengah
             setPos(prev => {
                 if (!prev) return prev;
                 const maxX = window.innerWidth - BTN_SIZE - MARGIN;

@@ -413,8 +413,8 @@ function ConversationList({
                 const pB = getAvatarPalette(conv.userB.name);
                 const preview = conv.lastMessage.is_deleted
                     ? "Pesan dihapus"
-                    : conv.lastMessage.attachment_type === "image" ? "📷 Foto"
-                    : conv.lastMessage.attachment_type === "file"  ? `📎 ${conv.lastMessage.attachment_name ?? "File"}`
+                    : conv.lastMessage.attachment_type === "image" ? "[Foto]"
+                    : conv.lastMessage.attachment_type === "file"  ? `[File] ${conv.lastMessage.attachment_name ?? ""}`
                     : conv.lastMessage.content;
 
                 return (
@@ -629,7 +629,7 @@ function MessageView({
                                         boxShadow: "0 1px 6px rgba(124,58,237,0.1)",
                                         whiteSpace: "nowrap",
                                     }}>
-                                        📅 {group.label}
+                                        {group.label}
                                     </span>
                                     <div style={{ flex: 1, height: 1, background: "linear-gradient(to left,transparent,#ddd6fe)" }} />
                                 </div>
@@ -710,7 +710,7 @@ function MessageView({
                                                                             style={{ maxWidth: "100%", maxHeight: 170, objectFit: "cover", display: "block", borderRadius: 11 }}
                                                                         />
                                                                         <p style={{ fontSize: 9, textAlign: "center", margin: "5px 0 0", opacity: 0.5 }}>
-                                                                            🔍 Tap untuk perbesar
+                                                                            Tap untuk perbesar
                                                                         </p>
                                                                     </div>
                                                                 )}

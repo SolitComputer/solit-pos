@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
-import { Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { Trash2, ArrowUp, ArrowDown, Inbox } from "lucide-react";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import UnitFormModal, { LaptopUnit as BaseLaptopUnit } from "@/components/inventory/UnitFormModal";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
@@ -523,7 +523,7 @@ function UnitCard({
                                     {fmt(totalUnitModal)}
                                 </span>
                                 {isLoss && (
-                                    <p className="text-[9px] text-red-500 font-semibold leading-tight">⚠ Rugi</p>
+                                    <p className="text-[9px] text-red-500 font-semibold leading-tight"> Rugi</p>
                                 )}
                             </div>
                         </div>
@@ -1129,7 +1129,7 @@ export default function AllUnitsPage() {
                     {/* ── Empty state ── */}
                     {isEmptyState && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-12 px-4 text-center">
-                            <div className="text-3xl mb-2 opacity-50">📦</div>
+                            <div className="flex justify-center mb-2 opacity-50"><Inbox className="w-8 h-8" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
                                 {hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL"
@@ -1263,7 +1263,7 @@ export default function AllUnitsPage() {
                                                                     </span>
                                                                     {isLoss && (
                                                                         <p className="text-[9px] text-red-500 font-semibold leading-tight mt-0.5">
-                                                                            ⚠ Rugi
+                                                                             Rugi
                                                                         </p>
                                                                     )}
                                                                 </td>

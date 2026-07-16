@@ -9,6 +9,7 @@ import TrackingStatusBadge from "@/components/preparation/TrackingStatusBadge";
 import { useHTCall } from "@/contexts/HTCallContext";
 import { hasAnyRole, PERMISSIONS } from "@/lib/permissions";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Inbox, User, Clock } from "lucide-react";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null }
 interface ActiveOrder extends LiveOrder {
@@ -163,7 +164,7 @@ export default function PreparationSedangDiantarPage() {
                         <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200 rounded-2xl p-3 sm:p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                    <span className="text-lg sm:text-xl flex-shrink-0">🛵</span>
+                                    <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
                                     <span className="text-[10px] sm:text-xs font-bold text-violet-600 uppercase tracking-wide truncate">Sedang Berjalan</span>
                                 </div>
                                 <span className="text-2xl sm:text-3xl font-black tabular-nums text-violet-700 flex-shrink-0">
@@ -177,7 +178,10 @@ export default function PreparationSedangDiantarPage() {
                             }`}>
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                    <span className="text-lg sm:text-xl flex-shrink-0">{problemCount > 0 ? "⚠️" : "✅"}</span>
+                                    {problemCount > 0
+                                        ? <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                        : <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    }
                                     <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wide truncate ${problemCount > 0 ? "text-red-600" : "text-emerald-600"
                                         }`}>
                                         Bermasalah
@@ -195,7 +199,7 @@ export default function PreparationSedangDiantarPage() {
                     {problemCount > 0 && (
                         <div className="bg-gradient-to-r from-red-50 to-red-100/70 border border-red-200 rounded-2xl px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4 shadow-sm animate-pulse">
                             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/25">
-                                <span className="text-lg sm:text-xl">📡</span>
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs sm:text-sm font-bold text-red-800">
@@ -205,7 +209,7 @@ export default function PreparationSedangDiantarPage() {
                                     Kemungkinan app pengantar ditutup atau GPS dimatikan.
                                 </p>
                             </div>
-                            <span className="text-xl sm:text-2xl animate-pulse flex-shrink-0">⚠️</span>
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                         </div>
                     )}
 
@@ -256,7 +260,7 @@ export default function PreparationSedangDiantarPage() {
                         </div>
                     ) : filtered.length === 0 ? (
                         <div className="bg-white rounded-3xl border border-gray-100 py-16 sm:py-20 text-center shadow-sm px-4">
-                            <div className="text-5xl sm:text-6xl mb-4 opacity-30">🛵</div>
+                            <div className="flex justify-center mb-4 opacity-30"><Inbox className="w-12 h-12" /></div>
                             <p className="text-gray-500 text-sm sm:text-base font-medium">
                                 {search ? "Tidak ada yang cocok dengan pencarian" : "Tidak ada pengantaran yang sedang berjalan"}
                             </p>
@@ -299,7 +303,7 @@ export default function PreparationSedangDiantarPage() {
                                                     </span>
                                                     {live.tone === "bad" && (
                                                         <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-500 text-white animate-pulse">
-                                                            ⚠️ MASALAH
+                                                             MASALAH
                                                         </span>
                                                     )}
                                                 </div>
@@ -307,9 +311,9 @@ export default function PreparationSedangDiantarPage() {
                                                     {o.customer_name}
                                                 </p>
                                                 <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 flex items-center gap-1 truncate">
-                                                    <span>🛵</span> {o.delivery_user_name || "—"}
+                                                    <User className="w-4 h-4 inline" /> {o.delivery_user_name || "—"}
                                                     {o.delivery_address && (
-                                                        <span className="text-gray-400 truncate">· 📍 {o.delivery_address}</span>
+                                                        <span className="text-gray-400 truncate">·  {o.delivery_address}</span>
                                                     )}
                                                 </p>
                                             </div>
@@ -337,7 +341,7 @@ export default function PreparationSedangDiantarPage() {
                                                     }}
                                                     className="mt-3 w-full h-11 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 px-2 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/30 group-hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 >
-                                                    <span className="text-base sm:text-lg flex-shrink-0">📞</span>
+                                                    <Clock className="w-5 h-5 flex-shrink-0" />
                                                     <span className="truncate">Panggil HT — {o.delivery_user_name || "Pengantar"}</span>
                                                     <svg className="w-4 h-4 flex-shrink-0 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -357,7 +361,7 @@ export default function PreparationSedangDiantarPage() {
                                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); forceDone(o.id, o.order_number); }}
                                                 className="mt-2 w-full h-10 rounded-xl bg-[#1a1a2e] hover:bg-[#16213e] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-40"
                                             >
-                                                {forcingId === o.id ? "Menyelesaikan..." : "✅ Tandai Selesai (Override)"}
+                                                {forcingId === o.id ? "Menyelesaikan..." : " Tandai Selesai (Override)"}
                                             </button>
                                         )}
                                     </Link>

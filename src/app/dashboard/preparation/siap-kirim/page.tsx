@@ -86,7 +86,7 @@ export default function PreparationSiapKirimPage() {
                     !silent &&
                     !knownIdsRef.current.has(row.id)
                 ) {
-                    showToast("📦 Barang siap dikirim!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+                showToast("Barang siap dikirim!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
                     setNewIds(prev => { const n = new Set(prev); n.add(row.id); return n; });
                     setTimeout(() => setNewIds(prev => { const n = new Set(prev); n.delete(row.id); return n; }), 12000);
                 }
@@ -141,7 +141,7 @@ export default function PreparationSiapKirimPage() {
                     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] animate-in slide-in-from-top-2 duration-300">
                         <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-full shadow-2xl shadow-orange-900/40 flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
-                            <p className="text-sm font-black">📦 {alarmCount} barang siap — pilih metode pengiriman!</p>
+                            <p className="text-sm font-black">{alarmCount} barang siap — pilih metode pengiriman!</p>
                             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
                         </div>
                     </div>
@@ -208,7 +208,7 @@ export default function PreparationSiapKirimPage() {
                         <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl">📦</span>
+                                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
                                     <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Menunggu Dispatch</span>
                                 </div>
                                 <span className="text-3xl font-black tabular-nums text-orange-700">
@@ -219,7 +219,7 @@ export default function PreparationSiapKirimPage() {
                         <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl">💻</span>
+                                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                                     <span className="text-xs font-bold text-violet-600 uppercase tracking-wide">Total Unit</span>
                                 </div>
                                 <span className="text-3xl font-black tabular-nums text-violet-700">
@@ -233,7 +233,7 @@ export default function PreparationSiapKirimPage() {
                     {orders.length > 0 && (
                         <div className="bg-gradient-to-r from-orange-50 to-orange-100/70 border border-orange-200 rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm">
                             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/25">
-                                <span className="text-xl">⚡</span>
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold text-orange-800">
@@ -243,7 +243,7 @@ export default function PreparationSiapKirimPage() {
                                     Klik untuk pilih: Diambil langsung, Diantar, atau Kurir
                                 </p>
                             </div>
-                            <span className="text-2xl animate-pulse">👉</span>
+                            <svg className="w-5 h-5 text-orange-500 animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </div>
                     )}
 
@@ -293,7 +293,7 @@ export default function PreparationSiapKirimPage() {
                         </div>
                     ) : filtered.length === 0 ? (
                         <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center shadow-sm">
-                            <div className="text-6xl mb-4 opacity-30">🎉</div>
+                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <p className="text-gray-500 text-base font-medium">
                                 {search ? "Tidak ada yang cocok dengan pencarian" : "Semua penyiapan sudah dikonfirmasi pengirimannya!"}
                             </p>
@@ -343,7 +343,7 @@ export default function PreparationSiapKirimPage() {
                                             </p>
                                             {o.customer_phone && (
                                                 <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                                                    <span>📱</span> {o.customer_phone}
+                                                    <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg> {o.customer_phone}
                                                 </p>
                                             )}
                                         </div>
@@ -360,7 +360,7 @@ export default function PreparationSiapKirimPage() {
                                     {o.delivery_address && (
                                         <div className="bg-gradient-to-r from-gray-50 to-gray-100/50 border border-gray-100 rounded-xl px-3 py-2 mb-3">
                                             <p className="text-xs text-gray-600 truncate flex items-center gap-1.5">
-                                                <span>📍</span> {o.delivery_address}
+                                                <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg> {o.delivery_address}
                                             </p>
                                         </div>
                                     )}
@@ -368,7 +368,7 @@ export default function PreparationSiapKirimPage() {
                                     <div className="mb-4">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                                                {o.preparation_items.length} Unit · Semua sudah dicek ✅
+                                                {o.preparation_items.length} Unit · Semua sudah dicek
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
@@ -386,7 +386,8 @@ export default function PreparationSiapKirimPage() {
                                     </div>
 
                                     <div className="h-11 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/30 group-hover:scale-[1.02] active:scale-95">
-                                        📮 Pilih Metode Pengiriman
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        Pilih Metode Pengiriman
                                         <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                         </svg>

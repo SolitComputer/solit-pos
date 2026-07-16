@@ -155,7 +155,7 @@ export async function middleware(request: NextRequest) {
           return NextResponse.redirect(new URL("/face-verify", request.url));
         }
         const userRoles: string[] = user.roles ?? [user.role];
-        // ✅ PKL variant pakai redirect parent role-nya
+        //  PKL variant pakai redirect parent role-nya
         const effectivePrimary = getEffectivePrimaryRole(userRoles);
         return NextResponse.redirect(
           new URL(
@@ -216,7 +216,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const userRoles: string[] = user.roles ?? [user.role];
-  // ✅ Expand: PKL_SALES → ["PKL_SALES", "CREW_SALES"], dst.
+  //  Expand: PKL_SALES → ["PKL_SALES", "CREW_SALES"], dst.
   const effectiveRoles = expandRolesWithParents(userRoles);
   const effectivePrimary = getEffectivePrimaryRole(userRoles);
 
@@ -237,7 +237,7 @@ export async function middleware(request: NextRequest) {
       return clearSessionAndRedirect(loginUrl);
     }
 
-    // ✅ throttle cek force_logout: max 1x per 5 menit per sesi
+    //  throttle cek force_logout: max 1x per 5 menit per sesi
     const nowSec = Math.floor(Date.now() / 1000);
     const lastFlCheck = Number(request.cookies.get("fl_check")?.value ?? 0);
     const FL_CHECK_INTERVAL = 300; // 5 menit
@@ -284,7 +284,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── PKL block: hanya block jika SEMUA effective roles adalah PKL polos ────
-  // ✅ Pakai effectiveRoles:
+  //  Pakai effectiveRoles:
   //   - PKL_SALES → effectiveRoles = ["PKL_SALES", "CREW_SALES"] → NOT allPKL → LOLOS
   //   - PKL polos → effectiveRoles = ["PKL"] → allPKL → BLOCKED
   const allPKL = effectiveRoles.every(

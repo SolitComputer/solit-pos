@@ -501,10 +501,10 @@ export default function SalarySlipPrintClient({
       {/* ── Action Buttons ── */}
       <div className="no-print actions">
         <button className="btn-print" onClick={() => window.print()}>
-          🖨️ Print / Simpan PDF
+           Print / Simpan PDF
         </button>
         <button className="btn-close" onClick={() => window.close()}>
-          ✕ Tutup
+           Tutup
         </button>
       </div>
 
@@ -527,7 +527,7 @@ export default function SalarySlipPrintClient({
         {/* DRAFT NOTICE */}
         {slip.status === "DRAFT" && (
           <div className="draft-notice">
-            ⚠️ Dokumen ini berstatus DRAFT — belum difinalisasi
+             Dokumen ini berstatus DRAFT — belum difinalisasi
           </div>
         )}
 
@@ -585,7 +585,7 @@ export default function SalarySlipPrintClient({
             <div className="table-body">
               <TableRow label="Cicilan Pinjaman" amount={slip.deduction_loan} />
               <TableRow label="Dana Pensiun" amount={slip.deduction_pension} />
-              {/* ✅ FIX: baris "Pelanggaran" dihapus — deduction_violation selalu 0 dari backend.
+              {/*  FIX: baris "Pelanggaran" dihapus — deduction_violation selalu 0 dari backend.
                   Spacer ditambah jadi 4 (dari 3) biar tinggi tabel Potongan tetap sejajar
                   dengan tabel Penghasilan yang punya 6 baris */}
               <TableRow label="" amount={null} spacer />

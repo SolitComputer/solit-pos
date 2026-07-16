@@ -267,7 +267,7 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: {
                             {isMine && (
                                 <span className="text-[10px]"
                                     style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
-                                    {msg.is_read ? "✓✓" : "✓"}
+                                    {msg.is_read ? "" : ""}
                                 </span>
                             )}
                         </div>
@@ -616,7 +616,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-                        <div className="text-3xl opacity-20">💬</div>
+                        <div className="text-3xl opacity-20"></div>
                         <p className="text-[11px] text-gray-400">Mulai percakapan!</p>
                     </div>
                 ) : messages.map(msg => (

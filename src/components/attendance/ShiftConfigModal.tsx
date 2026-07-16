@@ -171,7 +171,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
         <div className="bg-gradient-to-r from-indigo-600 to-violet-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
           <div>
             <p className="font-bold text-white text-base tracking-tight">
-              {targetUser ? `⏰ Jadwal Shift — ${targetUser.user_name}` : "⏰ Jadwal Shift Karyawan"}
+              {targetUser ? ` Jadwal Shift — ${targetUser.user_name}` : " Jadwal Shift Karyawan"}
             </p>
             <p className="text-xs text-white/70 mt-1">
               {targetUser
@@ -272,7 +272,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {c.has_custom && (
                           <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full">
-                            ✨ Custom
+                             Custom
                           </span>
                         )}
                         {isDirty && (
@@ -298,7 +298,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                             }`}
                           >
-                            {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
+                            {s === "PAGI" ? " Pagi" : " Sore"}
                           </button>
                         ))}
                       </div>
@@ -312,7 +312,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       {/* Buka */}
                       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                         <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-2 block">
-                          🟢 Buka Absen
+                          Buka Absen
                         </label>
                         <div className="flex items-center gap-1">
                           <input
@@ -339,7 +339,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       {/* Batas Tepat */}
                       <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                         <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-2 block">
-                          🟡 Batas Tepat
+                          Batas Tepat
                         </label>
                         <div className="flex items-center gap-1">
                           <input
@@ -366,7 +366,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       {/* Tutup */}
                       <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                         <label className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-2 block">
-                          🔴 Tutup Absen
+                           Tutup Absen
                         </label>
                         <div className="flex items-center gap-1">
                           <input
@@ -394,7 +394,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                     {/* Preview / Error */}
                     {valErr ? (
                       <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3 text-xs text-red-600 flex items-center gap-2">
-                        <span>⚠️</span>{valErr}
+                        <span></span>{valErr}
                       </div>
                     ) : (
                       <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3">
@@ -419,7 +419,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       >
                         {saving === c.user_id ? (
                           <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                        ) : "💾 Simpan Jadwal"}
+                        ) : " Simpan Jadwal"}
                       </button>
                       {c.has_custom && (
                         <button
@@ -455,7 +455,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                   onClick={() => { setFilterToUser("all"); setSearch(""); }}
                   className="h-9 px-4 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl text-xs font-semibold hover:bg-indigo-100 transition-all"
                 >
-                  👥 Lihat Semua
+                   Lihat Semua
                 </button>
               )}
               <button

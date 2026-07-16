@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { Medal, Trophy, Wrench, Moon, CheckCircle2, Hourglass } from "lucide-react";
 
 interface TeknisiRank {
   id: string;
@@ -54,7 +55,7 @@ const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-lg bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse ${className}`} />
 );
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL_COLORS = ["text-amber-400", "text-gray-400", "text-amber-600"];
 
 const STAT_CARDS = [
   { key: "antrian" as const,           label: "Antrian",        color: "text-yellow-700 bg-yellow-50 border-yellow-200",    dot: "bg-yellow-400",  href: "/dashboard/service/antrian" },
@@ -159,7 +160,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <span>⏳</span> Antrian Terlama
+              <Hourglass className="w-3.5 h-3.5 text-yellow-500" /> Antrian Terlama
             </h3>
             {totalAktif > 0 && (
               <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -181,7 +182,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               ))
             ) : !data?.terlamaAntrian?.length ? (
               <div className="py-8 text-center">
-                <p className="text-2xl mb-1">✅</p>
+                <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-300 mb-1" />
                 <p className="text-xs text-gray-400 font-medium">Tidak ada antrian</p>
               </div>
             ) : (
@@ -207,7 +208,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <span>🔧</span> Sedang Dikerjakan
+              <Wrench className="w-3.5 h-3.5 text-blue-500" /> Sedang Dikerjakan
             </h3>
             {canSeeFinancials && !loading && (data?.pendapatanHariIni ?? 0) > 0 && (
               <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
@@ -229,7 +230,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               ))
             ) : !data?.sedangDetail?.length ? (
               <div className="py-8 text-center">
-                <p className="text-2xl mb-1">💤</p>
+                <Moon className="w-8 h-8 mx-auto text-gray-300 mb-1" />
                 <p className="text-xs text-gray-400 font-medium">Tidak ada yang dikerjakan</p>
               </div>
             ) : (
@@ -267,11 +268,11 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
           </div>
         </div>
 
-        {/* ✅ Ranking Teknisi */}
+        {/*  Ranking Teknisi */}
         <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <span>🏆</span> Ranking Teknisi
+              <Trophy className="w-3.5 h-3.5 text-amber-500" /> Ranking Teknisi
             </h3>
             <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg">
               <button
@@ -311,7 +312,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               ))
             ) : rankList.length === 0 ? (
               <div className="py-6 text-center">
-                <p className="text-2xl mb-1">🔧</p>
+                <Wrench className="w-8 h-8 mx-auto text-gray-300 mb-1" />
                 <p className="text-xs text-gray-400 font-medium">
                   {rankTab === "today" ? "Belum ada yang selesai hari ini" : "Belum ada data"}
                 </p>
@@ -335,7 +336,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
                     <div className="flex items-center gap-2.5 mb-1.5">
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${badgeColor}`}>
                         {i < 3
-                          ? <span className="text-sm">{MEDALS[i]}</span>
+                          ? <Medal className={`w-4 h-4 ${MEDAL_COLORS[i]}`} />
                           : <span className="text-[10px]">{i + 1}</span>
                         }
                       </div>

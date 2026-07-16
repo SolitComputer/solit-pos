@@ -77,11 +77,11 @@ export const MISSION_STATUS_META: Record<
         icon: string;
     }
 > = {
-    PENDING: { label: "Audit", bg: "#f8fafc", text: "#475569", border: "#e2e8f0", icon: "🕒" },
-    IN_PROGRESS: { label: "On Progress", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", icon: "⚙️" },
-    SUBMITTED: { label: "Audit", bg: "#fffbeb", text: "#b45309", border: "#fde68a", icon: "🔍" },
-    APPROVED: { label: "Disetujui", bg: "#ecfdf5", text: "#059669", border: "#a7f3d0", icon: "✅" },
-    REJECTED: { label: "Ditolak", bg: "#fff1f2", text: "#be123c", border: "#fecdd3", icon: "❌" },
+    PENDING: { label: "Audit", bg: "#f8fafc", text: "#475569", border: "#e2e8f0", icon: "clock" },
+    IN_PROGRESS: { label: "On Progress", bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", icon: "settings" },
+    SUBMITTED: { label: "Audit", bg: "#fffbeb", text: "#b45309", border: "#fde68a", icon: "search" },
+    APPROVED: { label: "Disetujui", bg: "#ecfdf5", text: "#059669", border: "#a7f3d0", icon: "check" },
+    REJECTED: { label: "Ditolak", bg: "#fff1f2", text: "#be123c", border: "#fecdd3", icon: "x" },
 };
 
 export const MISSION_PRIORITY_META: Record<
@@ -99,21 +99,21 @@ export const MISSION_PRIORITY_META: Record<
         bg: "#f1f5f9",
         text: "#475569",
         border: "#e2e8f0",
-        icon: "⬇️",
+        icon: "arrow-down",
     },
     MEDIUM: {
         label: "Sedang",
         bg: "#eff6ff",
         text: "#1d4ed8",
         border: "#bfdbfe",
-        icon: "➡️",
+        icon: "arrow-right",
     },
     HIGH: {
         label: "Tinggi",
         bg: "#fff1f2",
         text: "#be123c",
         border: "#fecdd3",
-        icon: "🔥",
+        icon: "flame",
     },
 };
 

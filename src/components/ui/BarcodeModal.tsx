@@ -96,7 +96,9 @@ export default function BarcodeModal({ laptopId, laptopName, onClose }: BarcodeM
             </div>
           ) : units.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 0" }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
+              <div style={{ fontSize: 36, marginBottom: 12, display: "flex", justifyContent: "center" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+              </div>
               <p style={{ color: "#374151", fontSize: 14, fontWeight: 600, margin: 0 }}>
                 Tidak ada unit tersedia
               </p>
@@ -168,7 +170,7 @@ function BarcodeCard({ unit, laptopName }: { unit: UnitBarcode; laptopName: stri
     drawBarcode(canvasRef.current, unit.serial_number);
   }, [unit.serial_number]);
 
-  // ✅ NEW: Render kartu lengkap ke canvas baru untuk download
+  //  NEW: Render kartu lengkap ke canvas baru untuk download
   const generateFullBarcodeCanvas = (): HTMLCanvasElement => {
     const barcodeCanvas = canvasRef.current!;
     const grade = GRADE_COLOR[unit.grade] || GRADE_COLOR.A;

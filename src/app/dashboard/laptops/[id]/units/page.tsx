@@ -405,11 +405,11 @@ export default function UnitsPage() {
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {[
-                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: "📦" },
-                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: "✅" },
-                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: "⏳" },
-                            { label: "Service", value: counts.service, color: "text-blue-600", icon: "🔧" },
-                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: "💰" },
+                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: "" },
+                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: "" },
+                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: "" },
+                            { label: "Service", value: counts.service, color: "text-blue-600", icon: "" },
+                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: "" },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                                 <div className="flex items-center justify-between">
@@ -548,7 +548,7 @@ export default function UnitsPage() {
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-12 text-center">
-                            <div className="text-3xl mb-2 opacity-50">📦</div>
+                            <div className="text-3xl mb-2 opacity-50"></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
                                 {hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL"

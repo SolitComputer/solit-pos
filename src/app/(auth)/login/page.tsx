@@ -29,7 +29,7 @@ function LoginInner() {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
 
-  // ✅ Kalau ada ?reason=force_logout atau session_expired,
+  //  Kalau ada ?reason=force_logout atau session_expired,
   // clear error state supaya tidak bentrok dengan banner
   useEffect(() => {
     if (loginReason) setError("");
@@ -168,10 +168,10 @@ function LoginInner() {
           {/* ── LOGIN STAGE ── */}
           {stage === "login" && (
             <>
-              {/* ✅ Banner force logout — muncul ketika di-redirect dari middleware */}
+              {/*  Banner force logout — muncul ketika di-redirect dari middleware */}
               {loginReason === "force_logout" && (
                 <div className="mb-5 px-4 py-3 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start gap-3">
-                  <span className="text-lg flex-shrink-0">🚪</span>
+                  <span className="text-lg flex-shrink-0"></span>
                   <p className="text-orange-300 text-sm leading-relaxed">
                     Sesi kamu telah diakhiri oleh admin.
                     Silakan login kembali untuk melanjutkan.
@@ -179,10 +179,10 @@ function LoginInner() {
                 </div>
               )}
 
-              {/* ✅ Banner session expired — auto logout jam 03:00 WIB */}
+              {/*  Banner session expired — auto logout jam 03:00 WIB */}
               {loginReason === "session_expired" && (
                 <div className="mb-5 px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3">
-                  <span className="text-lg flex-shrink-0">⏰</span>
+                  <span className="text-lg flex-shrink-0"></span>
                   <p className="text-blue-300 text-sm leading-relaxed">
                     Sesi kamu telah berakhir otomatis.
                     Silakan login kembali.

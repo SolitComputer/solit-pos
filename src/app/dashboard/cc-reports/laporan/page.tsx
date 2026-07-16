@@ -168,7 +168,7 @@ export default function CCLaporanPage() {
                 />
               </div>
 
-              {/* ✅ Brand tujuan konten */}
+              {/*  Brand tujuan konten */}
               <div className="sm:w-44">
                 <label className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
                   Untuk Brand
@@ -369,7 +369,7 @@ export default function CCLaporanPage() {
 function Dot({ done }: { done: boolean }) {
   return done ? (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-600">
-      ✓
+      
     </span>
   ) : (
     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-50 text-xs font-black text-gray-300">

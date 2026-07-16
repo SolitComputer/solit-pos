@@ -102,8 +102,8 @@ function getItemProgress(items: TodoItem[] | undefined): number | null {
 
 function EmptyState({ filter }: { filter: FilterType }) {
     const messages: Record<FilterType, { icon: string; title: string; desc: string }> = {
-        all: { icon: "✦", title: "Belum ada tugas", desc: "Tambah tugas pertamamu sekarang" },
-        active: { icon: "✓", title: "Semua tugas selesai!", desc: "Tidak ada tugas yang tertunda" },
+        all: { icon: "", title: "Belum ada tugas", desc: "Tambah tugas pertamamu sekarang" },
+        active: { icon: "", title: "Semua tugas selesai!", desc: "Tidak ada tugas yang tertunda" },
         done: { icon: "◎", title: "Belum ada tugas selesai", desc: "Selesaikan tugas dan centang di sini" },
     };
     const { icon, title, desc } = messages[filter];
@@ -230,9 +230,9 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                                 onChange={(e) => setPriority(e.target.value as Priority)}
                                 className="w-full px-4 py-3 text-sm border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-gray-50/50 cursor-pointer"
                             >
-                                <option value="high">🔴 Tinggi</option>
-                                <option value="medium">🟡 Sedang</option>
-                                <option value="low">🔵 Rendah</option>
+                                <option value="high">Tinggi</option>
+                                <option value="medium">Sedang</option>
+                                <option value="low">Rendah</option>
                             </select>
                         </div>
                         <div>
@@ -1279,9 +1279,9 @@ export default function TodosClient() {
                                 className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-white text-gray-600 cursor-pointer"
                             >
                                 <option value="all">Semua Prioritas</option>
-                                <option value="high">🔴 Tinggi</option>
-                                <option value="medium">🟡 Sedang</option>
-                                <option value="low">🔵 Rendah</option>
+                                <option value="high">Tinggi</option>
+                                <option value="medium">Sedang</option>
+                                <option value="low">Rendah</option>
                             </select>
 
                             {doneTodos.length > 0 && (

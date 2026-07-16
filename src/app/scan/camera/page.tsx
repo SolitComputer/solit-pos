@@ -60,7 +60,7 @@ export default function CameraScanPage() {
 
             if (!data.success) {
                 setDebug(
-                    `❌ API GAGAL (HTTP ${res.status})\n` +
+                    ` API GAGAL (HTTP ${res.status})\n` +
                     `SN dikirim: "${sn}"\n` +
                     `Pesan: ${data.message || "-"}`
                 );
@@ -69,10 +69,10 @@ export default function CameraScanPage() {
             }
 
             // Sukses — tampilkan type dulu biar keliatan LAPTOP vs ACCESSORY
-            setDebug(`✅ KETEMU — type = ${data.data?.type ?? "(kosong!)"} → redirect...`);
+            setDebug(` KETEMU — type = ${data.data?.type ?? "(kosong!)"} → redirect...`);
             router.push(`/scan/${encodeURIComponent(sn)}`);
         } catch (e) {
-            setDebug("❌ Gagal fetch API: " + String(e));
+            setDebug(" Gagal fetch API: " + String(e));
             setLoading(false);
         }
     };
@@ -116,7 +116,7 @@ export default function CameraScanPage() {
                         onClick={rescan}
                         className="mt-4 w-full h-11 rounded-xl bg-white/10 border border-white/15 text-sm font-semibold"
                     >
-                        🔄 Scan Ulang
+                         Scan Ulang
                     </button>
                 )}
             </div>

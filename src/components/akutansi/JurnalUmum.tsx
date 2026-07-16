@@ -2,6 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Inbox, X } from "lucide-react";
 import {
     ACCOUNTS,
     ACCOUNT_TYPE_LABEL,
@@ -310,7 +311,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             ) : filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="py-16 text-center">
-                                        <div className="text-4xl mb-3 opacity-40">📒</div>
+                                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
                                         <p className="text-sm text-gray-500 font-medium">Belum ada jurnal di periode ini</p>
                                         <p className="text-xs text-gray-400 mt-1">
                                             Konfirmasi data pending di atas, atau buat jurnal manual.

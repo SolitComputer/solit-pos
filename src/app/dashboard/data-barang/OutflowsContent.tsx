@@ -121,7 +121,7 @@ export default function OutflowsContent() {
             setRows(prev =>
                 prev.map(r => r.id === id ? { ...r, ...json.data } : r)
             );
-            toast.success(json.data.is_audited ? "Ditandai sudah diaudit ✓" : "Audit dibatalkan");
+            toast.success(json.data.is_audited ? "Ditandai sudah diaudit " : "Audit dibatalkan");
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update audit");
         } finally { setAuditingId(null); }
@@ -555,7 +555,7 @@ function OutflowFormModal({
                         )}
                         {selected && (
                             <p className="mt-1 text-[11px] text-emerald-600 font-medium">
-                                ✓ Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
+                                 Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
                             </p>
                         )}
                     </div>

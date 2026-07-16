@@ -16,6 +16,7 @@ import { supabase } from "@/services/supabase";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import ReassignModal from "@/components/preparation/ReassignModal";
 import ManualStatusModal from "@/components/preparation/ManualStatusModal";
+import { CheckCircle2, FileText, Clock, Inbox, AlertCircle } from "lucide-react";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
@@ -97,7 +98,7 @@ function AddressDisplay({ address, className }: { address: string; className?: s
                 onClick={(e) => e.stopPropagation()
                 }
             >
-                🗺️ Buka Maps →
+                 Buka Maps →
             </a >
         );
     }
@@ -176,9 +177,9 @@ function DispatchModal({ order, onClose, onDispatched }: {
     const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition";
 
     const OPTIONS = [
-        { value: "DIAMBIL_CUSTOMER", icon: "🧍", title: "Langsung Diambil Customer", desc: "Customer ambil ke toko, langsung selesai" },
-        { value: "PENGANTARAN", icon: "🛵", title: "Diantar Role Pengantaran", desc: "Pengantar dapat notif tugas & harus menyetujui dulu" },
-        { value: "KURIR", icon: "📦", title: "Diantar Kurir", desc: "Jasa kurir pihak ketiga (JNE, J&T, dll)" },
+        { value: "DIAMBIL_CUSTOMER", icon: "", title: "Langsung Diambil Customer", desc: "Customer ambil ke toko, langsung selesai" },
+        { value: "PENGANTARAN", icon: "", title: "Diantar Role Pengantaran", desc: "Pengantar dapat notif tugas & harus menyetujui dulu" },
+        { value: "KURIR", icon: "", title: "Diantar Kurir", desc: "Jasa kurir pihak ketiga (JNE, J&T, dll)" },
     ] as const;
 
     return (
@@ -186,7 +187,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
                 <div className="bg-orange-500 px-5 py-4 flex-shrink-0">
-                    <p className="font-bold text-white text-sm">📦 Barang Siap Dikirim</p>
+                    <p className="font-bold text-white text-sm"> Barang Siap Dikirim</p>
                     <p className="text-xs text-orange-100 mt-0.5">Pilih cara barang sampai ke customer</p>
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2.5">
@@ -223,7 +224,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                                     <p className={`text-sm font-bold truncate ${driverId === d.id ? "text-violet-800" : "text-gray-700"}`}>{d.name}</p>
                                                     <p className="text-[10px] text-gray-400">{d.role}</p>
                                                 </div>
-                                                {driverId === d.id && <span className="text-violet-600 flex-shrink-0">✓</span>}
+                                                {driverId === d.id && <CheckCircle2 className="text-violet-600 w-5 h-5 flex-shrink-0" />}
                                             </button>
                                         ))}
                                     </div>
@@ -238,7 +239,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     className={inputCls}
                                 />
                                 <p className="text-[11px] text-violet-500 mt-1">
-                                    💡 Bisa isi alamat biasa atau paste link Google Maps / Waze
+                                     Bisa isi alamat biasa atau paste link Google Maps / Waze
                                 </p>
                             </div>
                             <div>
@@ -246,11 +247,11 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                 <div className="grid grid-cols-2 gap-2">
                                     <button type="button" onClick={() => setSchedule("TODAY")}
                                         className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TODAY" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
-                                        🚀 Antar Hari Ini
+                                         Antar Hari Ini
                                     </button>
                                     <button type="button" onClick={() => setSchedule("TOMORROW")}
                                         className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TOMORROW" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
-                                        📅 Antar Besok
+                                         Antar Besok
                                     </button>
                                 </div>
                                 <p className="text-[11px] text-violet-500 mt-1">
@@ -267,10 +268,10 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 text-[11px] text-blue-600 underline mt-1"
                                 >
-                                    🗺️ Preview Maps →
+                                     Preview Maps →
                                 </a>
                             )}
-                            <p className="text-[11px] text-violet-600">📲 Pengantar yang dipilih akan menerima notifikasi dan harus menyetujui tugas sebelum mulai antar.</p>
+                            <p className="text-[11px] text-violet-600"> Pengantar yang dipilih akan menerima notifikasi dan harus menyetujui tugas sebelum mulai antar.</p>
                         </div>
                     )}
 
@@ -327,7 +328,7 @@ function DoneModal({ order, onClose, onDone }: {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-emerald-600 px-5 py-4">
-                    <p className="font-bold text-white text-sm">✅ Selesai Pengecekan</p>
+                    <p className="font-bold text-white text-sm"> Selesai Pengecekan</p>
                     <p className="text-xs text-emerald-100 mt-0.5">Semua unit sudah dicek. Konfirmasi ke sales untuk pilih metode pengiriman.</p>
                 </div>
                 <div className="px-5 py-4 space-y-3">
@@ -346,7 +347,7 @@ function DoneModal({ order, onClose, onDone }: {
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
                     <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
-                        {saving ? "Menyimpan..." : "✅ Tandai Siap Kirim"}
+                        {saving ? "Menyimpan..." : " Tandai Siap Kirim"}
                     </button>
                 </div>
             </div>
@@ -383,7 +384,7 @@ function CancelModal({ order, onClose, onCancelled }: {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-red-600 px-5 py-4">
-                    <p className="font-bold text-white text-sm">🗑️ Batalkan Penyiapan</p>
+                    <p className="font-bold text-white text-sm"> Batalkan Penyiapan</p>
                     <p className="text-xs text-red-100 mt-0.5">
                         Pesanan {order.order_number} akan dibatalkan permanen dan tidak bisa dikembalikan.
                     </p>
@@ -575,7 +576,7 @@ export default function PreparationDetailPage() {
         const ok = await confirm({
             title: "Setujui tugas antar ini?",
             message: "Setelah setuju, kamu bertugas mengantar pesanan ini dan tracking GPS akan aktif.",
-            variant: "success", confirmText: "✅ Ya, Setuju",
+            variant: "success", confirmText: " Ya, Setuju",
         });
         if (!ok) return;
         setActionLoading(true);
@@ -763,7 +764,7 @@ export default function PreparationDetailPage() {
                                     </span>
                                 </div>
                                 <h1 className="text-lg font-black text-gray-900">{order.customer_name}</h1>
-                                {order.customer_phone && <p className="text-sm text-gray-500">📱 {order.customer_phone}</p>}
+                                {order.customer_phone && <p className="text-sm text-gray-500"> {order.customer_phone}</p>}
                                 {order.delivery_address && (
                                     <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-3 mt-2">
                                         <p className="text-[10px] text-gray-400 font-semibold uppercase mb-0.5">Tujuan</p>
@@ -772,7 +773,7 @@ export default function PreparationDetailPage() {
                                 )}
                                 {order.scheduled_delivery_date && order.status !== "SELESAI" && order.status !== "DIBATALKAN" && (
                                     <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 mt-2 inline-flex items-center gap-2">
-                                        <span>📅</span>
+                                        <FileText className="w-4 h-4 inline" />
                                         <div>
                                             <p className="text-[10px] text-indigo-400 font-semibold uppercase">Jadwal Antar</p>
                                             <p className="text-xs font-bold text-indigo-700">{fmtDate(order.scheduled_delivery_date)}</p>
@@ -816,7 +817,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.created_at, order.received_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg">
-                                            ⏳ Tunggu diterima: <span className="font-black">{dur}</span>
+                                             Tunggu diterima: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -826,7 +827,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.received_at, order.done_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg">
-                                            📦 Durasi penyiapan: <span className="font-black">{dur}</span>
+                                             Durasi penyiapan: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -836,7 +837,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.done_at, order.dispatched_at ?? null);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg">
-                                            🚀 Siap → dispatch: <span className="font-black">{dur}</span>
+                                             Siap → dispatch: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -846,7 +847,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.created_at, order.done_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                                            ✅ Total hingga siap: <span className="font-black">{dur}</span>
+                                             Total hingga siap: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -856,8 +857,8 @@ export default function PreparationDetailPage() {
 
                         {(order.delivery_distance_m || order.delivery_duration_s) && (
                             <div className="mt-3 flex gap-2">
-                                {order.delivery_distance_m != null && <span className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg">📏 {(order.delivery_distance_m / 1000).toFixed(1)} km</span>}
-                                {order.delivery_duration_s != null && <span className="text-[11px] font-bold bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-lg">⏱️ {Math.round(order.delivery_duration_s / 60)} mnt</span>}
+                                {order.delivery_distance_m != null && <span className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg"> {(order.delivery_distance_m / 1000).toFixed(1)} km</span>}
+                                {order.delivery_duration_s != null && <span className="text-[11px] font-bold bg-violet-50 text-violet-700 border border-violet-100 px-2.5 py-1 rounded-lg">{Math.round(order.delivery_duration_s / 60)} mnt</span>}
                             </div>
                         )}
 
@@ -881,7 +882,7 @@ export default function PreparationDetailPage() {
                     {order.status === "SIAP_KIRIM" && (
                         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
                             <div className="flex items-center gap-3 mb-3">
-                                <span className="text-2xl">📦</span>
+                                <Clock className="w-6 h-6 inline" />
                                 <div>
                                     <p className="text-sm font-bold text-orange-800">Barang sudah disiapkan oleh penyedia!</p>
                                     <p className="text-xs text-orange-600 mt-0.5">
@@ -899,7 +900,7 @@ export default function PreparationDetailPage() {
                             {canDispatch && (
                                 <button onClick={() => setShowDispatch(true)}
                                     className="w-full h-11 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition">
-                                    📮 Pilih Metode Pengiriman
+                                     Pilih Metode Pengiriman
                                 </button>
                             )}
                         </div>
@@ -909,7 +910,7 @@ export default function PreparationDetailPage() {
                     {order.status === "MENUNGGU_PENGANTAR" && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
                             <div className="flex items-center gap-3 mb-3">
-                                <span className="text-2xl">🛵</span>
+                                <Clock className="w-6 h-6 inline" />
                                 <div>
                                     <p className="text-sm font-bold text-yellow-800">
                                         {isAssignedDriver ? "Kamu ditugaskan mengantar pesanan ini" : "Menunggu pengantar menyetujui tugas"}
@@ -938,7 +939,7 @@ export default function PreparationDetailPage() {
                             {isAssignedDriver && (
                                 <button onClick={handleAccept} disabled={actionLoading}
                                     className="w-full h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                    {actionLoading ? "..." : "✅ Setuju & Terima Tugas"}
+                                    {actionLoading ? "..." : " Setuju & Terima Tugas"}
                                 </button>
                             )}
                         </div>
@@ -974,7 +975,7 @@ export default function PreparationDetailPage() {
                         {order.status === "DIPROSES" && canDone && (
                             <button onClick={() => setShowDone(true)} disabled={!allChecked}
                                 className="w-full mt-4 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                                {allChecked ? "✅ Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${order.preparation_items.length})`}
+                                {allChecked ? " Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${order.preparation_items.length})`}
                             </button>
                         )}
                     </div>
@@ -983,15 +984,15 @@ export default function PreparationDetailPage() {
                     {(isDeliveringGo || isReturning) && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                             <div className="flex items-center justify-between mb-3 gap-2">
-                                <h2 className="text-sm font-bold text-gray-800">🛵 Live Tracking {isReturning ? "Pulang" : "Pengantaran"}</h2>
+                                <h2 className="text-sm font-bold text-gray-800"> Live Tracking {isReturning ? "Pulang" : "Pengantaran"}</h2>
                                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                     {isAssignedDriver ? (
                                         <>
                                             {tracker.bufferedCount > 0 && (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">📵 {tracker.bufferedCount} tertahan</span>
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full"> {tracker.bufferedCount} tertahan</span>
                                             )}
                                             {tracker.wakeLockActive && (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">🔆 Layar aktif</span>
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full"> Layar aktif</span>
                                             )}
                                             <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${tracker.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : tracker.status === "NO_PERMISSION" ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${tracker.status === "ACTIVE" ? "bg-emerald-500 animate-pulse" : tracker.status === "NO_PERMISSION" ? "bg-red-500" : "bg-amber-500"}`} />
@@ -1065,19 +1066,19 @@ export default function PreparationDetailPage() {
                                                 setShowStart(true);
                                             }}
                                             className="w-full h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
-                                            🎯 Atur Tujuan & Mulai Antar
+                                             Atur Tujuan & Mulai Antar
                                         </button>
                                     )}
                                     {isDeliveringGo && order.delivery_started_at && (
                                         <div className="flex gap-2">
-                                            {!tracker.isTracking && <button onClick={tracker.startWatch} className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition">📍 Lanjut Kirim Lokasi</button>}                                            <button onClick={completeDelivery} disabled={actionLoading} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                                {actionLoading ? "..." : "✅ Sampai ke Customer"}
+                                            {!tracker.isTracking && <button onClick={tracker.startWatch} className="flex-1 h-11 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition"> Lanjut Kirim Lokasi</button>}                                            <button onClick={completeDelivery} disabled={actionLoading} className="flex-1 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+                                                {actionLoading ? "..." : " Sampai ke Customer"}
                                             </button>
                                         </div>
                                     )}
                                     {isReturning && (
                                         <button onClick={() => doReturnAction("RETURN_COMPLETE")} disabled={actionLoading} className="w-full h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                            {actionLoading ? "..." : "🏠 Sudah Sampai Toko"}
+                                            {actionLoading ? "..." : " Sudah Sampai Toko"}
                                         </button>
                                     )}
                                 </div>
@@ -1088,7 +1089,7 @@ export default function PreparationDetailPage() {
                     {/* ── KURIR ── */}
                     {order.status === "DIKIRIM" && order.delivery_method === "KURIR" && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                            <h2 className="text-sm font-bold text-gray-800 mb-3">📦 Pengiriman via Kurir</h2>
+                            <h2 className="text-sm font-bold text-gray-800 mb-3"> Pengiriman via Kurir</h2>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between"><span className="text-gray-500">Jasa Kurir</span><span className="font-bold">{order.courier_service || "—"}</span></div>
                                 <div className="flex justify-between"><span className="text-gray-500">No. Resi</span><span className="font-mono font-bold">{order.courier_tracking_number || "—"}</span></div>
@@ -1096,7 +1097,7 @@ export default function PreparationDetailPage() {
                             </div>
                             {canDeliver && (
                                 <button onClick={completeDelivery} disabled={actionLoading} className="w-full mt-4 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50">
-                                    {actionLoading ? "..." : "✅ Tandai Sudah Terkirim"}
+                                    {actionLoading ? "..." : " Tandai Sudah Terkirim"}
                                 </button>
                             )}
                         </div>
@@ -1105,7 +1106,7 @@ export default function PreparationDetailPage() {
                     {/* ── SELESAI ── */}
                     {order.status === "SELESAI" && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
-                            <div className="text-3xl mb-2">🎉</div>
+                            <div className="flex justify-center mb-2"><Inbox className="w-8 h-8 opacity-50" /></div>
                             <p className="text-sm font-bold text-emerald-800">Barang sudah sampai ke customer</p>
                             <p className="text-xs text-emerald-600 mt-1">
                                 {order.delivery_method === "DIAMBIL_CUSTOMER" ? "Diambil langsung oleh customer"
@@ -1118,7 +1119,7 @@ export default function PreparationDetailPage() {
                                 <div className="mt-4">
                                     {!order.return_started_at
                                         ? <button onClick={() => doReturnAction("RETURN_START")} disabled={actionLoading} className="inline-flex items-center gap-2 h-10 px-5 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition disabled:opacity-50">
-                                            {actionLoading ? "..." : "🔙 Mulai Perjalanan Pulang"}
+                                            {actionLoading ? "..." : " Mulai Perjalanan Pulang"}
                                         </button>
                                         : <span className="text-xs text-orange-600 font-semibold">Sedang dalam perjalanan pulang</span>}
                                 </div>
@@ -1133,10 +1134,10 @@ export default function PreparationDetailPage() {
                             <div className="mt-4">
                                 {order.transaction_invoice
                                     ? <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
-                                        🧾 Lihat Transaksi →
+                                         Lihat Transaksi →
                                     </Link>
                                     : <Link href={`/payment/create?prep_id=${order.id}`} className="inline-flex items-center gap-2 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
-                                        💳 Lanjut ke Pembayaran →
+                                         Lanjut ke Pembayaran →
                                     </Link>}
                             </div>
                         </div>
@@ -1145,7 +1146,7 @@ export default function PreparationDetailPage() {
                     {/* ── DIBATALKAN (item 4) ── */}
                     {order.status === "DIBATALKAN" && (
                         <div className="bg-gray-100 border border-gray-200 rounded-2xl p-5 text-center">
-                            <div className="text-3xl mb-2">🚫</div>
+                            <div className="flex justify-center mb-2"><Inbox className="w-8 h-8 opacity-50" /></div>
                             <p className="text-sm font-bold text-gray-700">Pesanan ini dibatalkan</p>
                             {order.cancelled_by_name && (
                                 <p className="text-xs text-gray-500 mt-1">
@@ -1163,7 +1164,7 @@ export default function PreparationDetailPage() {
                     {canForceComplete && order.delivery_method === "PENGANTARAN" && (
                         <div className="bg-[#1a1a2e] rounded-2xl p-4 space-y-3">
                             <div className="flex items-center gap-3">
-                                <span className="text-xl">🛠️</span>
+                                <AlertCircle className="w-5 h-5 inline text-white" />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-bold text-white">Override Supervisor</p>
                                     <p className="text-[11px] text-gray-300 mt-0.5">Khusus Admin & Kepala Sales — pindah pengantar atau ubah status manual.</p>
@@ -1173,20 +1174,21 @@ export default function PreparationDetailPage() {
                                 {(order.status === "DIKIRIM" || order.status === "MENUNGGU_PENGANTAR") && (
                                     <button onClick={forceComplete} disabled={actionLoading}
                                         className="h-9 px-4 bg-emerald-500 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition disabled:opacity-50">
-                                        {actionLoading ? "..." : "✅ Selesaikan"}
+                                        {actionLoading ? "..." : "Selesaikan"}
                                     </button>
                                 )}
                                 {(order.status === "MENUNGGU_PENGANTAR" || order.status === "DIKIRIM") && (
                                     <button onClick={() => setShowReassign(true)}
                                         className="h-9 px-4 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition">
-                                        🔄 Pindah Pengantar
+                                        Pindah Pengantar
                                     </button>
                                 )}
                                 <button onClick={() => setShowManualStatus(true)}
                                     className="h-9 px-4 bg-gray-600 text-white rounded-xl text-xs font-bold hover:bg-gray-700 transition">
-                                    🛠️ Ubah Status Manual
+                                    Ubah Status Manual
                                 </button>
                             </div>
+                        </div>
                         </div>
                     )}
 

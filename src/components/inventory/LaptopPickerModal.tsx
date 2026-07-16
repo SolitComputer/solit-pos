@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Inbox } from "lucide-react";
 
 export interface PickableLaptop {
     id: string;
@@ -112,7 +113,7 @@ export default function LaptopPickerModal({
                         ))
                     ) : filtered.length === 0 ? (
                         <div className="text-center py-10">
-                            <div className="text-3xl mb-2 opacity-50">💻</div>
+                            <div className="flex justify-center mb-2 opacity-50"><Inbox className="w-8 h-8" /></div>
                             <p className="text-gray-500 text-sm font-medium">Laptop tidak ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">Coba kata kunci lain</p>
                         </div>

@@ -504,7 +504,7 @@ export default function AntrianPage() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
     setPriceDialog(PRICE_DIALOG_CLOSED);
-    showToast(priceDialog.action === "mulai" ? "✅ Pengerjaan dimulai!" : "✅ Ditandai menunggu sparepart.");
+    showToast(priceDialog.action === "mulai" ? " Pengerjaan dimulai!" : " Ditandai menunggu sparepart.");
     refresh();
   };
 
@@ -528,7 +528,7 @@ export default function AntrianPage() {
     const json = await res.json();
     if (!json.success) throw new Error(json.message || "Gagal memperbarui status");
     setSparepartDialog(SPAREPART_DIALOG_CLOSED);
-    showToast("🎉 Ditandai menunggu sparepart.");
+    showToast(" Ditandai menunggu sparepart.");
     refresh();
   };
 
@@ -543,8 +543,8 @@ export default function AntrianPage() {
     setDialog(DIALOG_CLOSED);
     showToast(
       dialog.action === "done"
-        ? "✅ Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
-        : "✅ Status berhasil diperbarui!"
+        ? " Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
+        : " Status berhasil diperbarui!"
     );
     refresh();
   };
@@ -826,7 +826,7 @@ export default function AntrianPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/40 px-5 py-3">
                   <p className="text-xs font-medium text-gray-400">
-                    💡 Klik baris untuk melihat detail lengkap
+                     Klik baris untuk melihat detail lengkap
                   </p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-[#1a1a2e]">{orders.length}</span> order
@@ -910,7 +910,7 @@ export default function AntrianPage() {
                 })}
 
                 <div className="flex items-center justify-between px-1 pt-1">
-                  <p className="text-xs font-medium text-gray-400">💡 Ketuk kartu untuk detail</p>
+                  <p className="text-xs font-medium text-gray-400"> Ketuk kartu untuk detail</p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-[#1a1a2e]">{orders.length}</span> order
                   </p>
@@ -924,7 +924,7 @@ export default function AntrianPage() {
         <ServiceFormModal
           open={formOpen}
           onClose={() => setFormOpen(false)}
-          onSuccess={() => { showToast("✅ Formulir berhasil dibuat!"); refresh(); }}
+          onSuccess={() => { showToast(" Formulir berhasil dibuat!"); refresh(); }}
         />
 
         <ServiceConfirmDialog
