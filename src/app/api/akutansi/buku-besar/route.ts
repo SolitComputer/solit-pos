@@ -47,9 +47,9 @@ export const GET = withAuth(async (req) => {
   if (!accountCode || !accRow)
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
 
-  const resolvedName = accRow.name;
-
   try {
+    // ── 0) Saldo awal MANUAL (one-time input, bisa dikoreksi) — nilai dasar sebelum periode manapun ──
+    // Rumus normal balance: DEBIT = +nominal, KREDIT = -nominal.
     const { data: openingRow, error: openingErr } = await supabase
       .from("journal_opening_balances")
       .select("side, nominal")
@@ -89,7 +89,6 @@ export const GET = withAuth(async (req) => {
       }, 0);
     }
 
-    // Saldo awal periode berjalan = saldo awal manual + akumulasi mutasi periode-periode sebelumnya
     const saldoAwal = openingSigned + mutasiSebelumPeriode;
 
     // ── 2) Semua entry di periode berjalan ──
@@ -117,7 +116,6 @@ export const GET = withAuth(async (req) => {
       allLines = (linesData ?? []) as LineRow[];
     }
 
-    // Map: entry_id -> daftar kode akun lawan (selain akun yang sedang dibuka)
     const counterMap = new Map<string, string[]>();
     for (const l of allLines) {
       if (l.account_code === accountCode) continue;
@@ -126,7 +124,6 @@ export const GET = withAuth(async (req) => {
       counterMap.set(l.entry_id, arr);
     }
 
-    // ── 4) Baris milik akun yang sedang dibuka, urut tanggal lalu insert order ──
     const ownLines = allLines
       .filter((l) => l.account_code === accountCode)
       .sort((a, b) => {
@@ -162,7 +159,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({
       success: true,
       data: {
-        account: { code: accountCode, name: resolvedName },
+        account: { code: accountCode, name: accRow.name },
         saldo_awal: saldoAwal,
         opening_balance: openingRow
           ? { side: openingRow.side, nominal: Number(openingRow.nominal) }

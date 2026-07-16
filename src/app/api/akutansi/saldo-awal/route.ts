@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidAccount } from "@/lib/accounting";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -13,17 +12,27 @@ function getAdmin(): SupabaseClient {
   );
 }
 
+async function accountExists(supabase: SupabaseClient, code: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("chart_of_accounts")
+    .select("code")
+    .eq("code", code)
+    .maybeSingle();
+  return !!data;
+}
+
 // ── GET /api/akutansi/saldo-awal?account_code=110 ────────────────────────────
 // Cek apakah akun ini sudah punya saldo awal manual atau belum.
 export const GET = withAuth(async (req) => {
   const accountCode = new URL(req.url).searchParams.get("account_code") ?? "";
-  if (!accountCode || !isValidAccount(accountCode))
+  const supabase = getAdmin();
+
+  if (!accountCode || !(await accountExists(supabase, accountCode)))
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
 
-  const supabase = getAdmin();
   const { data, error } = await supabase
     .from("journal_opening_balances")
-    .select("account_code, side, nominal, created_at, created_by_user:users(id, name)")
+    .select("account_code, side, nominal, created_at, created_by_user:users!journal_opening_balances_created_by_fkey(id, name)")
     .eq("account_code", accountCode)
     .maybeSingle();
 
@@ -35,7 +44,7 @@ export const GET = withAuth(async (req) => {
   return NextResponse.json({ success: true, data: data ?? null });
 }, AKUNTANSI_MANAGE_ROLES);
 
-// ── POST /api/akutansi/saldo-awal — input saldo awal, HANYA BOLEH SEKALI ────
+// ── POST /api/akutansi/saldo-awal — input saldo awal PERTAMA KALI ───────────
 // Rumus normal balance:
 //   sisi DEBIT ketemu baris DEBIT  -> +   |  sisi DEBIT ketemu baris KREDIT -> -
 //   sisi KREDIT ketemu baris DEBIT -> -   |  sisi KREDIT ketemu baris KREDIT -> +
@@ -49,14 +58,14 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     nominal: number;
   };
 
-  if (!account_code || !isValidAccount(account_code))
+  const supabase = getAdmin();
+
+  if (!account_code || !(await accountExists(supabase, account_code)))
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
   if (side !== "DEBIT" && side !== "KREDIT")
     return NextResponse.json({ success: false, message: "Sisi saldo harus DEBIT/KREDIT" }, { status: 400 });
   if (!Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
     return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
-
-  const supabase = getAdmin();
 
   const { data: existing, error: checkErr } = await supabase
     .from("journal_opening_balances")
@@ -71,7 +80,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
 
   if (existing) {
     return NextResponse.json(
-      { success: false, message: "Saldo awal akun ini sudah pernah diinput dan tidak bisa diubah lagi" },
+      { success: false, message: "Saldo awal akun ini sudah pernah diinput. Gunakan tombol Koreksi untuk mengubahnya." },
       { status: 409 }
     );
   }
@@ -94,7 +103,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       {
         success: false,
         message: isDuplicate
-          ? "Saldo awal akun ini sudah pernah diinput dan tidak bisa diubah lagi"
+          ? "Saldo awal akun ini sudah pernah diinput. Gunakan tombol Koreksi untuk mengubahnya."
           : insertErr.message,
       },
       { status: isDuplicate ? 409 : 500 }
@@ -104,6 +113,10 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   return NextResponse.json({ success: true, data: inserted }, { status: 201 });
 }, AKUNTANSI_MANAGE_ROLES);
 
+// ── PUT /api/akutansi/saldo-awal — KOREKSI saldo awal yang sudah ada ────────
+// Berbeda dari POST: PUT butuh row yang SUDAH ADA, dan menimpa nilai lama.
+// ⚠️ Ini mengubah saldo berjalan di seluruh periode setelahnya — dipakai
+// hanya untuk memperbaiki kesalahan input, bukan alur normal.
 export const PUT = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
   const { account_code, side, nominal } = body as {
@@ -112,14 +125,14 @@ export const PUT = withAuth(async (req, _ctx, user: any) => {
     nominal: number;
   };
 
-  if (!account_code || !isValidAccount(account_code))
+  const supabase = getAdmin();
+
+  if (!account_code || !(await accountExists(supabase, account_code)))
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
   if (side !== "DEBIT" && side !== "KREDIT")
     return NextResponse.json({ success: false, message: "Sisi saldo harus DEBIT/KREDIT" }, { status: 400 });
   if (!Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
     return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
-
-  const supabase = getAdmin();
 
   const { data: existing, error: checkErr } = await supabase
     .from("journal_opening_balances")
@@ -134,10 +147,12 @@ export const PUT = withAuth(async (req, _ctx, user: any) => {
 
   if (!existing) {
     return NextResponse.json(
-      { success: false, message: "Akun ini belum punya saldo awal — gunakan input pertama, bukan edit" },
+      { success: false, message: "Saldo awal akun ini belum pernah diinput. Gunakan tombol Set Saldo Awal." },
       { status: 404 }
     );
   }
+
+  const before = { side: existing.side, nominal: Number(existing.nominal) };
 
   const { data: updated, error: updateErr } = await supabase
     .from("journal_opening_balances")
@@ -148,13 +163,23 @@ export const PUT = withAuth(async (req, _ctx, user: any) => {
       updated_at: new Date().toISOString(),
     })
     .eq("account_code", account_code)
-    .select("account_code, side, nominal, created_at, updated_at")
+    .select("account_code, side, nominal, created_at")
     .single();
 
   if (updateErr) {
     console.error("[saldo-awal PUT update]", updateErr);
     return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
   }
+
+  // Catat koreksi ke audit log supaya ada jejak (siapa, kapan, dari-ke berapa)
+  await supabase.from("journal_audit_logs").insert({
+    entry_id: null,
+    period: null,
+    action: "EDIT",
+    before_data: { account_code, ...before },
+    after_data: { account_code, side, nominal: Number(nominal) },
+    changed_by: user.id,
+  });
 
   return NextResponse.json({ success: true, data: updated });
 }, AKUNTANSI_MANAGE_ROLES);

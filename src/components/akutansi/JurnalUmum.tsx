@@ -44,6 +44,7 @@ interface PendingDraft {
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW";
     source_id: string;
     tanggal: string;
+    sort_ts: string;
     keterangan: string;
     total: number;
     lines: DraftLine[];
@@ -90,11 +91,12 @@ export default function JurnalUmum({ period }: { period: string }) {
             const p = await pRes.json();
             setEntries(j.success ? j.data ?? [] : []);
 
+            // Data dari API sudah terurut deterministik (tanggal, lalu sort_ts).
+            // Sort ulang di sini cuma jaga-jaga kalau ada penggabungan data di masa depan —
+            // pakai sort_ts, BUKAN source_id, supaya urutannya sesuai waktu asli, bukan alfabetis.
             const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
-                const t = new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
-                if (t !== 0) return t;
-                if (a.source_type !== b.source_type) return a.source_type.localeCompare(b.source_type);
-                return a.source_id.localeCompare(b.source_id);
+                if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
+                return (a.sort_ts ?? "").localeCompare(b.sort_ts ?? "");
             });
             setPending(pendingSorted);
 
