@@ -1,3 +1,4 @@
+// capacitor.config.ts
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
@@ -5,16 +6,9 @@ const config: CapacitorConfig = {
   appName: "Solit POS",
   webDir: "capacitor-shell",
   server: {
-    // ✅ Ganti dengan domain Vercel production kamu
-    url: "https://solit-pos.vercel.app",
+    url: "https://solit-pos.store",
     androidScheme: "https",
     cleartext: false,
-  },
-  plugins: {
-    // ✅ Penting untuk Phase 2 (lihat catatan throttle di bawah):
-    // routing fetch lewat native HTTP + sinkron cookie auth
-    CapacitorHttp: { enabled: true },
-    CapacitorCookies: { enabled: true },
   },
 };
 
