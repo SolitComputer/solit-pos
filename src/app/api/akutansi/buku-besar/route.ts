@@ -94,14 +94,14 @@ export const GET = withAuth(async (req) => {
     // ── 2) Semua entry di periode berjalan ──
     const { data: periodEntries, error: entryErr } = await supabase
       .from("journal_entries")
-      .select("id, tanggal, keterangan, ref")
+      .select("id, tanggal, keterangan, ref, created_at")
       .eq("period", period)
       .order("tanggal", { ascending: true });
 
     if (entryErr) throw entryErr;
 
-    const entryMap = new Map<string, EntryRow>();
-    for (const e of (periodEntries ?? []) as EntryRow[]) entryMap.set(e.id, e);
+    const entryMap = new Map<string, EntryRow & { created_at: string }>();
+    for (const e of (periodEntries ?? []) as (EntryRow & { created_at: string })[]) entryMap.set(e.id, e);
     const periodEntryIds = Array.from(entryMap.keys());
 
     // ── 3) Semua baris jurnal di entry-entry tsb (untuk hitung Ref lawan akun) ──
@@ -131,7 +131,7 @@ export const GET = withAuth(async (req) => {
         const eb = entryMap.get(b.entry_id)!;
         const t = new Date(ea.tanggal).getTime() - new Date(eb.tanggal).getTime();
         if (t !== 0) return t;
-        return ea.id.localeCompare(eb.id);
+        return new Date(ea.created_at).getTime() - new Date(eb.created_at).getTime();
       });
 
     let running = saldoAwal;
