@@ -7,7 +7,7 @@ import type { UserRole } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const TAKE_FIELDS = [
-  "videographer", "talent", "location", "equipment",
+  "videographer", "talent", "location", "equipment", "device",
   "take_start", "take_end", "take_received_editor", "take_done",
 ] as const;
 const EDIT_FIELDS = [
@@ -22,6 +22,8 @@ const ALLOWED = new Set<string>([
   ...POSTING_FIELDS,
   "title",
   "brand",
+  "needs_revision",
+  "is_cancelled",
 ]);
 
 // GET satu konten
@@ -81,6 +83,24 @@ export async function PATCH(
       { success: false, error: "Brand tidak valid" },
       { status: 400 }
     );
+  }
+
+  if (patch.needs_revision === true) {
+    const { data: cur, error: curErr } = await supabaseAdmin
+      .from("cc_reports")
+      .select("edit_done")
+      .eq("id", id)
+      .single();
+
+    if (curErr || !cur) {
+      return NextResponse.json({ success: false, error: "Konten tidak ditemukan" }, { status: 404 });
+    }
+    if (!cur.edit_done) {
+      return NextResponse.json(
+        { success: false, error: "Tahap Editing belum pernah selesai — revisi belum bisa ditandai" },
+        { status: 400 }
+      );
+    }
   }
 
   if (patch.posting_done === true) {
