@@ -20,9 +20,9 @@ interface Props {
 type PickupType = "service" | "garansi";
 
 const METHOD_OPTIONS = [
-  { value: "CASH", label: "Cash / Tunai", icon: "💵" },
-  { value: "TRANSFER", label: "Transfer Bank", icon: "🏦" },
-  { value: "QRIS", label: "QRIS", icon: "📱" },
+  { value: "CASH", label: "Cash / Tunai", icon: "" },
+  { value: "TRANSFER", label: "Transfer Bank", icon: "" },
+  { value: "QRIS", label: "QRIS", icon: "" },
 ] as const;
 
 function fmtRupiah(n: number) {
@@ -305,7 +305,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
             />
           </div>
 
-          {/* ✅ Metode Pembayaran — HANYA tampil kalau Service, disembunyikan kalau Garansi */}
+          {/*  Metode Pembayaran — HANYA tampil kalau Service, disembunyikan kalau Garansi */}
           {!isGaransi && (
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</label>
@@ -406,7 +406,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-            ) : isGaransi ? "✓ Konfirmasi Klaim Garansi" : "✓ Konfirmasi Diambil"}
+            ) : isGaransi ? " Konfirmasi Klaim Garansi" : " Konfirmasi Diambil"}
           </button>
         </div>
       </div>

@@ -33,13 +33,13 @@ interface MinusUnit {
 
 // ─── Repair Status Config ─────────────────────────────────────────────────────
 const REPAIR_STATUS: Record<string, { label: string; badge: string; dot: string; emoji: string }> = {
-  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "🔄" },
-  NOT_STARTED: { label: "Belum Terpegang", badge: "bg-gray-100 text-gray-600 border-gray-200", dot: "bg-gray-400", emoji: "⏸️" },
-  GIVE_UP: { label: "Nyerah", badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", emoji: "🚫" },
-  DEAD: { label: "Mati Total", badge: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500", emoji: "💀" },
-  HARD_PARTS: { label: "Sparepart Susah", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", emoji: "🔍" },
-  DONE: { label: "Selesai", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "✅" },
-  OTHER: { label: "Lain-lain", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "📝" },
+  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
+  NOT_STARTED: { label: "Belum Terpegang", badge: "bg-gray-100 text-gray-600 border-gray-200", dot: "bg-gray-400", emoji: "" },
+  GIVE_UP: { label: "Nyerah", badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", emoji: "" },
+  DEAD: { label: "Mati Total", badge: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500", emoji: "" },
+  HARD_PARTS: { label: "Sparepart Susah", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", emoji: "" },
+  DONE: { label: "Selesai", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
+  OTHER: { label: "Lain-lain", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
 };
 
 const UNIT_STATUS: Record<string, { label: string; badge: string }> = {
@@ -487,10 +487,10 @@ function MinusContent() {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: "📦" },
-              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: "⏸️" },
-              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-gray-700", bar: "bg-gray-500", icon: "🔄" },
-              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-gray-700", bar: "bg-gray-500", icon: "✅" },
+              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: "" },
+              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: "" },
+              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-gray-700", bar: "bg-gray-500", icon: "" },
+              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-gray-700", bar: "bg-gray-500", icon: "" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden group hover:shadow-md transition-all duration-300">
                 <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${s.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
@@ -508,7 +508,7 @@ function MinusContent() {
           {/* Filter Panel */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <span>🔧</span> Status Perbaikan
+              <span></span> Status Perbaikan
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               <button onClick={() => setFilterRepair("ALL")}
@@ -534,9 +534,9 @@ function MinusContent() {
 
             <div className="flex gap-2 flex-wrap">
               {[
-                { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: "📋" },
-                { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: "🔧" },
-                { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: "⏳" },
+                { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: "" },
+                { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: "" },
+                { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: "" },
               ].map((opt) => (
                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
@@ -571,7 +571,7 @@ function MinusContent() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-              <div className="text-5xl mb-3">🔧</div>
+              <div className="text-5xl mb-3"></div>
               <p className="text-gray-500 font-semibold text-base">Tidak ada unit ditemukan</p>
               <p className="text-gray-400 text-sm mt-1">Coba ubah filter pencarian</p>
             </div>
@@ -623,7 +623,7 @@ function MinusContent() {
                               </span>
                             )}
                             {missingAnalisa && (
-                              <span className="block text-[10px] text-amber-600 mt-1 font-medium">⚠ perlu analisa</span>
+                              <span className="block text-[10px] text-amber-600 mt-1 font-medium"> perlu analisa</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
@@ -698,8 +698,8 @@ function MinusContent() {
             );
             setAlertMsg(
               updated.status === "SIAP_JUAL"
-                ? "Unit dipindahkan ke Siap Jual ✅"
-                : "Status perbaikan diperbarui ✅"
+                ? "Unit dipindahkan ke Siap Jual "
+                : "Status perbaikan diperbarui "
             );
           }}
         />

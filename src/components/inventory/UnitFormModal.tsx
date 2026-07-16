@@ -151,7 +151,7 @@ export default function UnitFormModal({
                                         window.open(`https://www.google.com/search?q=${encodeURIComponent(formData.serial_number + " laptop")}`, "_blank");
                                     }}
                                     className="px-3 h-9 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
-                                    🔍 Cek
+                                     Cek
                                 </button>
                             </div>
                         </div>

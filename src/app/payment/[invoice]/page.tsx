@@ -398,7 +398,7 @@ export default function EditTransactionPage() {
       }
       setTransaction(result.data);
       setHasChanges(false);
-      alert("✅ Transaksi berhasil diupdate");
+      alert(" Transaksi berhasil diupdate");
     } catch {
       alert("Terjadi kesalahan");
     } finally {
@@ -694,7 +694,7 @@ export default function EditTransactionPage() {
         <div className="form-card">
 
           {/* ─ Section: Pembeli ─ */}
-          <SectionHeader icon="👤" title="Data Pembeli" color="#EEF2FF" />
+          <SectionHeader icon="" title="Data Pembeli" color="#EEF2FF" />
 
           <div className="px-5 pt-1 pb-4">
             <label className="block text-xs font-medium text-gray-400 mb-2">
@@ -702,9 +702,9 @@ export default function EditTransactionPage() {
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: "UMUM", label: "Umum", icon: "👤" },
-                { value: "RESELLER", label: "Reseller", icon: "🔄" },
-                { value: "MITRA", label: "Mitra", icon: "🤝" },
+                { value: "UMUM", label: "Umum", icon: "" },
+                { value: "RESELLER", label: "Reseller", icon: "" },
+                { value: "MITRA", label: "Mitra", icon: "" },
               ].map((opt) => (
                 <button
                   key={opt.value}
@@ -785,7 +785,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Unit Laptop ─ */}
-          <SectionHeader icon="💻" title="Unit Laptop" color="#EEF2FF" />
+          <SectionHeader icon="" title="Unit Laptop" color="#EEF2FF" />
           <div className="px-5 pb-5 space-y-4">
 
             {/* Active units list */}
@@ -899,7 +899,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Harga ─ */}
-          <SectionHeader icon="💰" title="Harga & Pembayaran" color="#ECFDF5" />
+          <SectionHeader icon="" title="Harga & Pembayaran" color="#ECFDF5" />
           <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Total Harga Deal (Rp)">
               <input
@@ -961,7 +961,7 @@ export default function EditTransactionPage() {
                 {totalInventoryPrice > 0 &&
                   totalInventoryPrice !== transaction.inventory_price && (
                     <p className="text-[9px] text-amber-500 font-semibold mt-0.5">
-                      ✏️ Diubah dari {fmt(transaction.inventory_price)}
+                       Diubah dari {fmt(transaction.inventory_price)}
                     </p>
                   )}
               </div>
@@ -983,7 +983,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Pengambilan ─ */}
-          <SectionHeader icon="📦" title="Info Pengambilan" color="#FFFBEB" />
+          <SectionHeader icon="" title="Info Pengambilan" color="#FFFBEB" />
           <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Metode Pengambilan">
               <select
@@ -1030,7 +1030,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Catatan ─ */}
-          <SectionHeader icon="📝" title="Catatan" color="#F1F5F9" />
+          <SectionHeader icon="" title="Catatan" color="#F1F5F9" />
           <div className="px-5 pb-5">
             <textarea
               name="notes"
@@ -1162,7 +1162,7 @@ export default function EditTransactionPage() {
                   style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}
                 >
                   <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2.5">
-                    💻 Unit Aktif ({activeUnits.length})
+                     Unit Aktif ({activeUnits.length})
                   </p>
                   <div className="space-y-2">
                     {activeUnits.map((u, i) => {
@@ -1411,7 +1411,7 @@ function UnitEditRow({
         style={{ background: "#F8FAFC" }}
       >
         <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-          💰 Harga Deal
+           Harga Deal
         </label>
         <input
           type="number"
@@ -1430,7 +1430,7 @@ function UnitEditRow({
           style={{ background: "#FAFBFF" }}
         >
           <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">
-            🔄 Pilih unit pengganti
+             Pilih unit pengganti
           </p>
           <div className="relative">
             <input
@@ -1481,7 +1481,7 @@ function UnitEditRow({
             }}
             className="mt-2 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition"
           >
-            ✕ Batal
+             Batal
           </button>
         </div>
       )}

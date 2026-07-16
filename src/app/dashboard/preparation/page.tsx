@@ -8,6 +8,7 @@ import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
+import { Clock, AlertCircle, Inbox } from "lucide-react";
 
 function BarcodeScanModal({
   onScan,
@@ -134,7 +135,7 @@ function BarcodeScanModal({
       <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-4 py-4 flex items-center justify-between">
           <div>
-            <p className="text-white font-bold text-base">📷 Scan Barcode</p>
+            <p className="text-white font-bold text-base"> Scan Barcode</p>
             <p className="text-gray-400 text-xs mt-0.5">
               Arahkan ke barcode Serial Number
               {engine === "zxing" && " · mode kompatibel"}
@@ -144,7 +145,7 @@ function BarcodeScanModal({
             onClick={onClose}
             className="text-white/70 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition"
           >
-            ✕
+            
           </button>
         </div>
 
@@ -166,7 +167,7 @@ function BarcodeScanModal({
           {detected && (
             <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
               <div className="text-center">
-                <div className="text-5xl mb-2">✅</div>
+                <div className="text-5xl mb-2"></div>
                 <p className="text-emerald-400 font-bold text-lg">Terbaca!</p>
                 <p className="font-mono text-white mt-1 text-sm">{detected}</p>
               </div>
@@ -437,7 +438,7 @@ function CreateModal({
                 className="px-3 h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap shadow-sm hover:shadow-md"
                 title="Scan barcode SN"
               >
-                📷
+                
               </button>
               <button
                 type="button"
@@ -808,7 +809,7 @@ export default function PreparationPage() {
           const row: any = payload.new;
           if (isPrepProvider(userRole) && !isPrepSilent(userRole)) {
             showToast(
-              "📦 Penyiapan baru masuk!",
+              " Penyiapan baru masuk!",
               `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`
             );
           }
@@ -842,7 +843,7 @@ export default function PreparationPage() {
           ) {
             notifiedDoneRef.current.add(row.id);
             showToast(
-              "✅ Barang siap dikirim!",
+              " Barang siap dikirim!",
               `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`
             );
           }
@@ -941,10 +942,10 @@ export default function PreparationPage() {
   ];
 
   const STAT_CARDS = [
-    { key: "MENUNGGU", label: "Menunggu", value: sc?.menunggu ?? 0, color: "amber", icon: "⏳" },
-    { key: "DIPROSES", label: "Diproses", value: sc?.diproses ?? 0, color: "blue", icon: "🔧" },
-    { key: "DIKIRIM", label: "Dikirim", value: sc?.dikirim ?? 0, color: "violet", icon: "🚚" },
-    { key: "SELESAI", label: "Selesai", value: sc?.selesai ?? 0, color: "emerald", icon: "✅" },
+    { key: "MENUNGGU", label: "Menunggu", value: sc?.menunggu ?? 0, color: "amber", icon: "" },
+    { key: "DIPROSES", label: "Diproses", value: sc?.diproses ?? 0, color: "blue", icon: "" },
+    { key: "DIKIRIM", label: "Dikirim", value: sc?.dikirim ?? 0, color: "violet", icon: "" },
+    { key: "SELESAI", label: "Selesai", value: sc?.selesai ?? 0, color: "emerald", icon: "" },
   ];
   const statColor: Record<string, string> = {
     amber: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
@@ -959,7 +960,7 @@ export default function PreparationPage() {
       key: "formats",
       title: "Paling Banyak Buat Format",
       sub: "Sales input penyiapan",
-      icon: "📝",
+      icon: "",
       rows: stats?.formats ?? [],
       type: "count" as const,
     },
@@ -967,7 +968,7 @@ export default function PreparationPage() {
       key: "prepared",
       title: "Paling Banyak Menyiapkan",
       sub: "Penyedia cek → siap kirim",
-      icon: "📦",
+      icon: "",
       rows: stats?.prepared ?? [],
       type: "count" as const,
     },
@@ -975,7 +976,7 @@ export default function PreparationPage() {
       key: "delivered",
       title: "Paling Banyak Mengantar",
       sub: "Pengantar selesai antar",
-      icon: "🛵",
+      icon: "",
       rows: stats?.delivered ?? [],
       type: "count" as const,
     },
@@ -984,7 +985,7 @@ export default function PreparationPage() {
   const speedRows: SpeedRow[] = stats?.speed ?? [];
 
   const medal = (i: number) =>
-    i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`;
+    i === 0 ? "" : i === 1 ? "" : i === 2 ? "" : `${i + 1}`;
 
   const TABS = [
     { value: "ALL", label: "Semua" },
@@ -1113,8 +1114,8 @@ export default function PreparationPage() {
           {/* View toggle */}
           <div className="inline-flex bg-white border border-gray-200 rounded-xl p-1 gap-1 shadow-sm">
             {[
-              { v: "list", label: "📋 Daftar" },
-              { v: "board", label: "🏆 Papan Peringkat" },
+              { v: "list", label: " Daftar" },
+              { v: "board", label: " Papan Peringkat" },
             ].map((t) => (
               <button
                 key={t.v}
@@ -1145,7 +1146,7 @@ export default function PreparationPage() {
                 </button>
               ))}
               <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg">
-                📅 {rangeLabel}
+                 {rangeLabel}
               </span>
             </div>
             <div className="flex flex-wrap items-end gap-4">
@@ -1229,7 +1230,7 @@ export default function PreparationPage() {
             <>
               {/* Header banner */}
               <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl px-5 py-4 flex items-center gap-4">
-                <span className="text-3xl">🏆</span>
+                <AlertCircle className="w-8 h-8 inline text-gray-500" />
                 <div>
                   <p className="text-sm font-bold text-indigo-800">
                     Papan Peringkat · {rangeLabel}
@@ -1249,7 +1250,7 @@ export default function PreparationPage() {
                       <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <span className="text-xl">⏳</span>
+                            <span className="text-xl"></span>
                           </div>
                           <div>
                             <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wide">
@@ -1269,7 +1270,7 @@ export default function PreparationPage() {
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <span className="text-xl">📦</span>
+                            <span className="text-xl"></span>
                           </div>
                           <div>
                             <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">
@@ -1294,7 +1295,7 @@ export default function PreparationPage() {
                 {/* 1. Menyiapkan */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-2xl">⚡</span>
+                    <Clock className="w-6 h-6 inline text-gray-500" />
                     <div>
                       <h3 className="text-sm font-black text-gray-800 leading-tight">Paling Cepat Menyiapkan</h3>
                       <p className="text-[11px] text-gray-400">Diterima → siap kirim</p>
@@ -1323,7 +1324,7 @@ export default function PreparationPage() {
                 {/* 2. Respon Pengantar */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-2xl">🏃</span>
+                    <Clock className="w-6 h-6 inline text-gray-500" />
                     <div>
                       <h3 className="text-sm font-black text-gray-800 leading-tight">Respon Tercepat</h3>
                       <p className="text-[11px] text-gray-400">Ditugaskan → terima tugas</p>
@@ -1352,7 +1353,7 @@ export default function PreparationPage() {
                 {/* 3. Selesai Pengantar */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-2xl">🏁</span>
+                    <Clock className="w-6 h-6 inline text-gray-500" />
                     <div>
                       <h3 className="text-sm font-black text-gray-800 leading-tight">Selesai Tercepat</h3>
                       <p className="text-[11px] text-gray-400">Mulai jalan → sampai tujuan</p>
@@ -1438,7 +1439,7 @@ export default function PreparationPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
                 <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">👤</span>
+                    <Clock className="w-6 h-6 inline text-gray-500" />
                     <div>
                       <h3 className="text-sm font-black text-gray-800 leading-tight">
                         Ringkasan Per Orang
@@ -1459,7 +1460,7 @@ export default function PreparationPage() {
                           : "text-gray-500 hover:text-gray-700"
                           }`}
                       >
-                        {tab === "sales" ? "📝 Sales" : "📦 Penyedia"}
+                        {tab === "sales" ? " Sales" : " Penyedia"}
                       </button>
                     ))}
                   </div>
@@ -1551,7 +1552,7 @@ export default function PreparationPage() {
                     {/* Legend */}
                     <div className="flex flex-wrap gap-3 pt-2 px-1">
                       <span className="text-[10px] text-gray-400">
-                        💡 Jam mulai/selesai = persentil 10%/90% dari semua order di periode ini (WIB)
+                         Jam mulai/selesai = persentil 10%/90% dari semua order di periode ini (WIB)
                       </span>
                       {personTab === "penyedia" && (
                         <span className="text-[10px] text-gray-400">
@@ -1569,7 +1570,7 @@ export default function PreparationPage() {
             <>
               {canDone && (sc?.menunggu ?? 0) > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4">
-                  <span className="text-3xl">📥</span>
+                  <AlertCircle className="w-8 h-8 inline text-gray-500" />
                   <div>
                     <p className="text-sm font-bold text-amber-800">
                       {sc?.menunggu} penyiapan menunggu diproses
@@ -1627,7 +1628,7 @@ export default function PreparationPage() {
                 </div>
               ) : orders.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 py-20 text-center">
-                  <div className="text-5xl mb-4 opacity-40">📦</div>
+                  <div className="flex justify-center mb-4 opacity-40"><Inbox className="w-12 h-12" /></div>
                   <p className="text-gray-500 text-sm font-medium">
                     {debouncedSearch || statusFilter !== "ALL" || !allTime
                       ? "Tidak ada penyiapan yang cocok di periode/filter ini"

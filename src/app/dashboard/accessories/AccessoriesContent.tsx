@@ -41,10 +41,10 @@ const CATEGORIES = [
 ];
 
 const CATEGORY_EMOJI: Record<string, string> = {
-    HDD: "💽", SSD: "💾", RAM: "🧠", CHARGER: "🔌", BATERAI: "🔋",
-    KEYBOARD: "⌨️", LCD: "🖥️", CASING: "📦", MOTHERBOARD: "🔲",
-    PROCESSOR: "🧩", VGA: "🎮", FAN: "🌀", "THERMAL PASTE": "🧴",
-    KABEL: "🔗", LAINNYA: "🧰",
+    HDD: "", SSD: "", RAM: "", CHARGER: "", BATERAI: "",
+    KEYBOARD: "⌨", LCD: "", CASING: "", MOTHERBOARD: "",
+    PROCESSOR: "", VGA: "", FAN: "", "THERMAL PASTE": "",
+    KABEL: "", LAINNYA: "",
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: {
                 </div>
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                     <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                        <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">{CATEGORY_EMOJI[accessory.category] ?? "🧰"}</div>
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">{CATEGORY_EMOJI[accessory.category] ?? ""}</div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug break-words">{accessory.name}</h3>
                             <p className="text-sm text-gray-400 mt-0.5 font-medium">{accessory.brand || "—"}{accessory.spec ? ` · ${accessory.spec}` : ""}</p>
@@ -719,7 +719,7 @@ function AccessoriesContent() {
                     {/* TABLE */}
                     {fetching ? <SkeletonTable /> : items.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
-                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🧰</div>
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"></div>
                             <p className="text-gray-700 font-bold text-base">Belum ada data aksesori</p>
                             <p className="text-gray-400 text-sm mt-1.5">{hasFilter ? "Coba ubah filter pencarian" : "Klik tombol Tambah Aksesori untuk mulai"}</p>
                         </div>

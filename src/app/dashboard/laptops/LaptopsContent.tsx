@@ -288,10 +288,10 @@ export function LaptopsContent() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
 
-    // ✅ Multi-role: simpan SEMUA roles user (bukan cuma 1 primary role)
+    //  Multi-role: simpan SEMUA roles user (bukan cuma 1 primary role)
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
-    // ✅ Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
+    //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
     const canExport = hasAnyRole(userRoles, [
@@ -316,7 +316,7 @@ export function LaptopsContent() {
 
     useEffect(() => { fetchLaptops(); }, []);
 
-    // ✅ Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal
+    //  Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
@@ -484,7 +484,7 @@ export function LaptopsContent() {
             });
             const result = await res.json();
             if (!result.success) { showAlert(result.message || "Gagal menambahkan laptop"); return; }
-            closeModal(); fetchLaptops(); showAlert("Laptop berhasil ditambahkan ✅");
+            closeModal(); fetchLaptops(); showAlert("Laptop berhasil ditambahkan ");
         } catch {
             showAlert("Terjadi kesalahan saat menyimpan");
         } finally {
@@ -525,7 +525,7 @@ export function LaptopsContent() {
     };
 
     // ─── Export Excel ─────────────────────────────────────────────────────────
-    // ✅ Export disesuaikan dengan filterStatus yang aktif:
+    //  Export disesuaikan dengan filterStatus yang aktif:
     //    - ALL     → tampilkan semua kolom (Stock Total, Siap Jual, Minus, Terjual)
     //    - SIAP_JUAL  → hanya kolom "Siap Jual", data hanya unit SIAP_JUAL
     //    - BELUM_SIAP → hanya kolom "Minus", data hanya unit SERVICE/BELUM_SIAP
@@ -578,7 +578,7 @@ export function LaptopsContent() {
             terjualFg: "FF1E3A8A", // blue-900
         };
 
-        // ✅ Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
+        //  Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
         ws.columns = [
             { header: "No", key: "no", width: 6 },
             { header: "Product", key: "product", width: 35 },
@@ -615,7 +615,7 @@ export function LaptopsContent() {
             cell.alignment = { horizontal: "center", vertical: "middle" };
         });
 
-        // ✅ Data rows — nilai kolom stok dihitung ulang sesuai filterStatus
+        //  Data rows — nilai kolom stok dihitung ulang sesuai filterStatus
         filteredLaptops.forEach((item, idx) => {
             const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
             const units = item.laptop_units || [];
@@ -626,7 +626,7 @@ export function LaptopsContent() {
             const terjualCount = units.filter((u: LaptopUnit) => u.status === "SOLD").length;
             const tersediaCount = units.filter((u: LaptopUnit) => u.status !== "SOLD").length;
 
-            // ✅ Nilai kolom "stock" disesuaikan dengan konteks filter
+            //  Nilai kolom "stock" disesuaikan dengan konteks filter
             const stockValue = isSiapJualOnly
                 ? siapJualCount
                 : isMinusOnly
@@ -684,7 +684,7 @@ export function LaptopsContent() {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
 
                 } else if (key === "stock") {
-                    // ✅ Warna kolom "stock" mengikuti konteks filter
+                    //  Warna kolom "stock" mengikuti konteks filter
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                     if (isSiapJualOnly) {
                         if (stockValue > 0) {
@@ -856,9 +856,9 @@ export function LaptopsContent() {
                             <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
                             <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="ALL">Semua Status</option>
-                                <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                <option value="BELUM_SIAP">⚠️ Minus</option>
-                                <option value="TERJUAL">💰 Terjual</option>
+                                <option value="SIAP_JUAL"> Siap Jual</option>
+                                <option value="BELUM_SIAP"> Minus</option>
+                                <option value="TERJUAL"> Terjual</option>
                             </FilterSelect>
                             <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
@@ -1145,7 +1145,7 @@ export function LaptopsContent() {
                 ) : selectedLaptop ? (
                     <div className="space-y-5">
                         <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">💻</div>
+                            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0"></div>
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug">{selectedLaptop.laptop_name}</h3>
                                 <p className="text-sm text-gray-400 mt-0.5 font-medium">{selectedLaptop.brand || "—"}</p>
@@ -1159,7 +1159,7 @@ export function LaptopsContent() {
                                     })()}
                                     {selectedLaptop.ready_to_sell && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                            ✓ Ready to Sell
+                                             Ready to Sell
                                         </span>
                                     )}
                                 </div>
@@ -1270,7 +1270,7 @@ export function LaptopsContent() {
                             if (!result.success) { showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`); return; }
                             if (modalMode === "detail") closeModal();
                             fetchLaptops();
-                            showAlert("Laptop berhasil dihapus ✅");
+                            showAlert("Laptop berhasil dihapus ");
                         } catch {
                             showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
                         }

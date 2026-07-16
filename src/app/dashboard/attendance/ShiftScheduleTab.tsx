@@ -10,8 +10,8 @@ const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const SHIFT_PREVIEW = {
-  PAGI: { open: "07:30", late: "08:00", close: "12:00", emoji: "🌅", label: "Pagi" },
-  SORE: { open: "14:00", late: "16:00", close: "18:00", emoji: "🌆", label: "Sore" },
+  PAGI: { open: "07:30", late: "08:00", close: "12:00", emoji: "", label: "Pagi" },
+  SORE: { open: "14:00", late: "16:00", close: "18:00", emoji: "", label: "Sore" },
 } as const;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -25,7 +25,7 @@ export function ShiftScheduleTab({
   users, schedules, calYear, calMonth, onSaved,
 }: {
   users: UserInfo[];
-  schedules: ShiftScheduleRow[];   // ✅ dari page.tsx — satu sumber kebenaran
+  schedules: ShiftScheduleRow[];   //  dari page.tsx — satu sumber kebenaran
   calYear: number;
   calMonth: number;                // 0-indexed
   onSaved: () => void | Promise<void>;
@@ -188,12 +188,12 @@ export function ShiftScheduleTab({
     <div className="space-y-5">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-          <span>⚠️</span>{error}
+          <span></span>{error}
         </div>
       )}
 
       <div className="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3">
-        <p className="text-[11px] font-black text-violet-700 uppercase tracking-wide mb-1">⏰ Cara kerja</p>
+        <p className="text-[11px] font-black text-violet-700 uppercase tracking-wide mb-1"> Cara kerja</p>
         <p className="text-[11px] text-violet-600 leading-relaxed">
           Jadwal ini <strong>menimpa shift default</strong> karyawan — tapi hanya di rentang tanggal & hari yang
           kamu pilih. Di luar itu, shift kembali ke default. Rentang yang lebih sempit menang atas yang lebih lebar.
@@ -432,9 +432,9 @@ export function ShiftScheduleTab({
           {useCustomHours && (
             <div className="grid grid-cols-3 gap-2 mt-3">
               {([
-                ["open", "🟢 Buka", "emerald"],
-                ["late", "🟡 Batas Tepat", "amber"],
-                ["close", "🔴 Tutup", "red"],
+                ["open", "Buka", "emerald"],
+                ["late", "Batas Tepat", "amber"],
+                ["close", "Tutup", "red"],
               ] as const).map(([k, label, color]) => (
                 <div key={k} className={`bg-${color}-50 border border-${color}-100 rounded-xl p-2.5`}>
                   <label className={`block text-[9px] font-black text-${color}-700 uppercase mb-1.5`}>{label}</label>
@@ -467,7 +467,7 @@ export function ShiftScheduleTab({
       {/* ══ Preview + Simpan ══ */}
       {canSave && (
         <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-4">
-          <p className="text-[10px] font-black text-violet-700 uppercase tracking-wide mb-2.5">📋 Preview</p>
+          <p className="text-[10px] font-black text-violet-700 uppercase tracking-wide mb-2.5"> Preview</p>
           <div className="grid grid-cols-3 gap-2 mb-3">
             {[
               { label: "Karyawan", value: `${selectedUsers.length}`, sub: "orang" },
@@ -500,7 +500,7 @@ export function ShiftScheduleTab({
           >
             {saving
               ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-              : "⏰ Simpan Jadwal Shift"}
+              : " Simpan Jadwal Shift"}
           </button>
         </div>
       )}
@@ -514,7 +514,7 @@ export function ShiftScheduleTab({
 
         {schedules.length === 0 ? (
           <div className="py-10 text-center bg-gray-50 rounded-2xl border border-gray-100">
-            <span className="text-2xl opacity-30">⏰</span>
+            <span className="text-2xl opacity-30"></span>
             <p className="text-[11px] text-gray-400 font-semibold mt-2">Belum ada jadwal shift khusus</p>
             <p className="text-[10px] text-gray-300 mt-0.5">Semua karyawan pakai shift default</p>
           </div>
@@ -546,7 +546,7 @@ export function ShiftScheduleTab({
                           {" · "}
                           {everyDay ? "Setiap hari" : dows.map(d => DAY_NAMES[d]).join(", ")}
                         </p>
-                        {s.notes && <p className="text-[9px] text-violet-400 font-semibold truncate">📝 {s.notes}</p>}
+                        {s.notes && <p className="text-[9px] text-violet-400 font-semibold truncate"> {s.notes}</p>}
                       </div>
                     </div>
 

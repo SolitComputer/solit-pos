@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Inbox } from "lucide-react";
 
 interface NeracaRow {
     code: string;
@@ -87,7 +88,7 @@ export default function Neraca({ period }: { period: string }) {
                     className={`rounded-xl border p-3.5 flex items-start gap-2.5 ${data.totals.balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                         }`}
                 >
-                    <span className="text-lg leading-none">{data.totals.balanced ? "✅" : "⚠️"}</span>
+                    <span className="text-lg leading-none">{data.totals.balanced ? "" : ""}</span>
                     <span className={`text-xs font-semibold leading-relaxed ${data.totals.balanced ? "text-emerald-700" : "text-red-700"}`}>
                         {data.totals.balanced ? (
                             "Neraca Balance — total Debit sama dengan total Kredit."
@@ -136,7 +137,7 @@ export default function Neraca({ period }: { period: string }) {
                             ) : !data || data.rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="py-16 text-center">
-                                        <div className="text-4xl mb-3 opacity-40">⚖️</div>
+                                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
                                         <p className="text-sm text-gray-500 font-medium">Belum ada saldo di periode ini</p>
                                         <p className="text-xs text-gray-400 mt-1">
                                             Konfirmasi jurnal di Jurnal Umum, atau input Saldo Awal Manual di Buku Besar dulu.

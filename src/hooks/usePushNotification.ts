@@ -19,7 +19,7 @@ export function usePushNotification() {
         }
         setPermission(Notification.permission as PermissionState);
 
-        // ✅ Auto-register SW saat pertama load (tidak perlu tunggu user subscribe)
+        //  Auto-register SW saat pertama load (tidak perlu tunggu user subscribe)
         // Ini penting agar SW sudah siap saat user klik "Aktifkan"
         navigator.serviceWorker.register("/sw.js").then(() => {
             checkSubscription();

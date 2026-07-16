@@ -12,6 +12,11 @@ import { GrossProfitDetailModal } from "@/components/modals/GrossProfitDetailMod
 import { TransactionDetailModal } from "@/components/modals/TransactionDetailModal";
 import ServiceDashboardWidget from "@/components/service/ServiceDashboardWidget";
 import { AdminChatMonitor } from "@/components/ui/AdminChatMonitor";
+import {
+  Trophy, Laptop, Inbox, BarChart3,
+  CheckCircle2, Clock, XCircle, ClipboardList,
+  Medal, ArrowUp, ArrowDown,
+} from "lucide-react";
 
 import {
   Chart as ChartJS,
@@ -112,7 +117,7 @@ function TrendBadge({ change }: { change: number | null }) {
   const up = change >= 0;
   return (
     <span className={`inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full ${up ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"}`}>
-      {up ? "▲" : "▼"} {Math.abs(change)}%
+      {up ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />} {Math.abs(change)}%
     </span>
   );
 }
@@ -192,14 +197,14 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
 function TopListItem({ rank, name, total, maxTotal, extra }: {
   rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode;
 }) {
-  const medal = ["🥇", "🥈", "🥉"][rank - 1] ?? `${rank}`;
+  const medalColor = ["text-amber-400", "text-gray-400", "text-amber-600"][rank - 1];
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
   return (
     <div className="group">
       <div className="flex items-center gap-2 py-1.5">
-        <div className="w-6 text-center flex-shrink-0">
+        <div className="w-6 flex-shrink-0 flex justify-center">
           {rank <= 3 ? (
-            <span className="text-base sm:text-lg">{medal}</span>
+            <Medal className={`w-4 h-4 sm:w-5 sm:h-5 ${medalColor}`} />
           ) : (
             <span className="text-[10px] sm:text-xs font-semibold text-gray-400 bg-gray-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{rank}</span>
           )}
@@ -222,10 +227,10 @@ const STATUS_STYLES: Record<string, string> = {
   CANCELLED: "bg-rose-100 text-rose-600 border-rose-200",
 };
 
-const STATUS_ICON: Record<string, string> = {
-  PAID: "✅",
-  PENDING: "⏳",
-  CANCELLED: "❌",
+const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  PAID: CheckCircle2,
+  PENDING: Clock,
+  CANCELLED: XCircle,
 };
 
 function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
@@ -250,7 +255,10 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-gray-800 text-xs sm:text-sm">{item.customer_name}</span>
             <span className={`inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full border font-semibold ${STATUS_STYLES[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
-              <span className="text-[8px] sm:text-[10px]">{STATUS_ICON[item.status] || "📋"}</span>
+              {(() => {
+                const StatusIco = STATUS_ICON[item.status] || ClipboardList;
+                return <StatusIco className="w-2.5 h-2.5 sm:w-3 sm:h-3" />;
+              })()}
               <span className="hidden sm:inline">{item.status}</span>
             </span>
             {item.source_platform && (
@@ -529,7 +537,7 @@ export default function Page() {
         callbacks: {
           label: (ctx: any) => {
             if (ctx.dataset.label === "Laptop Terjual") {
-              return `💻 Terjual: ${ctx.raw} unit`;
+              return ` Terjual: ${ctx.raw} unit`;
             }
             return `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}`;
           },
@@ -823,7 +831,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <div className="text-center py-8 sm:py-12">
-                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-gray-300 mb-1 sm:mb-2" />
                     <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
                   </div>
                 )}
@@ -847,7 +855,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <div className="text-center py-8 sm:py-12">
-                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                    <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-gray-300 mb-1 sm:mb-2" />
                     <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
                   </div>
                 )}
@@ -865,7 +873,7 @@ export default function Page() {
             <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
               <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
                 <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🏆</span>
+                  <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                   Top Sales
                 </h2>
                 <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
@@ -896,7 +904,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <div className="text-center py-6 sm:py-8">
-                    <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">🏆</p>
+                    <Trophy className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-gray-300 mb-1 sm:mb-2" />
                     <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
                   </div>
                 )}
@@ -914,7 +922,7 @@ export default function Page() {
             <div className="h-full flex flex-col bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 p-3 sm:p-5">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-                  <span className="text-base sm:text-lg">💻</span>
+                  <Laptop className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                   Laptop Terlaris
                 </h2>
                 <span className="text-[9px] sm:text-[10px] text-gray-400 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full">hari ini</span>
@@ -938,7 +946,7 @@ export default function Page() {
                 </div>
               ) : (
                 <div className="text-center py-6 sm:py-8">
-                  <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">💻</p>
+                  <Laptop className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-gray-300 mb-1 sm:mb-2" />
                   <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
                 </div>
               )}
@@ -962,7 +970,7 @@ export default function Page() {
               <div style={{ height: 130 }} className="sm:h-[160px]"><Bar data={trxBarData} options={barOptions} /></div>
             ) : (
               <div className="text-center py-8 sm:py-12">
-                <p className="text-2xl sm:text-3xl mb-1 sm:mb-2">📊</p>
+                <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 mx-auto text-gray-300 mb-1 sm:mb-2" />
                 <p className="text-gray-400 text-[11px] sm:text-sm">Belum ada data</p>
               </div>
             )}
@@ -1001,7 +1009,7 @@ export default function Page() {
               ))
             ) : transactions.length === 0 ? (
               <div className="py-12 sm:py-16 text-center">
-                <div className="text-4xl sm:text-5xl mb-2 sm:mb-3">📭</div>
+                <Inbox className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-300 mb-2 sm:mb-3" />
                 <p className="text-gray-500 text-[11px] sm:text-sm font-medium">Belum ada transaksi hari ini</p>
                 <p className="text-gray-400 text-[9px] sm:text-xs mt-1">Transaksi akan muncul setelah dibuat</p>
               </div>

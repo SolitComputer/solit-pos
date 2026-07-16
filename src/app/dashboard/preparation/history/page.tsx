@@ -179,10 +179,10 @@ export default function PreparationHistoryPage() {
   const inputCls = "h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition";
 
   const SUMMARY = [
-    { label: "Total Trip", value: totals.trips, sub: `${totals.completed} selesai`, color: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700", icon: "🛵" },
-    { label: "Total Jarak", value: fmtDistance(totals.distance), sub: "akumulasi", color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "📏" },
-    { label: "Total Waktu Antar", value: fmtDur(totals.antar), sub: "berangkat→sampai", color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: "⏱️" },
-    { label: "Total Berhenti", value: totals.stops, sub: "≥45 dtk", color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: "⏸️" },
+    { label: "Total Trip", value: totals.trips, sub: `${totals.completed} selesai`, color: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg> },
+    { label: "Total Jarak", value: fmtDistance(totals.distance), sub: "akumulasi", color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
+    { label: "Total Waktu Antar", value: fmtDur(totals.antar), sub: "berangkat→sampai", color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+    { label: "Total Berhenti", value: totals.stops, sub: "≥45 dtk", color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> },
   ];
 
   return (
@@ -304,7 +304,7 @@ export default function PreparationHistoryPage() {
                 className={`bg-gradient-to-br ${s.color} border rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xl">{s.icon}</span>
+                <span className="text-current opacity-70">{s.icon}</span>
                   <span className="text-2xl font-black tabular-nums">{s.value}</span>
                 </div>
                 <p className="text-[11px] font-bold uppercase tracking-wide mt-1.5 opacity-80">{s.label}</p>
@@ -317,7 +317,7 @@ export default function PreparationHistoryPage() {
           {daily.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">📈</span>
+              <svg className="w-8 h-8 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-6 9 6-9 6-9-6z"/><path d="M3 15l9 6 9-6"/></svg>
                 <div>
                   <h2 className="text-sm font-bold text-gray-800">Tren Pengantaran Harian</h2>
                   <p className="text-xs text-gray-400">Perbandingan jumlah trip dan jarak tempuh</p>
@@ -333,7 +333,7 @@ export default function PreparationHistoryPage() {
           {leaderboard.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">🏆</span>
+              <svg className="w-8 h-8 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 21l4-4 4 4"/><path d="M12 17V7"/><path d="M20 7H4l4-4 4 4 4-4z"/></svg>
                 <div>
                   <h2 className="text-sm font-bold text-gray-800">Rekap per Pengantar</h2>
                   <p className="text-xs text-gray-400">Kinerja pengantar berdasarkan jumlah trip</p>
@@ -354,7 +354,7 @@ export default function PreparationHistoryPage() {
                         ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white" 
                         : "bg-gradient-to-br from-violet-500 to-violet-600 text-white"
                     }`}>
-                      {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : d.name.charAt(0).toUpperCase()}
+                       {i === 0 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-amber-400"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : i === 1 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-slate-400"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : i === 2 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-amber-600"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : d.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-gray-800 truncate">{d.name}</p>
@@ -366,7 +366,7 @@ export default function PreparationHistoryPage() {
                       </div>
                     </div>
                     {i === 0 && (
-                      <span className="text-2xl">👑</span>
+                      <svg className="w-6 h-6 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm0 2h14v1H5v-1z"/></svg>
                     )}
                   </div>
                 ))}
@@ -397,7 +397,9 @@ export default function PreparationHistoryPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center shadow-sm">
-              <div className="text-6xl mb-4 opacity-30">🗺️</div>
+              <div className="text-6xl mb-4 opacity-30">
+                <svg className="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+              </div>
               <p className="text-gray-500 text-base font-medium">
                 Belum ada riwayat pengantaran di rentang ini
               </p>
@@ -429,7 +431,7 @@ export default function PreparationHistoryPage() {
                           )}
                           {t.returned_at && (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
-                              PP ✓
+                              PP 
                             </span>
                           )}
                         </div>
@@ -437,9 +439,9 @@ export default function PreparationHistoryPage() {
                           {t.customer_name}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 truncate">
-                          <span>🛵</span> {t.delivery_user_name || "—"}
+                          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg> {t.delivery_user_name || "—"}
                           {t.delivery_address && (
-                            <span className="text-gray-400">· 📍 {t.delivery_address}</span>
+                            <span className="text-gray-400">· <svg className="w-3 h-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg> {t.delivery_address}</span>
                           )}
                         </p>
                       </div>

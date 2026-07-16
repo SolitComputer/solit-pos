@@ -346,7 +346,7 @@ export function HTCallProvider({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
           <div className="relative w-full max-w-sm bg-[#1a1a2e] rounded-3xl p-6 text-white shadow-2xl text-center">
-            <div className="text-5xl mb-3 animate-bounce">📻</div>
+            <div className="text-5xl mb-3 animate-bounce"></div>
             <p className="text-[11px] uppercase tracking-wide text-gray-400 font-bold">
               {state === "incoming" ? "Panggilan HT masuk" : state === "outgoing" ? "Memanggil…" : state === "connecting" ? "Menyambungkan…" : "Tersambung"}
             </p>
@@ -358,26 +358,43 @@ export function HTCallProvider({ children }: { children: React.ReactNode }) {
                 {[0, 1, 2].map(i => <span key={i} className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />)}
               </div>
             )}
-            {state === "in-call" && <p className="text-emerald-300 text-xs font-bold mt-3">🔊 {connState === "connected" ? "Tersambung — silakan bicara" : connState}</p>}
+            {state === "in-call" && <p className="text-emerald-300 text-xs font-bold mt-3 flex items-center gap-1.5 justify-center"><svg className="w-3.5 h-3.5 animate-pulse text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg> {connState === "connected" ? "Tersambung — silakan bicara" : connState}</p>}
 
             {audioBlocked && (
-              <button onClick={enableAudio} className="mt-3 w-full h-9 rounded-xl bg-amber-400 text-amber-950 text-xs font-bold">🔊 Tap untuk aktifkan suara</button>
+              <button onClick={enableAudio} className="mt-3 w-full h-9 rounded-xl bg-amber-400 text-amber-950 text-xs font-bold flex items-center justify-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                Tap untuk aktifkan suara
+              </button>
             )}
 
             <div className="mt-6 flex items-center justify-center gap-4">
               {state === "incoming" && (
                 <>
-                  <button onClick={reject} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-2xl shadow-lg active:scale-95 transition">📵</button>
-                  <button onClick={accept} className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center text-2xl shadow-lg active:scale-95 transition animate-pulse">📞</button>
+                  <button onClick={reject} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition" title="Tolak Panggilan">
+                    <svg className="w-8 h-8 rotate-[135deg]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                  </button>
+                  <button onClick={accept} className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition animate-pulse" title="Jawab Panggilan">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                  </button>
                 </>
               )}
               {(state === "outgoing" || state === "connecting") && (
-                <button onClick={hangUp} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-2xl shadow-lg active:scale-95 transition">📵</button>
+                <button onClick={hangUp} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition" title="Tutup Panggilan">
+                  <svg className="w-8 h-8 rotate-[135deg]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                </button>
               )}
               {state === "in-call" && (
                 <>
-                  <button onClick={toggleMute} className={`w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-lg active:scale-95 transition ${muted ? "bg-amber-500" : "bg-white/15 hover:bg-white/25"}`}>{muted ? "🔇" : "🎙️"}</button>
-                  <button onClick={hangUp} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-2xl shadow-lg active:scale-95 transition">📵</button>
+                  <button onClick={toggleMute} className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition ${muted ? "bg-amber-500" : "bg-white/15 hover:bg-white/25"}`} title={muted ? "Nyalakan Mic" : "Matikan Mic"}>
+                    {muted ? (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l4-4m0 4l-4-4" /></svg>
+                    ) : (
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                    )}
+                  </button>
+                  <button onClick={hangUp} className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-lg active:scale-95 transition" title="Tutup Panggilan">
+                    <svg className="w-8 h-8 rotate-[135deg]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                  </button>
                 </>
               )}
             </div>

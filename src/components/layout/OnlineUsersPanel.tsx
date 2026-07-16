@@ -5,6 +5,7 @@
   import { getCurrentUserClient } from "@/lib/auth-client";
   import { getSupabaseClient } from "@/services/supabaseClient";
   import { useChatContext } from "@/contexts/ChatContext";
+import { User } from "lucide-react";
 
   const ONLINE_THRESHOLD_MS = 35 * 1000;
   const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -30,27 +31,27 @@
   }
 
   function getPageLabel(page: string | null): { label: string; emoji: string } {
-    if (!page) return { label: "Belum aktif", emoji: "💤" };
-    if (page === "/" || page === "") return { label: "Beranda", emoji: "🏠" };
-    if (page.startsWith("/dashboard/attendance/overtime")) return { label: "Lembur", emoji: "⏱️" };
-    if (page.startsWith("/dashboard/attendance")) return { label: "Absensi", emoji: "📋" };
-    if (page.startsWith("/dashboard/laptops/create")) return { label: "Tambah Laptop", emoji: "➕" };
-    if (page.startsWith("/dashboard/laptops/ready")) return { label: "Laptop Siap", emoji: "✅" };
-    if (page.startsWith("/dashboard/laptops/minus")) return { label: "Laptop Minus", emoji: "⚠️" };
-    if (page.startsWith("/dashboard/laptops")) return { label: "Laptop", emoji: "💻" };
-    if (page.startsWith("/dashboard/transactions")) return { label: "Transaksi", emoji: "🛒" };
-    if (page.startsWith("/dashboard/users")) return { label: "Manajemen User", emoji: "👥" };
-    if (page.startsWith("/dashboard/reports")) return { label: "Laporan", emoji: "📊" };
-    if (page.startsWith("/dashboard/warranty")) return { label: "Garansi", emoji: "🛡️" };
-    if (page.startsWith("/dashboard/pending-orders")) return { label: "Pending Order", emoji: "⏳" };
-    if (page.startsWith("/dashboard/login-logs")) return { label: "Login Log", emoji: "🔐" };
-    if (page.startsWith("/dashboard/activity-log")) return { label: "Activity Log", emoji: "📝" };
-    if (page.startsWith("/dashboard")) return { label: "Dashboard", emoji: "🏠" };
-    if (page.startsWith("/payment/create")) return { label: "Buat Transaksi", emoji: "💳" };
-    if (page.startsWith("/payment")) return { label: "Pembayaran", emoji: "💳" };
-    if (page.startsWith("/face-verify")) return { label: "Absen Wajah", emoji: "📷" };
-    if (page.startsWith("/scan")) return { label: "Scan Barcode", emoji: "📱" };
-    return { label: page.replace(/^\//, ""), emoji: "📄" };
+    if (!page) return { label: "Belum aktif", emoji: "" };
+    if (page === "/" || page === "") return { label: "Beranda", emoji: "" };
+    if (page.startsWith("/dashboard/attendance/overtime")) return { label: "Lembur", emoji: "" };
+    if (page.startsWith("/dashboard/attendance")) return { label: "Absensi", emoji: "" };
+    if (page.startsWith("/dashboard/laptops/create")) return { label: "Tambah Laptop", emoji: "" };
+    if (page.startsWith("/dashboard/laptops/ready")) return { label: "Laptop Siap", emoji: "" };
+    if (page.startsWith("/dashboard/laptops/minus")) return { label: "Laptop Minus", emoji: "" };
+    if (page.startsWith("/dashboard/laptops")) return { label: "Laptop", emoji: "" };
+    if (page.startsWith("/dashboard/transactions")) return { label: "Transaksi", emoji: "" };
+    if (page.startsWith("/dashboard/users")) return { label: "Manajemen User", emoji: "" };
+    if (page.startsWith("/dashboard/reports")) return { label: "Laporan", emoji: "" };
+    if (page.startsWith("/dashboard/warranty")) return { label: "Garansi", emoji: "" };
+    if (page.startsWith("/dashboard/pending-orders")) return { label: "Pending Order", emoji: "" };
+    if (page.startsWith("/dashboard/login-logs")) return { label: "Login Log", emoji: "" };
+    if (page.startsWith("/dashboard/activity-log")) return { label: "Activity Log", emoji: "" };
+    if (page.startsWith("/dashboard")) return { label: "Dashboard", emoji: "" };
+    if (page.startsWith("/payment/create")) return { label: "Buat Transaksi", emoji: "" };
+    if (page.startsWith("/payment")) return { label: "Pembayaran", emoji: "" };
+    if (page.startsWith("/face-verify")) return { label: "Absen Wajah", emoji: "" };
+    if (page.startsWith("/scan")) return { label: "Scan Barcode", emoji: "" };
+    return { label: page.replace(/^\//, ""), emoji: "" };
   }
 
   function formatLastSeen(secondsAgo: number | null): string {
@@ -80,7 +81,7 @@
   function ChatHintTooltip() {
     return (
       <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-[9px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg">
-        💬 Klik untuk chat
+         Klik untuk chat
       </span>
     );
   }
@@ -120,7 +121,7 @@
           </div>
         ) : onlineUsers.length === 0 ? (
           <div className="py-6 text-center">
-            <div className="text-2xl mb-1">😴</div>
+            <div className="flex justify-center mb-1"><User className="w-6 h-6 text-gray-400" /></div>
             <p className="text-xs text-gray-400">Belum ada yang online</p>
           </div>
         ) : (
@@ -225,7 +226,7 @@
               <button key={f} onClick={() => setFilter(f)}
                 className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${filter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
                   }`}>
-                {f === "all" ? `Semua (${presence.length})` : f === "online" ? `🟢 ${onlineCount}` : `⚫ ${offlineCount}`}
+                {f === "all" ? `Semua (${presence.length})` : f === "online" ? `Online (${onlineCount})` : `Offline (${offlineCount})`}
               </button>
             ))}
           </div>
@@ -246,7 +247,7 @@
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-8 text-center">
-            <div className="text-2xl mb-1.5">👻</div>
+            <div className="flex justify-center mb-1.5"><User className="w-6 h-6 text-gray-400" /></div>
             <p className="text-xs text-gray-400 font-medium">
               {filter === "online" ? "Tidak ada yang online" : "Tidak ada data"}
             </p>
@@ -262,7 +263,7 @@
                   className={`relative group px-4 py-2.5 flex items-center gap-2.5 transition-colors ${p.is_online ? "" : "opacity-55"} ${isSelf ? "cursor-default" : "cursor-pointer hover:bg-emerald-50/60 active:bg-emerald-100/60"
                     }`}
                   onClick={() => { if (!isSelf) onChatOpen({ id: p.user_id, name: p.user_name, role: p.user_role }); }}
-                  title={isSelf ? `${p.user_name} (Kamu)` : `💬 Chat dengan ${p.user_name}`}
+                  title={isSelf ? `${p.user_name} (Kamu)` : ` Chat dengan ${p.user_name}`}
                 >
                   <div className="relative flex-shrink-0">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-[9px] font-black shadow-sm ${p.is_online ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gray-400"
@@ -306,7 +307,7 @@
 
         {!loading && presence.length > 0 && (
           <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-            <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir · Klik nama untuk chat 💬</p>
+            <p className="text-[9px] text-gray-400">Online = aktif dalam 2 menit terakhir · Klik nama untuk chat </p>
           </div>
         )}
       </div>

@@ -91,7 +91,7 @@ export function BirthdayBanner() {
                     fetch("/api/messages", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ receiver_id: u.id, content: `🎂 ${text}` }),
+                        body: JSON.stringify({ receiver_id: u.id, content: ` ${text}` }),
                     })
                 );
             await Promise.allSettled(promises);
@@ -136,12 +136,12 @@ export function BirthdayBanner() {
             >
                 {/* Header row */}
                 <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-                    <span className="text-2xl flex-shrink-0">🎂</span>
+                    <span className="text-2xl flex-shrink-0"></span>
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-amber-900">🎉 Selamat Ulang Tahun!</p>
+                        <p className="text-xs font-black text-amber-900"> Selamat Ulang Tahun!</p>
                         <p className="text-[11px] text-amber-800 font-semibold mt-0.5 truncate">{names}</p>
                     </div>
-                    <span className="text-2xl flex-shrink-0">🎈</span>
+                    <span className="text-2xl flex-shrink-0"></span>
                     {/* Close button */}
                     <button
                         onClick={handleDismiss}
@@ -164,7 +164,7 @@ export function BirthdayBanner() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
-                                Ucapan terkirim via chat! 🎉
+                                Ucapan terkirim via chat! 
                             </div>
                         ) : (
                             <div className="flex gap-1.5">

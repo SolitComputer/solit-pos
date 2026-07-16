@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Headphones, Laptop } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LaptopUnitResult {
@@ -248,7 +249,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                                 <div className="bg-white">
                                     <div className="p-4">
                                         <div className="flex items-start gap-3 mb-3">
-                                            <div className="text-xl flex-shrink-0 mt-0.5">🎧</div>
+                                            <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 mt-0.5 text-indigo-500"><Headphones className="w-5 h-5" /></div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="font-semibold text-sm text-[#1a1a2e] leading-snug">
                                                     {result.accessory.name}
@@ -322,7 +323,7 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                                 {/* Unit info */}
                                 <div className="p-4">
                                     <div className="flex items-start gap-3 mb-3">
-                                        <div className="text-xl flex-shrink-0 mt-0.5">💻</div>
+                                        <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 mt-0.5 text-gray-500"><Laptop className="w-5 h-5" /></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-sm text-[#1a1a2e] leading-snug">
                                                 {result.laptop.laptop_name}

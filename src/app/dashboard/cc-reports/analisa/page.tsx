@@ -314,13 +314,13 @@ export default function CCAnalisaPage() {
                 )}
                 {tt.level === "WARN" && (
                   <>
-                    <b>⚠️ Koneksi TikTok perlu perhatian.</b>{" "}
+                    <b> Koneksi TikTok perlu perhatian.</b>{" "}
                     {tt.error ?? (tt.daysLeft !== null && `Sesi tersisa ${tt.daysLeft} hari.`)}
                   </>
                 )}
                 {tt.level === "DEAD" && (
                   <>
-                    <b>🔴 TikTok tidak terhubung.</b> Metrik TikTok tidak ter-update otomatis.
+                    <b> TikTok tidak terhubung.</b> Metrik TikTok tidak ter-update otomatis.
                     {tt.error && <span className="ml-1 opacity-80">({tt.error})</span>}
                   </>
                 )}
@@ -343,12 +343,12 @@ export default function CCAnalisaPage() {
               <p className={`text-xs font-medium ${ig.level === "WARN" ? "text-amber-800" : "text-red-800"}`}>
                 {ig.level === "WARN" ? (
                   <>
-                    <b>⚠️ Token Instagram perlu perhatian.</b>{" "}
+                    <b> Token Instagram perlu perhatian.</b>{" "}
                     {ig.error ?? (ig.daysLeft !== null && `Sisa ${ig.daysLeft} hari sebelum kedaluwarsa.`)}
                   </>
                 ) : (
                   <>
-                    <b>🔴 Token Instagram kedaluwarsa.</b> Metrik IG tidak ter-update.
+                    <b> Token Instagram kedaluwarsa.</b> Metrik IG tidak ter-update.
                     {ig.error && <span className="ml-1 opacity-80">({ig.error})</span>}
                   </>
                 )}
@@ -360,7 +360,7 @@ export default function CCAnalisaPage() {
           {data && data.problems.length > 0 && (
             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
               <p className="text-xs font-black text-amber-900">
-                ⚠️ {data.problems.length} posting metriknya belum akurat
+                 {data.problems.length} posting metriknya belum akurat
                 {data.issues.partial > 0 && ` · ${data.issues.partial} sebagian`}
                 {data.issues.error > 0 && ` · ${data.issues.error} gagal`}
               </p>
@@ -410,7 +410,7 @@ export default function CCAnalisaPage() {
             </div>
 
             <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-              {/* ✅ Toggle realtime */}
+              {/*  Toggle realtime */}
               <button
                 onClick={() => setLive((v) => !v)}
                 title="Tarik ulang metrik otomatis tiap 60 detik"
@@ -892,9 +892,9 @@ function ProcessTooltip({ active, payload, label }: TooltipInjected) {
     <div className="max-w-[240px] rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-lg">
       <p className="truncate text-[11px] font-bold text-gray-500">{String(label)}</p>
       <div className="mt-1 space-y-0.5 text-xs font-semibold text-gray-700">
-        <p>🎥 Take: <b>{fmtMinutes(take)}</b></p>
-        <p>📤 Serah ke editor: <b>{fmtMinutes(handoff)}</b></p>
-        <p>✂️ Editing: <b>{fmtMinutes(edit)}</b></p>
+        <p> Take: <b>{fmtMinutes(take)}</b></p>
+        <p> Serah ke editor: <b>{fmtMinutes(handoff)}</b></p>
+        <p> Editing: <b>{fmtMinutes(edit)}</b></p>
         <p className="border-t border-gray-100 pt-1 text-gray-900">
           Total: <b>{fmtMinutes(take + handoff + edit)}</b>
         </p>

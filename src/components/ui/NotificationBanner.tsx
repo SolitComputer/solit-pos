@@ -44,7 +44,7 @@ export function NotificationBanner() {
   if (!mounted) return null;
   if (dismissed || permission === "unsupported" || permission === "denied" || isSubscribed) return null;
 
-  // ✅ Sukses aktifkan — tampilkan konfirmasi lebih lama
+  //  Sukses aktifkan — tampilkan konfirmasi lebih lama
   if (justEnabled) {
     return (
       <div
@@ -52,7 +52,7 @@ export function NotificationBanner() {
         style={{ animation: "slideUp 0.3s ease-out" }}
       >
         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-base">✅</span>
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
         </div>
         <div>
           <p className="text-sm font-bold">Notifikasi aktif!</p>
@@ -70,7 +70,7 @@ export function NotificationBanner() {
       >
         <div className="bg-[#1a1a2e] rounded-2xl shadow-2xl overflow-hidden border border-white/10">
 
-          {/* ✅ Header dengan gradient */}
+          {/*  Header dengan gradient */}
           <div
             className="px-4 pt-4 pb-3 flex items-start gap-3"
             style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)" }}
@@ -78,7 +78,7 @@ export function NotificationBanner() {
             {/* Ikon animasi */}
             <div className="relative flex-shrink-0 mt-0.5">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                <span className="text-xl" style={{ animation: "bellRing 2s ease-in-out infinite" }}>🔔</span>
+                <svg className="w-5 h-5 text-white" style={{ animation: "bellRing 2s ease-in-out infinite" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
               </div>
               {/* Pulse ring */}
               <div className="absolute -inset-1 rounded-xl border-2 border-amber-400/30 animate-ping" />
@@ -92,8 +92,9 @@ export function NotificationBanner() {
                 Terima notif chat tim & DM langsung di HP, bahkan saat app ditutup.
               </p>
               {retryCount > 0 && (
-                <p className="text-xs text-amber-400 mt-1">
-                  ⚠️ Gagal {retryCount}x — pastikan browser mengizinkan notifikasi
+                <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  Gagal {retryCount}x — pastikan browser mengizinkan notifikasi
                 </p>
               )}
             </div>
@@ -109,20 +110,20 @@ export function NotificationBanner() {
             </button>
           </div>
 
-          {/* ✅ Info fitur */}
+          {/*  Info fitur */}
           <div className="px-4 pb-3 flex items-center gap-4 text-[10px] text-white/40">
             <span className="flex items-center gap-1">
-              <span>💬</span> Grup Chat
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> Grup Chat
             </span>
             <span className="flex items-center gap-1">
-              <span>📩</span> Pesan Langsung
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg> Pesan Langsung
             </span>
             <span className="flex items-center gap-1">
-              <span>📱</span> Background
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Background
             </span>
           </div>
 
-          {/* ✅ Tombol aksi */}
+          {/*  Tombol aksi */}
           <div className="px-4 pb-4 flex gap-2">
             <button
               onClick={handleDismiss}
@@ -146,17 +147,17 @@ export function NotificationBanner() {
                 </>
               ) : (
                 <>
-                  <span>🔔</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                   <span>Aktifkan Sekarang</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* ✅ Hide hint */}
+          {/*  Hide hint */}
           <div className="px-4 pb-3 text-center">
             <p className="text-[9px] text-white/25">
-              Klik ✕ untuk sembunyikan • akan muncul kembali dalam 3 hari
+              Klik  untuk sembunyikan • akan muncul kembali dalam 3 hari
             </p>
           </div>
         </div>
@@ -189,7 +190,7 @@ export function NotificationToggleButton() {
   if (permission === "denied") {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
-        <span>🔕</span>
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l4-4m0 4l-4-4" /></svg>
         <span>Notifikasi diblokir — aktifkan di browser</span>
       </div>
     );
@@ -208,7 +209,9 @@ export function NotificationToggleButton() {
       {isLoading ? (
         <div className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
       ) : (
-        <span>{isSubscribed ? "🔔" : "🔕"}</span>
+        isSubscribed
+          ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+          : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l4-4m0 4l-4-4" /></svg>
       )}
       <span className="flex-1 text-left">
         {isSubscribed ? "Notifikasi aktif" : "Aktifkan notifikasi"}

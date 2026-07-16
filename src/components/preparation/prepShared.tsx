@@ -21,9 +21,9 @@ export const STATUS_META: Record<string, { label: string; badge: string; dot: st
 };
 
 export const DELIVERY_META: Record<string, { label: string; icon: string }> = {
-  DIAMBIL_CUSTOMER: { label: "Diambil Customer", icon: "🧍" },
-  PENGANTARAN: { label: "Pengantaran", icon: "🛵" },
-  KURIR: { label: "Kurir", icon: "📦" },
+  DIAMBIL_CUSTOMER: { label: "Diambil Customer", icon: "" },
+  PENGANTARAN: { label: "Pengantaran", icon: "" },
+  KURIR: { label: "Kurir", icon: "" },
 };
 
 export const fmtDate = (iso: string) =>
@@ -71,7 +71,7 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
             {isNew && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500 text-white animate-pulse">BARU</span>}
           </div>
           <p className="text-base font-black text-gray-900 leading-tight">{o.customer_name}</p>
-          {o.customer_phone && <p className="text-xs text-gray-500 mt-0.5">📱 {o.customer_phone}</p>}
+          {o.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {o.customer_phone}</p>}
         </div>
         <div className="text-right flex-shrink-0">
           <p className="text-[11px] font-bold text-gray-700">{fmtTime(o.created_at)}</p>
@@ -103,13 +103,13 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
         {total > 6 && <span className="text-[10px] text-gray-400 px-1 self-center">+{total - 6} lagi</span>}
       </div>
 
-      {o.delivery_address && <p className="text-[11px] text-gray-400 mb-3 truncate">📍 {o.delivery_address}</p>}
+      {o.delivery_address && <p className="text-[11px] text-gray-400 mb-3 truncate"> {o.delivery_address}</p>}
 
       <div className="flex gap-2">
         {showReceive && (
           <button onClick={() => onReceive!(o.id)} disabled={receivingId === o.id}
             className="flex-1 h-9 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition disabled:opacity-50">
-            {receivingId === o.id ? "Memproses..." : "📥 Terima & Cek"}
+            {receivingId === o.id ? "Memproses..." : " Terima & Cek"}
           </button>
         )}
         <Link href={`/dashboard/preparation/${o.id}`}

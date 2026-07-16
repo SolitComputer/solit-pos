@@ -33,19 +33,19 @@ const KEPALA_ROLES = [
 ];
 
 const DIVISIONS = [
-    { id: "MARKETING", label: "Marketing", emoji: "📣", color: "bg-pink-100 text-pink-700 border-pink-200" },
-    { id: "SALES", label: "Sales", emoji: "🛒", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    { id: "PENYEDIA_BARANG", label: "Penyedia Barang", emoji: "📦", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    { id: "TEKNISI", label: "Teknisi", emoji: "🔧", color: "bg-orange-100 text-orange-700 border-orange-200" },
-    { id: "ONPOINT", label: "Onpoint", emoji: "🎯", color: "bg-blue-100 text-blue-700 border-blue-200" },
-    { id: "SOTECH", label: "Sotech", emoji: "💻", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-    { id: "UMUM", label: "Umum", emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" },
+    { id: "MARKETING", label: "Marketing", emoji: "", color: "bg-pink-100 text-pink-700 border-pink-200" },
+    { id: "SALES", label: "Sales", emoji: "", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    { id: "PENYEDIA_BARANG", label: "Penyedia Barang", emoji: "", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    { id: "TEKNISI", label: "Teknisi", emoji: "", color: "bg-orange-100 text-orange-700 border-orange-200" },
+    { id: "ONPOINT", label: "Onpoint", emoji: "", color: "bg-blue-100 text-blue-700 border-blue-200" },
+    { id: "SOTECH", label: "Sotech", emoji: "", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+    { id: "UMUM", label: "Umum", emoji: "", color: "bg-gray-100 text-gray-700 border-gray-200" },
 ];
 
 const STATUS_CONFIG = {
-    SUBMITTED: { label: "Terkirim", emoji: "📤", bg: "bg-blue-100", color: "text-blue-700", border: "border-blue-200" },
-    REVIEWED: { label: "Disetujui", emoji: "✅", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
-    REVISION: { label: "Revisi", emoji: "🔄", bg: "bg-amber-100", color: "text-amber-700", border: "border-amber-200" },
+    SUBMITTED: { label: "Terkirim", emoji: "", bg: "bg-blue-100", color: "text-blue-700", border: "border-blue-200" },
+    REVIEWED: { label: "Disetujui", emoji: "", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
+    REVISION: { label: "Revisi", emoji: "", bg: "bg-amber-100", color: "text-amber-700", border: "border-amber-200" },
 };
 
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -111,7 +111,7 @@ function formatDateShort(iso: string) {
     return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 function getDivisionInfo(id: string) {
-    return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "📋", color: "bg-gray-100 text-gray-700 border-gray-200" };
+    return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "", color: "bg-gray-100 text-gray-700 border-gray-200" };
 }
 function shiftMonth(ym: string, delta: number) {
     const [y, m] = ym.split("-").map(Number);
@@ -402,7 +402,7 @@ function MonthInsight({
     return (
         <div className="bg-white rounded-2xl overflow-hidden h-full" style={CARD_STYLE}>
             <SectionHeader
-                title={<>✨ Ringkasan {MONTH_NAMES[m - 1]}</>}
+                title={<> Ringkasan {MONTH_NAMES[m - 1]}</>}
                 subtitle={isPKLUser ? "Kepatuhan laporan harianmu (Senin–Sabtu)" : "Sebaran status & pemantauan harian"}
             />
 
@@ -466,7 +466,7 @@ function MonthInsight({
                 {isPKLUser && missing.length > 0 && (
                     <div className="pt-4" style={{ borderTop: "1px solid #f2f3fa" }}>
                         <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">
-                            ⚠️ Belum dilaporkan ({missing.length}) — klik untuk isi
+                             Belum dilaporkan ({missing.length}) — klik untuk isi
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                             {missing.slice(-8).map(d => (
@@ -484,7 +484,7 @@ function MonthInsight({
 
                 {isPKLUser && missing.length === 0 && workDays.length > 0 && (
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#ecfdf5] border border-[#a7f3d0]">
-                        <span className="text-lg">🎉</span>
+                        <span className="text-lg"></span>
                         <p className="text-[11px] font-bold text-[#047857]">Semua hari kerja sudah dilaporkan!</p>
                     </div>
                 )}
@@ -496,7 +496,7 @@ function MonthInsight({
                             Belum lapor hari ini ({notReportedToday.length}/{pklUsers.length})
                         </p>
                         {notReportedToday.length === 0 ? (
-                            <p className="text-[11px] font-bold text-[#047857]">✅ Semua PKL sudah mengirim laporan hari ini</p>
+                            <p className="text-[11px] font-bold text-[#047857]"> Semua PKL sudah mengirim laporan hari ini</p>
                         ) : (
                             <div className="flex flex-wrap gap-1.5">
                                 {notReportedToday.map(u => (
@@ -611,7 +611,7 @@ function ReportFormModal({
                         style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
                     <div className="relative">
                         <p className="font-black text-white text-base tracking-tight">
-                            {isEdit ? "✏️ Edit Laporan Kerja" : isAdminAdd ? "➕ Tambah Laporan (Admin)" : "📝 Buat Laporan Kerja"}
+                            {isEdit ? " Edit Laporan Kerja" : isAdminAdd ? " Tambah Laporan (Admin)" : " Buat Laporan Kerja"}
                         </p>
                         <p className="text-xs text-white/55 mt-1">
                             {isEdit ? "Update isi laporan kerja PKL" : "Catat kegiatan kerja harian PKL"}
@@ -626,7 +626,7 @@ function ReportFormModal({
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                     {error && (
                         <div className="bg-[#fff1f2] border border-[#fecdd3] text-[#be123c] text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-                            <span>⚠️</span>{error}
+                            <span></span>{error}
                         </div>
                     )}
 
@@ -743,7 +743,7 @@ function ReportFormModal({
                     >
                         {saving
                             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                            : isEdit ? "💾 Simpan Perubahan" : "📤 Kirim Laporan"
+                            : isEdit ? " Simpan Perubahan" : " Kirim Laporan"
                         }
                     </button>
                 </div>
@@ -795,7 +795,7 @@ function ReviewModal({
                     <div className="absolute -top-10 -right-6 w-40 h-40 rounded-full blur-3xl opacity-30"
                         style={{ background: "radial-gradient(circle, #a78bfa, transparent 70%)" }} />
                     <div className="relative">
-                        <p className="font-black text-white text-base tracking-tight">🔍 Review Laporan</p>
+                        <p className="font-black text-white text-base tracking-tight"> Review Laporan</p>
                         <p className="text-xs text-white/70 mt-1">{report.users?.name ?? "—"} · {formatDateShort(report.report_date)}</p>
                     </div>
                     <button onClick={onClose} className="relative w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
@@ -804,7 +804,7 @@ function ReviewModal({
                 </div>
 
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-                    {error && <div className="bg-[#fff1f2] border border-[#fecdd3] text-[#be123c] text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>}
+                    {error && <div className="bg-[#fff1f2] border border-[#fecdd3] text-[#be123c] text-xs px-4 py-3 rounded-xl"> {error}</div>}
 
                     {/* Isi laporan */}
                     <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl p-4">
@@ -827,14 +827,14 @@ function ReviewModal({
                                     ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
-                                <span>✅</span> Disetujui
+                                <span></span> Disetujui
                             </button>
                             <button type="button" onClick={() => setStatus("REVISION")}
                                 className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${status === "REVISION"
                                     ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
-                                <span>🔄</span> Perlu Revisi
+                                <span></span> Perlu Revisi
                             </button>
                         </div>
                     </div>
@@ -859,7 +859,7 @@ function ReviewModal({
                     <button onClick={submit} disabled={saving}
                         className="flex-1 h-11 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                         style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 8px 22px -6px rgba(124,58,237,0.5)" }}>
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "✔️ Simpan Review"}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan Review"}
                     </button>
                 </div>
             </div>
@@ -899,7 +899,7 @@ function ReportDetailModal({
                     <div className="absolute -top-10 -right-6 w-40 h-40 rounded-full blur-3xl opacity-30"
                         style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
                     <div className="relative">
-                        <p className="font-black text-white text-base tracking-tight">📄 Detail Laporan</p>
+                        <p className="font-black text-white text-base tracking-tight"> Detail Laporan</p>
                         <p className="text-xs text-white/60 mt-1">
                             {report.users?.name ?? "—"} · {formatDateShort(report.report_date)}
                         </p>
@@ -920,7 +920,7 @@ function ReportDetailModal({
                         </span>
                         {report.created_by_admin && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-violet-100 text-violet-700 border-violet-200">
-                                🔒 Input Admin
+                                 Input Admin
                             </span>
                         )}
                     </div>
@@ -951,7 +951,7 @@ function ReportDetailModal({
                     {report.review_note && (
                         <div className={`rounded-xl px-4 py-3 border ${report.status === "REVIEWED" ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
                             <p className={`text-[10px] font-bold uppercase tracking-wide mb-1 ${report.status === "REVIEWED" ? "text-emerald-600" : "text-amber-600"}`}>
-                                💬 Catatan Reviewer
+                                 Catatan Reviewer
                                 {report.reviewer && <span className="font-normal normal-case ml-1">— {report.reviewer.name}</span>}
                             </p>
                             <p className="text-sm text-[#334155] leading-relaxed">{report.review_note}</p>
@@ -969,20 +969,20 @@ function ReportDetailModal({
                     {canDel && (
                         <button onClick={onDelete}
                             className="h-10 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition-all active:scale-[0.98]">
-                            🗑️ Hapus
+                             Hapus
                         </button>
                     )}
                     {canEdit && (
                         <button onClick={onEdit}
                             className="h-10 px-4 bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0] rounded-xl text-xs font-bold hover:bg-[#e2e8f0] transition-all active:scale-[0.98]">
-                            ✏️ Edit
+                             Edit
                         </button>
                     )}
                     {canDoReview && (
                         <button onClick={onReview}
                             className="flex-1 h-10 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all active:scale-[0.98]"
                             style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 6px 18px -6px rgba(124,58,237,0.5)" }}>
-                            🔍 Review Laporan
+                             Review Laporan
                         </button>
                     )}
                     {!canDoReview && !canEdit && (
@@ -1139,7 +1139,7 @@ export default function PKLReportsPage() {
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <div className="w-16 h-16 rounded-2xl bg-[#fff1f2] flex items-center justify-center mb-4">
-                        <span className="text-3xl">🚫</span>
+                        <span className="text-3xl"></span>
                     </div>
                     <p className="text-base font-bold text-[#334155]">Akses Ditolak</p>
                     <p className="text-sm text-[#94a3b8] mt-1">Halaman ini hanya untuk PKL dan pemantau divisi</p>
@@ -1208,7 +1208,7 @@ export default function PKLReportsPage() {
                                     onClick={() => { setEditReport(null); setPrefillDate(null); setShowForm(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-white px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all active:scale-[0.98] shadow-lg shadow-black/20"
                                 >
-                                    ➕ {isPKLUser ? "Buat Laporan" : "Tambah Manual"}
+                                     {isPKLUser ? "Buat Laporan" : "Tambah Manual"}
                                 </button>
                             )}
                         </div>
@@ -1228,17 +1228,17 @@ export default function PKLReportsPage() {
                                 </span>
                             ))}
                             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 ring-1 ring-white/10 backdrop-blur-sm text-[11px] font-semibold text-white/75">
-                                🗓️ {MONTH_NAMES[parseInt(calendarMonth.split("-")[1]) - 1]} {calendarMonth.split("-")[0]}
+                                 {MONTH_NAMES[parseInt(calendarMonth.split("-")[1]) - 1]} {calendarMonth.split("-")[0]}
                             </span>
                         </div>
                     </div>
 
                     {/* ── Stat Cards ── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <StatCard icon="📋" value={stats.total} label="Total Laporan" loading={loading} gradient="linear-gradient(135deg, #94a3b8, #475569)" tint="#f1f5f9" />
-                        <StatCard icon="📤" value={stats.submitted} label="Terkirim" loading={loading} gradient="linear-gradient(135deg, #60a5fa, #2563eb)" tint="#eff6ff" />
-                        <StatCard icon="✅" value={stats.reviewed} label="Disetujui" loading={loading} gradient="linear-gradient(135deg, #34d399, #059669)" tint="#ecfdf5" />
-                        <StatCard icon="🔄" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
+                        <StatCard icon="" value={stats.total} label="Total Laporan" loading={loading} gradient="linear-gradient(135deg, #94a3b8, #475569)" tint="#f1f5f9" />
+                        <StatCard icon="" value={stats.submitted} label="Terkirim" loading={loading} gradient="linear-gradient(135deg, #60a5fa, #2563eb)" tint="#eff6ff" />
+                        <StatCard icon="" value={stats.reviewed} label="Disetujui" loading={loading} gradient="linear-gradient(135deg, #34d399, #059669)" tint="#ecfdf5" />
+                        <StatCard icon="" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
                     </div>
 
                     {/* ── Kalender + Insight ── */}
@@ -1319,7 +1319,7 @@ export default function PKLReportsPage() {
                                                 ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                 : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                         >
-                                            🌐 Semua Divisi
+                                             Semua Divisi
                                         </button>
                                         {DIVISIONS.map(div => (
                                             <button
@@ -1372,9 +1372,9 @@ export default function PKLReportsPage() {
                                         className="h-10 border border-[#e8ecf5] rounded-xl px-3 text-sm bg-[#f7f9ff] text-[#334155] focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:bg-white transition-all min-w-[140px]"
                                     >
                                         <option value="ALL">Semua Status</option>
-                                        <option value="SUBMITTED">📤 Terkirim</option>
-                                        <option value="REVIEWED">✅ Disetujui</option>
-                                        <option value="REVISION">🔄 Perlu Revisi</option>
+                                        <option value="SUBMITTED"> Terkirim</option>
+                                        <option value="REVIEWED"> Disetujui</option>
+                                        <option value="REVISION"> Perlu Revisi</option>
                                     </select>
                                 </div>
 
@@ -1411,7 +1411,7 @@ export default function PKLReportsPage() {
                     {!isPKLUser && Object.keys(reportsByPKL).length > 0 && (
                         <div>
                             <div className="flex items-center gap-2 mb-3">
-                                <p className="text-sm font-bold text-[#475569]">📊 Ringkasan per PKL</p>
+                                <p className="text-sm font-bold text-[#475569]"> Ringkasan per PKL</p>
                                 <span className="text-[10px] font-bold text-[#94a3b8] bg-white border border-[#eef0f6] px-2 py-0.5 rounded-full tabular-nums">
                                     {Object.keys(reportsByPKL).length} orang
                                 </span>
@@ -1496,7 +1496,7 @@ export default function PKLReportsPage() {
                                 </p>
                                 <p className="text-[10px] text-[#94a3b8] mt-0.5">
                                     {filterDate
-                                        ? `📌 ${formatDate(filterDate)}`
+                                        ? ` ${formatDate(filterDate)}`
                                         : filterMonth
                                             ? `${MONTH_NAMES[parseInt(filterMonth.split("-")[1]) - 1]} ${filterMonth.split("-")[0]}`
                                             : "Semua bulan"}
@@ -1515,7 +1515,7 @@ export default function PKLReportsPage() {
                                     onClick={() => { setPrefillDate(getWIBToday()); setEditReport(null); setShowForm(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-[#1a1545] bg-white border border-[#e2e8f0] px-4 py-2 rounded-xl hover:bg-[#f1f5f9] transition-all active:scale-[0.97]"
                                 >
-                                    ✏️ Laporan Hari Ini
+                                     Laporan Hari Ini
                                 </button>
                             )}
                         </div>
@@ -1529,7 +1529,7 @@ export default function PKLReportsPage() {
                         ) : reports.length === 0 ? (
                             <div className="py-16 text-center px-4">
                                 <div className="w-14 h-14 rounded-2xl bg-[#f5f7ff] flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-3xl opacity-40">📋</span>
+                                    <span className="text-3xl opacity-40"></span>
                                 </div>
                                 <p className="text-sm text-[#475569] font-bold">Belum ada laporan di rentang ini</p>
                                 <p className="text-xs text-[#94a3b8] mt-1">Ubah filter bulan/status, atau buat laporan baru.</p>
@@ -1539,7 +1539,7 @@ export default function PKLReportsPage() {
                                         className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-white px-5 py-2.5 rounded-xl transition-all active:scale-[0.98]"
                                         style={{ background: NAVY_GRADIENT, boxShadow: NAVY_SHADOW }}
                                     >
-                                        ➕ Buat laporan
+                                         Buat laporan
                                     </button>
                                 )}
                             </div>
@@ -1606,7 +1606,7 @@ export default function PKLReportsPage() {
                                                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                                             : "bg-amber-50 text-amber-700 border border-amber-200"
                                                             }`}>
-                                                            <span className="flex-shrink-0">💬</span>
+                                                            <span className="flex-shrink-0"></span>
                                                             <span className="line-clamp-1">{report.review_note}</span>
                                                         </div>
                                                     )}

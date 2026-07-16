@@ -237,7 +237,7 @@ const calDays = useMemo(() => {
         {/* Header */}
         <div className="bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-6 py-5 flex items-start justify-between flex-shrink-0">
           <div>
-            <p className="font-bold text-white text-base">📅 Atur Hari Libur</p>
+            <p className="font-bold text-white text-base"> Atur Hari Libur</p>
             <div className="flex items-center gap-2 mt-1.5">
               <button
                 onClick={() => shiftMonth(-1)}
@@ -251,11 +251,11 @@ const calDays = useMemo(() => {
                 onClick={() => shiftMonth(1)}
                 className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all text-[11px]"
                 title="Bulan berikutnya"
-              >▶</button>
+              ></button>
             </div>
             {isOtherMonth ? (
               <p className="text-[10px] text-amber-300 mt-1.5 flex items-center gap-1">
-                ⚠️ Mengatur {MONTH_NAMES[viewMonth]} {viewYear} — untuk libur yang lewat ke bulan depan
+                 Mengatur {MONTH_NAMES[viewMonth]} {viewYear} — untuk libur yang lewat ke bulan depan
               </p>
             ) : (
               <p className="text-[10px] text-white/50 mt-1.5">Maks. {MAX_OFF} hari libur bulanan per orang</p>
@@ -315,7 +315,7 @@ const calDays = useMemo(() => {
           <div className="px-6 pt-3">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2 mb-3">
-                <span>⚠️</span>{error}
+                <span></span>{error}
               </div>
             )}
           </div>
@@ -340,7 +340,7 @@ const calDays = useMemo(() => {
                     {Array.from({ length: MAX_OFF }).map((_, i) => (
                       <div key={i} className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center text-[9px] font-black transition-all ${i < usedCount ? "bg-red-500 border-red-500 text-white" : "bg-gray-100 border-gray-200 text-gray-300"
                         }`}>
-                        {i < usedCount ? "✕" : ""}
+                        {i < usedCount ? "" : ""}
                       </div>
                     ))}
                   </div>
@@ -446,8 +446,8 @@ const calDays = useMemo(() => {
                             <>
                               <span className={isOff ? "font-black" : ""}>{day}</span>
                               {isOff && <span className="text-[8px] mt-0.5 text-white/70 font-normal leading-none">libur</span>}
-                              {isCanceled && <span className="text-[8px] mt-0.5 text-gray-400 font-normal leading-none">masuk ✓</span>}
-                              {isWeeklyActive && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none">✕ batal?</span>}
+                              {isCanceled && <span className="text-[8px] mt-0.5 text-gray-400 font-normal leading-none">masuk </span>}
+                              {isWeeklyActive && <span className="text-[7px] mt-0.5 text-indigo-400 font-normal leading-none"> batal?</span>}
                               {isDateOffRef && <span className="text-[7px] mt-0.5 text-indigo-300 font-normal leading-none">libur</span>}
                               {isToday && !isOff && !isWeeklyDay && !isDateOffRef && (
                                 <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
@@ -513,7 +513,7 @@ const calDays = useMemo(() => {
                             <p className="text-[11px] font-bold text-gray-600 line-through">
                               {DAY_FULL[d.getDay()]}, {d.toLocaleDateString("id-ID", { day: "numeric", month: "long" })}
                             </p>
-                            <p className="text-[9px] text-emerald-500 font-semibold">masuk ✓</p>
+                            <p className="text-[9px] text-emerald-500 font-semibold">masuk </p>
                           </div>
                           <button
                             onClick={() => restoreWeeklyOff(dateStr)}

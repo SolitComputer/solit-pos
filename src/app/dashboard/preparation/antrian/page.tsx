@@ -85,7 +85,7 @@ export default function PreparationAntrianPage() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, (payload) => {
         const row: any = payload.new;
         if (canHearIncoming) {   // ← admin / non-penyedia yang buka halaman ini tidak ikut bunyi
-          showToast("📦 Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
+          showToast("Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
         }
         if (row.id && !knownIdsRef.current.has(row.id)) {
           setNewIds(prev => new Set(prev).add(row.id));
@@ -149,9 +149,9 @@ export default function PreparationAntrianPage() {
   ] as const;
 
   const STAT = [
-    { label: "Menunggu", value: counts.MENUNGGU, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: "⏳" },
-    { label: "Diproses", value: counts.DIPROSES, color: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700", icon: "🔧" },
-    { label: "Unit Antri", value: totalUnitMenunggu, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "💻" },
+    { label: "Menunggu", value: counts.MENUNGGU, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+    { label: "Diproses", value: counts.DIPROSES, color: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> },
+    { label: "Unit Antri", value: totalUnitMenunggu, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },
   ];
 
   return (
@@ -178,7 +178,7 @@ export default function PreparationAntrianPage() {
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] animate-in slide-in-from-top-2 duration-300">
             <div className="bg-red-600 text-white px-5 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
-              <p className="text-sm font-black">🔔 {alarmCount} penyiapan menunggu diterima!</p>
+              <p className="text-sm font-black"> {alarmCount} penyiapan menunggu diterima!</p>
             </div>
           </div>
         )}
@@ -219,7 +219,7 @@ export default function PreparationAntrianPage() {
             {STAT.map(s => (
               <div key={s.label} className={`bg-gradient-to-br ${s.color} border rounded-2xl p-3`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-lg">{s.icon}</span>
+                  <span className="text-current opacity-70">{s.icon}</span>
                   <span className="text-2xl font-black tabular-nums">{s.value}</span>
                 </div>
                 <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
@@ -229,7 +229,9 @@ export default function PreparationAntrianPage() {
 
           {counts.MENUNGGU > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-              <span className="text-2xl">📥</span>
+              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+              </div>
               <div>
                 <p className="text-sm font-bold text-amber-800">{counts.MENUNGGU} penyiapan menunggu diterima</p>
                 <p className="text-xs text-amber-600">Total {totalUnitMenunggu} unit perlu disiapkan</p>
@@ -260,7 +262,7 @@ export default function PreparationAntrianPage() {
             <div className="space-y-2.5">{[1, 2, 3].map(i => <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-              <div className="text-4xl mb-3">🎉</div>
+              <svg className="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <p className="text-gray-500 text-sm font-medium">Antrian kosong — semua barang sudah disiapkan</p>
             </div>
           ) : (

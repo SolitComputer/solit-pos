@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -35,11 +36,12 @@
         </provider>
 
         <!-- ✅ TAMBAHAN: service background geolocation (di DALAM <application>) -->
-        <service
-            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"
-            android:enabled="true"
-            android:exported="true"
-            android:foregroundServiceType="location" />
+       <service
+        android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"
+        android:enabled="true"
+        android:exported="false"
+        android:foregroundServiceType="location"
+        tools:replace="android:exported" />
 
     </application>
 
@@ -55,5 +57,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.location.gps" />
+    <!-- tambahkan di dalam <manifest>, sejajar dengan permission location -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
 </manifest>

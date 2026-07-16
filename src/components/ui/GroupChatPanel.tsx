@@ -7,6 +7,7 @@ import {
 import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
+import { Inbox, Clock, FileText } from "lucide-react";
 import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
 import { GroupInfoModal } from "@/components/ui/GroupInfoModal";
 import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
@@ -391,7 +392,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                     )}
                     <div className="px-3 py-2 text-slate-400 text-xs italic flex items-center gap-1.5"
                         style={{ background: "#f1f5f9", border: "1px solid #e8ecf0", borderRadius: 12 }}>
-                        <span style={{ opacity: 0.6 }}>🚫</span>
+                        <FileText className="w-4 h-4 inline opacity-60" />
                         <span>Pesan dihapus</span>
                     </div>
                 </div>
@@ -493,10 +494,10 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                     </p>
                                     <p className="truncate mt-0.5 text-[9px]"
                                         style={{ color: isMine ? "rgba(255,255,255,0.5)" : "#94a3b8" }}>
-                                        {msg.reply_to.is_deleted ? "🚫 Pesan dihapus"
-                                            : msg.reply_to.attachment_type === "image" ? "📷 Foto"
-                                                : msg.reply_to.attachment_type === "voice" ? "🎤 Pesan suara"
-                                                    : msg.reply_to.attachment_type === "file" ? "📎 File"
+                                        {msg.reply_to.is_deleted ? " Pesan dihapus"
+                                            : msg.reply_to.attachment_type === "image" ? " Foto"
+                                                : msg.reply_to.attachment_type === "voice" ? " Pesan suara"
+                                                    : msg.reply_to.attachment_type === "file" ? " File"
                                                         : msg.reply_to.content}
                                     </p>
                                 </div>
@@ -846,9 +847,9 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "3px solid #6366f1" }}>
                         <p className="text-[10px] font-black text-indigo-500 mb-0.5">{replyTo.sender_name}</p>
                         <p className="text-xs text-slate-500 truncate">
-                            {replyTo.attachment_type === "image" ? "📷 Foto"
-                                : replyTo.attachment_type === "voice" ? "🎤 Pesan suara"
-                                    : replyTo.attachment_type === "file" ? "📎 File"
+                            {replyTo.attachment_type === "image" ? " Foto"
+                                : replyTo.attachment_type === "voice" ? " Pesan suara"
+                                    : replyTo.attachment_type === "file" ? " File"
                                         : replyTo.content}
                         </p>
                     </div>
@@ -994,7 +995,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
         edited_at: string | null;
         created_at: string;
         attachment_url: string | null;
-        attachment_type: "image" | "file" | "voice" | null; // ⬅️ +voice
+        attachment_type: "image" | "file" | "voice" | null; // +voice
         attachment_name: string | null;
         attachment_size: number | null;
     }
@@ -1133,7 +1134,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-                        <div className="text-3xl opacity-20">💬</div>
+                        <div className="flex justify-center opacity-20"><Inbox className="w-8 h-8" /></div>
                         <p className="text-[11px] text-slate-400 font-medium">Mulai percakapan dengan</p>
                         <p className="text-[11px] font-bold text-slate-600">{targetUser.name}</p>
                     </div>
@@ -1176,7 +1177,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                                     <span className="text-[9px]">{formatTime(msg.created_at)}</span>
                                     {isMine && (
                                         <span className="text-[9px]" style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
-                                            {msg.is_read ? "✓✓" : "✓"}
+                                            {msg.is_read ? "" : ""}
                                         </span>
                                     )}
                                 </div>
@@ -1761,13 +1762,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 <button key={f} onClick={() => setMemberFilter(f)}
                                     className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all ${memberFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
                                         }`}>
-                                    {f === "all" ? `Semua (${users.length})` : `🟢 Online (${onlineCount})`}
+                                    {f === "all" ? `Semua (${users.length})` : `Online (${onlineCount})`}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Entri grup — klik untuk balik ke All Team Solit dari sidebar */}
+                    {/* BARU: entri grup — klik untuk balik ke All Team Solit dari sidebar */}
                     <button
                         onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); setActiveGroupId(DEFAULT_GROUP_ID); }}
                         className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID ? "bg-indigo-50" : "hover:bg-slate-50"}`}
@@ -1948,7 +1949,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 <h2 className="text-sm font-black text-white tracking-tight">
                                     {activeGroupId === DEFAULT_GROUP_ID ? "All Team Solit" : customGroups.find(g => g.id === activeGroupId)?.name ?? "Grup"}
                                 </h2>
-                                <span style={{ fontSize: 14 }}>💬</span>
+                                {activeGroupId === DEFAULT_GROUP_ID ? (
+                                    <Clock className="w-4 h-4 inline" />
+                                ) : (
+                                    <span style={{ fontSize: 14 }}>💬</span>
+                                )}
                                 {activeGroupId !== DEFAULT_GROUP_ID && (
                                     <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -2043,7 +2048,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                                 <div className="flex items-center justify-center text-4xl"
                                     style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
-                                    👋
+                                    
                                 </div>
                                 <div>
                                     <p className="text-sm font-bold text-slate-700">Belum ada pesan</p>
@@ -2163,7 +2168,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 <p className="text-[9.5px] mt-0.5 truncate"
                                     style={{ color: getAvatarColor(embeddedDMUser.role) }}>
                                     {presenceMap[embeddedDMUser.id]?.is_online
-                                        ? "🟢 online"
+                                        ? "online"
                                         : `Terakhir online ${formatLastSeen(presenceMap[embeddedDMUser.id]?.seconds_ago ?? null)}`}
                                 </p>
                             </div>

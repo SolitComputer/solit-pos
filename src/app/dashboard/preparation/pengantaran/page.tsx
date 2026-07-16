@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { AlertCircle, Clock, Inbox } from "lucide-react";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 interface MyDelivery {
@@ -30,10 +31,10 @@ function getPhase(o: MyDelivery): Phase {
 }
 
 const PHASE_META: Record<Phase, { label: string; badge: string; dot: string; cta: string; pulse?: boolean }> = {
-  MENUNGGU_SETUJU: { label: "Perlu Disetujui", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500", cta: "✅ Setujui Tugas", pulse: true },
-  PERLU_ANTAR: { label: "Perlu Diantar", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", cta: "🎯 Mulai Antar", pulse: true },
-  SEDANG_ANTAR: { label: "Sedang Diantar", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", cta: "📍 Lanjutkan Antar", pulse: true },
-  PULANG: { label: "Perjalanan Pulang", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", cta: "🏠 Lihat Perjalanan", pulse: true },
+  MENUNGGU_SETUJU: { label: "Perlu Disetujui", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500", cta: " Setujui Tugas", pulse: true },
+  PERLU_ANTAR: { label: "Perlu Diantar", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", cta: " Mulai Antar", pulse: true },
+  SEDANG_ANTAR: { label: "Sedang Diantar", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", cta: " Lanjutkan Antar", pulse: true },
+  PULANG: { label: "Perjalanan Pulang", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", cta: " Lihat Perjalanan", pulse: true },
   SELESAI: { label: "Selesai", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", cta: "Lihat Detail" },
 };
 
@@ -63,7 +64,7 @@ function DeliveryTimer({ start, end }: { start: string; end?: string | null }) {
 
   return (
     <span className={`text-[10px] font-bold border px-2 py-0.5 rounded flex items-center gap-1 ${end ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-orange-50 text-orange-700 border-orange-100"}`}>
-      ⏱️ Aktual: <span className="font-mono tabular-nums">{elapsed}</span>
+      Aktual: <span className="font-mono tabular-nums">{elapsed}</span>
     </span>
   );
 }
@@ -91,7 +92,7 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
           {o.customer_phone && (
             <a href={`tel:${o.customer_phone}`} onClick={(e) => e.stopPropagation()}
               className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 mt-0.5">
-              📱 {o.customer_phone}
+               {o.customer_phone}
             </a>
           )}
         </div>
@@ -99,14 +100,14 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
 
       {o.delivery_address && (
         <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 mb-2 flex items-start gap-2">
-          <span className="text-sm flex-shrink-0">📍</span>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <p className="text-xs text-gray-600 leading-snug">{o.delivery_address}</p>
         </div>
       )}
 
       {o.scheduled_delivery_date && (
         <div className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg px-2.5 py-1 mb-2">
-          <span className="text-xs">📅</span>
+          <Clock className="w-3 h-3" />
           <span className="text-[11px] font-bold text-indigo-700">Antar: {fmtSched(o.scheduled_delivery_date)}</span>
         </div>
       )}
@@ -131,7 +132,7 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
 
       {(o.delivery_distance_m || o.delivery_duration_s || o.delivery_accepted_at) && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {o.delivery_distance_m != null && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded">📏 {(o.delivery_distance_m / 1000).toFixed(1)} km</span>}
+          {o.delivery_distance_m != null && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded"> {(o.delivery_distance_m / 1000).toFixed(1)} km</span>}
           {o.delivery_duration_s != null && <span className="text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-100 px-2 py-0.5 rounded flex items-center gap-1">Estimasi: <span className="font-mono tabular-nums">{Math.round(o.delivery_duration_s / 60)} mnt</span></span>}
           {o.delivery_accepted_at && (
             <DeliveryTimer start={o.delivery_accepted_at} end={o.delivered_at} />
@@ -193,7 +194,7 @@ export default function MyDeliveryPage() {
         const fresh = activeIds.filter((id) => !knownIdsRef.current.has(id));
         if (fresh.length) {
           const o = data.find((d) => d.id === fresh[0]);
-          showToast("🛵 Tugas antar baru!", `${o?.customer_name ?? "Customer"} · ${o?.order_number ?? ""}`);
+          showToast(" Tugas antar baru!", `${o?.customer_name ?? "Customer"} · ${o?.order_number ?? ""}`);
           setNewIds((prev) => { const n = new Set(prev); fresh.forEach((id) => n.add(id)); return n; });
           fresh.forEach((id) => setTimeout(() => setNewIds((prev) => { const n = new Set(prev); n.delete(id); return n; }), 12000));
         }
@@ -255,9 +256,9 @@ export default function MyDeliveryPage() {
   }, [orders, filter, search]);
 
   const STAT = [
-    { label: "Perlu Diantar", value: counts.perlu, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: "📦" },
-    { label: "Sedang Jalan", value: counts.jalan, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "🛵" },
-    { label: "Selesai", value: counts.selesai, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: "✅" },
+    { label: "Perlu Diantar", value: counts.perlu, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: "" },
+    { label: "Sedang Jalan", value: counts.jalan, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "" },
+    { label: "Selesai", value: counts.selesai, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: "" },
   ];
 
   const TABS = [
@@ -332,7 +333,7 @@ export default function MyDeliveryPage() {
 
           {counts.perlu > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-              <span className="text-2xl">📦</span>
+              <Clock className="w-6 h-6" />
               <div>
                 <p className="text-sm font-bold text-amber-800">{counts.perlu} barang siap diantar</p>
                 <p className="text-xs text-amber-600">Tap kartunya buat mulai antar & aktifkan tracking</p>
@@ -361,7 +362,7 @@ export default function MyDeliveryPage() {
             <div className="space-y-2.5">{[1, 2, 3].map((i) => <div key={i} className="h-48 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-              <div className="text-4xl mb-3 opacity-40">🛵</div>
+              <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
               <p className="text-gray-500 text-sm font-medium">
                 {filter === "SELESAI" ? "Belum ada pengantaran selesai" : "Belum ada tugas pengantaran buat kamu"}
               </p>

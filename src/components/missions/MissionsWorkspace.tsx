@@ -16,6 +16,7 @@ import {
     canReviewMission,
     isMissionFullAccess,
 } from "@/lib/missions";
+import { Clock, Settings, Search, Check, X, ArrowDown, ArrowRight, Flame, AlertCircle, Inbox } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { hasFullAccess } from "@/components/missions/missionShared";
 
@@ -35,40 +36,40 @@ const supabaseRealtime = createClient(
 // ── Role visual ───────────────────────────────────────────────────────────────
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 const ROLE_VISUAL: Record<string, { label: string; emoji: string; color: string; border: string }> = {
-    ADMIN: { label: "Admin / CEO", emoji: "👑", color: "#7c3aed", border: "#ddd6fe" },
-    PROGRAMMER: { label: "Programmer", emoji: "💻", color: "#4f46e5", border: "#c7d2fe" },
-    ASISTEN_CEO: { label: "Asisten CEO", emoji: "🤝", color: "#9333ea", border: "#e9d5ff" },
-    KEPALA_MARKETING: { label: "Kepala Marketing", emoji: "🎯", color: "#e11d48", border: "#fecdd3" },
-    KEPALA_SALES: { label: "Kepala Sales", emoji: "📊", color: "#059669", border: "#a7f3d0" },
-    CREW_SALES: { label: "Crew Sales", emoji: "💼", color: "#0284c7", border: "#bae6fd" },
-    PKL_SALES: { label: "PKL Sales", emoji: "🎓", color: "#0284c7", border: "#bae6fd" },
-    PENGANTARAN: { label: "Pengantaran", emoji: "🚚", color: "#0d9488", border: "#99f6e4" },
-    PKL_PENGANTARAN: { label: "PKL Pengantaran", emoji: "🎓", color: "#0d9488", border: "#99f6e4" },
-    KONTEN: { label: "Konten Kreator", emoji: "📝", color: "#a21caf", border: "#f0abfc" },
-    PKL_KONTEN: { label: "PKL Konten", emoji: "🎓", color: "#a21caf", border: "#f0abfc" },
-    MARKETING: { label: "Marketing", emoji: "📱", color: "#db2777", border: "#fbcfe8" },
-    PKL_MARKETING: { label: "PKL Marketing", emoji: "🎓", color: "#db2777", border: "#fbcfe8" },
-    KEPALA_TEKNISI: { label: "Kepala Teknisi", emoji: "🔩", color: "#dc2626", border: "#fecaca" },
-    CUSTOMER_SERVICE: { label: "Customer Service", emoji: "🎧", color: "#0369a1", border: "#bae6fd" },
-    PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", emoji: "🎓", color: "#0369a1", border: "#bae6fd" },
-    TEKNISI: { label: "Teknisi", emoji: "🔧", color: "#ea580c", border: "#fed7aa" },
-    PKL_TEKNISI: { label: "PKL Teknisi", emoji: "🎓", color: "#ea580c", border: "#fed7aa" },
-    KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia", emoji: "🏢", color: "#c2410c", border: "#fed7aa" },
-    PENYEDIA_BARANG: { label: "Penyedia Barang", emoji: "🏭", color: "#ca8a04", border: "#fef08a" },
-    PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang", emoji: "🎓", color: "#ca8a04", border: "#fef08a" },
-    KEPALA_ONPOINT: { label: "Kepala Onpoint", emoji: "🎯", color: "#16a34a", border: "#bbf7d0" },
-    ONPOINT: { label: "Onpoint", emoji: "📍", color: "#15803d", border: "#a7f3d0" },
-    PKL_ONPOINT: { label: "PKL Onpoint", emoji: "🎓", color: "#15803d", border: "#a7f3d0" },
-    KEPALA_SOTECH: { label: "Kepala Sotech", emoji: "⚙️", color: "#4d7c0f", border: "#d9f99d" },
-    SOTECH: { label: "Sotech", emoji: "🛠️", color: "#65a30d", border: "#d9f99d" },
-    PKL_SOTECH: { label: "PKL Sotech", emoji: "🎓", color: "#65a30d", border: "#d9f99d" },
-    KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola", emoji: "📦", color: "#1d4ed8", border: "#bfdbfe" },
-    PENGELOLA_BARANG: { label: "Adm / Pengelola Barang", emoji: "📦", color: "#2563eb", border: "#bfdbfe" },
-    PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", emoji: "🎓", color: "#2563eb", border: "#bfdbfe" },
-    ACCOUNTING: { label: "Accounting", emoji: "💰", color: "#d97706", border: "#fde68a" },
+    ADMIN: { label: "Admin / CEO", emoji: "[ADM]", color: "#7c3aed", border: "#ddd6fe" },
+    PROGRAMMER: { label: "Programmer", emoji: "[PROG]", color: "#4f46e5", border: "#c7d2fe" },
+    ASISTEN_CEO: { label: "Asisten CEO", emoji: "[AST]", color: "#9333ea", border: "#e9d5ff" },
+    KEPALA_MARKETING: { label: "Kepala Marketing", emoji: "[MKT]", color: "#e11d48", border: "#fecdd3" },
+    KEPALA_SALES: { label: "Kepala Sales", emoji: "[SLS]", color: "#059669", border: "#a7f3d0" },
+    CREW_SALES: { label: "Crew Sales", emoji: "[CREW]", color: "#0284c7", border: "#bae6fd" },
+    PKL_SALES: { label: "PKL Sales", emoji: "[PKL]", color: "#0284c7", border: "#bae6fd" },
+    PENGANTARAN: { label: "Pengantaran", emoji: "[TRIP]", color: "#0d9488", border: "#99f6e4" },
+    PKL_PENGANTARAN: { label: "PKL Pengantaran", emoji: "[PKL]", color: "#0d9488", border: "#99f6e4" },
+    KONTEN: { label: "Konten Kreator", emoji: "[CONTENT]", color: "#a21caf", border: "#f0abfc" },
+    PKL_KONTEN: { label: "PKL Konten", emoji: "[PKL]", color: "#a21caf", border: "#f0abfc" },
+    MARKETING: { label: "Marketing", emoji: "[MKT]", color: "#db2777", border: "#fbcfe8" },
+    PKL_MARKETING: { label: "PKL Marketing", emoji: "[PKL]", color: "#db2777", border: "#fbcfe8" },
+    KEPALA_TEKNISI: { label: "Kepala Teknisi", emoji: "[TEK]", color: "#dc2626", border: "#fecaca" },
+    CUSTOMER_SERVICE: { label: "Customer Service", emoji: "[CS]", color: "#0369a1", border: "#bae6fd" },
+    PKL_CUSTOMER_SERVICE: { label: "PKL CS", emoji: "[PKL]", color: "#0369a1", border: "#bae6fd" },
+    TEKNISI: { label: "Teknisi", emoji: "[TEK]", color: "#ea580c", border: "#fed7aa" },
+    PKL_TEKNISI: { label: "PKL Teknisi", emoji: "[PKL]", color: "#ea580c", border: "#fed7aa" },
+    KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia", emoji: "[PENYEDIA]", color: "#c2410c", border: "#fed7aa" },
+    PENYEDIA_BARANG: { label: "Penyedia Barang", emoji: "[FACTORY]", color: "#ca8a04", border: "#fef08a" },
+    PKL_PENYEDIA_BARANG: { label: "PKL Penyedia", emoji: "[PKL]", color: "#ca8a04", border: "#fef08a" },
+    KEPALA_ONPOINT: { label: "Kepala Onpoint", emoji: "[ONPOINT]", color: "#16a34a", border: "#bbf7d0" },
+    ONPOINT: { label: "Onpoint", emoji: "[GPS]", color: "#15803d", border: "#a7f3d0" },
+    PKL_ONPOINT: { label: "PKL Onpoint", emoji: "[PKL]", color: "#15803d", border: "#a7f3d0" },
+    KEPALA_SOTECH: { label: "Kepala Sotech", emoji: "[SOTECH]", color: "#4d7c0f", border: "#d9f99d" },
+    SOTECH: { label: "Sotech", emoji: "[SOTECH]", color: "#65a30d", border: "#d9f99d" },
+    PKL_SOTECH: { label: "PKL Sotech", emoji: "[PKL]", color: "#65a30d", border: "#d9f99d" },
+    KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola", emoji: "[INV]", color: "#1d4ed8", border: "#bfdbfe" },
+    PENGELOLA_BARANG: { label: "Pengelola Barang", emoji: "[INV]", color: "#2563eb", border: "#bfdbfe" },
+    PKL_PENGELOLA_BARANG: { label: "PKL Pengelola", emoji: "[PKL]", color: "#2563eb", border: "#bfdbfe" },
+    ACCOUNTING: { label: "Accounting", emoji: "[ACC]", color: "#d97706", border: "#fde68a" },
 };
 function roleVis(r: string) {
-    return ROLE_VISUAL[r] ?? { label: r.replace(/_/g, " "), emoji: "👤", color: "#64748b", border: "#e2e8f0" };
+    return ROLE_VISUAL[r] ?? { label: r.replace(/_/g, " "), emoji: "", color: "#64748b", border: "#e2e8f0" };
 }
 
 // ── Struktur hak akses (display, sesuai bagan) ────────────────────────────────
@@ -78,10 +79,10 @@ function rnode(role: string, children: DNode[] = []): DNode {
     return { key: role, role, label: v.label, emoji: v.emoji, color: v.color, children };
 }
 const ACCESS_TREE: DNode = {
-    key: "CEO", label: "CEO / Akses Penuh", emoji: "👑", color: "#7c3aed", virtual: true,
+    key: "CEO", label: "CEO / Akses Penuh", emoji: "", color: "#7c3aed", virtual: true,
     children: [
         {
-            key: "FINANCE", label: "Finance", emoji: "💵", color: "#0f766e", virtual: true,
+            key: "FINANCE", label: "Finance", emoji: "", color: "#0f766e", virtual: true,
             children: [
                 rnode("KEPALA_MARKETING", [
                     rnode("KEPALA_SALES", [rnode("CREW_SALES"), rnode("PKL_SALES"), rnode("PENGANTARAN"), rnode("PKL_PENGANTARAN")]),
@@ -91,13 +92,13 @@ const ACCESS_TREE: DNode = {
                 ]),
                 rnode("KEPALA_TEKNISI", [rnode("CUSTOMER_SERVICE"), rnode("PKL_CUSTOMER_SERVICE"), rnode("TEKNISI"), rnode("PKL_TEKNISI")]),
                 rnode("KEPALA_PENYEDIA_BARANG", [rnode("PENYEDIA_BARANG"), rnode("PKL_PENYEDIA_BARANG")]),
-                { key: "MASAK", label: "Masak / Dapur", emoji: "🍳", color: "#a16207", virtual: true, children: [] },
+                { key: "MASAK", label: "Masak / Dapur", emoji: "", color: "#a16207", virtual: true, children: [] },
             ],
         },
         rnode("ACCOUNTING", [
             rnode("KEPALA_PENGELOLA_BARANG", [rnode("PENGELOLA_BARANG"), rnode("PKL_PENGELOLA_BARANG")]),
         ]),
-        { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", emoji: "💻", color: "#4f46e5", children: [] },
+        { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", emoji: "", color: "#4f46e5", children: [] },
         rnode("KEPALA_SOTECH", [rnode("SOTECH"), rnode("PKL_SOTECH")]),
         rnode("KEPALA_ONPOINT", [rnode("ONPOINT"), rnode("PKL_ONPOINT")]),
     ],
@@ -219,7 +220,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 function ErrorBox({ msg }: { msg: string }) {
     return <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
-        style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>⚠️ {msg}</div>;
+        style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}> {msg}</div>;
 }
 function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
     return (
@@ -233,13 +234,15 @@ function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
 // ── Badges ────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Mission["status"] }) {
     const s = MISSION_STATUS_META[status];
+    const Icon = s.icon === "clock" ? Clock : s.icon === "settings" ? Settings : s.icon === "search" ? Search : s.icon === "check" ? Check : s.icon === "x" ? X : AlertCircle;
     return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
-        style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>{s.icon} {s.label}</span>;
+        style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}><Icon className="w-3 h-3" /> {s.label}</span>;
 }
 function PriorityBadge({ priority }: { priority: MissionPriority }) {
     const p = MISSION_PRIORITY_META[priority];
+    const Icon = p.icon === "arrow-down" ? ArrowDown : p.icon === "arrow-right" ? ArrowRight : p.icon === "flame" ? Flame : AlertCircle;
     return <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
-        style={{ background: p.bg, color: p.text, border: `1px solid ${p.border}` }}>{p.icon} {p.label}</span>;
+        style={{ background: p.bg, color: p.text, border: `1px solid ${p.border}` }}><Icon className="w-3 h-3" /> {p.label}</span>;
 }
 
 // ── Vertical tree (Hak Akses — anti geser) ────────────────────────────────────
@@ -277,7 +280,7 @@ function AccessTree({ mine }: { mine: Set<string> }) {
             <div className="vt-item vt-item--root">
                 <div className="vt-chip vt-chip--root"
                     style={iAmFull ? { boxShadow: "0 0 0 2px #c4b5fd, 0 6px 18px rgba(15,12,41,0.3)" } : undefined}>
-                    <span style={{ fontSize: 15 }}>👑</span>
+                    <AlertCircle className="w-4 h-4 inline" />
                     <div style={{ lineHeight: 1.15 }}>
                         <div style={{ fontSize: 11.5, fontWeight: 800, color: "#fff" }}>CEO / Akses Penuh {iAmFull && "· kamu"}</div>
                         <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)" }}>Bisa beri misi ke semua peran</div>
@@ -305,7 +308,7 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
                             : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                        ⏰ Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
+                         Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
                     </span>
                 )}
             </div>
@@ -445,14 +448,14 @@ function MissionCard({
                 <div className="flex items-center gap-2 flex-wrap mt-2.5 pt-2.5" style={{ borderTop: "1px dashed #eef2f7" }}>
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                        🗓️ Dibuat {fmtDateShort(m.created_at)}
+                         Dibuat {fmtDateShort(m.created_at)}
                     </span>
                     <span className="text-[9.5px] text-slate-400">{timeAgo(m.created_at)}</span>
                     {m.due_date && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
                             style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
                                 : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                            ⏰ {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
+                             {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
                         </span>
                     )}
                 </div>
@@ -559,7 +562,7 @@ function MissionCalendar({
             </div>
 
             <div className="px-3 pt-3 flex flex-wrap items-center gap-1.5">
-                {([{ k: "created", label: "🗓️ Dibuat" }, { k: "due", label: "⏰ Tenggat" }] as { k: DateBasis; label: string }[]).map(b => {
+                {([{ k: "created", label: " Dibuat" }, { k: "due", label: " Tenggat" }] as { k: DateBasis; label: string }[]).map(b => {
                     const active = basis === b.k;
                     return (
                         <button key={b.k} onClick={() => onBasisChange(b.k)}
@@ -574,7 +577,7 @@ function MissionCalendar({
                     <button onClick={() => onSelectDate(null)}
                         className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
                         style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
-                        Semua Tanggal ✕
+                        Semua Tanggal 
                     </button>
                 )}
             </div>
@@ -655,7 +658,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
 
     const save = async () => {
         setError("");
-        // ✅ FIX: validasi array
+        //  FIX: validasi array
         if (assignedTo.length === 0) { setError("Pilih minimal 1 penerima misi"); return; }
         if (!title.trim()) { setError("Judul misi wajib diisi"); return; }
         setSaving(true);
@@ -714,7 +717,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                 {error && <ErrorBox msg={error} />}
 
                 <Field label={`Penerima Misi ${assignedTo.length > 0 ? `(${assignedTo.length} dipilih)` : ""}`}>
-                    {/* ✅ FIX: chip list penerima terpilih (bisa lebih dari 1) */}
+                    {/*  FIX: chip list penerima terpilih (bisa lebih dari 1) */}
                     {assignedTo.length > 0 && (
                         <div className="mb-2 flex flex-wrap gap-1.5 p-2 rounded-xl"
                             style={{ background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", border: "1px solid #ddd6fe" }}>
@@ -743,7 +746,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                         </div>
                     )}
 
-                    <Input placeholder="🔍 Cari nama..." value={search} onChange={e => setSearch(e.target.value)} />
+                    <Input placeholder=" Cari nama..." value={search} onChange={e => setSearch(e.target.value)} />
 
                     {loadingUsers ? (
                         <div className="mt-2 space-y-1.5">
@@ -762,7 +765,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                     ) : (
                         <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-0.5">
                             {filtered.map(u => {
-                                // ✅ FIX: cek dari array assignedTo, bukan single ID
+                                //  FIX: cek dari array assignedTo, bukan single ID
                                 const active = assignedTo.includes(u.id);
                                 return (
                                     <button key={u.id} type="button"
@@ -782,7 +785,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                                             <p className="text-xs font-bold truncate" style={{ color: active ? "#5b21b6" : "#334155" }}>{u.name}</p>
                                             <p className="text-[10px] truncate" style={{ color: active ? "#a78bfa" : "#94a3b8" }}>{ROLE_LABEL_MINI(u.roles?.[0] ?? u.role)}</p>
                                         </div>
-                                        {/* ✅ FIX: checkbox indicator, bukan cuma centang */}
+                                        {/*  FIX: checkbox indicator, bukan cuma centang */}
                                         <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
                                             style={active
                                                 ? { background: "#7c3aed", color: "#fff", border: "1.5px solid #7c3aed" }
@@ -797,7 +800,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
 
                     {assignedTo.length > 1 && (
                         <p className="text-[10px] mt-1.5" style={{ color: "#7c3aed" }}>
-                            💡 Misi yang sama akan dibuat untuk <b>{assignedTo.length} orang</b> — masing-masing punya progress sendiri.
+                             Misi yang sama akan dibuat untuk <b>{assignedTo.length} orang</b> — masing-masing punya progress sendiri.
                         </p>
                     )}
                 </Field>
@@ -864,7 +867,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                 <button onClick={save} disabled={saving}
                     className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
                     style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                    {saving ? "Menyimpan..." : "🎯 Beri Misi"}
+                    {saving ? "Menyimpan..." : " Beri Misi"}
                 </button>
             </div>
         </ModalShell>
@@ -903,7 +906,7 @@ function ConfirmDeleteModal({
 
                 <div className="rounded-xl p-3 text-xs"
                     style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e" }}>
-                    ⚠️ Misi & semua sub-tugas akan dihapus permanen dari sistem.
+                     Misi & semua sub-tugas akan dihapus permanen dari sistem.
                     {mission.status === "IN_PROGRESS" && (
                         <p className="mt-1 font-semibold">Catatan: misi ini sedang dikerjakan penerima.</p>
                     )}
@@ -931,7 +934,7 @@ function ConfirmDeleteModal({
                         boxShadow: "0 4px 14px rgba(220,38,38,0.3)",
                     }}
                 >
-                    {deleting ? "Menghapus..." : "🗑️ Ya, Hapus"}
+                    {deleting ? "Menghapus..." : " Ya, Hapus"}
                 </button>
             </div>
         </ModalShell>
@@ -987,7 +990,7 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
             });
             const data = await res.json();
             if (!data.success) { showToast(data.message ?? "Gagal submit", "err"); return; }
-            showToast("Misi diselesaikan, menunggu ACC ✅", "ok");
+            showToast("Misi diselesaikan, menunggu ACC ", "ok");
             onChanged();
         } catch { showToast("Terjadi kesalahan", "err"); }
         finally { setBusy(false); }
@@ -1026,7 +1029,7 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
                                 style={checklistComplete
                                     ? { background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }
                                     : { background: "linear-gradient(135deg, #94a3b8, #64748b)" }}>
-                                {checklistComplete ? "✅ Selesaikan" : `✅ Selesaikan (${percent}%)`}
+                                {checklistComplete ? " Selesaikan" : ` Selesaikan (${percent}%)`}
                             </button>
                         )}
                     </>
@@ -1036,7 +1039,7 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Kembali</button>
                         <button onClick={submitProof} disabled={busy}
                             className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>{busy ? "Mengirim..." : "📤 Kirim Bukti"}</button>
+                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>{busy ? "Mengirim..." : " Kirim Bukti"}</button>
                     </>
                 )}
             </div>
@@ -1067,7 +1070,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
             });
             const data = await res.json();
             if (!data.success) { showToast(data.message ?? "Gagal", "err"); return; }
-            showToast(action === "approve" ? "Misi disetujui ✅" : "Misi ditolak", "ok");
+            showToast(action === "approve" ? "Misi disetujui " : "Misi ditolak", "ok");
             onChanged();
         } catch { showToast("Terjadi kesalahan", "err"); }
         finally { setBusy(false); }
@@ -1079,7 +1082,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
             const res = await fetch(`/api/missions/${mission.id}`, { method: "DELETE" });
             const data = await res.json();
             if (!data.success) { showToast(data.message ?? "Gagal menghapus", "err"); return; }
-            showToast("Misi dihapus 🗑️", "ok");
+            showToast("Misi dihapus ", "ok");
             onChanged();
         } catch { showToast("Terjadi kesalahan", "err"); }
         finally { setBusy(false); }
@@ -1126,10 +1129,10 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                             <div className="flex gap-2.5">
                                 <button onClick={() => setMode("reject")} disabled={busy}
                                     className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
-                                    style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>❌ Tolak</button>
+                                    style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}> Tolak</button>
                                 <button onClick={() => decide("approve")} disabled={busy}
                                     className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
-                                    style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>{busy ? "..." : "✅ ACC"}</button>
+                                    style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>{busy ? "..." : " ACC"}</button>
                             </div>
                         )}
                         <div className="flex gap-2.5">
@@ -1138,7 +1141,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                             {canDelete && (
                                 <button onClick={() => setMode("confirmDelete")}
                                     className="px-4 h-10 rounded-xl text-sm font-bold transition-all active:scale-95"
-                                    style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>🗑 Hapus</button>
+                                    style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}> Hapus</button>
                             )}
                         </div>
                     </>
@@ -1158,7 +1161,7 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
                         <button onClick={del} disabled={busy}
                             className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>{busy ? "..." : "🗑 Ya, Hapus"}</button>
+                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>{busy ? "..." : " Ya, Hapus"}</button>
                     </div>
                 )}
             </div>
@@ -1232,7 +1235,7 @@ function MissionStatsPanel() {
 
     if (!data || data.total === 0) return null;
 
-    const MEDAL = ["🥇", "🥈", "🥉"];
+    const MEDAL = ["", "", ""];
 
     return (
         <div className="space-y-3">
@@ -1247,7 +1250,7 @@ function MissionStatsPanel() {
                         <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tabular-nums">{data.total}</p>
                         <div className="flex items-center gap-1.5 mt-1.5">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "#ecfdf5", color: "#059669" }}>
-                                ✅ {data.statusCounts.APPROVED ?? 0} selesai
+                                 {data.statusCounts.APPROVED ?? 0} selesai
                             </span>
                         </div>
                     </div>
@@ -1276,7 +1279,7 @@ function MissionStatsPanel() {
                             {data.overdue}
                         </p>
                         <p className="text-[9px] font-bold mt-1.5" style={{ color: data.overdue > 0 ? "#f43f5e" : "#94a3b8" }}>
-                            {data.overdue > 0 ? "⚠️ Perlu perhatian" : "✨ Semua aman"}
+                            {data.overdue > 0 ? " Perlu perhatian" : " Semua aman"}
                         </p>
                     </div>
                 </div>
@@ -1289,9 +1292,9 @@ function MissionStatsPanel() {
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Prioritas</p>
                         <div className="flex items-end gap-2 mt-1">
                             {[
-                                { key: "HIGH", label: "🔥", color: "#dc2626" },
-                                { key: "MEDIUM", label: "➡️", color: "#d97706" },
-                                { key: "LOW", label: "⬇️", color: "#059669" },
+                                { key: "HIGH", label: "", color: "#dc2626" },
+                                { key: "MEDIUM", label: "", color: "#d97706" },
+                                { key: "LOW", label: "", color: "#059669" },
                             ].map(p => (
                                 <div key={p.key} className="text-center">
                                     <span className="text-xs">{p.label}</span>
@@ -1311,7 +1314,7 @@ function MissionStatsPanel() {
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                                 style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
-                                🏆
+                                
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Leaderboard Tercepat</p>
@@ -1322,7 +1325,7 @@ function MissionStatsPanel() {
                     <div className="divide-y divide-slate-50">
                         {data.leaderboard.length === 0 ? (
                             <div className="px-5 py-8 text-center">
-                                <p className="text-3xl mb-2">🏁</p>
+                                <div className="flex justify-center mb-2"><Inbox className="w-8 h-8 opacity-50" /></div>
                                 <p className="text-xs font-bold text-slate-400">Belum ada misi yang selesai</p>
                             </div>
                         ) : data.leaderboard.map((u, i) => {
@@ -1378,7 +1381,7 @@ function MissionStatsPanel() {
                                     {/* Stats */}
                                     <div className="text-right flex-shrink-0">
                                         <p className="text-xs font-black tabular-nums" style={{ color: i === 0 ? "#d97706" : "#334155" }}>
-                                            ⚡ {fmtDuration(u.avgMs)}
+                                             {fmtDuration(u.avgMs)}
                                         </p>
                                         <p className="text-[9px] font-semibold text-slate-400 mt-0.5 tabular-nums">
                                             {u.completed}/{u.total} ({u.rate}%)
@@ -1396,7 +1399,7 @@ function MissionStatsPanel() {
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                                 style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
-                                📌
+                                
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Top Pemberi Misi</p>
@@ -1407,7 +1410,7 @@ function MissionStatsPanel() {
                     <div className="divide-y divide-slate-50">
                         {data.topAssigners.length === 0 ? (
                             <div className="px-5 py-8 text-center">
-                                <p className="text-3xl mb-2">📋</p>
+                                <div className="flex justify-center mb-2"><Inbox className="w-8 h-8 opacity-50" /></div>
                                 <p className="text-xs font-bold text-slate-400">Belum ada data</p>
                             </div>
                         ) : data.topAssigners.map((u, i) => {
@@ -1610,7 +1613,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
             }
             // Optimistic: remove dari list lokal langsung
             setMissions(prev => prev.filter(m => m.id !== confirmDelete.id));
-            showToast("Misi berhasil dihapus 🗑️", "ok");
+            showToast("Misi berhasil dihapus ", "ok");
             setConfirmDelete(null);
         } catch {
             showToast("Terjadi kesalahan saat menghapus", "err");
@@ -1647,8 +1650,8 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                 { event: "INSERT", schema: "public", table: "missions", filter: `assigned_to=eq.${uid}` },
                 (payload: any) => {
                     const t = payload.new?.title ?? "Misi baru";
-                    showToast("🎯 Misi baru masuk untukmu!", "ok");
-                    notifyBrowser("🎯 Misi Baru", t);
+                    showToast(" Misi baru masuk untukmu!", "ok");
+                    notifyBrowser(" Misi Baru", t);
                     try { navigator.vibrate?.(200); } catch { }
                     fetchMissions(box, true);
                 })
@@ -1656,8 +1659,8 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                 { event: "UPDATE", schema: "public", table: "missions", filter: `assigned_to=eq.${uid}` },
                 (payload: any) => {
                     const st = payload.new?.status; const t = payload.new?.title ?? "Misi";
-                    if (st === "APPROVED") { showToast("🎉 Misi kamu disetujui!", "ok"); notifyBrowser("🎉 Misi Disetujui", t); }
-                    else if (st === "REJECTED") { showToast("❌ Misi kamu ditolak", "err"); notifyBrowser("❌ Misi Ditolak", t); }
+                    if (st === "APPROVED") { showToast(" Misi kamu disetujui!", "ok"); notifyBrowser(" Misi Disetujui", t); }
+                    else if (st === "REJECTED") { showToast(" Misi kamu ditolak", "err"); notifyBrowser(" Misi Ditolak", t); }
                     fetchMissions(box, true);
                 })
             .on("postgres_changes",
@@ -1674,8 +1677,8 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                 (payload: any) => {
                     const st = payload.new?.status; const t = payload.new?.title ?? "Misi";
                     if (st === "SUBMITTED") {
-                        showToast("🔍 Ada misi menunggu audit", "ok");
-                        notifyBrowser("🔍 Misi Disubmit", `${t} menunggu audit`);
+                        showToast(" Ada misi menunggu audit", "ok");
+                        notifyBrowser(" Misi Disubmit", `${t} menunggu audit`);
                         try { navigator.vibrate?.(200); } catch { }
                     }
                     fetchMissions(box, true);
@@ -1726,7 +1729,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
             {showCreate && (
                 <CreateMissionModal
                     onClose={() => setShowCreate(false)}
-                    onCreated={() => { setShowCreate(false); fetchMissions(box); showToast("Misi berhasil dibuat 🎯", "ok"); }}
+                    onCreated={() => { setShowCreate(false); fetchMissions(box); showToast("Misi berhasil dibuat ", "ok"); }}
                 />
             )}
             {detail?.mode === "assignee" && (
@@ -1783,9 +1786,9 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     {/* Stats */}
                     {!showStructure && (
                         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                            <MiniStat icon="⚙️" value={stats.pending} label="On Progress" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
-                            <MiniStat icon="🔍" value={stats.review} label="Audit" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
-                            <MiniStat icon="✅" value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
+                            <MiniStat icon="" value={stats.pending} label="On Progress" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
+                            <MiniStat icon="" value={stats.review} label="Audit" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
+                            <MiniStat icon="" value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
                         </div>
                     )}
 
@@ -1798,10 +1801,10 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     <div className="bg-white rounded-2xl p-1.5" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                         <div className="flex gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
                             {([
-                                { key: "received", label: "Misi Saya", emoji: "📥", onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
-                                ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", emoji: "📌", onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
-                                ...(iAmAdmin && section === "dashboard" ? [{ key: "all", label: "Semua Misi", emoji: "🗂️", onClick: () => router.push("/dashboard/missions/all"), active: false }] : []),
-                                ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", emoji: "🧭", onClick: () => setShowStructure(true), active: showStructure }] : []),
+                                { key: "received", label: "Misi Saya", emoji: "", onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
+                                ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", emoji: "", onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
+                                ...(iAmAdmin && section === "dashboard" ? [{ key: "all", label: "Semua Misi", emoji: "", onClick: () => router.push("/dashboard/missions/all"), active: false }] : []),
+                                ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", emoji: "", onClick: () => setShowStructure(true), active: showStructure }] : []),
                             ]).map(t => (
                                 <button key={t.key} onClick={t.onClick}
                                     className="flex-1 min-w-[72px] flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all"
@@ -1834,7 +1837,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                                 <span className="inline-flex items-center gap-1.5">
                                     <span style={{ width: 10, height: 10, borderRadius: 99, background: "#a78bfa", display: "inline-block", boxShadow: "0 0 0 2px #ddd6fe" }} /> Peran kamu
                                 </span>
-                                <span>💡 <b>Finance</b> & <b>Masak</b> belum jadi role sistem — untuk sekarang tugas Finance dijalankan lewat akun Akses Penuh (Admin/Asisten CEO).</span>
+                                <span> <b>Finance</b> & <b>Masak</b> belum jadi role sistem — untuk sekarang tugas Finance dijalankan lewat akun Akses Penuh (Admin/Asisten CEO).</span>
                             </div>
                         </div>
                     ) : (
@@ -1852,7 +1855,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                             {selectedDate && (
                                 <div className="flex items-center gap-3 rounded-2xl px-4 py-3"
                                     style={{ background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", border: "1px solid #ddd6fe" }}>
-                                    <span className="text-xl">📌</span>
+                                    <Clock className="w-5 h-5 inline" />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-black text-violet-800 truncate">{fmtDayLabel(selectedDate)}</p>
                                         <p className="text-[11px] text-violet-500">
@@ -1870,7 +1873,7 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                                 <div className="space-y-3">{Array(4).fill(0).map((_, i) => <CardSkeleton key={i} />)}</div>
                             ) : filteredMissions.length === 0 ? (
                                 <div className="bg-white rounded-2xl text-center py-16" style={{ border: "1px solid #f0f0f8" }}>
-                                    <div className="text-4xl mb-3">🗒️</div>
+                                    <div className="flex justify-center mb-3"><Inbox className="w-10 h-10 opacity-30" /></div>
                                     {selectedDate ? (
                                         <>
                                             <p className="text-sm font-bold text-slate-600">Tidak ada misi pada tanggal ini</p>

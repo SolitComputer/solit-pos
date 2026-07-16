@@ -9,11 +9,26 @@ import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
+import { Check, Clock, Frown, FileText, X, Umbrella, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
     return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
+}
+
+function renderStatusEmoji(emojiName: string) {
+    if (emojiName === "check") return <Check className="w-3.5 h-3.5" />;
+    if (emojiName === "clock") return <Clock className="w-3.5 h-3.5" />;
+    if (emojiName === "frown") return <Frown className="w-3.5 h-3.5" />;
+    if (emojiName === "file-text") return <FileText className="w-3.5 h-3.5" />;
+    if (emojiName === "x") return <X className="w-3.5 h-3.5" />;
+    if (emojiName === "umbrella") return <Umbrella className="w-3.5 h-3.5" />;
+    if (emojiName === "slash") return <X className="w-3.5 h-3.5 opacity-50" />;
+    if (emojiName === "alert") return <ShieldAlert className="w-3.5 h-3.5" />;
+    if (emojiName === "sun") return <Sun className="w-3.5 h-3.5" />;
+    if (emojiName === "inbox") return <Inbox className="w-3.5 h-3.5" />;
+    return null;
 }
 
 type Attendance = {
@@ -159,7 +174,7 @@ function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
-// ✅ Multi-role aware: baca dari currentUser.role ATAU currentUser.roles[]
+// Multi-role aware: baca dari currentUser.role ATAU currentUser.roles[]
 function getUserRoles(user: any): string[] {
     if (!user) return [];
     if (Array.isArray(user.roles) && user.roles.length > 0) return user.roles as string[];
@@ -178,20 +193,20 @@ const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
 
 
 const MANUAL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
-    PRESENT: { label: "Hadir", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200", emoji: "✅" },
-    LATE: { label: "Terlambat", color: "text-amber-700", bg: "bg-amber-100", border: "border-amber-200", emoji: "⏰" },
-    SICK: { label: "Sakit", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200", emoji: "🤒" },
-    PERMIT: { label: "Izin", color: "text-violet-700", bg: "bg-violet-100", border: "border-violet-200", emoji: "📋" },
-    ABSENT: { label: "Tidak Hadir", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", emoji: "❌" },
-    LEAVE: { label: "Cuti", color: "text-cyan-700", bg: "bg-cyan-100", border: "border-cyan-200", emoji: "🌴" },
+    PRESENT: { label: "Hadir", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200", emoji: "check" },
+    LATE: { label: "Terlambat", color: "text-amber-700", bg: "bg-amber-100", border: "border-amber-200", emoji: "clock" },
+    SICK: { label: "Sakit", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200", emoji: "frown" },
+    PERMIT: { label: "Izin", color: "text-violet-700", bg: "bg-violet-100", border: "border-violet-200", emoji: "file-text" },
+    ABSENT: { label: "Tidak Hadir", color: "text-red-700", bg: "bg-red-100", border: "border-red-200", emoji: "x" },
+    LEAVE: { label: "Cuti", color: "text-cyan-700", bg: "bg-cyan-100", border: "border-cyan-200", emoji: "umbrella" },
 };
 
 const ABSENCE_REASON_LABELS: Record<AbsenceReason, { label: string; emoji: string; bg: string; color: string; border: string }> = {
-    ALPHA: { label: "Tanpa Keterangan", emoji: "🚫", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
-    ABSENT: { label: "Tidak Hadir", emoji: "❌", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
-    SICK: { label: "Sakit", emoji: "🤒", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
-    PERMIT: { label: "Izin", emoji: "📋", bg: "bg-violet-50", color: "text-violet-700", border: "border-violet-200" },
-    LEAVE: { label: "Cuti", emoji: "🌴", bg: "bg-cyan-50", color: "text-cyan-700", border: "border-cyan-200" },
+    ALPHA: { label: "Tanpa Keterangan", emoji: "slash", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
+    ABSENT: { label: "Tidak Hadir", emoji: "x", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
+    SICK: { label: "Sakit", emoji: "frown", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
+    PERMIT: { label: "Izin", emoji: "file-text", bg: "bg-violet-50", color: "text-violet-700", border: "border-violet-200" },
+    LEAVE: { label: "Cuti", emoji: "umbrella", bg: "bg-cyan-50", color: "text-cyan-700", border: "border-cyan-200" },
 };
 
 
@@ -274,7 +289,7 @@ function countWorkingDaysFrom(
     dayOffDows: Set<number>,
     offDates: Set<string>,
     startDate: string,
-    leaveDates?: Set<string>  // ✅ Tambah parameter opsional
+    leaveDates?: Set<string>  // Tambah parameter opsional
 ): number {
     const dim = new Date(year, month + 1, 0).getDate();
     let c = 0;
@@ -418,12 +433,12 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
             });
             return timeString.substring(0, 5);
         } catch (e) {
-            console.error("❌ parseTimeFromISO error:", e);
+            console.error(" parseTimeFromISO error:", e);
             return "08:00";
         }
     };
 
-    // ✅ FIX 1: filteredUsers HARUS di atas early return (Rules of Hooks)
+    // FIX 1: filteredUsers HARUS di atas early return (Rules of Hooks)
     const filteredUsers = useMemo(() => {
         if (pklMode === undefined) return users;
         return users.filter(u =>
@@ -436,7 +451,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     const [error, setError] = useState("");
 
     const [form, setForm] = useState({
-        // ✅ FIX 3: gunakan filteredUsers[0]?.id, bukan users[0]?.id
+        // FIX 3: gunakan filteredUsers[0]?.id, bukan users[0]?.id
         user_id: editData?.user_id ?? prefillUserId ?? filteredUsers[0]?.id ?? "",
         attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
         check_in_time: parseTimeFromISO(editData?.check_in_time),
@@ -450,7 +465,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
         console.log("[ManualAttendanceModal] editData:", editData?.user_id);
 
         setForm({
-            // ✅ FIX 3: gunakan filteredUsers[0]?.id
+            // FIX 3: gunakan filteredUsers[0]?.id
             user_id: editData?.user_id ?? prefillUserId ?? filteredUsers[0]?.id ?? "",
             attendance_date: editData?.attendance_date ?? prefillDate ?? getWIBToday(),
             check_in_time: parseTimeFromISO(editData?.check_in_time),
@@ -516,7 +531,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 
     const selectedUser = filteredUsers.find(u => u.id === form.user_id);
 
-    // ✅ FIX 4: cek filteredUsers.length, bukan users.length
+    // FIX 4: cek filteredUsers.length, bukan users.length
     if (!isEdit && filteredUsers.length === 0) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -533,25 +548,25 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     return (
         <ModalShell onClose={onClose}
             headerColor={isEdit ? "bg-gradient-to-r from-blue-600 to-blue-700" : "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]"}
-            title={isEdit ? "✏️ Edit Absen Manual" : "➕ Tambah Absen Manual"}
+            title={isEdit ? "Edit Absen Manual" : " Tambah Absen Manual"}
             subtitle={isEdit ? `${editData?.users?.name ?? "—"} · ${editData?.attendance_date}` : "Input data kehadiran yang belum tercatat atau koreksi absen"}
             footer={
                 <div className="flex gap-3">
                     {isEdit && (
                         <button onClick={deleteRecord} disabled={deleting}
                             className="h-11 px-5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition-all duration-200 disabled:opacity-50 flex items-center gap-2">
-                            {deleting ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" /> : "🗑️ Hapus"}
+                            {deleting ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" /> : "Hapus"}
                         </button>
                     )}
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all duration-200">Batal</button>
                     <button onClick={save} disabled={saving}
                         className={`flex-1 h-11 ${isEdit ? "bg-gradient-to-r from-blue-600 to-blue-700" : "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]"} text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2`}>
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             }>
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-                {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2"><span>⚠️</span>{error}</div>}
+                {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-amber-500 inline mr-1" />{error}</div>}
 
                 {/* Karyawan */}
                 <div>
@@ -699,19 +714,19 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
 
     return (
         <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-emerald-600 to-green-700"
-            title="💰 Kelola Gaji Karyawan" subtitle="Atur tipe dan nominal gaji per karyawan"
+            title=" Kelola Gaji Karyawan" subtitle="Atur tipe dan nominal gaji per karyawan"
             footer={
                 <div className="flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan Semua"}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan Semua"}
                     </button>
                 </div>
             }>
             <div className="overflow-y-auto flex-1 px-6 py-4">
                 {error && <div className="mb-3 bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-2.5 rounded-xl">{error}</div>}
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-xs text-amber-700">
-                    <strong>ℹ️</strong> Gaji <strong>Tetap</strong> = nominal penuh, tidak tergantung absensi.
+                    <strong>ℹ</strong> Gaji <strong>Tetap</strong> = nominal penuh, tidak tergantung absensi.
                     Gaji <strong>Persentase Absen</strong> = % kehadiran × gaji pokok.
                 </div>
                 <div className="space-y-3">
@@ -721,10 +736,10 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[11px] font-black shadow-md flex-shrink-0">{initials(u.name)}</div>
                                 <div><p className="text-sm font-bold text-gray-800">{u.name}</p><p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p></div>
                                 {local[u.id]?.salary_type === "FIXED" && (
-                                    <span className="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">💰 Tetap</span>
+                                    <span className="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full"> Tetap</span>
                                 )}
                                 {local[u.id]?.salary_type === "PERCENTAGE" && (
-                                    <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full">📊 % Absen</span>
+                                    <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full">% Absen</span>
                                 )}
                             </div>
                             <div className="grid grid-cols-2 gap-3">
@@ -732,8 +747,8 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1 block">Tipe Gaji</label>
                                     <select value={local[u.id]?.salary_type ?? "FIXED"} onChange={e => setLocal(p => ({ ...p, [u.id]: { ...p[u.id], salary_type: e.target.value as any } }))}
                                         className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none transition-all">
-                                        <option value="FIXED">💰 Tetap</option>
-                                        <option value="PERCENTAGE">📊 Persentase Absen</option>
+                                        <option value="FIXED"> Tetap</option>
+                                        <option value="PERCENTAGE">Persentase Absen</option>
                                     </select>
                                 </div>
                                 <div>
@@ -814,7 +829,7 @@ function EditAllowanceModal({
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between">
                     <div>
-                        <p className="font-bold text-white text-base">💜 Tunjangan & Potongan</p>
+                        <p className="font-bold text-white text-base">Tunjangan & Potongan</p>
                         <p className="text-xs text-white/70 mt-1">{userName}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition">
@@ -827,14 +842,14 @@ function EditAllowanceModal({
                 <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[70vh]">
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
-                            ⚠️ {error}
+                             {error}
                         </div>
                     )}
 
                     {/* TUNJANGAN SECTION */}
                     <div>
                         <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-4">
-                            ➕ Tunjangan (Disesuaikan % Kehadiran)
+                             Tunjangan (Disesuaikan % Kehadiran)
                         </p>
                         <div className="space-y-3">
                             {/* Tunjangan Istri */}
@@ -890,7 +905,7 @@ function EditAllowanceModal({
                     {/* POTONGAN SECTION */}
                     <div>
                         <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4">
-                            ➖ Potongan (Langsung Potong, Tidak Disesuaikan %)
+                             Potongan (Langsung Potong, Tidak Disesuaikan %)
                         </p>
                         <div className="space-y-3">
                             {/* Cicilan Kasbon */}
@@ -943,7 +958,7 @@ function EditAllowanceModal({
 
                     {/* SUMMARY */}
                     <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-2xl p-4">
-                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3">📋 Ringkasan</p>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3"> Ringkasan</p>
                         <div className="space-y-1.5 text-sm">
                             <div className="flex justify-between text-gray-600">
                                 <span>Tunjangan Istri (×%)</span>
@@ -977,7 +992,7 @@ function EditAllowanceModal({
                                 Menyimpan...
                             </>
                         ) : (
-                            "💾 Simpan"
+                            " Simpan"
                         )}
                     </button>
                 </div>
@@ -1068,7 +1083,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-cyan-600 to-teal-700"
-            title="🌴 Kelola Cuti Karyawan"
+            title="Kelola Cuti Karyawan"
             subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan`}
             wide
             footer={
@@ -1081,8 +1096,8 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                 {/* ── Info banner ── */}
                 <div className="px-6 pt-4 pb-2">
                     <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-2.5 text-[11px] text-cyan-700 flex items-center gap-2">
-                        <span>ℹ️</span>
-                        <span>Admin bisa tambah/kurangi cuti meski saldo habis. Klik <strong>➕</strong> untuk tambah, <strong>➖</strong> untuk kurangi/hapus.</span>
+                        <span>ℹ</span>
+                        <span>Admin bisa tambah/kurangi cuti meski saldo habis. Klik <strong></strong> untuk tambah, <strong></strong> untuk kurangi/hapus.</span>
                     </div>
                 </div>
 
@@ -1142,7 +1157,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                             disabled={settingQuota || manualQuota === ""}
                                                             className="w-8 h-8 flex items-center justify-center bg-violet-600 text-white rounded-lg text-[10px] font-bold hover:bg-violet-700 disabled:opacity-50 transition-all"
                                                         >
-                                                            {settingQuota ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "✓"}
+                                                            {settingQuota ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : ""}
                                                         </button>
                                                         <button
                                                             onClick={() => { setQuotaUid(null); setManualQuota(""); }}
@@ -1180,7 +1195,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                     <div className="flex flex-wrap gap-1">
                                                         {ud.requests.map(r => (
                                                             <span key={r.id} className="group inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
                                                                 <button
                                                                     onClick={() => deleteLeave(r.id)}
                                                                     disabled={deleting === r.id}
@@ -1248,7 +1263,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                                 disabled={saving || !addDate}
                                                                 className="h-9 px-4 bg-gradient-to-r from-cyan-600 to-teal-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
                                                             >
-                                                                {saving ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "✅ Simpan Cuti"}
+                                                                {saving ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan Cuti"}
                                                             </button>
                                                             <button
                                                                 onClick={() => { setExpandedUid(null); setAddDate(""); setAddReason(""); setError(""); }}
@@ -1258,11 +1273,11 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                             </button>
                                                         </div>
                                                         {error && (
-                                                            <p className="w-full text-[11px] text-red-500 flex items-center gap-1">⚠️ {error}</p>
+                                                            <p className="w-full text-[11px] text-red-500 flex items-center gap-1"> {error}</p>
                                                         )}
                                                         {available <= 0 && (
                                                             <p className="w-full text-[11px] text-amber-500 flex items-center gap-1">
-                                                                ⚠️ Saldo habis — admin tetap bisa tambah cuti
+                                                                 Saldo habis — admin tetap bisa tambah cuti
                                                             </p>
                                                         )}
                                                     </div>
@@ -1286,7 +1301,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                 <div className="px-6 pb-4 flex items-center gap-4 flex-wrap text-[10px] text-gray-400">
                     <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center text-violet-700 font-black text-[9px]">1</span>Kuota — klik untuk edit</span>
                     <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-lg bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700 font-black text-[10px]">＋</span>Tambah cuti</span>
-                    <span className="flex items-center gap-1.5">🌴 tanggal → hover × untuk hapus</span>
+                    <span className="flex items-center gap-1.5">tanggal → hover × untuk hapus</span>
                 </div>
             </div>
         </ModalShell>
@@ -1328,12 +1343,12 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: {
     };
     const shown = filter ? users.filter(u => u.id === filter) : users;
     return (
-        <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-[#1a1a2e] to-[#16213e]" title="📅 Libur Mingguan Berulang" subtitle="Pilih hari libur tetap per karyawan"
+        <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-[#1a1a2e] to-[#16213e]" title=" Libur Mingguan Berulang" subtitle="Pilih hari libur tetap per karyawan"
             footer={
                 <div className="flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             }>
@@ -1409,7 +1424,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     else state = "OPEN";
 
     let cfg: {
-        icon: string; gradient: string; iconBg: string; badge: string; dot: string;
+        icon: React.ReactNode; gradient: string; iconBg: string; badge: string; dot: string;
         badgeText: string; title: string; sub: string; showBtn: boolean;
         btnLabel?: string; btnColor?: string; btnAction?: () => void;
     };
@@ -1417,7 +1432,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     switch (state) {
         case "EXEMPT":
             cfg = {
-                icon: "🛡️", gradient: "from-slate-50 to-gray-100", iconBg: "bg-slate-100",
+                icon: "", gradient: "from-slate-50 to-gray-100", iconBg: "bg-slate-100",
                 badge: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400",
                 badgeText: "Bebas Absen", title: "Tidak Wajib Absen",
                 sub: `Role kamu dikecualikan dari absensi · Shift ${status.shift}`, showBtn: false,
@@ -1436,7 +1451,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 || { label: "Tercatat", color: "text-gray-700" };
             const adminName = status.manualCreatedByName;
             cfg = {
-                icon: "✏️",
+                icon: "",
                 gradient: "from-blue-50 to-indigo-50",
                 iconBg: "bg-blue-100",
                 badge: "bg-blue-100 text-blue-700 border-blue-200",
@@ -1449,7 +1464,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "ATTENDED":
             cfg = {
-                icon: "✅", gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
+                icon: <CheckCircle2 className="w-6 h-6 text-emerald-600" />, gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
                 badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-400",
                 badgeText: "Sudah Absen", title: "Absensi Hari Ini Tercatat",
                 sub: `Shift ${status.shift}`, showBtn: false,
@@ -1457,7 +1472,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "DAY_OFF":
             cfg = {
-                icon: "🏖️", gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
+                icon: "", gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
                 badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400",
                 badgeText: "Hari Libur", title: "Kamu Libur Hari Ini",
                 sub: "Tidak perlu absen", showBtn: false,
@@ -1465,7 +1480,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "TOO_EARLY":
             cfg = {
-                icon: "⏳", gradient: "from-blue-50 to-indigo-50", iconBg: "bg-blue-100",
+                icon: <Clock className="w-6 h-6 text-indigo-600" />, gradient: "from-blue-50 to-indigo-50", iconBg: "bg-blue-100",
                 badge: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-400",
                 badgeText: "Belum Waktunya", title: "Belum Waktunya Absen",
                 sub: `Absen dibuka pukul ${openAt} · Shift ${status.shift}`, showBtn: false,
@@ -1473,7 +1488,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "TOO_LATE":
             cfg = {
-                icon: "⌛", gradient: "from-red-50 to-rose-50", iconBg: "bg-red-100",
+                icon: <Frown className="w-6 h-6 text-red-600" />, gradient: "from-red-50 to-rose-50", iconBg: "bg-red-100",
                 badge: "bg-red-100 text-red-600 border-red-200", dot: "bg-red-400",
                 badgeText: "Waktu Habis", title: "Waktu Absen Sudah Lewat",
                 sub: `Batas absen pukul ${closeAt} · Shift ${status.shift}`, showBtn: false,
@@ -1482,7 +1497,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         case "OPEN":
         default:
             cfg = {
-                icon: "🟡", gradient: "from-amber-50 to-yellow-50", iconBg: "bg-amber-100",
+                icon: <Clock className="w-6 h-6 text-amber-600" />, gradient: "from-amber-50 to-yellow-50", iconBg: "bg-amber-100",
                 badge: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-400 animate-pulse",
                 badgeText: "Belum Absen",
                 title: needEnroll ? "Belum Absen — Daftar Wajah Dulu" : "Kamu Belum Absen Hari Ini",
@@ -1523,7 +1538,7 @@ function MonthSelector({ onSelect }: { onSelect: (year: number, month: number) =
     return (
         <div className="max-w-2xl mx-auto px-4 py-12 animate-fadeIn">
             <div className="text-center mb-10">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-lg mb-4"><span className="text-3xl">📊</span></div>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-lg mb-4"><CalendarDays className="w-8 h-8 text-white" /></div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-[#1a1a2e] to-[#16213e] bg-clip-text text-transparent tracking-tight">Absensi Karyawan</h1>
                 <p className="text-sm text-gray-400 mt-2">Pilih bulan untuk melihat laporan absensi</p>
             </div>
@@ -1601,7 +1616,7 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
             <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
                     <div>
-                        <p className="font-bold text-white text-base">💰 Edit Gaji</p>
+                        <p className="font-bold text-white text-base"> Edit Gaji</p>
                         <p className="text-xs text-white/70 mt-1">{userName}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
@@ -1612,7 +1627,7 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
                 </div>
                 <div className="px-6 py-5 space-y-4">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">⚠️ {error}</div>
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl"> {error}</div>
                     )}
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tipe Gaji</label>
@@ -1623,7 +1638,7 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
                                         ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
                                         : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                         }`}>
-                                    {t === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                    {t === "FIXED" ? "Tetap" : "% Absen"}
                                 </button>
                             ))}
                         </div>
@@ -1656,7 +1671,7 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving || !baseSalary}
                         className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "💾 Simpan"}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             </div>
@@ -1674,7 +1689,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
             <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-red-600 to-rose-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
                     <div>
-                        <p className="font-bold text-white text-base">❌ Detail Ketidakhadiran</p>
+                        <p className="font-bold text-white text-base"> Detail Ketidakhadiran</p>
                         <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
@@ -1685,7 +1700,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                     <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Hari tidak hadir ({absences.length})</p>
                         {absences.length === 0 ? (
-                            <p className="text-sm text-gray-400">Tidak ada ketidakhadiran 🎉</p>
+                            <p className="text-sm text-gray-400">Tidak ada ketidakhadiran </p>
                         ) : (
                             <div className="space-y-2">
                                 {absences.map(a => {
@@ -1694,7 +1709,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                                         <div key={a.date} className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-gray-800">{fmt(a.date)}</p>
-                                                {a.note && <p className="text-[11px] text-gray-400 truncate">📝 {a.note}</p>}
+                                                {a.note && <p className="text-[11px] text-gray-400 truncate">{a.note}</p>}
                                             </div>
                                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border}`}>
                                                 {cfg.emoji} {cfg.label}
@@ -1712,7 +1727,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                             <div className="flex flex-wrap gap-1.5">
                                 {offDates.map(d => (
                                     <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200 px-2 py-1 rounded-lg">
-                                        🏖️ {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                         {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
                                     </span>
                                 ))}
                             </div>
@@ -1736,7 +1751,7 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
     const headerColor = isPresent
         ? "bg-gradient-to-r from-emerald-600 to-green-700"
         : "bg-gradient-to-r from-amber-500 to-orange-600";
-    const title = isPresent ? "✅ Detail Hari Tepat Waktu" : "⏰ Detail Hari Terlambat";
+    const title = isPresent ? "Detail Hari Tepat Waktu" : " Detail Hari Terlambat";
 
     const fmt = (d: string) =>
         new Date(d + "T12:00:00").toLocaleDateString("id-ID", {
@@ -1778,10 +1793,10 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
                                     <p className="text-sm font-bold text-gray-800">{fmt(item.date)}</p>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                         <span className="font-mono text-[11px] font-bold text-gray-600">
-                                            🕐 {item.checkInTime}
+                                             {item.checkInTime}
                                         </span>
                                         {item.method === "MANUAL" && (
-                                            <span className="text-[10px] text-blue-600 font-bold">✏️ Manual</span>
+                                            <span className="text-[10px] text-blue-600 font-bold"> Manual</span>
                                         )}
                                         {item.manualCreatedBy && (
                                             <span className="text-[10px] text-violet-500 font-semibold">
@@ -1794,7 +1809,7 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
                                     ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                                     : "bg-amber-100 text-amber-700 border-amber-200"
                                     }`}>
-                                    {isPresent ? "✅ Tepat" : "⏰ Terlambat"}
+                                    {isPresent ? "Tepat" : "Terlambat"}
                                 </span>
                             </div>
                         ))
@@ -1900,15 +1915,15 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                         : "bg-amber-100 text-amber-700 border-amber-200"
                         }`}>
-                        {slip.status === "FINALIZED" ? "✅ Final" : "⏳ Draft"}
+                        {slip.status === "FINALIZED" ? "Final" : "Draft"}
                     </span>
-                    {/* ✅ Badge terkirim */}
+                    {/* Badge terkirim */}
                     {alreadySent && (
                         <span
                             className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-blue-100 text-blue-700 border-blue-200"
                             title={`Dikirim: ${sentDate}`}
                         >
-                            📤 Terkirim {sentDate}
+                             Terkirim {sentDate}
                         </span>
                     )}
                 </div>
@@ -1921,7 +1936,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
                     >
-                        📄 PDF
+                         PDF
                     </a>
 
                     {slip.status === "DRAFT" && (
@@ -1930,11 +1945,11 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                             disabled={finalizing}
                             className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
                         >
-                            {finalizing ? "..." : "✔ Finalisasi"}
+                            {finalizing ? "..." : "Finalisasi"}
                         </button>
                     )}
 
-                    {/* ✅ Tombol Kirim */}
+                    {/* Tombol Kirim */}
                     <button
                         onClick={handleSend}
                         disabled={sending || alreadySent}
@@ -1946,7 +1961,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     >
                         {sending
                             ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</>
-                            : alreadySent ? "📤 Terkirim" : "📤 Kirim"
+                            : alreadySent ? "Terkirim" : "Kirim"
                         }
                     </button>
                 </div>
@@ -1985,7 +2000,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     <p className="text-[9px] font-bold text-white/70 uppercase tracking-wide mb-1">Gaji Bersih</p>
                     <p className="text-base font-black text-white font-mono">{formatRupiah(slip.net_salary)}</p>
                     <p className="text-[9px] text-white/60 mt-1">
-                        {slip.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 % Kehadiran"} · {MONTH_NAMES[slip.month - 1]} {slip.year}
+                        {slip.salary_type === "FIXED" ? "Gaji Tetap" : "% Kehadiran"} · {MONTH_NAMES[slip.month - 1]} {slip.year}
                     </p>
                     {alreadySent && (
                         <p className="text-[9px] text-white/50 mt-0.5">Dikirim {sentDate}</p>
@@ -2115,7 +2130,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
-            title="🔄 Tukar Libur"
+            title="Tukar Libur"
             subtitle="Ganti hari libur dengan hari kerja lain dalam bulan ini"
             footer={
                 <div className="flex gap-3">
@@ -2129,7 +2144,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                     >
                         {saving
                             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                            : "🔄 Simpan Tukar Libur"
+                            : "Simpan Tukar Libur"
                         }
                     </button>
                 </div>
@@ -2138,13 +2153,13 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                 {error && (
                     <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-                        <span>⚠️</span>{error}
+                        <ShieldAlert className="w-4 h-4 text-amber-500 inline mr-1" />{error}
                     </div>
                 )}
 
                 {/* Info box */}
                 <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-xs text-violet-700">
-                    <p className="font-bold mb-1">ℹ️ Cara kerja Tukar Libur:</p>
+                    <p className="font-bold mb-1"><span className="inline-flex mr-1 items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold">i</span> Cara kerja Tukar Libur:</p>
                     <ul className="space-y-1 text-violet-600">
                         <li>• <strong>Tanggal Diganti Libur</strong>: hari yang harusnya masuk, tapi karyawan izin/libur</li>
                         <li>• <strong>Tanggal Masuk Pengganti</strong>: hari libur mingguan yang akan dipakai sebagai ganti masuk</li>
@@ -2183,7 +2198,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                         {/* Tanggal yang jadi libur (harusnya masuk) */}
                         <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                                📋 Tanggal Diganti Libur
+                                Tanggal Diganti Libur
                             </label>
                             <input
                                 type="date"
@@ -2196,7 +2211,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                             {offDate && (
                                 <p className={`text-[10px] mt-1 font-semibold ${isDayOff(offDate) ? "text-red-500" : "text-emerald-600"}`}>
                                     {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
-                                    {isDayOff(offDate) ? " ⚠️ Ini hari libur!" : " ✓ Hari kerja"}
+                                    {isDayOff(offDate) ? " Ini hari libur!" : "Hari kerja"}
                                 </p>
                             )}
                             <p className="text-[9px] text-gray-400 mt-0.5">Hari yang harusnya masuk → jadi libur</p>
@@ -2205,7 +2220,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                         {/* Tanggal pengganti (harusnya libur → jadi masuk) */}
                         <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                                ✅ Tanggal Masuk Pengganti
+                                Tanggal Masuk Pengganti
                             </label>
                             <input
                                 type="date"
@@ -2218,7 +2233,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                             {workDate && (
                                 <p className={`text-[10px] mt-1 font-semibold ${isDayOff(workDate) ? "text-emerald-600" : "text-amber-500"}`}>
                                     {new Date(workDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
-                                    {isDayOff(workDate) ? " ✓ Hari libur (bisa dipakai)" : " ⚠️ Ini bukan hari libur!"}
+                                    {isDayOff(workDate) ? "Hari libur (bisa dipakai)" : " Ini bukan hari libur!"}
                                 </p>
                             )}
                             <p className="text-[9px] text-gray-400 mt-0.5">Hari libur mingguan → jadi masuk</p>
@@ -2285,11 +2300,11 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                             <div className="flex items-center gap-2 text-xs flex-wrap">
                                                 <span className="bg-red-100 text-red-600 border border-red-200 px-2.5 py-1 rounded-lg font-bold">
-                                                    🔴 {new Date(off.off_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
+                                                    {new Date(off.off_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
                                                 </span>
                                                 <span className="text-gray-400 font-bold">→</span>
                                                 <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
-                                                    ✅ {new Date(work.work_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
+                                                    {new Date(work.work_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
                                                 </span>
                                             </div>
                                             {off.note && (
@@ -2344,7 +2359,7 @@ function AbsentUsersModal({
     const STATUS_CONFIG = {
         WITHIN_TIME: {
             label: "Belum Buka Absen",
-            emoji: "⏰",
+            icon: "clock",
             bg: "bg-blue-50",
             color: "text-blue-600",
             border: "border-blue-200",
@@ -2352,7 +2367,7 @@ function AbsentUsersModal({
         },
         POTENTIALLY_LATE: {
             label: "Berpotensi Terlambat",
-            emoji: "⚠️",
+            icon: "alert",
             bg: "bg-amber-50",
             color: "text-amber-600",
             border: "border-amber-200",
@@ -2360,7 +2375,7 @@ function AbsentUsersModal({
         },
         LATE_MORNING: {
             label: "Absen Siang",
-            emoji: "🌤️",
+            icon: "sun",
             bg: "bg-orange-50",
             color: "text-orange-600",
             border: "border-orange-200",
@@ -2368,7 +2383,7 @@ function AbsentUsersModal({
         },
         ABSENT_CONFIRMED: {
             label: "Tidak Hadir",
-            emoji: "🚫",
+            icon: "slash",
             bg: "bg-red-50",
             color: "text-red-600",
             border: "border-red-200",
@@ -2376,7 +2391,7 @@ function AbsentUsersModal({
         },
         NO_RECORD: {
             label: "Tidak Ada Catatan",
-            emoji: "📭",
+            icon: "inbox",
             bg: "bg-gray-50",
             color: "text-gray-500",
             border: "border-gray-200",
@@ -2404,7 +2419,7 @@ function AbsentUsersModal({
                 {/* Header */}
                 <div className={`bg-gradient-to-r ${headerGradient} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
                     <div>
-                        <p className="font-bold text-white text-base">{isPKL ? "🎓 PKL Belum Absen" : "⚠️ Karyawan Belum Absen"}</p>
+                        <p className="font-bold text-white text-base">{isPKL ? "PKL Belum Absen" : "Karyawan Belum Absen"}</p>
                         <p className="text-xs text-white/70 mt-1">{dateLabel} · {absentUsers.length} {modeLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
@@ -2424,7 +2439,7 @@ function AbsentUsersModal({
                         return (
                             <div key={statusKey}>
                                 <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-xl ${cfg.bg} border ${cfg.border}`}>
-                                    <span className="text-sm">{cfg.emoji}</span>
+                                    <span className="text-sm">{renderStatusEmoji(cfg.icon)}</span>
                                     <div>
                                         <p className={`text-xs font-bold ${cfg.color}`}>{cfg.label} ({group.length})</p>
                                         <p className="text-[10px] text-gray-400">{cfg.desc}</p>
@@ -2444,7 +2459,7 @@ function AbsentUsersModal({
                                                     <p className="text-sm font-bold text-gray-800 truncate">{u.name}</p>
                                                     <p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p>
                                                     {u.note && (
-                                                        <p className="text-[10px] text-blue-500 mt-0.5 truncate">📝 {u.note}</p>
+                                                        <p className="text-[10px] text-blue-500 mt-0.5 truncate">{u.note}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -2453,7 +2468,7 @@ function AbsentUsersModal({
                                                     onClick={() => { onAbsenManual(u.userId); onClose(); }}
                                                     className="flex-shrink-0 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all"
                                                 >
-                                                    ✏️ Absen
+                                                    Absen
                                                 </button>
                                             )}
                                         </div>
@@ -2490,7 +2505,7 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
     const subColor = isPKL ? "text-amber-500" : "text-orange-500";
     const avatarGrad = isPKL ? "from-amber-400 to-yellow-500" : "from-orange-400 to-amber-500";
     const arrowColor = isPKL ? "text-amber-400 group-hover:text-amber-600" : "text-orange-400 group-hover:text-orange-600";
-    const icon = isPKL ? "🎓" : "⚠️";
+    const icon = isPKL ? "graduation-cap" : "alert";
     const label = isPKL ? "PKL" : "Karyawan";
 
     const confirmed = list.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED").length;
@@ -2545,7 +2560,7 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
 
 function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSaved }: {
     users: UserInfo[];
-    schedules: ShiftScheduleRow[];   // ✅ NEW
+    schedules: ShiftScheduleRow[];   // NEW
     calYear: number; calMonth: number;
     onClose: () => void; onSaved: () => void | Promise<void>;
 }) {
@@ -2553,7 +2568,7 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
-            title="⏰ Jadwal Shift per Tanggal"
+            title="Jadwal Shift per Tanggal"
             subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan · ${schedules.length} jadwal aktif`}
             wide
             footer={
@@ -2704,7 +2719,7 @@ export default function AttendanceDashboardPage() {
         const d = await r.json();
         if (d.success) {
             const raw = d.data;
-            console.log("[fetchLeaveData] raw response:", raw); // 🔍 sementara, buat ngecek shape asli — boleh dihapus setelah dicek
+            console.log("[fetchLeaveData] raw response:", raw); //  sementara, buat ngecek shape asli — boleh dihapus setelah dicek
             setLeaveData(Array.isArray(raw) ? raw : raw ? [raw] : []);
         }
     }, []);
@@ -2862,8 +2877,8 @@ export default function AttendanceDashboardPage() {
             fetchAllUsers(),
             fetchSalaries(),
             fetchAllowances(),
-            fetchLeaveData(year, month), // ✅ FIX: sama seperti di atas
-            fetchShiftSchedules(year, month),   // ✅ tambah baris ini
+            fetchLeaveData(year, month), // FIX: sama seperti di atas
+            fetchShiftSchedules(year, month),   // tambah baris ini
         ];
         Promise.all(tasks).finally(() => setLoading(false));
     }, [
@@ -3013,7 +3028,7 @@ export default function AttendanceDashboardPage() {
         leaveData.forEach(ld => {
             const uid = ld?.user?.id;
             if (!uid || !ld?.requests?.some(r => r.leave_date === dk)) return;
-            // ✅ Absen manual non-LEAVE menimpa status cuti basi (Cuti → Izin/Sakit/dll)
+            // Absen manual non-LEAVE menimpa status cuti basi (Cuti → Izin/Sakit/dll)
             const mr = manualMap[`${uid}_${dk}`];
             if (mr && mr.status !== "LEAVE") return;
             add(ld?.user?.name, "Cuti");
@@ -3084,7 +3099,7 @@ export default function AttendanceDashboardPage() {
     const uniqueUsers = useMemo(() => { if (allUsers.length > 0) return allUsers.map(u => u.name).sort(); return [...new Set(mergedAttendances.map(a => a.user_name))].sort(); }, [allUsers, mergedAttendances]);
     const salaryMap = useMemo(() => { const m: Record<string, UserSalary> = {}; salaries.forEach(s => m[s.user_id] = s); return m; }, [salaries]);
 
-    // ✅ Shift efektif per (user, tanggal): jadwal > shift user > PAGI
+    // Shift efektif per (user, tanggal): jadwal > shift user > PAGI
     const schedulesByUser = useMemo(() => {
         const m: Record<string, ShiftScheduleRow[]> = {};
         shiftSchedules.forEach(s => { (m[s.user_id] ??= []).push(s); });
@@ -3118,7 +3133,7 @@ export default function AttendanceDashboardPage() {
     const userSummary = useMemo(() => {
         type UserStat = {
             name: string; present: number; late: number; score: number;
-            leave: number; leaveDates: string[];          // ✅ tambah ini
+            leave: number; leaveDates: string[];          // tambah ini
             pastWorkdays: number; totalWorkdays: number; pct: number;
             remainingDays: number; userId: string;
             absences: AbsenceItem[]; offDates: string[];
@@ -3183,7 +3198,7 @@ export default function AttendanceDashboardPage() {
             const offs = dateOffByName[name] ?? new Set<string>();
             const userId = userIdByName[name] ?? "";
 
-            // ✅ Cari created_at user ini
+            // Cari created_at user ini
             const userInfo = allUsers.find(u => u.id === userId);
             const userStartDate = getUserStartDate(userInfo?.created_at, calYear, calMonth);
 
@@ -3196,7 +3211,7 @@ export default function AttendanceDashboardPage() {
                 else userLeaveSet.delete(date);
             });
 
-            let present = 0, late = 0, score = 0, leave = 0;   // ✅ + leave
+            let present = 0, late = 0, score = 0, leave = 0;   // + leave
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
             const leaveDates: string[] = [];
@@ -3335,7 +3350,7 @@ export default function AttendanceDashboardPage() {
 
             if (isToday) {
                 const totalMinNow = nowWIB.getUTCHours() * 60 + nowWIB.getUTCMinutes();
-                const times = effectiveShiftFor(u.id, selectedDate); // ✅ hormati jadwal
+                const times = effectiveShiftFor(u.id, selectedDate); // hormati jadwal
 
                 if (totalMinNow < times.open) {
                     attendanceStatus = "WITHIN_TIME";
@@ -3418,7 +3433,7 @@ export default function AttendanceDashboardPage() {
                     user_id: userStat.userId,
                     year: calYear,
                     month: calMonth + 1,
-                    // ✅ Kirim data pre-calculated dari rekapan
+                    // Kirim data pre-calculated dari rekapan
                     salary_type: sal?.salary_type || "FIXED",
                     base_salary: sal?.base_salary || 0,
                     salary_income: salaryIncome,
@@ -3447,7 +3462,7 @@ export default function AttendanceDashboardPage() {
         }
     }, [salaryMap, allowanceMap, overtimeTotal, calYear, calMonth]);
 
-    // ✅ NEW: Generator slip khusus PKL — tanpa tunjangan, kasbon, pensiun.
+    // NEW: Generator slip khusus PKL — tanpa tunjangan, kasbon, pensiun.
     // Fallback ke rate harian (PKL_DAILY_RATE / PKL_LATE_RATE) kalau belum ada config gaji,
     // biar nominal di slip PERSIS sama dengan yang tampil di tab Rekap Gaji PKL.
     const generateSlipPKL = useCallback(async (userStat: typeof userSummary[0]) => {
@@ -3579,7 +3594,7 @@ export default function AttendanceDashboardPage() {
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!document.hidden && selectedMonth) {
-                console.log("🔄 Refresh data...");
+                console.log("Refresh data...");
                 refreshAll();
             }
         };
@@ -3641,7 +3656,7 @@ export default function AttendanceDashboardPage() {
                                 disabled={usersLoading}
                                 className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
                             >
-                                {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                {usersLoading ? "Loading..." : "Absen Manual"}
                             </button>
                         )}
                         {canManage && (
@@ -3653,9 +3668,9 @@ export default function AttendanceDashboardPage() {
                                     }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
-                                    📅 Atur Libur
+                                    Atur Libur
                                 </button>
-                                {/* ✅ NEW */}
+                                {/* NEW */}
                                 <button
                                     onClick={async () => {
                                         if (allUsers.length === 0) await fetchAllUsers();
@@ -3663,7 +3678,7 @@ export default function AttendanceDashboardPage() {
                                     }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
                                 >
-                                    ⏰ Jadwal Shift
+                                    Jadwal Shift
                                 </button>
                             </>
                         )}
@@ -3678,15 +3693,15 @@ export default function AttendanceDashboardPage() {
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                        { label: "Hari Hadir", value: thisMonthDays, icon: "📅", gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
-                        { label: "Tepat Waktu", value: thisMonthPresent, icon: "✅", gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
-                        { label: "Terlambat", value: thisMonthLate, icon: "⏰", gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
-                        { label: "Karyawan", value: uniqueUsers.length, icon: "👥", gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
+                        { label: "Hari Hadir", value: thisMonthDays, icon: <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>, gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
+                        { label: "Tepat Waktu", value: thisMonthPresent, icon: <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>, gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
+                        { label: "Terlambat", value: thisMonthLate, icon: <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
+                        { label: "Karyawan", value: uniqueUsers.length, icon: <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>, gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
                     ].map(c => (
                         <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:scale-[1.02]`}>
                             <div className="flex items-start justify-between mb-3">
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{c.label}</p>
-                                <div className={`w-8 h-8 rounded-xl ${c.iconBg} flex items-center justify-center shadow-sm`}><span className="text-base">{c.icon}</span></div>
+                                <div className={`w-8 h-8 rounded-xl ${c.iconBg} flex items-center justify-center shadow-sm`}>{c.icon}</div>
                             </div>
                             <p className="text-3xl font-black tracking-tight text-gray-800">
                                 {loading ? <span className="inline-block w-10 h-8 bg-white/50 rounded-lg animate-pulse" /> : c.value}
@@ -3696,24 +3711,24 @@ export default function AttendanceDashboardPage() {
                     ))}
                 </div>
 
-                {/* ✅ Tab bar — computed di luar JSX */}
+                {/* Tab bar — computed di luar JSX */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
                     {(() => {
                         const tabs: { id: typeof activeTab; label: string }[] = [
-                            { id: "calendar", label: "📅 Kalender" },
+                            { id: "calendar", label: "Kalender" },
                         ];
-                        if (canManage) tabs.push({ id: "summary", label: "📊 Ringkasan" });
+                        if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
                         if (canSalary) {
-                            tabs.push({ id: "salary", label: "💰 Rekap Gaji" });
-                            tabs.push({ id: "salary-pkl", label: "🎓 Gaji PKL" });
-                            tabs.push({ id: "salary-slip", label: "📄 Slip Gaji" });
-                            tabs.push({ id: "salary-history", label: "📋 Riwayat Gaji" });
+                            tabs.push({ id: "salary", label: "Rekap Gaji" });
+                            tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
+                            tabs.push({ id: "salary-slip", label: "Slip Gaji" });
+                            tabs.push({ id: "salary-history", label: "Riwayat Gaji" });
                         }
                         if (!isAdmin && !canSalary && !userIsPKL(currentUser)) {
-                            tabs.push({ id: "my-salary" as typeof activeTab, label: "💰 Gaji Saya" });
-                            tabs.push({ id: "my-slip" as typeof activeTab, label: "📄 Slip Gaji" });
+                            tabs.push({ id: "my-salary" as typeof activeTab, label: "Gaji Saya" });
+                            tabs.push({ id: "my-slip" as typeof activeTab, label: "Slip Gaji" });
                         }
-                        if (isAdmin) tabs.push({ id: "leave", label: "🌴 Cuti" });
+                        if (isAdmin) tabs.push({ id: "leave", label: "Cuti" });
                         return tabs.map(t => (
                             <button key={t.id} onClick={() => handleSetActiveTab(t.id)}
                                 className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
@@ -3730,7 +3745,7 @@ export default function AttendanceDashboardPage() {
                 {canManage && activeTab === "calendar" && (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">🎯 Filter Karyawan</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Filter Karyawan</p>
                             {isAdmin && (
                                 <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
                                     <button
@@ -3740,7 +3755,7 @@ export default function AttendanceDashboardPage() {
                                             : "text-gray-400 hover:text-gray-600"
                                             }`}
                                     >
-                                        👥 Karyawan
+                                        Karyawan
                                     </button>
                                     <button
                                         onClick={() => { setCalendarPklFilter("pkl"); setFilterUser("Semua"); }}
@@ -3749,7 +3764,7 @@ export default function AttendanceDashboardPage() {
                                             : "text-gray-400 hover:text-amber-600"
                                             }`}
                                     >
-                                        🎓 PKL
+                                        PKL
                                     </button>
                                     <button
                                         onClick={() => { setCalendarPklFilter("all"); setFilterUser("Semua"); }}
@@ -3758,7 +3773,7 @@ export default function AttendanceDashboardPage() {
                                             : "text-gray-400 hover:text-gray-600"
                                             }`}
                                     >
-                                        🌐 Semua
+                                        Semua
                                     </button>
                                 </div>
                             )}
@@ -3852,21 +3867,20 @@ export default function AttendanceDashboardPage() {
                                                     setSelectedDate(p => p === dk ? null : dk);
                                                 }}
                                                     className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
-                                                    {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className={`absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isSel ? "bg-red-300 animate-pulse" : "bg-red-400"}`} />}
-                                                    {filterUser === "Semua" && hasAnyDayOff && !isSel && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-300 animate-pulse" />}
-                                                    {hasManual && <span className="hidden sm:block absolute top-2 left-2 w-2 h-2 rounded-full bg-blue-400" />}
-                                                    <span className={`text-xs sm:text-base font-black leading-none mb-1 sm:mb-2 ${isSel ? "text-white" : isTod ? "text-blue-600" : isUserDayOff ? "text-red-500" : "text-gray-800"}`}>{day}</span>
+                                                    {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-400 ring-2 ring-white" />}
+                                                    <span className={`text-[11px] sm:text-xs font-semibold ${isSel ? "text-white/90" : isTod ? "text-blue-700" : isUserDayOff ? "text-red-500" : "text-gray-700"}`}>
+                                                        {day}
+                                                    </span>
                                                     {tot > 0 && (
-                                                        <div className="flex flex-col gap-1 w-full mt-auto">
-                                                            <div className="flex gap-0.5 sm:gap-1">
-                                                                {pc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-emerald-300" : "bg-emerald-400"}`} style={{ width: `${(pc / tot) * 100}%` }} />}
-                                                                {lc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-amber-300" : "bg-amber-400"}`} style={{ width: `${(lc / tot) * 100}%` }} />}
-                                                                {sc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-gray-300" : "bg-gray-400"}`} style={{ width: `${(sc / tot) * 100}%` }} />}
-                                                                {mc > 0 && <div className={`h-1 sm:h-1.5 rounded-full ${isSel ? "bg-blue-300" : "bg-blue-400"}`} style={{ width: `${(mc / tot) * 100}%` }} />}
+                                                        <div className="mt-auto pt-1 w-full flex items-center gap-1">
+                                                            <div className={`flex items-center justify-center w-3 h-3 sm:w-4 sm:h-4 rounded-full ${isSel ? "bg-white/20" : "bg-[#1a1a2e]/10"} ${hasManual ? "ring-1 ring-yellow-400" : ""}`}>
+                                                                <span className={`flex items-center justify-center ${isSel ? "text-white" : "text-[#1a1a2e]"}`}>
+                                                                    {hasManual ? <Wrench className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> : <CheckCircle2 className="w-2 h-2 sm:w-2.5 sm:h-2.5" />}
+                                                                </span>
                                                             </div>
                                                             <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
-                                                                <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc}✏️` : ""}</span>
-                                                                <span className="sm:hidden">{tot}{mc > 0 ? "✏️" : ""}</span>
+                                                                <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc} manual` : ""}</span>
+                                                                <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
                                                             </span>
                                                         </div>
                                                     )}
@@ -3874,117 +3888,117 @@ export default function AttendanceDashboardPage() {
                                             );
                                         })}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Detail tanggal */}
-                        {selectedDate && (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn">
-                                <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-wrap gap-3">
-                                    <div>
-                                        <p className="text-lg font-bold text-gray-800">
-                                            {new Date(selectedDate + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                            {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full">✅ {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
-                                            {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full">⏰ {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
-                                            {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full">✏️ {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
-                                            {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full">🔴 {selectedOffDetail.length} libur</span>}
-                                            {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
-                                                <button
-                                                    onClick={() => setAbsentPopupMode("karyawan")}
-                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
-                                                >
-                                                    ⚠️ {selectedAbsentKaryawan.length} karyawan tidak masuk
-                                                </button>
-                                            )}
-                                            {selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
-                                                <button
-                                                    onClick={() => setAbsentPopupMode("pkl")}
-                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full hover:bg-amber-200 transition-all"
-                                                >
-                                                    🎓 {selectedAbsentPKL.length} PKL tidak masuk
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {isAdminRole(currentUser?.role)
-                                            && (
-                                                <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
-                                                    ➕ Tambah Manual
-                                                </button>
-                                            )}
-                                        <button onClick={() => { setSelectedDate(null); setAbsentPopupMode(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {canManage && selectedOffDetail.length > 0 && calendarPklFilter !== "pkl" && (
-                                    <div className="px-6 pt-4 pb-3 border-b border-gray-50 bg-red-50/20">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
-                                            🔴 Libur / Tidak Masuk ({selectedOffDetail.length})
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedOffDetail.map(o => (
-                                                <div key={o.name} className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl pl-1.5 pr-3 py-1.5 shadow-sm">
-                                                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">
-                                                        {initials(o.name)}
-                                                    </div>
-                                                    <div className="leading-tight">
-                                                        <p className="text-[11px] font-bold text-gray-700">{o.name}</p>
-                                                        <p className="text-[9px] text-red-500 font-semibold">
-                                                            {o.reason}{o.role ? ` · ${o.role.replace(/_/g, " ")}` : ""}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {canManage && selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
-                                    <AbsentSummaryBanner
-                                        list={selectedAbsentKaryawan}
-                                        mode="karyawan"
-                                        onClick={() => setAbsentPopupMode("karyawan")}
-                                    />
-                                )}
-                                {canManage && selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
-                                    <AbsentSummaryBanner
-                                        list={selectedAbsentPKL}
-                                        mode="pkl"
-                                        onClick={() => setAbsentPopupMode("pkl")}
-                                    />
-                                )}
-
-                                {selectedAttendances.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-12 px-6">
-                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                                            {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
-                                                ? <span className="text-3xl">🏖️</span>
-                                                : <span className="text-3xl opacity-40">📅</span>
-                                            }
-                                        </div>
-                                        {!canManage && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
-                                            <div className="text-center">
-                                                <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
-                                                <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
-                                            </div>
-                                        ) : !isAdminRole(currentUser?.role) ? (
-                                            <div className="text-center">
-                                                <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
-                                                <p className="text-xs text-gray-400">
-                                                    Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
-                                                </p>
-                                                <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-                                                    📋 Hari Kerja
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
-                                        )}
+                                  )}
+                             </div>
+                         </div>
+ 
+                         {/* Detail tanggal */}
+                         {selectedDate && (
+                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn">
+                                 <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-wrap gap-3">
+                                     <div>
+                                         <p className="text-lg font-bold text-gray-800">
+                                             {new Date(selectedDate + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                                         </p>
+                                         <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                             {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg> {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
+                                             {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
+                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg> {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
+                                             {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> {selectedOffDetail.length} libur</span>}
+                                             {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
+                                                 <button
+                                                     onClick={() => setAbsentPopupMode("karyawan")}
+                                                     className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
+                                                 >
+                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> {selectedAbsentKaryawan.length} karyawan tidak masuk
+                                                 </button>
+                                             )}
+                                             {selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                                 <button
+                                                     onClick={() => setAbsentPopupMode("pkl")}
+                                                     className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full hover:bg-amber-200 transition-all"
+                                                 >
+                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 10v6M2 10l10 5 10-5"/></svg> {selectedAbsentPKL.length} PKL tidak masuk
+                                                 </button>
+                                             )}
+                                         </div>
+                                     </div>
+                                     <div className="flex items-center gap-2">
+                                         {isAdminRole(currentUser?.role)
+                                             && (
+                                                 <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
+                                                     Tambah Manual
+                                                 </button>
+                                             )}
+                                         <button onClick={() => { setSelectedDate(null); setAbsentPopupMode(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                         </button>
+                                     </div>
+                                 </div>
+ 
+                                 {canManage && selectedOffDetail.length > 0 && calendarPklFilter !== "pkl" && (
+                                     <div className="px-6 pt-4 pb-3 border-b border-gray-50 bg-red-50/20">
+                                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
+                                             Libur / Tidak Masuk ({selectedOffDetail.length})
+                                         </p>
+                                         <div className="flex flex-wrap gap-2">
+                                             {selectedOffDetail.map(o => (
+                                                 <div key={o.name} className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl pl-1.5 pr-3 py-1.5 shadow-sm">
+                                                     <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">
+                                                         {initials(o.name)}
+                                                     </div>
+                                                     <div className="leading-tight">
+                                                         <p className="text-[11px] font-bold text-gray-700">{o.name}</p>
+                                                         <p className="text-[9px] text-red-500 font-semibold">
+                                                             {o.reason}{o.role ? ` · ${o.role.replace(/_/g, " ")}` : ""}
+                                                         </p>
+                                                     </div>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 )}
+ 
+                                 {canManage && selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
+                                     <AbsentSummaryBanner
+                                         list={selectedAbsentKaryawan}
+                                         mode="karyawan"
+                                         onClick={() => setAbsentPopupMode("karyawan")}
+                                     />
+                                 )}
+                                 {canManage && selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                     <AbsentSummaryBanner
+                                         list={selectedAbsentPKL}
+                                         mode="pkl"
+                                         onClick={() => setAbsentPopupMode("pkl")}
+                                     />
+                                 )}
+ 
+                                 {selectedAttendances.length === 0 ? (
+                                     <div className="flex flex-col items-center justify-center py-12 px-6">
+                                         <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                             {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
+                                                 ? <svg className="w-8 h-8 text-orange-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z"/></svg>
+                                                 : <svg className="w-8 h-8 text-gray-400 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                             }
+                                         </div>
+                                         {!canManage && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
+                                             <div className="text-center">
+                                                 <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
+                                                 <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
+                                             </div>
+                                         ) : !isAdminRole(currentUser?.role) ? (
+                                             <div className="text-center">
+                                                 <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
+                                                 <p className="text-xs text-gray-400">
+                                                     Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
+                                                 </p>
+                                                 <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                                     Hari Kerja
+                                                 </span>
+                                             </div>
+                                         ) : (
+                                             <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
+                                         )}
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -4030,35 +4044,35 @@ export default function AttendanceDashboardPage() {
                                                             <td className="px-4 py-4">
                                                                 {manualRec ? (
                                                                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${MANUAL_STATUS_LABELS[manualRec.status]?.bg} ${MANUAL_STATUS_LABELS[manualRec.status]?.color} ${MANUAL_STATUS_LABELS[manualRec.status]?.border}`}>
-                                                                        {MANUAL_STATUS_LABELS[manualRec.status]?.emoji} {MANUAL_STATUS_LABELS[manualRec.status]?.label}
+                                                                        {renderStatusEmoji(MANUAL_STATUS_LABELS[manualRec.status]?.emoji)} {MANUAL_STATUS_LABELS[manualRec.status]?.label}
                                                                     </span>
                                                                 ) : (
                                                                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${a.displayStatus === "PRESENT" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : a.displayStatus === "SKIP" ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
-                                                                        {a.displayStatus === "PRESENT" ? "✓ Tepat" : a.displayStatus === "SKIP" ? "⏭ Skip" : "⏰ Terlambat"}
+                                                                        {a.displayStatus === "PRESENT" ? <Check className="w-3 h-3 text-emerald-600" /> : a.displayStatus === "SKIP" ? <X className="w-3 h-3 text-gray-500" /> : <Clock className="w-3 h-3 text-amber-600" />} {a.displayStatus === "PRESENT" ? "Tepat" : a.displayStatus === "SKIP" ? "Skip" : "Terlambat"}
                                                                     </span>
                                                                 )}
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.source === "MANUAL" ? "bg-blue-100 text-blue-700 border-blue-200" : a.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
-                                                                    {a.source === "MANUAL" ? "✏️ Manual" : a.method === "FACE" ? "📷 Wajah" : "⏭️ Skip"}
+                                                                    {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : "Skip"}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 {a.latitude && a.longitude ? (
                                                                     <a href={`https://maps.google.com/?q=${a.latitude},${a.longitude}`} target="_blank" rel="noopener noreferrer"
                                                                         className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-full border no-underline transition-all hover:shadow-md ${Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG)) <= 80 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>
-                                                                        📍 {Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))}m
+                                                                        {Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))}m
                                                                     </a>
                                                                 ) : <span className="text-[10px] text-gray-200 font-bold">—</span>}
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
                                                                 <div className="space-y-0.5">
                                                                     {manualRec?.notes && (
-                                                                        <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">📝 {manualRec.notes}</p>
+                                                                        <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">Notes: {manualRec.notes}</p>
                                                                     )}
                                                                     {manualRec?.created_by_name && (
                                                                         <p className="text-[10px] text-violet-500 font-bold">
-                                                                            ✏️ oleh {manualRec.created_by_name}
+                                                                            oleh {manualRec.created_by_name}
                                                                         </p>
                                                                     )}
                                                                     {!manualRec && (
@@ -4066,7 +4080,7 @@ export default function AttendanceDashboardPage() {
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            {/* ✅ NEW: Tombol Edit di tabel */}
+                                                            {/* NEW: Tombol Edit di tabel */}
                                                             {isAdminRole(currentUser?.role)
                                                                 && (
                                                                     <td className="px-4 py-4 text-center">
@@ -4078,7 +4092,7 @@ export default function AttendanceDashboardPage() {
                                                                                     }}
                                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
                                                                                     title="Edit manual attendance">
-                                                                                    ✏️ Edit
+                                                                                    Edit
                                                                                 </button>
                                                                             ) : (
                                                                                 <>
@@ -4102,7 +4116,7 @@ export default function AttendanceDashboardPage() {
                                                                                         }}
                                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:text-red-700 transition-all duration-200"
                                                                                         title="Hapus absen wajah ini">
-                                                                                        🗑️ Hapus
+                                                                                        Hapus
                                                                                     </button>
 
                                                                                     <button
@@ -4124,14 +4138,14 @@ export default function AttendanceDashboardPage() {
                                                                                         }}
                                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
                                                                                         title="Convert ke manual entry">
-                                                                                        ✏️ Edit
+                                                                                        Edit
                                                                                     </button>
                                                                                 </>
                                                                             )}
                                                                         </div>
                                                                     </td>
                                                                 )}
-                                                            {/* ✅ Kolom Shift — resolve per tanggal record */}
+                                                            {/* Kolom Shift — resolve per tanggal record */}
                                                             <td className="px-4 py-4 text-center">
                                                                 {(() => {
                                                                     const eff = effectiveShiftFor(userId, dateKey);
@@ -4141,10 +4155,10 @@ export default function AttendanceDashboardPage() {
                                                                                 ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                                 : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                                 }`}>
-                                                                                {eff.shift === "PAGI" ? "🌅" : "🌆"} {eff.shift}
+                                                                                {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {eff.shift}
                                                                             </span>
                                                                             {eff.fromSchedule && (
-                                                                                <span className="text-[8px] font-bold text-violet-500">📅 jadwal</span>
+                                                                                <span className="text-[8px] font-bold text-violet-500">jadwal</span>
                                                                             )}
                                                                         </div>
                                                                     );
@@ -4181,20 +4195,20 @@ export default function AttendanceDashboardPage() {
                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!pklFilterMode ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-600"
                                                 }`}
                                         >
-                                            👥 Karyawan
+                                            Karyawan
                                         </button>
                                         <button
                                             onClick={() => setPklFilterMode(true)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${pklFilterMode ? "bg-amber-500 text-white shadow-sm" : "text-gray-400 hover:text-amber-600"
                                                 }`}
                                         >
-                                            🎓 PKL
+                                            PKL
                                         </button>
                                     </div>
                                 )}
                                 <button onClick={() => openAddManual()} disabled={usersLoading}
                                     className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60">
-                                    {usersLoading ? "⏳ Loading..." : "✏️ Absen Manual"}
+                                    {usersLoading ? "Loading..." : "Absen Manual"}
                                 </button>
                             </div>
                         </div>
@@ -4251,7 +4265,7 @@ export default function AttendanceDashboardPage() {
                                                                 <span className="font-bold text-gray-800 block">{u.name}</span>
                                                                 {salaryMap[u.userId] && (
                                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${salaryMap[u.userId].salary_type === "FIXED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                                                        {salaryMap[u.userId].salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                                        {salaryMap[u.userId].salary_type === "FIXED" ? "Tetap" : "% Absen"}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -4322,16 +4336,16 @@ export default function AttendanceDashboardPage() {
                                                                     onClick={async () => {
                                                                         if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
                                                                         const success = await generateSlipFromRecapan(u);
-                                                                        if (success) { fetchSalarySlips(calYear, calMonth); alert(`✅ Slip gaji ${u.name} berhasil di-generate!`); }
+                                                                        if (success) { fetchSalarySlips(calYear, calMonth); alert(`Slip gaji ${u.name} berhasil di-generate!`); }
                                                                     }}
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     title={`Generate slip gaji ${u.name}`}>
-                                                                    📄 Slip
+                                                                    Slip
                                                                 </button>
                                                                 <button onClick={() => openAddManual(undefined, u.userId)}
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
                                                                     title={`Tambah absen manual untuk ${u.name}`}>
-                                                                    ➕ Absen
+                                                                    Absen
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -4348,10 +4362,10 @@ export default function AttendanceDashboardPage() {
                                                                             ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                             : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                             }`}>
-                                                                            {eff.shift === "PAGI" ? "🌅" : "🌆"} {eff.shift}
+                                                                            {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {eff.shift}
                                                                         </span>
                                                                         {eff.fromSchedule && (
-                                                                            <span className="text-[8px] font-bold text-violet-500">📅 dari jadwal</span>
+                                                                            <span className="text-[8px] font-bold text-violet-500">dari jadwal</span>
                                                                         )}
                                                                         {(isAdmin || u.userId !== currentUser?.id) && (
                                                                             <button
@@ -4359,7 +4373,7 @@ export default function AttendanceDashboardPage() {
                                                                                 className="text-[9px] font-bold text-gray-400 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
                                                                                 title={`Atur shift default ${u.name}`}
                                                                             >
-                                                                                ⚙️ Default
+                                                                                Default
                                                                             </button>
                                                                         )}
                                                                     </div>
@@ -4397,7 +4411,7 @@ export default function AttendanceDashboardPage() {
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(false); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">⚙️ Atur Gaji</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(false); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">Atur Gaji</button>
                             </div>
                         </div>
 
@@ -4412,17 +4426,17 @@ export default function AttendanceDashboardPage() {
 
                                             {/* PENGHASILAN SECTION */}
                                             <th colSpan={5} className="px-4 py-4 text-center text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/40 border-2 border-gray-300">
-                                                📈 PENGHASILAN
+                                                PENGHASILAN
                                             </th>
 
                                             {/* POTONGAN SECTION */}
                                             <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-red-600 uppercase tracking-widest bg-red-50/40 border-2 border-gray-300">
-                                                📉 POTONGAN
+                                                POTONGAN
                                             </th>
 
                                             {/* TOTAL SECTION */}
                                             <th colSpan={2} className="px-4 py-4 text-center text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50/40 border-2 border-gray-300">
-                                                💰 TOTAL
+                                                TOTAL
                                             </th>
 
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest border-2 border-gray-300">Aksi</th>
@@ -4478,7 +4492,7 @@ export default function AttendanceDashboardPage() {
                                                                 <div className="min-w-0">
                                                                     <span className="font-bold text-gray-800 block text-sm truncate">{u.name}</span>
                                                                     <span className="text-[10px] text-gray-400">
-                                                                        {sal ? (sal.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen") : "—"}
+                                                                        {sal ? (sal.salary_type === "FIXED" ? "Tetap" : "% Absen") : "—"}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -4583,7 +4597,7 @@ export default function AttendanceDashboardPage() {
                                                                 </div>
                                                                 {salaryMap[u.userId]?.salary_type === "FIXED" && u.totalWorkdays > 0 && (
                                                                     <span className="text-[8px] font-bold text-violet-500 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                                                                        💰 Tetap
+                                                                         Tetap
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -4636,7 +4650,7 @@ export default function AttendanceDashboardPage() {
                                                         {/* Aksi */}
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                                                                {/* ✅ NEW: Tombol Generate Slip dari rekapan gaji */}
+                                                                {/* NEW: Tombol Generate Slip dari rekapan gaji */}
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (!confirm(`Generate slip gaji ${u.name} untuk ${MONTH_NAMES[calMonth]} ${calYear}?`)) return;
@@ -4644,13 +4658,13 @@ export default function AttendanceDashboardPage() {
                                                                         if (success) {
                                                                             // Refresh list slip gaji
                                                                             fetchSalarySlips(calYear, calMonth);
-                                                                            alert(`✅ Slip gaji ${u.name} berhasil di-generate!`);
+                                                                            alert(`Slip gaji ${u.name} berhasil di-generate!`);
                                                                         }
                                                                     }}
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     title={`Generate slip gaji ${u.name} dari rekapan bulan ini`}
                                                                 >
-                                                                    📄 Slip
+                                                                    Slip
                                                                 </button>
                                                                 {/* Tombol Edit Tunjangan */}
                                                                 <button
@@ -4662,7 +4676,7 @@ export default function AttendanceDashboardPage() {
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
                                                                     title="Edit tunjangan & potongan"
                                                                 >
-                                                                    💜 Tunjangan
+                                                                    Tunjangan
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -4779,11 +4793,11 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-4 flex-wrap text-[10px] text-gray-500 font-medium">
-                            <span>💡 <span className="text-emerald-600 font-semibold">Tunjangan × % kehadiran</span> — otomatis disesuaikan</span>
+                            <span><span className="text-emerald-600 font-semibold">Tunjangan × % kehadiran</span> — otomatis disesuaikan</span>
                             <span>•</span>
-                            <span>💡 <span className="text-red-600 font-semibold">Potongan langsung</span> — tidak dihitung %</span>
+                            <span><span className="text-red-600 font-semibold">Potongan langsung</span> — tidak dihitung %</span>
                             <span>•</span>
-                            <span>💡 <span className="text-blue-600 font-semibold">Gross = Total Penghasilan</span> sebelum potongan</span>
+                            <span><span className="text-blue-600 font-semibold">Gross = Total Penghasilan</span> sebelum potongan</span>
                         </div>
                     </div>
                 )}
@@ -4793,7 +4807,7 @@ export default function AttendanceDashboardPage() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-yellow-50 flex items-center justify-between flex-wrap gap-3">
                             <div>
-                                <p className="text-base font-bold text-gray-800">🎓 Rekap Gaji PKL — {MONTH_NAMES[calMonth]} {calYear}</p>
+                                <p className="text-base font-bold text-gray-800">Rekap Gaji PKL — {MONTH_NAMES[calMonth]} {calYear}</p>
                                 <p className="text-[10px] text-amber-600 mt-1 font-semibold">
                                     Gaji Pokok + Lemburan · <span className="text-gray-400 font-medium">tanpa tunjangan, kasbon & pensiun</span>
                                 </p>
@@ -4803,7 +4817,7 @@ export default function AttendanceDashboardPage() {
                                     onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(true); setShowSalaryModal(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all"
                                 >
-                                    ⚙️ Atur Gaji PKL
+                                    Atur Gaji PKL
                                 </button>
                             </div>
                         </div>
@@ -4825,7 +4839,7 @@ export default function AttendanceDashboardPage() {
                                 return (
                                     <div className="py-16 text-center px-4">
                                         <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
-                                            <span className="text-3xl opacity-50">🎓</span>
+                                            <FileText className="w-8 h-8 text-gray-400 opacity-50" />
                                         </div>
                                         <p className="text-sm text-gray-400 font-medium">Tidak ada karyawan PKL bulan ini</p>
                                         <p className="text-xs text-gray-300 mt-1">PKL akan muncul otomatis setelah data absensi masuk</p>
@@ -4833,7 +4847,7 @@ export default function AttendanceDashboardPage() {
                                 );
                             }
 
-                            // ✅ Helper hitung gaji pokok PKL (tanpa potongan/tunjangan)
+                            // Helper hitung gaji pokok PKL (tanpa potongan/tunjangan)
                             const calcPklIncome = (u: typeof pklSummary[0]) => {
                                 const sal = salaryMap[u.userId];
                                 const hasSalaryConfig = !!sal && sal.base_salary > 0;
@@ -4848,7 +4862,7 @@ export default function AttendanceDashboardPage() {
 
                             const totalPokokPKL = pklSummary.reduce((s, u) => s + calcPklIncome(u), 0);
                             const totalOvertimePKL = pklSummary.reduce((s, u) => s + (overtimeTotal[u.userId] || 0), 0);
-                            const totalNetPKL = totalPokokPKL + totalOvertimePKL; // ✅ PKL: net = pokok + lembur
+                            const totalNetPKL = totalPokokPKL + totalOvertimePKL; // PKL: net = pokok + lembur
 
                             return (
                                 <>
@@ -4899,7 +4913,7 @@ export default function AttendanceDashboardPage() {
                                                     const hasSalaryConfig = !!sal && sal.base_salary > 0;
 
                                                     const salaryIncome = calcPklIncome(u);
-                                                    const net = salaryIncome + overtime; // ✅ tanpa potongan
+                                                    const net = salaryIncome + overtime; // tanpa potongan
 
                                                     const pctColor = u.pct >= 90 ? "text-emerald-600" : u.pct >= 70 ? "text-amber-600" : "text-red-500";
                                                     const barGrad = u.pct >= 90 ? "from-emerald-400 to-green-500" : u.pct >= 70 ? "from-amber-400 to-orange-500" : "from-red-400 to-rose-500";
@@ -4997,7 +5011,7 @@ export default function AttendanceDashboardPage() {
                                                                     </span>
                                                                     {hasSalaryConfig ? (
                                                                         <span className="text-[8px] text-gray-400">
-                                                                            {sal!.salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                                            {sal!.salary_type === "FIXED" ? "Tetap" : "% Absen"}
                                                                         </span>
                                                                     ) : (
                                                                         <span className="text-[8px] text-amber-500 font-semibold whitespace-nowrap">
@@ -5035,7 +5049,7 @@ export default function AttendanceDashboardPage() {
                                                                         })}
                                                                         className="text-[9px] text-gray-400 hover:text-emerald-600 font-bold border border-gray-200 hover:border-emerald-300 px-2 py-0.5 rounded-lg transition-all"
                                                                     >
-                                                                        ✏️ Edit nominal
+                                                                        Edit nominal
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -5049,12 +5063,12 @@ export default function AttendanceDashboardPage() {
                                                                             const success = await generateSlipPKL(u);
                                                                             if (success) {
                                                                                 fetchSalarySlips(calYear, calMonth);
-                                                                                alert(`✅ Slip gaji PKL ${u.name} berhasil di-generate!`);
+                                                                                alert(`Slip gaji PKL ${u.name} berhasil di-generate!`);
                                                                             }
                                                                         }}
                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     >
-                                                                        📄 Slip
+                                                                        Slip
                                                                     </button>
                                                                     <button
                                                                         onClick={() => setEditSalaryUser({
@@ -5064,7 +5078,7 @@ export default function AttendanceDashboardPage() {
                                                                         })}
                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-all whitespace-nowrap"
                                                                     >
-                                                                        ✏️ Edit Gaji
+                                                                        Edit Gaji
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -5104,11 +5118,11 @@ export default function AttendanceDashboardPage() {
 
                                     {/* Legend */}
                                     <div className="px-6 py-4 bg-amber-50/30 border-t border-amber-100 flex items-center gap-4 flex-wrap text-[10px] text-gray-500 font-medium">
-                                        <span>🎓 <span className="text-amber-600 font-semibold">Gaji PKL</span> = Gaji Pokok + Lemburan</span>
+                                        <span><span className="text-amber-600 font-semibold">Gaji PKL</span> = Gaji Pokok + Lemburan</span>
                                         <span>•</span>
-                                        <span>🚫 <span className="text-gray-500 font-semibold">Tanpa tunjangan, kasbon & pensiun</span></span>
+                                        <span><span className="text-gray-500 font-semibold">Tanpa tunjangan, kasbon & pensiun</span></span>
                                         <span>•</span>
-                                        <span>💡 Belum diatur gaji → fallback rate harian <strong>Rp10rb/hadir</strong>, <strong>Rp5rb/telat</strong></span>
+                                        <span>Belum diatur gaji → fallback rate harian <strong>Rp10rb/hadir</strong>, <strong>Rp5rb/telat</strong></span>
                                     </div>
                                 </>
                             );
@@ -5125,12 +5139,12 @@ export default function AttendanceDashboardPage() {
                                     <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
                                     <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
                                 </div>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">➕ Kelola Cuti</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">Kelola Cuti</button>
                             </div>
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
                             ) : leaveData.length === 0 ? (
-                                <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><span className="text-3xl opacity-40">🌴</span></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
+                                <div className="py-16 text-center"><div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><Umbrella className="w-8 h-8 text-gray-400" /></div><p className="text-sm text-gray-400 font-medium">Belum ada data cuti</p></div>
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
@@ -5164,7 +5178,7 @@ export default function AttendanceDashboardPage() {
                                                                 <div className="flex flex-wrap gap-1.5">
                                                                     {ld.requests.map(r => (
                                                                         <span key={r.id} className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-100 text-cyan-700 border border-cyan-200 px-2 py-1 rounded-lg">
-                                                                            🌴 {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                                                            {new Date(r.leave_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
                                                                         </span>
                                                                     ))}
                                                                 </div>
@@ -5186,14 +5200,14 @@ export default function AttendanceDashboardPage() {
                     <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                         <div className="flex items-center justify-between flex-wrap gap-3">
                             <div>
-                                <p className="text-base font-bold text-gray-800">📋 Riwayat Perubahan Gaji</p>
+                                <p className="text-base font-bold text-gray-800">Riwayat Perubahan Gaji</p>
                                 <p className="text-[10px] text-gray-400 mt-1">Tracking semua perubahan gaji per karyawan</p>
                             </div>
                             <button
                                 onClick={fetchSalaryHistory}
                                 className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition"
                             >
-                                🔄 Refresh
+                                Refresh
                             </button>
                         </div>
                     </div>
@@ -5207,7 +5221,7 @@ export default function AttendanceDashboardPage() {
                     ) : salaryHistory.length === 0 ? (
                         <div className="py-16 text-center px-4">
                             <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                                <span className="text-3xl opacity-40">📋</span>
+                                <FileText className="w-8 h-8 text-gray-400" />
                             </div>
                             <p className="text-sm text-gray-400 font-medium">Belum ada riwayat perubahan gaji</p>
                             <p className="text-xs text-gray-300 mt-1">Semua perubahan gaji akan tampil di sini</p>
@@ -5273,7 +5287,7 @@ export default function AttendanceDashboardPage() {
                                                         ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                                                         : "bg-amber-100 text-amber-700 border-amber-200"
                                                         }`}>
-                                                        {hist.new_salary_type === "FIXED" ? "💰 Tetap" : "📊 % Absen"}
+                                                        {hist.new_salary_type === "FIXED" ? "Tetap" : "% Absen"}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4">
@@ -5330,7 +5344,7 @@ export default function AttendanceDashboardPage() {
                                 {/* Card Gaji Pokok */}
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                     <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5">
-                                        <p className="font-bold text-white text-base">💰 Informasi Gaji</p>
+                                        <p className="font-bold text-white text-base">Informasi Gaji</p>
                                         <p className="text-xs text-white/70 mt-1">
                                             {MONTH_NAMES[calMonth]} {calYear}
                                         </p>
@@ -5340,7 +5354,7 @@ export default function AttendanceDashboardPage() {
                                         {!mySalary ? (
                                             <div className="text-center py-8">
                                                 <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                                    <span className="text-2xl opacity-40">💰</span>
+                                                    <FileText className="w-6 h-6 text-gray-400" />
                                                 </div>
                                                 <p className="text-sm text-gray-400 font-medium">Belum ada data gaji</p>
                                                 <p className="text-xs text-gray-300 mt-1">Hubungi admin untuk mengatur gaji kamu</p>
@@ -5355,7 +5369,7 @@ export default function AttendanceDashboardPage() {
                                                             ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                                                             : "bg-amber-100 text-amber-700 border-amber-200"
                                                             }`}>
-                                                            {mySalary.salary_type === "FIXED" ? "💰 Gaji Tetap" : "📊 Persentase Kehadiran"}
+                                                            {mySalary.salary_type === "FIXED" ? "Gaji Tetap" : "Persentase Kehadiran"}
                                                         </span>
                                                     </div>
                                                     <div className="bg-gray-50 rounded-2xl p-4">
@@ -5365,7 +5379,7 @@ export default function AttendanceDashboardPage() {
                                                         </p>
                                                         {mySalary.salary_type === "PERCENTAGE" && myStat && (
                                                             <p className="text-[10px] text-amber-600 font-semibold mt-1">
-                                                                📊 {formatPct(myStat.pct)}% kehadiran
+                                                                {formatPct(myStat.pct)}% kehadiran
                                                             </p>
                                                         )}
                                                     </div>
@@ -5375,24 +5389,24 @@ export default function AttendanceDashboardPage() {
                                                 {myStat && (
                                                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-4">
                                                         <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
-                                                            📊 Kehadiran Bulan Ini
+                                                            Kehadiran Bulan Ini
                                                         </p>
                                                         <div className="grid grid-cols-3 gap-3 mb-4">
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-emerald-600">{myStat.present}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">✅ Tepat</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Tepat</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-amber-600">{myStat.late}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">⏰ Terlambat</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1"> Terlambat</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-red-500">{myStat.absences.length}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">❌ Tidak Hadir</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1"> Tidak Hadir</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-cyan-600">{myStat.leave}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">🌴 Cuti</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Cuti</p>
                                                             </div>
                                                         </div>
 
@@ -5434,7 +5448,7 @@ export default function AttendanceDashboardPage() {
                                                     return (
                                                         <>
                                                             <div className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl p-4 space-y-2">
-                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">📋 Rincian Gaji Bulan Ini</p>
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Rincian Gaji Bulan Ini</p>
                                                                 <div className="flex justify-between text-sm">
                                                                     <span className="text-gray-500">Gaji Pokok{mySalary.salary_type === "PERCENTAGE" ? ` (${formatPct(myStat.pct)}%)` : ""}</span>
                                                                     <span className="font-bold text-gray-800 font-mono">{formatRupiah(pokok)}</span>
@@ -5475,7 +5489,7 @@ export default function AttendanceDashboardPage() {
                                                                 )}
                                                             </div>
                                                             <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5">
-                                                                <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-1">💰 Gaji Bersih Bulan Ini</p>
+                                                                <p className="text-[10px] font-bold text-white/70 uppercase tracking-wide mb-1">Gaji Bersih Bulan Ini</p>
                                                                 <p className="text-3xl font-black text-white font-mono">{formatRupiah(net)}</p>
                                                                 <p className="text-[11px] text-white/60 mt-1">
                                                                     {mySalary.salary_type === "FIXED"
@@ -5491,7 +5505,7 @@ export default function AttendanceDashboardPage() {
                                                 {mySalary.salary_type === "FIXED" && myStat && (
                                                     <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
                                                         <p className="text-[11px] text-blue-700 font-medium">
-                                                            ℹ️ Kamu memiliki gaji tetap — nominal gaji tidak berubah meskipun kehadiran kurang dari 100%.
+                                                            ℹ Kamu memiliki gaji tetap — nominal gaji tidak berubah meskipun kehadiran kurang dari 100%.
                                                             Namun persentase kehadiran kamu tetap dicatat: <strong>{formatPct(myStat.pct)}%</strong>
                                                         </p>
                                                     </div>
@@ -5512,7 +5526,7 @@ export default function AttendanceDashboardPage() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-center gap-3 mb-5">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-lg">
-                                📄
+                                
                             </div>
                             <div>
                                 <p className="font-bold text-gray-800">Slip Gaji Saya</p>
@@ -5529,7 +5543,7 @@ export default function AttendanceDashboardPage() {
                         ) : mySlips.length === 0 ? (
                             <div className="text-center py-12">
                                 <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                    <span className="text-2xl opacity-40">📄</span>
+                                    <span className="text-2xl opacity-40"><FileText className="w-5 h-5" /> </span>
                                 </div>
                                 <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji yang dikirim</p>
                                 <p className="text-xs text-gray-300 mt-1">Slip akan muncul setelah admin mengirimkannya</p>
@@ -5552,7 +5566,7 @@ export default function AttendanceDashboardPage() {
                                                 <div className="flex items-center justify-between gap-3 flex-wrap">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
-                                                            📄
+                                                            
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-gray-800 text-sm">
@@ -5565,7 +5579,7 @@ export default function AttendanceDashboardPage() {
                                                             )}
                                                         </div>
                                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-emerald-100 text-emerald-700 border-emerald-200">
-                                                            ✅ Final
+                                                            Final
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
@@ -5581,7 +5595,7 @@ export default function AttendanceDashboardPage() {
                                                             rel="noopener noreferrer"
                                                             className="flex items-center gap-1.5 text-xs font-bold bg-gray-900 text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition"
                                                         >
-                                                            🖨️ Lihat & Cetak
+                                                            Lihat & Cetak
                                                         </a>
                                                     </div>
                                                 </div>
@@ -5604,7 +5618,7 @@ export default function AttendanceDashboardPage() {
                             <div>
                                 <p className="text-sm font-bold text-gray-800">Slip Gaji</p>
                                 <p className="text-[11px] text-gray-400 mt-0.5">
-                                    ✅ Data dari rekapan gaji · Gunakan tombol <strong>📄 Slip</strong> untuk generate
+                                    Data dari rekapan gaji · Gunakan tombol <strong>Slip</strong> untuk generate
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -5624,11 +5638,11 @@ export default function AttendanceDashboardPage() {
                                         year: s.month === 11 ? s.year + 1 : s.year,
                                     }))}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
-                                >▶</button>
+                                ></button>
                             </div>
                         </div>
 
-                        {/* ✅ NEW: Toggle Karyawan / PKL / Semua */}
+                        {/* NEW: Toggle Karyawan / PKL / Semua */}
                         <div className="flex items-center justify-between gap-3 flex-wrap border-t border-gray-100 pt-3">
                             <div className="flex items-center gap-0.5 bg-gray-100 p-1 rounded-xl">
                                 <button
@@ -5638,7 +5652,7 @@ export default function AttendanceDashboardPage() {
                                         : "text-gray-400 hover:text-gray-600"
                                         }`}
                                 >
-                                    👥 Karyawan
+                                    Karyawan
                                 </button>
                                 <button
                                     onClick={() => setSlipPklFilter("pkl")}
@@ -5647,7 +5661,7 @@ export default function AttendanceDashboardPage() {
                                         : "text-gray-400 hover:text-amber-600"
                                         }`}
                                 >
-                                    🎓 PKL
+                                    PKL
                                 </button>
                                 <button
                                     onClick={() => setSlipPklFilter("all")}
@@ -5656,7 +5670,7 @@ export default function AttendanceDashboardPage() {
                                         : "text-gray-400 hover:text-gray-600"
                                         }`}
                                 >
-                                    🌐 Semua
+                                    Semua
                                 </button>
                             </div>
                             <span className="text-[10px] font-bold text-gray-400">
@@ -5695,8 +5709,8 @@ export default function AttendanceDashboardPage() {
                         </div>
                     ) : visibleSalarySlips.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                <span className="text-2xl opacity-50">{slipPklFilter === "pkl" ? "🎓" : "📄"}</span>
+                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-400">
+                                {slipPklFilter === "pkl" ? <GraduationCap className="w-7 h-7" /> : <Briefcase className="w-7 h-7" />}
                             </div>
                             <p className="text-sm text-gray-400 font-medium">
                                 Belum ada slip {slipPklFilter === "pkl" ? "PKL" : slipPklFilter === "karyawan" ? "karyawan" : ""} bulan ini
@@ -5707,7 +5721,7 @@ export default function AttendanceDashboardPage() {
                             <button
                                 onClick={async () => {
                                     const base = allUsers.length > 0 ? allUsers : await fetchAllUsers();
-                                    // ✅ Hormati filter aktif: cuma generate grup yang dipilih
+                                    // Hormati filter aktif: cuma generate grup yang dipilih
                                     const usersToGen = (base as UserInfo[]).filter(u => {
                                         if (slipPklFilter === "all") return true;
                                         return slipPklFilter === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role);
@@ -5722,7 +5736,7 @@ export default function AttendanceDashboardPage() {
                                     fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                 }}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
-                            >⚡ Generate Slip Sekarang</button>
+                            >Generate Slip Sekarang</button>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -5769,7 +5783,7 @@ export default function AttendanceDashboardPage() {
                     calMonth={calMonth}
                     onClose={() => setShowShiftScheduleModal(false)}
                     onSaved={async () => {
-                        await fetchShiftSchedules(calYear, calMonth);  // ✅ await → Ringkasan & list sinkron
+                        await fetchShiftSchedules(calYear, calMonth);  // await → Ringkasan & list sinkron
                         await fetchAttendance();
                         fetchTodayStatus();
                     }}

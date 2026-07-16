@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
+import { ImageIcon, Pencil, CheckCircle2, Receipt, Inbox } from "lucide-react";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
@@ -127,18 +128,18 @@ const paymentBgMap: Record<string, string> = {
 
 function getSourcePlatformBadge(platform: string): { text: string; color: string } {
   const p = (platform ?? "").toUpperCase();
-  if (p.includes("SHOPEE")) return { text: "🛒 Shopee", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
-  if (p.includes("TOKOPEDIA")) return { text: "🏪 Toped", color: "bg-green-50 text-green-700 ring-1 ring-green-200" };
-  if (p.includes("COD") || p.includes("CASH ON DELIVERY")) return { text: "🚗 COD", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
-  if (p.includes("ADS INSTAGRAM")) return { text: "📸 Ads IG", color: "bg-pink-50 text-pink-700 ring-1 ring-pink-200" };
-  if (p.includes("ADS FACEBOOK")) return { text: "📣 Ads FB", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" };
-  if (p === "INSTAGRAM") return { text: "📷 Instagram", color: "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200" };
-  if (p === "TIKTOK") return { text: "🎵 TikTok", color: "bg-slate-50 text-slate-700 ring-1 ring-slate-200" };
-  if (p.includes("FACEBOOK") || p.includes("FB")) return { text: "👥 Facebook", color: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" };
-  if (p.includes("WHATSAPP") || p.includes("WA")) return { text: "💬 WhatsApp", color: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
-  if (p.includes("GOOGLE")) return { text: "🔍 Google", color: "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200" };
-  if (p.includes("TEMAN")) return { text: "🤝 Teman", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
-  if (p.includes("LAINNYA")) return { text: "🔖 Lainnya", color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
+  if (p.includes("SHOPEE")) return { text: " Shopee", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
+  if (p.includes("TOKOPEDIA")) return { text: " Toped", color: "bg-green-50 text-green-700 ring-1 ring-green-200" };
+  if (p.includes("COD") || p.includes("CASH ON DELIVERY")) return { text: " COD", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
+  if (p.includes("ADS INSTAGRAM")) return { text: " Ads IG", color: "bg-pink-50 text-pink-700 ring-1 ring-pink-200" };
+  if (p.includes("ADS FACEBOOK")) return { text: " Ads FB", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" };
+  if (p === "INSTAGRAM") return { text: " Instagram", color: "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200" };
+  if (p === "TIKTOK") return { text: " TikTok", color: "bg-slate-50 text-slate-700 ring-1 ring-slate-200" };
+  if (p.includes("FACEBOOK") || p.includes("FB")) return { text: " Facebook", color: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" };
+  if (p.includes("WHATSAPP") || p.includes("WA")) return { text: " WhatsApp", color: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
+  if (p.includes("GOOGLE")) return { text: " Google", color: "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200" };
+  if (p.includes("TEMAN")) return { text: " Teman", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
+  if (p.includes("LAINNYA")) return { text: " Lainnya", color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
   return { text: platform || "-", color: "bg-gray-50 text-gray-700 ring-1 ring-gray-200" };
 }
 
@@ -155,9 +156,9 @@ function getCompanyBadge(company: string): { label: string; color: string } {
 
 function getCustomerTypeBadge(type: string): { text: string; icon: string } {
   const t = (type ?? "UMUM").toUpperCase();
-  if (t === "RESELLER") return { text: "Reseller", icon: "🏪" };
-  if (t === "CORPORATE") return { text: "Korporat", icon: "🏢" };
-  return { text: "Umum", icon: "👤" };
+  if (t === "RESELLER") return { text: "Reseller", icon: "" };
+  if (t === "CORPORATE") return { text: "Korporat", icon: "" };
+  return { text: "Umum", icon: "" };
 }
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
@@ -188,7 +189,7 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
             <p>• Status → <span className="font-bold text-red-600">BATAL</span></p>
             <p>• Unit kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
             {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
-            {item.status === "RESERVED" && <p className="text-amber-700 font-semibold">⚠️ DP yang sudah dibayar diurus manual</p>}
+            {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
           </div>
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 flex-shrink-0">
@@ -251,10 +252,10 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
   const getMethodMeta = (m: string): { label: string; icon: string; color: string } => {
     const upper = m.toUpperCase();
-    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI")) return { label: "Transfer", icon: "🏦", color: "blue" };
-    if (upper.includes("TUNAI") || upper.includes("CASH")) return { label: "Tunai", icon: "💵", color: "emerald" };
-    if (upper.includes("QRIS") || upper.includes("QR")) return { label: "QRIS", icon: "📱", color: "purple" };
-    return { label: m, icon: "💳", color: "gray" };
+    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI")) return { label: "Transfer", icon: "", color: "blue" };
+    if (upper.includes("TUNAI") || upper.includes("CASH")) return { label: "Tunai", icon: "", color: "emerald" };
+    if (upper.includes("QRIS") || upper.includes("QR")) return { label: "QRIS", icon: "", color: "purple" };
+    return { label: m, icon: "", color: "gray" };
   };
 
   const colorMap: Record<string, { bg: string; border: string; text: string; label: string }> = {
@@ -475,11 +476,11 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-400">📅 {formatDate(item.created_at)}</span>
+          <span className="text-[11px] text-gray-400"> {formatDate(item.created_at)}</span>
           <span className="text-gray-200">·</span>
-          <span className="text-[11px] text-gray-500 font-semibold">🕐 {timeStr}</span>
+          <span className="text-[11px] text-gray-500 font-semibold"> {timeStr}</span>
           {item.customer_phone && (
-            <><span className="text-gray-200">·</span><span className="text-[11px] text-gray-500">📱 {item.customer_phone}</span></>
+            <><span className="text-gray-200">·</span><span className="text-[11px] text-gray-500"> {item.customer_phone}</span></>
           )}
         </div>
       </div>
@@ -497,7 +498,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             </span>
           )}
           {item.sales_name && (
-            <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-gray-100 text-gray-700 whitespace-nowrap">👤 {item.sales_name}</span>
+            <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-gray-100 text-gray-700 whitespace-nowrap"> {item.sales_name}</span>
           )}
         </div>
 
@@ -529,9 +530,9 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
               <p className="text-xs font-bold text-gray-900 leading-snug mb-1.5">{item.laptop_name || "—"}</p>
               {(item.cpu || item.ram || item.storage) && (
                 <div className="flex flex-wrap gap-1 mb-1.5">
-                  {item.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">⚙️ {item.cpu}</span>}
-                  {item.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">💾 {item.ram}</span>}
-                  {item.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">🗄️ {item.storage}</span>}
+                  {item.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold"> {item.cpu}</span>}
+                  {item.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold"> {item.ram}</span>}
+                  {item.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold"> {item.storage}</span>}
                 </div>
               )}
               {(() => {
@@ -564,7 +565,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           ) : item.other !== undefined && item.other !== null && (
             <div className={`rounded-xl p-2.5 ring-1 ${item.other > 0 ? "bg-emerald-50 ring-emerald-100" : item.other < 0 ? "bg-red-50 ring-red-100" : "bg-gray-50 ring-gray-100"}`}>
               <p className={`text-[10px] font-semibold mb-0.5 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-400"}`}>
-                {item.other > 0 ? "📈 Profit" : item.other < 0 ? "📉 Loss" : "➖ BEP"}
+                {item.other > 0 ? " Profit" : item.other < 0 ? " Loss" : " BEP"}
               </p>
               <p className={`text-sm font-bold tabular-nums truncate ${item.other > 0 ? "text-emerald-900" : item.other < 0 ? "text-red-900" : "text-gray-400"}`}>
                 {item.other > 0 ? "+" : ""}Rp{(item.other ?? 0).toLocaleString("id-ID")}
@@ -612,33 +613,33 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             {showDetails ? "Sembunyikan" : "Detail"}
           </button>
           <button onClick={() => onRowClick?.(item)} className="h-9 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800 transition">
-            🔍 Lihat Laptop
+             Lihat Laptop
           </button>
         </div>
 
         <div className="flex gap-2">
           {item.payment_photo && (
             <button onClick={() => onPhotoClick(item.payment_photo)} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-[10px] font-semibold">
-              <span>📸</span>Bukti
+              <ImageIcon className="w-3.5 h-3.5" />Bukti
             </button>
           )}
           {canEditTransaction && (
             <a href={`/payment/${item.invoice_number}`} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition text-[10px] font-semibold">
-              <span>✏️</span>Edit
+              <Pencil className="w-3.5 h-3.5" />Edit
             </a>
           )}
           {isPending && canEditTransaction && (
             <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
-              <span>✅</span>Lunas
+              <CheckCircle2 className="w-3.5 h-3.5" />Lunas
             </button>
           )}
           {canRestore && (
             <button onClick={() => setShowRestoreModal(true)} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition text-[10px] font-semibold">
-              <span>↩️</span>{isPending ? "Batal" : "Restore"}
+              <span>↩</span>{isPending ? "Batal" : "Restore"}
             </button>
           )}
           <a href={`/receipt/${item.invoice_number}`} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition text-[10px] font-semibold">
-            <span>📄</span>Receipt
+            <Receipt className="w-3.5 h-3.5" />Receipt
           </a>
         </div>
       </div>
@@ -692,7 +693,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
-    // ✅ max-h diperpanjang — hampir full viewport tingginya
+    //  max-h diperpanjang — hampir full viewport tingginya
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
         <table className="w-full border-collapse" style={{ minWidth: "1900px" }}>
@@ -850,7 +851,7 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           )}
         </td>
         <td className="px-4 py-3.5">
-          {item.customer_phone ? <span className="text-[11px] font-medium text-gray-500 whitespace-nowrap">📱 {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
+          {item.customer_phone ? <span className="text-[11px] font-medium text-gray-500 whitespace-nowrap"> {item.customer_phone}</span> : <span className="text-[10px] text-gray-300">—</span>}
         </td>
         <td className="px-4 py-3.5">
           {item.sales_name ? (
@@ -997,7 +998,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
             </div>
             <h2 className="font-bold text-gray-900 text-base leading-snug">{item.customer_name}</h2>
             <p className="text-xs text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
-            <p className="text-xs text-gray-400 mt-0.5">📅 {formatDateShort(item.created_at)}</p>
+            <p className="text-xs text-gray-400 mt-0.5"> {formatDateShort(item.created_at)}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition flex-shrink-0">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1010,7 +1011,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Customer</p>
               <p className="text-sm font-bold text-gray-800">{item.customer_name}</p>
-              {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5">📱 {item.customer_phone}</p>}
+              {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {item.customer_phone}</p>}
               {item.customer_type && item.customer_type !== "UMUM" && (
                 <span className="inline-flex items-center mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
                   {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
@@ -1030,7 +1031,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
 
           {/* Laptop details */}
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">💻 {isMulti ? `Laptop (${grouped.length} item)` : "Detail Laptop"}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> {isMulti ? `Laptop (${grouped.length} item)` : "Detail Laptop"}</p>
             <div className="space-y-2">
               {grouped.length > 0 ? grouped.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
@@ -1095,7 +1096,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
 
           {/* Payment */}
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">💰 Pembayaran</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2.5">
               {/* ── SESUDAH ── */}
               {canSeeFinancials && (
@@ -1172,8 +1173,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
 
         {/* Footer */}
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2.5 flex-shrink-0">
-          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">📄 Receipt</a>
-          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition">✏️ Edit</a>
+          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
+          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition"> Edit</a>
         </div>
       </div>
     </div>
@@ -1475,12 +1476,12 @@ export default function Page() {
         {focusInvoice && (
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-xs text-amber-800">
-              🔗 Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
+               Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
               {filteredTransactions[0]?.customer_name && <> · <b>{filteredTransactions[0].customer_name}</b></>}
               {filteredTransactions.length === 0 && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
             <button onClick={() => { setFocusInvoice(null); window.history.replaceState({}, "", "/dashboard/transactions"); }}
-              className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0">✕ Semua</button>
+              className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0"> Semua</button>
           </div>
         )}
 
@@ -1625,7 +1626,7 @@ export default function Page() {
 
               {hasActiveFilter && (
                 <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-400 border border-gray-200 rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition font-semibold">
-                  ✕ Reset semua filter
+                   Reset semua filter
                 </button>
               )}
             </div>
@@ -1637,7 +1638,7 @@ export default function Page() {
           isMobile ? <MobileSkeletonList /> : <DesktopSkeletonTable />
         ) : paginatedTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 py-16 px-4 text-center">
-            <div className="text-4xl mb-3 opacity-30">🔍</div>
+            <div className="text-gray-300 flex justify-center mb-3 opacity-50"><Inbox className="w-12 h-12" /></div>
             <p className="text-gray-400 text-sm font-medium">Tidak ada transaksi ditemukan</p>
             {hasActiveFilter && (
               <button onClick={resetFilters} className="mt-3 text-xs text-blue-500 hover:underline font-medium">Reset filter</button>

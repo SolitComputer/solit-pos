@@ -83,9 +83,9 @@ function toWaNumber(phone: string): string {
 function buildWaMessage(f: Followup): string {
   const nama = (f.customer_name || "").split(" ")[0] || "Kak";
   if (f.seller_type === "PEDAGANG") {
-    return `Halo Kak ${nama}, ini dari Solit 03 👋\n\nMau follow-up nih, gimana stok laptopnya? Kalau butuh restock atau ada unit yang lagi dicari, langsung info ke kami ya. Banyak unit ready baru nih 🙏😊`;
+    return `Halo Kak ${nama}, ini dari Solit 03 \n\nMau follow-up nih, gimana stok laptopnya? Kalau butuh restock atau ada unit yang lagi dicari, langsung info ke kami ya. Banyak unit ready baru nih `;
   }
-  return `Halo Kak ${nama}, ini dari Solit 03 👋\n\nMau follow-up nih, gimana kabar laptopnya? Semua lancar kan? Kalau ada kendala atau lagi nyari unit lain, langsung chat aja ya 🙏😊`;
+  return `Halo Kak ${nama}, ini dari Solit 03 \n\nMau follow-up nih, gimana kabar laptopnya? Semua lancar kan? Kalau ada kendala atau lagi nyari unit lain, langsung chat aja ya `;
 }
 
 const waLink = (f: Followup) =>
@@ -367,7 +367,7 @@ function PicAccessDropdown({
             : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
         )}
       >
-        <span aria-hidden="true">{error ? "⚠️" : "🔐"}</span>
+        <span aria-hidden="true">{error ? "" : ""}</span>
         <span>Akses PIC</span>
         {!error && (
           <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black tabular-nums">
@@ -390,7 +390,7 @@ function PicAccessDropdown({
             {loading ? (
               <div className="px-4 py-6 text-center text-xs text-gray-400">Memuat…</div>
             ) : error ? (
-              /* ✅ Error tampil eksplisit — tidak lagi "diam" */
+              /*  Error tampil eksplisit — tidak lagi "diam" */
               <div className="px-4 py-5 text-center">
                 <p className="text-xs font-bold text-red-600 mb-1">Gagal memuat</p>
                 <p className="text-[10px] text-gray-400 leading-relaxed mb-3">{error}</p>
@@ -531,7 +531,7 @@ function TandaiFuButton({
       )}
     >
       <span className="flex-shrink-0 inline-flex">
-        {processing ? <Spinner /> : isUnowned ? <span aria-hidden="true">🙋</span> : <PhoneIcon />}
+        {processing ? <Spinner /> : isUnowned ? <span aria-hidden="true"></span> : <PhoneIcon />}
       </span>
       <span className="truncate">{isUnowned ? "Klaim & FU" : "Follow-up"}</span>
     </button>
@@ -606,7 +606,7 @@ function BuktiFuUploader({
             <TrashIcon />
           </button>
           <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-blue-100">
-            <p className="text-[10px] font-bold text-blue-600 truncate">🖼️ {value?.name}</p>
+            <p className="text-[10px] font-bold text-blue-600 truncate"> {value?.name}</p>
             <p className="text-[9px] text-gray-400 mt-0.5 tabular-nums">
               {value ? (value.size / 1024).toFixed(0) + " KB" : ""}
             </p>
@@ -698,7 +698,7 @@ function ConfirmFollowupModal({
     }
   }, [followup]);
 
-  // ✅ Object URL dibuat di effect (bukan di render) supaya tidak leak memory
+  //  Object URL dibuat di effect (bukan di render) supaya tidak leak memory
   useEffect(() => {
     if (!buktiFu) {
       setPreviewUrl(null);
@@ -842,7 +842,7 @@ function ConfirmFollowupModal({
               <div className="space-y-2 mb-4">
                 <SummaryRow label="Customer">{followup.customer_name}</SummaryRow>
                 <SummaryRow label="Tipe">
-                  {followup.seller_type === "PEDAGANG" ? "🏷️ Pedagang" : "🙋 User"}
+                  {followup.seller_type === "PEDAGANG" ? " Pedagang" : " User"}
                 </SummaryRow>
                 <SummaryRow label="Jadwal baru">
                   <span className="text-blue-600">+{intervalDays} hari dari sekarang</span>
@@ -859,7 +859,7 @@ function ConfirmFollowupModal({
 
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-3">
                 <p className="text-xs font-black text-amber-800 leading-relaxed">
-                  ⚠️ Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
+                   Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
                 </p>
                 <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
                   Data ini akan tersimpan permanen dan tidak bisa dibatalkan. Jadwal follow-up
@@ -972,7 +972,7 @@ function PicBlock({ f }: { f: Followup }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
       <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
-        🙋
+        
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider leading-none mb-1">
@@ -1049,7 +1049,7 @@ function FollowupCard({
                 : "bg-blue-50 text-blue-700 border-blue-200"
             )}
           >
-            {isPedagang ? "🏷️ Pedagang" : "🙋 User"}
+            {isPedagang ? " Pedagang" : " User"}
           </span>
           <span className="text-[9px] text-gray-300">·</span>
           <span className="text-[9px] text-gray-400 font-medium">
@@ -1073,15 +1073,15 @@ function FollowupCard({
 
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatPill>
-            <span className="tabular-nums">🛒 {f.purchase_count}× beli</span>
+            <span className="tabular-nums"> {f.purchase_count}× beli</span>
           </StatPill>
           <StatPill>
-            <span className="tabular-nums">📞 {f.followup_count}× FU</span>
+            <span className="tabular-nums"> {f.followup_count}× FU</span>
           </StatPill>
           {f.last_followup_by && (
             <StatPill>
               <span className="truncate max-w-[120px] sm:max-w-[140px]">
-                👤 FU terakhir: {f.last_followup_by}
+                 FU terakhir: {f.last_followup_by}
               </span>
             </StatPill>
           )}
@@ -1094,7 +1094,7 @@ function FollowupCard({
                 FOCUS_RING
               )}
             >
-              🖼️ Lihat bukti
+               Lihat bukti
             </ExternalLink>
           )}
         </div>
@@ -1186,9 +1186,9 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-          { emoji: "🗂️", label: "Total Arsip", short: "Arsip", value: total, danger: false },
+          { emoji: "", label: "Total Arsip", short: "Arsip", value: total, danger: false },
           {
-            emoji: "📞",
+            emoji: "",
             label: "Total Follow-up",
             short: "Total FU",
             value: totalFU,
@@ -1196,16 +1196,16 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
           },
         ]
       : [
-          { emoji: "👥", label: "Customer", short: "Customer", value: total, danger: false },
+          { emoji: "", label: "Customer", short: "Customer", value: total, danger: false },
           {
-            emoji: "🔴",
+            emoji: "",
             label: "Perlu Follow-up",
             short: "Perlu FU",
             value: totalDue,
             danger: totalDue > 0,
           },
           {
-            emoji: "📞",
+            emoji: "",
             label: "Total Follow-up",
             short: "Total FU",
             value: totalFU,
@@ -1347,7 +1347,7 @@ export default function ManagementSellerPage() {
   const canView = hasAnyRole(userRoles, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
   const canManage = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
 
-  // ✅ Visibilitas tombol checklist ditentukan dari ROLE user (client-side),
+  //  Visibilitas tombol checklist ditentukan dari ROLE user (client-side),
   //    bukan dari hasil API. Enforcement asli tetap di server (PUT /api/seller-pics).
   const canManagePic = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_PIC);
 
@@ -1580,14 +1580,14 @@ export default function ManagementSellerPage() {
                 {
                   key: "USER" as Tab,
                   label: "User",
-                  icon: "🙋",
+                  icon: "",
                   count: userItems.length,
                   due: userDue,
                 },
                 {
                   key: "PEDAGANG" as Tab,
                   label: "Pedagang",
-                  icon: "🏷️",
+                  icon: "",
                   count: pedagangItems.length,
                   due: pedagangDue,
                 },
@@ -1682,7 +1682,7 @@ export default function ManagementSellerPage() {
         ) : visible.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 py-14 sm:py-20 px-6 text-center">
             <div className="text-4xl sm:text-5xl mb-4 opacity-25">
-              {scope === "ARCHIVED" ? "🗂️" : search.trim() ? "🔍" : "✅"}
+              {scope === "ARCHIVED" ? "" : search.trim() ? "" : ""}
             </div>
             <p className="text-sm font-bold text-gray-700">
               {search.trim()

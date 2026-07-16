@@ -14,6 +14,7 @@
 //    dynamic_roles, matrix-nya kosong sampai admin isi sendiri.
 
 import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, AlertTriangle, Save } from "lucide-react";
 
 interface DynamicRoleRow {
   id: string;
@@ -68,9 +69,9 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
     <div
       className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold bg-white border ${
         type === "ok" ? "text-slate-700 border-slate-100" : "text-red-600 border-red-100"
-      }`}
+      } flex items-center gap-2`}
     >
-      {type === "ok" ? "✅ " : "⚠️ "}
+      {type === "ok" ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
       {msg}
     </div>
   );
@@ -87,7 +88,7 @@ function CreateRoleModal({
 }) {
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
-  const [icon, setIcon] = useState("👤");
+  const [icon, setIcon] = useState("");
   const [isPkl, setIsPkl] = useState(false);
   const [parentRole, setParentRole] = useState("");
   const [saving, setSaving] = useState(false);
@@ -469,7 +470,7 @@ export default function RoleAccessManager() {
                   className="h-9 px-4 rounded-xl text-xs font-bold text-white disabled:opacity-50 flex-shrink-0"
                   style={{ background: "linear-gradient(135deg, #059669, #047857)" }}
                 >
-                  {saving ? "Menyimpan..." : "💾 Simpan"}
+                  {saving ? "Menyimpan..." : <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" /> Simpan</span>}
                 </button>
               </div>
 

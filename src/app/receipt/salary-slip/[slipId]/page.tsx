@@ -22,7 +22,7 @@ type PageProps = {
 export default async function SalarySlipPage({ params }: PageProps) {
     const { slipId } = await params;
 
-    // ✅ Auth guard — wajib login
+    //  Auth guard — wajib login
     const currentUser = await getCurrentUser();
     if (!currentUser) {
         redirect("/login");
@@ -39,13 +39,13 @@ export default async function SalarySlipPage({ params }: PageProps) {
         notFound();
     }
 
-    // ✅ Permission guard — hanya admin atau pemilik slip
+    //  Permission guard — hanya admin atau pemilik slip
     const isAdmin = ADMIN_ROLES.includes(currentUser.role);
     if (!isAdmin && slip.user_id !== currentUser.id) {
         redirect("/dashboard/attendance");
     }
 
-    // ✅ Non-admin hanya bisa lihat slip yang sudah dikirim (sent_at tidak null)
+    //  Non-admin hanya bisa lihat slip yang sudah dikirim (sent_at tidak null)
     if (!isAdmin && !slip.sent_at) {
         redirect("/dashboard/attendance");
     }

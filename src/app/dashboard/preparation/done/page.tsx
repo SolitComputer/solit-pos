@@ -61,9 +61,9 @@ export default function PreparationDonePage() {
   ] as const;
 
   const STAT = [
-    { label: "Dikirim", value: counts.DIKIRIM, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "🚚" },
-    { label: "Selesai", value: counts.SELESAI, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: "✅" },
-    { label: "Total", value: counts.ALL, color: "from-gray-50 to-gray-100/50 border-gray-200 text-gray-700", icon: "📦" },
+    { label: "Dikirim", value: counts.DIKIRIM, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> },
+    { label: "Selesai", value: counts.SELESAI, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+    { label: "Total", value: counts.ALL, color: "from-gray-50 to-gray-100/50 border-gray-200 text-gray-700", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> },
   ];
 
   return (
@@ -89,7 +89,7 @@ export default function PreparationDonePage() {
             {STAT.map(s => (
               <div key={s.label} className={`bg-gradient-to-br ${s.color} border rounded-2xl p-3`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-lg">{s.icon}</span>
+                  <span className="text-current opacity-70">{s.icon}</span>
                   <span className="text-2xl font-black tabular-nums">{s.value}</span>
                 </div>
                 <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
@@ -120,7 +120,7 @@ export default function PreparationDonePage() {
             <div className="space-y-2.5">{[1, 2, 3].map(i => <div key={i} className="h-44 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-              <div className="text-4xl mb-3 opacity-40">📭</div>
+              <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
               <p className="text-gray-500 text-sm font-medium">Belum ada barang yang selesai disiapkan</p>
             </div>
           ) : (

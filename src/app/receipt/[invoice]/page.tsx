@@ -1,6 +1,7 @@
 import { supabase } from "@/services/supabase";
 import Link from "next/link";
 import ReceiptActions from "./ReceiptActions";
+import { User, Package, Shield, FileText } from "lucide-react";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -133,16 +134,16 @@ export default async function Page(props: Props) {
             <Separator />
 
             {/* Customer */}
-            <Section title="Data Pembeli" icon="👤">
+            <Section title="Data Pembeli" icon={<User className="w-4 h-4" />}>
               <InfoRow label="Nama" value={data.customer_name} bold />
               <InfoRow label="WhatsApp" value={data.customer_phone} />
               {data.company_name && <InfoRow label="Perusahaan" value={data.company_name} />}
               <InfoRow
                 label="Tipe"
                 value={
-                  data.customer_type === "RESELLER" ? "🔄 Reseller"
-                    : data.customer_type === "MITRA" ? "🤝 Mitra Bisnis"
-                      : "👤 Umum"
+                  data.customer_type === "RESELLER" ? "Reseller"
+                    : data.customer_type === "MITRA" ? "Mitra Bisnis"
+                      : "Umum"
                 }
               />
             </Section>
@@ -150,7 +151,7 @@ export default async function Page(props: Props) {
             <Separator />
 
             {/* Pickup */}
-            <Section title="Info Pengambilan" icon="📦">
+            <Section title="Info Pengambilan" icon={<Package className="w-4 h-4" />}>
               <InfoRow label="Metode" value={data.pickup_method === "DATANG" ? "Datang ke Toko" : "Diantar"} />
               {pickupDate && <InfoRow label="Tanggal" value={pickupDate} />}
               {data.pickup_time && <InfoRow label="Jam" value={data.pickup_time} />}
@@ -161,7 +162,7 @@ export default async function Page(props: Props) {
             {warranty && (
               <>
                 <Separator />
-                <Section title="Informasi Garansi" icon="🛡️">
+                <Section title="Informasi Garansi" icon={<Shield className="w-4 h-4" />}>
                   <div className={`rounded-xl p-4 border ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
                     ? "bg-emerald-50 border-emerald-200"
                     : warrantyDaysLeft !== null && warrantyDaysLeft > 0
@@ -218,7 +219,7 @@ export default async function Page(props: Props) {
             {data.notes && (
               <>
                 <Separator />
-                <Section title="Catatan" icon="📝">
+                <Section title="Catatan" icon={<FileText className="w-4 h-4" />}>
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{data.notes}</p>
                 </Section>
               </>
@@ -277,11 +278,11 @@ export default async function Page(props: Props) {
 }
 
 // ── Helper Components ─────────────────────────────────────────────────────────
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-base">{icon}</span>
+        <span className="text-gray-400">{icon}</span>
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</h3>
       </div>
       <div className="space-y-2.5">{children}</div>

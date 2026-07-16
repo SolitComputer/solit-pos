@@ -135,7 +135,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
 
       if (destination) {
         destRef.current = L.marker([destination.lat, destination.lng], {
-          icon: L.divIcon({ className: "", html: `<div style="font-size:32px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">📍</div>`, iconSize: [32, 32], iconAnchor: [16, 30] }),
+          icon: L.divIcon({ className: "", html: `<div style="font-size:32px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))"></div>`, iconSize: [32, 32], iconAnchor: [16, 30] }),
         }).addTo(map);
       }
 
@@ -143,7 +143,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
         <div style="position:relative;width:46px;height:46px;">
           <div style="position:absolute;inset:0;border-radius:9999px;background:rgba(37,99,235,.25);animation:motoPulse 1.6s ease-out infinite;"></div>
           <div class="moto-rot" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform .25s linear;">
-            <div style="width:36px;height:36px;border-radius:9999px;background:#fff;border:3px solid #2563eb;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.4);font-size:19px;">🏍️</div>
+            <div style="width:36px;height:36px;border-radius:9999px;background:#fff;border:3px solid #2563eb;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.4);font-size:19px;"></div>
           </div>
         </div>`;
       motoRef.current = L.marker([start.lat, start.lng], {
@@ -272,7 +272,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
     if (!L || !mapRef.current || !destination) return;
     if (destRef.current) destRef.current.setLatLng([destination.lat, destination.lng]);
     else destRef.current = L.marker([destination.lat, destination.lng], {
-      icon: L.divIcon({ className: "", html: `<div style="font-size:32px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">📍</div>`, iconSize: [32, 32], iconAnchor: [16, 30] }),
+      icon: L.divIcon({ className: "", html: `<div style="font-size:32px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))"></div>`, iconSize: [32, 32], iconAnchor: [16, 30] }),
     }).addTo(mapRef.current);
   }, [destination]);
 
@@ -304,7 +304,7 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
         <div style={{ position: "absolute", left: 10, right: 10, top: 10, zIndex: 20, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ background: "rgba(26,26,46,.92)", color: "#fff", borderRadius: 12, padding: "7px 12px", display: "flex", alignItems: "center", gap: 12, fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.3)", maxWidth: "92%" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-              <span>🛣️</span>
+              <span></span>
               <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170 }}>{street}</span>
             </span>
             <span style={{ background: "#2563eb", borderRadius: 8, padding: "2px 8px", whiteSpace: "nowrap" }}>{speedKmh != null ? `${Math.round(speedKmh)} km/j` : "—"}</span>
@@ -321,18 +321,18 @@ export default function DeliveryMap({ points, routeLine, destination, height = 3
       {ready && liveStop && (
         <div style={{ position: "absolute", left: 10, right: 10, bottom: 56, zIndex: 20, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
           <div style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", borderRadius: 12, padding: "6px 12px", fontSize: 12, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,.2)", maxWidth: "92%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            ⏸️ Sedang berhenti — {liveStop.emoji} {liveStop.kind}
+            Sedang berhenti — {liveStop.emoji} {liveStop.kind}
           </div>
         </div>
       )}
 
       <button type="button" onClick={toggleType}
         style={{ position: "absolute", left: 10, bottom: 10, zIndex: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "7px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
-        {mapType === "road" ? "🛰️ Satelit" : "🗺️ Peta"}
+        {mapType === "road" ? " Satelit" : " Peta"}
       </button>
       <button type="button" onClick={recenter}
         style={{ position: "absolute", right: 10, bottom: 10, zIndex: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "8px 11px", fontSize: 12, fontWeight: 700, color: "#1a1a2e", boxShadow: "0 2px 8px rgba(0,0,0,.15)", cursor: "pointer" }}>
-        🎯 Ikuti motor
+         Ikuti motor
       </button>
     </div>
   );
