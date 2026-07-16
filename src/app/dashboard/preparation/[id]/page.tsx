@@ -1189,7 +1189,6 @@ export default function PreparationDetailPage() {
                                 </button>
                             </div>
                         </div>
-                        </div>
                     )}
 
                 </div>

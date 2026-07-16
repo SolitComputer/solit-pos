@@ -1464,7 +1464,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "ATTENDED":
             cfg = {
-                icon: "", gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
+                icon: <CheckCircle2 className="w-6 h-6 text-emerald-600" />, gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
                 badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-400",
                 badgeText: "Sudah Absen", title: "Absensi Hari Ini Tercatat",
                 sub: `Shift ${status.shift}`, showBtn: false,
