@@ -15,6 +15,8 @@ interface LedgerLine {
     kredit: number;
     saldo_debit: number;
     saldo_kredit: number;
+    checked: boolean;
+    checked_at: string | null;
 }
 
 interface OpeningBalance {
@@ -86,6 +88,44 @@ export default function BukuBesar({ period }: { period: string }) {
             setLoading(false);
         }
     }, [period, accountCode]);
+
+    // Toggle status "sudah dicek" per baris jurnal.
+    // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
+    // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
+    const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+        setData((prev) =>
+            prev
+                ? {
+                    ...prev,
+                    lines: prev.lines.map((l) =>
+                        l.id === lineId
+                            ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
+                            : l
+                    ),
+                }
+                : prev
+        );
+        try {
+            const res = await fetch("/api/akutansi/buku-besar/check", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ line_id: lineId, checked: next }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message);
+        } catch {
+            setData((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        lines: prev.lines.map((l) =>
+                            l.id === lineId ? { ...l, checked: !next, checked_at: !next ? new Date().toISOString() : null } : l
+                        ),
+                    }
+                    : prev
+            );
+        }
+    }, []);
 
     useEffect(() => {
         load();
@@ -236,7 +276,7 @@ export default function BukuBesar({ period }: { period: string }) {
             {/* ── Tabel Buku Besar ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{ minWidth: "980px" }}>
+                    <table className="w-full border-collapse" style={{ minWidth: "1040px" }}>
                         <thead>
                             <tr className="border-b border-gray-100 bg-gray-50">
                                 <th rowSpan={2} className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[100px] align-bottom">
@@ -257,6 +297,9 @@ export default function BukuBesar({ period }: { period: string }) {
                                 <th colSpan={2} className="px-4 py-2 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider border-l-2 border-gray-200">
                                     Saldo
                                 </th>
+                                <th rowSpan={2} className="px-3 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[64px] align-bottom border-l-2 border-gray-200">
+                                    Cek
+                                </th>
                             </tr>
                             <tr className="border-b-2 border-gray-200 bg-gray-50">
                                 <th className="px-4 py-2 text-right text-[10px] font-bold text-blue-600 uppercase tracking-wider w-[140px] border-l-2 border-gray-200">
@@ -271,7 +314,7 @@ export default function BukuBesar({ period }: { period: string }) {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="border-b border-gray-50">
-                                        {Array.from({ length: 7 }).map((__, j) => (
+                                        {Array.from({ length: 8 }).map((__, j) => (
                                             <td key={j} className="px-4 py-4">
                                                 <div className="h-3 bg-gray-100 rounded animate-pulse" />
                                             </td>
@@ -280,7 +323,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                 ))
                             ) : !data ? (
                                 <tr>
-                                    <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
+                                    <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
                                         Pilih akun untuk melihat buku besar
                                     </td>
                                 </tr>
@@ -300,6 +343,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                         <td className="px-4 py-2.5 text-right text-[12px] font-mono font-bold text-emerald-700">
                                             {data.saldo_awal < 0 ? rp(Math.abs(data.saldo_awal)) : ""}
                                         </td>
+                                        <td className="px-3 py-2.5 text-center text-gray-300 border-l-2 border-gray-200">—</td>
                                     </tr>
 
                                     {data.lines.length === 0 ? (
@@ -334,6 +378,22 @@ export default function BukuBesar({ period }: { period: string }) {
                                                 <td className="px-4 py-2.5 text-right text-[12px] font-mono text-emerald-700">
                                                     {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
                                                 </td>
+                                                <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
+                                                    <button
+                                                        onClick={() => toggleChecked(l.id, !l.checked)}
+                                                        title={
+                                                            l.checked
+                                                                ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
+                                                                : "Tandai sudah dicek"
+                                                        }
+                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black transition ${l.checked
+                                                            ? "bg-green-600 border-green-600 text-white"
+                                                            : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
+                                                            }`}
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -359,6 +419,9 @@ export default function BukuBesar({ period }: { period: string }) {
                                     </td>
                                     <td className="px-4 py-3 text-right text-sm font-black text-emerald-700 font-mono">
                                         {data.totals.saldo_akhir < 0 ? rp(Math.abs(data.totals.saldo_akhir)) : ""}
+                                    </td>
+                                    <td className="px-3 py-3 text-center border-l-2 border-gray-200 text-[10px] font-bold text-gray-400">
+                                        {data.lines.filter((l) => l.checked).length}/{data.lines.length}
                                     </td>
                                 </tr>
                             </tfoot>
