@@ -175,21 +175,22 @@ async function handler(req: NextRequest) {
         allocated_deal_price: number;
         unit_count: number;
       }>();
-
+      // ── SESUDAH ──
       let totalPurchasePrice = 0;
+      let matchedAnyUnit = false;
       const allSerialNumbers: string[] = [];
 
       for (const uid of unitIds) {
         const unitData = unitMap.get(uid);
         if (!unitData) continue;
 
+        matchedAnyUnit = true;
         totalPurchasePrice += unitData.purchase_price;
         if (unitData.serial_number) allSerialNumbers.push(unitData.serial_number);
 
         const laptopId = unitData.laptop_id ?? trx.laptop_id ?? "unknown";
         const specs = laptopMap.get(laptopId);
 
-        // ✅ Deal price per unit dari transaction_items, fallback proporsional
         const unitDealPrice = itemDealPriceMap.get(uid) ?? 0;
 
         if (!laptopGroups.has(laptopId)) {
@@ -273,7 +274,7 @@ async function handler(req: NextRequest) {
 
       const storedInventoryPrice = Number(trx.inventory_price ?? 0);
 
-      const finalInventoryPrice = totalPurchasePrice > 0 ? totalPurchasePrice : storedInventoryPrice;
+      const finalInventoryPrice = matchedAnyUnit ? totalPurchasePrice : storedInventoryPrice;
 
       const hasModal = finalInventoryPrice > 0;
       const totalMargin = hasModal

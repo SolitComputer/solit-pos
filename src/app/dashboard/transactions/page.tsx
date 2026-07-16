@@ -420,7 +420,7 @@ function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm
 }
 
 // ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
-function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
+function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -550,7 +550,13 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             <p className="text-[10px] text-blue-500 font-semibold mb-0.5">Harga Jual</p>
             <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
           </div>
-          {item.has_modal === false ? (
+          {/* ── SESUDAH ── */}
+          {!canSeeModal ? (
+            <div className="rounded-xl p-2.5 ring-1 bg-gray-50 ring-gray-100">
+              <p className="text-[10px] font-semibold mb-0.5 text-gray-400">🔒 Margin</p>
+              <p className="text-xs font-bold text-gray-400 leading-snug">Dibatasi</p>
+            </div>
+          ) : item.has_modal === false ? (
             <div className="rounded-xl p-2.5 ring-1 bg-amber-50 ring-amber-100">
               <p className="text-[10px] font-semibold mb-0.5 text-amber-600">⚠️ Modal</p>
               <p className="text-xs font-bold text-amber-700 leading-snug">Belum di-set</p>
@@ -682,7 +688,7 @@ function StatusBadge({ item }: { item: any }) {
 }
 
 // ─── TRANSACTION TABLE (Desktop) ─────────────────────────────────────
-function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, onPhotoClick, onRestored, onRowClick }: any) {
+function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick }: any) {
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
@@ -717,6 +723,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
                 canEditTransaction={canEditTransaction}
                 canRestoreTransaction={canRestoreTransaction}
                 canSeeFinancials={canSeeFinancials}
+                canSeeModal={canSeeModal}
                 onRestored={onRestored}
                 onRowClick={onRowClick}
               />
@@ -732,7 +739,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
 }
 
 // ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
-function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, onRestored, onRowClick }: any) {
+function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -877,7 +884,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
           <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
         </td>
         <td className="px-4 py-3.5 text-right">
-          {item.has_modal === false ? (
+          {!canSeeModal ? (
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-400 ring-1 ring-gray-200 whitespace-nowrap">
+              🔒 Dibatasi
+            </span>
+          ) : item.has_modal === false ? (
             <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
               ⚠️ Belum di-set modal
             </span>
@@ -942,8 +953,18 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   );
 }
 
-// ─── TRANSACTION DETAIL MODAL ─────────────────────────────────────────
-function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any; onClose: () => void; canSeeFinancials: boolean }) {
+const MODAL_VISIBLE_ROLES = [
+  "ADMIN",
+  "KEPALA_SALES",
+  "PENYEDIA_BARANG",
+  "KEPALA_PENYEDIA_BARANG",
+  "KEPALA_TEKNISI",
+  "ACCOUNTING",
+  "ASISTEN_CEO",
+  "PROGRAMMER",
+];
+
+function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -1035,11 +1056,14 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                       </div>
                     </div>
                   )}
+                  {/* ── SESUDAH ── */}
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-4 gap-2">
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Modal</p>
-                        {g.has_modal === false ? (
+                        {!canSeeModal ? (
+                          <p className="text-[10px] font-bold text-gray-400">🔒 Dibatasi</p>
+                        ) : g.has_modal === false ? (
                           <p className="text-[10px] font-bold text-amber-600">⚠️ Belum di-set</p>
                         ) : (
                           <p className="text-xs font-bold text-gray-700 font-mono tabular-nums">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
@@ -1049,7 +1073,9 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                       <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Deal</p><p className="text-xs font-bold text-blue-700 font-mono tabular-nums">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p></div>
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Margin</p>
-                        {g.has_modal === false ? (
+                        {!canSeeModal ? (
+                          <p className="text-[10px] font-bold text-gray-400">🔒</p>
+                        ) : g.has_modal === false ? (
                           <p className="text-[10px] font-bold text-amber-600">—</p>
                         ) : (
                           <p className={`text-xs font-bold font-mono tabular-nums ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}</p>
@@ -1071,10 +1097,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">💰 Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2.5">
+              {/* ── SESUDAH ── */}
               {canSeeFinancials && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Modal</span>
-                  {item.has_modal === false ? (
+                  {!canSeeModal ? (
+                    <span className="text-xs font-bold text-gray-400">🔒 Dibatasi</span>
+                  ) : item.has_modal === false ? (
                     <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
                   ) : (
                     <span className="text-sm font-bold text-gray-700 font-mono tabular-nums">Rp{totalModal.toLocaleString("id-ID")}</span>
@@ -1097,13 +1126,19 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials }: { item: any
                   <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
                 </div>
               )}
-              {canSeeFinancials && item.has_modal === false && (
+              {canSeeFinancials && !canSeeModal && (
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                  <span className="text-xs font-semibold text-gray-700">Total Margin</span>
+                  <span className="text-xs font-bold text-gray-400">🔒 Dibatasi</span>
+                </div>
+              )}
+              {canSeeFinancials && canSeeModal && item.has_modal === false && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
                   <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
                 </div>
               )}
-              {canSeeFinancials && item.has_modal !== false && totalMargin !== 0 && (
+              {canSeeFinancials && canSeeModal && item.has_modal !== false && totalMargin !== 0 && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
                   <span className={`text-sm font-bold font-mono tabular-nums ${totalMargin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
@@ -1196,6 +1231,7 @@ export default function Page() {
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
   const canSeeFinancials = hasAnyRole(userRoles, PERMISSIONS.VIEW_FINANCIALS);
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
+  const canSeeModal = userRoles.some((r) => MODAL_VISIBLE_ROLES.includes(r));
 
   useEffect(() => { fetchTransactions(); }, []);
 
@@ -1398,7 +1434,7 @@ export default function Page() {
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
-      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} />}
+      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} />}
 
       {/* ── Page wrapper — padding lebih kecil di desktop agar table lebih tinggi ── */}
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
@@ -1613,6 +1649,7 @@ export default function Page() {
               <TransactionCard
                 key={item.id} item={item} onPhotoClick={setPhotoModal}
                 canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials}
+                canSeeModal={canSeeModal}
                 canRestoreTransaction={canRestoreTransaction}
                 onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
               />
@@ -1622,7 +1659,7 @@ export default function Page() {
           <TransactionTable
             paginatedTransactions={paginatedTransactions}
             canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction}
-            canSeeFinancials={canSeeFinancials} onPhotoClick={setPhotoModal}
+            canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} onPhotoClick={setPhotoModal}
             onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
           />
         )}
