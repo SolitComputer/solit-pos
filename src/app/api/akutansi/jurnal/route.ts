@@ -12,7 +12,6 @@ import {
   totalOf,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
-import { getAccountMap } from "@/lib/chartOfAccounts";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -28,6 +27,11 @@ const ENTRY_SELECT = `
   updated_by_user:users!journal_entries_updated_by_fkey(id, name),
   lines:journal_lines(*)
 `;
+
+async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
+  const { data } = await supabase.from("chart_of_accounts").select("code").eq("code", code).maybeSingle();
+  return !!data;
+}
 
 // ── GET /api/akuntansi/jurnal?period=2026-07 ─────────────────────────────────
 export const GET = withAuth(async (req) => {
@@ -49,7 +53,6 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  // Urutkan baris: DEBIT dulu, lalu KREDIT (sesuai tampilan jurnal umum)
   const entries = (data ?? []).map((e: any) => ({
     ...e,
     lines: [...(e.lines ?? [])].sort((a: any, b: any) => {
@@ -102,10 +105,9 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     return NextResponse.json({ success: false, message: "Minimal 2 baris (debit & kredit)" }, { status: 400 });
 
   const supabase = getAdmin();
-  const accountMap = await getAccountMap(supabase);
 
   for (const l of lines) {
-    if (!accountMap.has(l.account_code))
+    if (!(await isValidAccountAnywhere(supabase, l.account_code)))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (l.side !== "DEBIT" && l.side !== "KREDIT")
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });

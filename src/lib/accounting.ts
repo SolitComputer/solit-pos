@@ -272,3 +272,8 @@ export const MANUAL_TEMPLATES: {
   },
   { key: "CUSTOM", label: "Kosong (custom)", lines: [] },
 ];
+
+export const PROTECTED_ACCOUNT_CODES: string[] = [
+  ...Object.values(AKUN),
+  ...Object.values(CASHFLOW_OUT_ACCOUNT),
+];

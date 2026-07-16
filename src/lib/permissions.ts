@@ -92,6 +92,8 @@ const ALL_ROLES: UserRole[] = [
   "CUSTOMER_SERVICE",
 ];
 
+export const ALL_STATIC_ROLES: string[] = [...ALL_ROLES];
+
 const SALES_ACCESS: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
@@ -135,6 +137,20 @@ export const ALL_UNITS_ROLES: UserRole[] = [
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 /** Yang boleh konfirmasi / edit / hapus jurnal */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+export function humanizeRoleKey(role: string): string {
+  return role
+    .split("_")
+    .map((w) => (w.length ? w[0] + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
+export function getLegacyPageAccess(role: string, pageRoute: string): boolean {
+  const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
+    .filter((r) => pageRoute === r || pageRoute.startsWith(r + "/"))
+    .sort((a, b) => b.length - a.length)[0];
+ 
+  if (!matchedRoute) return true;
+  return (ROUTE_PERMISSIONS[matchedRoute] as string[]).includes(role);
+}
 
 // ─── Pengambilan Barang (Item Outflow) ────────────────────────────────────
 export const ITEM_OUTFLOW_ROLES: UserRole[] = [
@@ -455,13 +471,13 @@ export const PERMISSIONS = {
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
     "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
     ...TRANSACTION_VIEW,
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL_SALES",
   ] as UserRole[],
 
   CREATE_TRANSACTION: [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   ] as UserRole[],

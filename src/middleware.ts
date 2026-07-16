@@ -13,6 +13,8 @@ import {
   getEffectivePrimaryRole,
 } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
+import { ALL_STATIC_ROLES } from "@/lib/permissions";
+import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
@@ -218,6 +220,9 @@ export async function middleware(request: NextRequest) {
   const effectiveRoles = expandRolesWithParents(userRoles);
   const effectivePrimary = getEffectivePrimaryRole(userRoles);
 
+  const fullyExpandedRoles = await expandDynamicParents(effectiveRoles);
+  const hasDynamicRole = fullyExpandedRoles.some((r) => !ALL_STATIC_ROLES.includes(r));
+
   const isPageRoute = !pathname.startsWith("/api/");
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
@@ -289,25 +294,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // ── Route permission check ────────────────────────────────────────────────
-  // ✅ Pakai effectiveRoles: PKL_MARKETING akan lolos di route yang allow MARKETING
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((route) => pathname.startsWith(route))
     .sort((a, b) => b.length - a.length)[0];
 
+  let hasRouteAccess: boolean;
+
   if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
-    const hasAccess = effectiveRoles.some((r: string) =>
-      (allowed as string[]).includes(r)
-    );
-    if (!hasAccess) {
-      return NextResponse.redirect(
-        new URL(
-          ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard",
-          request.url
-        )
-      );
+    hasRouteAccess = effectiveRoles.some((r: string) => (allowed as string[]).includes(r));
+
+
+    if (!hasRouteAccess && hasDynamicRole) {
+      const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
+      if (dyn.matched) hasRouteAccess = dyn.allowed;
     }
+  } else if (hasDynamicRole) {
+
+    const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
+    hasRouteAccess = dyn.matched ? dyn.allowed : true;
+  } else {
+    // Role statis, halaman tidak ada di ROUTE_PERMISSIONS -> perilaku lama (izinkan).
+    hasRouteAccess = true;
+  }
+
+  if (!hasRouteAccess) {
+    return NextResponse.redirect(
+      new URL(ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard", request.url)
+    );
   }
 
   // ── Inject user headers untuk API routes ──────────────────────────────────

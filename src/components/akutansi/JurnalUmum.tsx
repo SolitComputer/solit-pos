@@ -89,7 +89,15 @@ export default function JurnalUmum({ period }: { period: string }) {
             const j = await jRes.json();
             const p = await pRes.json();
             setEntries(j.success ? j.data ?? [] : []);
-            setPending(p.success ? p.data ?? [] : []);
+
+            const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
+                const t = new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
+                if (t !== 0) return t;
+                if (a.source_type !== b.source_type) return a.source_type.localeCompare(b.source_type);
+                return a.source_id.localeCompare(b.source_id);
+            });
+            setPending(pendingSorted);
+
             setSelected(new Set());
         } finally {
             setLoading(false);
@@ -452,7 +460,6 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: "gra
     );
 }
 
-// ─── Form Modal (manual + edit) ───────────────────────────────────────────────
 function EntryFormModal({
     period,
     entry,
@@ -469,6 +476,14 @@ function EntryFormModal({
     const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
+
+    const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
+    useEffect(() => {
+        fetch("/api/akutansi/accounts")
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setAllAccounts(j.data); })
+            .catch(() => { });
+    }, []);
     const [lines, setLines] = useState<DraftLine[]>(
         entry?.lines.map((l) => ({ account_code: l.account_code, side: l.side, nominal: Number(l.nominal) })) ?? [
             { account_code: "110", side: "DEBIT", nominal: 0 },
@@ -623,7 +638,7 @@ function EntryFormModal({
                                     >
                                         {ACCOUNT_TYPE_ORDER.map((type) => (
                                             <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
-                                                {ACCOUNTS.filter((a) => a.type === type).map((a) => (
+                                                {allAccounts.filter((a) => a.type === type).map((a) => (
                                                     <option key={a.code} value={a.code}>
                                                         {a.code} · {a.name}
                                                     </option>

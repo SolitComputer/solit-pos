@@ -1638,6 +1638,18 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const hasFetched = useRef(false);
 
+  const [dynamicGroups, setDynamicGroups] = useState<MenuGroup[]>([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch("/api/me/menu")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) setDynamicGroups(d.groups);
+      })
+      .catch(() => { });
+  }, [user?.id]);
+
   const [rail, setRail] = useState(false);
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
@@ -1702,12 +1714,21 @@ export default function Sidebar() {
 
   const effectiveRoles = expandRolesWithParents(userRoles);
 
-  const groups: MenuGroup[] =
+  const staticGroups: MenuGroup[] =
     effectiveRoles.length > 0
       ? dedupeGroups(
         mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles)
       )
       : [];
+
+
+  const groups: MenuGroup[] = dedupeGroups([
+    ...staticGroups,
+    ...dynamicGroups.map((g) => ({
+      label: g.label,
+      items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
+    })),
+  ]);
 
   const groupsSig = groups.map((g) => g.label).join("|");
 

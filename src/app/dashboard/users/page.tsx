@@ -6,6 +6,7 @@ import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
+import RoleAccessManager from "@/components/users/RoleAccessManager";
 
 interface User {
   id: string;
@@ -22,9 +23,19 @@ interface User {
   birth_date: string | null;
 }
 
+interface CustomRoleRow {
+  key: string;
+  label: string;
+  icon: string;
+  badge_bg: string;
+  badge_text: string;
+  badge_border: string;
+  is_pkl: boolean;
+}
+
 const ALL_ROLES = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "KEPALA_SALES", "KEPALA_ZENITH",              // ← pindah ke sini
+  "KEPALA_SALES", "KEPALA_ZENITH",
   "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
@@ -69,7 +80,7 @@ const ROLE_ICON: Record<string, string> = {
   PKL: "🎓", PKL_MARKETING: "🎓", PKL_SALES: "🎓",
   PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
   PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
-  CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",     // ← NEW
+  CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",
   PKL_PENGELOLA_BARANG: "🎓", PURCHASING: "🛒", KEPALA_ZENITH: "⚡",
 };
 
@@ -102,30 +113,15 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PKL_ONPOINT: PKL_BADGE, PKL_TEKNISI: PKL_BADGE, PKL_KONTEN: PKL_BADGE, PKL_PENGANTARAN: PKL_BADGE,
   CUSTOMER_SERVICE: { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
   KEPALA_PENGELOLA_BARANG: { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
-  PKL_CUSTOMER_SERVICE: PKL_BADGE,     // ← NEW
+  PKL_CUSTOMER_SERVICE: PKL_BADGE,
   PKL_PENGELOLA_BARANG: PKL_BADGE,
   PURCHASING: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
   KEPALA_ZENITH: { bg: "#fdf4ff", text: "#7e22ce", border: "#e9d5ff" },
 };
 
-const ROLE_AVATAR_COLOR: Record<string, string> = {
-  ADMIN: "#7c3aed", PROGRAMMER: "#4f46e5", ASISTEN_CEO: "#9333ea",
-  KEPALA_SALES: "#059669", KEPALA_MARKETING: "#e11d48", KEPALA_TEKNISI: "#dc2626",
-  CREW_SALES: "#0284c7", SOTECH: "#65a30d", ACCOUNTING: "#d97706",
-  PENGELOLA_BARANG: "#2563eb", KEPALA_PENGELOLA_BARANG: "#1d4ed8", TEKNISI: "#ea580c",
-  PENGANTARAN: "#0d9488", KEPALA_ZENITH: "#7c3aed",
-  MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
-  PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
-  KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
-  KEPALA_SOTECH: "#4d7c0f",
-  PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309",
-  PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
-  PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
-  CUSTOMER_SERVICE: "#0369a1", PKL_CUSTOMER_SERVICE: "#b45309",     // ← NEW
-  PKL_PENGELOLA_BARANG: "#b45309", PURCHASING: "#9333ea",
-};
-
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
+const ROLE_MANAGER_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
@@ -143,9 +139,27 @@ function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
+
+const ROLE_AVATAR_COLOR: Record<string, string> = {
+  ADMIN: "#7c3aed", PROGRAMMER: "#4f46e5", ASISTEN_CEO: "#9333ea",
+  KEPALA_SALES: "#059669", KEPALA_MARKETING: "#e11d48", KEPALA_TEKNISI: "#dc2626",
+  CREW_SALES: "#0284c7", SOTECH: "#65a30d", ACCOUNTING: "#d97706",
+  PENGELOLA_BARANG: "#2563eb", KEPALA_PENGELOLA_BARANG: "#1d4ed8", TEKNISI: "#ea580c",
+  PENGANTARAN: "#0d9488", KEPALA_ZENITH: "#7c3aed",
+  MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
+  PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
+  KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
+  KEPALA_SOTECH: "#4d7c0f",
+  PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309",
+  PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
+  PKL_ONPOINT: "#b45309", PKL_TEKNISI: "#b45309", PKL_KONTEN: "#b45309", PKL_PENGANTARAN: "#b45309",
+  CUSTOMER_SERVICE: "#0369a1", PKL_CUSTOMER_SERVICE: "#b45309",
+  PKL_PENGELOLA_BARANG: "#b45309", PURCHASING: "#9333ea",
+};
 function getAvatarColor(role: string) {
   return ROLE_AVATAR_COLOR[role] ?? "#6b7280";
 }
+
 function isBirthdayToday(birthDate: string | null): boolean {
   if (!birthDate) return false;
   const today = new Date();
@@ -191,62 +205,11 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   );
 }
 
-function RoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="w-full h-10 border rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
-      style={{ borderColor: "#e2e8f0", color: "#1e293b" }}
-    >
-      <optgroup label="— Akses Penuh —">
-        {["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Management —">
-        {["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Operasional —">
-        {["CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Penyedia & Konten —">
-        {["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Onpoint & Sotech —">
-        {["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Magang (PKL) —">
-        {["PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-          "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-          "PKL_PENGANTARAN",
-          "PKL_CUSTOMER_SERVICE",
-          "PKL_PENGELOLA_BARANG",
-        ].map(r => (
-          <option key={r} value={r}>{ROLE_ICON[r]} {ROLE_LABEL[r]}</option>
-        ))}
-      </optgroup>
-      <optgroup label="— Layanan —">
-        <option value="CUSTOMER_SERVICE">🎧 Customer Service</option>
-      </optgroup>
-    </select>
-  );
-}
-
 // ── Modal Shell ───────────────────────────────────────────────────────────────
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      {/* drag handle for mobile */}
       <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn"
         style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.18)" }}>
         <div className="flex justify-center pt-3 pb-0 sm:hidden">
@@ -402,6 +365,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 }
 
 // ── MultiRoleSelect ───────────────────────────────────────────────────────────
+// FIX: fetch role custom dari /api/admin/roles supaya muncul di dropdown.
 function MultiRoleSelect({
   values,
   onChange,
@@ -409,32 +373,70 @@ function MultiRoleSelect({
   values: string[];
   onChange: (v: string[]) => void;
 }) {
-  const ALL_ROLE_GROUPS = [
-    { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
-    { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+  const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
+  const [loadingCustom, setLoadingCustom] = useState(true);
 
-    {
-      label: "Operasional",
-      roles: [
-        "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",    // ← ADD PURCHASING
-        "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN",
-        "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
-      ]
-    },
-    { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
-    { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
-    {
-      label: "Magang (PKL)", roles: [
-        "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-        "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-        "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-      ]
-    },
-  ];
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin/roles")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!alive) return;
+        if (data.success) setCustomRoles(data.roles ?? []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoadingCustom(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const customLookup = useMemo(() => {
+    const map = new Map<string, CustomRoleRow>();
+    for (const r of customRoles) map.set(r.key, r);
+    return map;
+  }, [customRoles]);
+
+  const getLabel = (role: string) => customLookup.get(role)?.label ?? ROLE_LABEL[role] ?? role;
+  const getIcon = (role: string) => customLookup.get(role)?.icon ?? ROLE_ICON[role] ?? "👤";
+  const getBadge = (role: string) => {
+    const custom = customLookup.get(role);
+    if (custom) return { bg: custom.badge_bg, text: custom.badge_text, border: custom.badge_border };
+    return ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+  };
+
+  const ALL_ROLE_GROUPS = useMemo(() => {
+    const groups = [
+      { label: "Akses Penuh", roles: ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] },
+      { label: "Management", roles: ["KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG"] },
+      {
+        label: "Operasional",
+        roles: [
+          "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
+          "PENGELOLA_BARANG", "TEKNISI", "PENGANTARAN",
+          "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
+        ]
+      },
+      { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
+      { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
+      {
+        label: "Magang (PKL)", roles: [
+          "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+          "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+          "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+        ]
+      },
+    ];
+    if (customRoles.length > 0) {
+      groups.push({ label: "Role Custom", roles: customRoles.map((r) => r.key) });
+    }
+    return groups;
+  }, [customRoles]);
 
   const toggle = (role: string) => {
     if (values.includes(role)) {
-      // Jangan hapus kalau cuma 1 role tersisa
       if (values.length === 1) return;
       onChange(values.filter(r => r !== role));
     } else {
@@ -449,12 +451,11 @@ function MultiRoleSelect({
 
   return (
     <div className="space-y-3">
-      {/* Selected roles chips */}
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl min-h-[40px]"
           style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
           {values.map((role, idx) => {
-            const badge = ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+            const badge = getBadge(role);
             const isPrimary = idx === 0;
             return (
               <div key={role}
@@ -466,7 +467,7 @@ function MultiRoleSelect({
                     UTAMA
                   </span>
                 )}
-                <span>{ROLE_ICON[role] || "👤"} {ROLE_LABEL[role] ?? role}</span>
+                <span>{getIcon(role)} {getLabel(role)}</span>
                 {!isPrimary && (
                   <button
                     type="button"
@@ -492,7 +493,6 @@ function MultiRoleSelect({
         </div>
       )}
 
-      {/* Role picker grouped */}
       <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
         {ALL_ROLE_GROUPS.map(group => (
           <div key={group.label}>
@@ -503,7 +503,7 @@ function MultiRoleSelect({
             <div className="flex flex-wrap gap-1">
               {group.roles.map(role => {
                 const isSelected = values.includes(role);
-                const badge = ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+                const badge = getBadge(role);
                 return (
                   <button
                     key={role}
@@ -516,13 +516,16 @@ function MultiRoleSelect({
                     }
                   >
                     {isSelected && "✓ "}
-                    {ROLE_ICON[role] || "👤"} {ROLE_LABEL[role] ?? role}
+                    {getIcon(role)} {getLabel(role)}
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
+        {loadingCustom && (
+          <p className="text-[9px] text-slate-300 italic">Memuat role custom...</p>
+        )}
       </div>
 
       {values.some(r => FULL_ACCESS_ROLES.has(r)) && (
@@ -751,7 +754,6 @@ function StatCard({ icon, value, label, sub, accent }: {
   return (
     <div className="bg-white rounded-2xl p-4 relative overflow-hidden group transition-all hover:shadow-md"
       style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-      {/* left accent bar */}
       <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
       <div className="pl-3">
         <div className="flex items-start justify-between mb-3">
@@ -784,9 +786,13 @@ export default function UsersPage() {
   const [confirmResetPwUser, setConfirmResetPwUser] = useState<User | null>(null);
   const [resettingPw, setResettingPw] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isRoleManager, setIsRoleManager] = useState(false);
+  const [mainTab, setMainTab] = useState<"users" | "roles">("users");
   const [isKepala, setIsKepala] = useState(false);
   const [currentUserInfo, setCurrentUserInfo] = useState<{ id: string; name: string; role: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"karyawan" | "pkl">("karyawan");
+
+  const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
 
   const { openChat, setOpenGroupChat } = useChatContext();
   const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
@@ -795,23 +801,44 @@ export default function UsersPage() {
     getCurrentUserClient().then(u => {
       if (!u) return;
 
-      // ✅ Gunakan roles array, bukan hanya primary role
       const userRoles: string[] =
         Array.isArray(u.roles) && u.roles.length > 0
           ? u.roles
           : [u.role];
 
-      // isAdmin = true jika SALAH SATU rolenya adalah FULL_ACCESS
       const admin = userRoles.some(r => FULL_ACCESS_ROLES.has(r));
-
-      // isKepala = true jika TIDAK admin DAN SALAH SATU rolenya adalah KEPALA
       const kepala = !admin && userRoles.some(r => KEPALA_ROLES.has(r));
 
       setIsAdmin(admin);
       setIsKepala(kepala);
       setCurrentUserInfo({ id: u.id, name: u.name, role: u.role });
+      setIsRoleManager(userRoles.some((r) => ROLE_MANAGER_ROLES.has(r)));
     });
   }, []);
+
+  const fetchCustomRoles = async () => {
+    try {
+      const res = await fetch("/api/admin/roles");
+      const data = await res.json();
+      if (data.success) setCustomRoles(data.roles ?? []);
+    } catch { /* diam-diam gagal, fallback ke label default */ }
+  };
+
+  useEffect(() => { fetchCustomRoles(); }, []);
+
+  const customRoleLookup = useMemo(() => {
+    const map = new Map<string, CustomRoleRow>();
+    for (const r of customRoles) map.set(r.key, r);
+    return map;
+  }, [customRoles]);
+
+  const getRoleLabel = (role: string) => customRoleLookup.get(role)?.label ?? ROLE_LABEL[role] ?? role;
+  const getRoleIcon = (role: string) => customRoleLookup.get(role)?.icon ?? ROLE_ICON[role] ?? "👤";
+  const getRoleBadge = (role: string) => {
+    const custom = customRoleLookup.get(role);
+    if (custom) return { bg: custom.badge_bg, text: custom.badge_text, border: custom.badge_border };
+    return ROLE_BADGE_STYLE[role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -917,10 +944,12 @@ export default function UsersPage() {
   }, [users, search, filterRole, sortOrder, activeTab]);
 
   const tabRoles = useMemo(() => {
+    const customKeys = customRoles.filter((r) => !r.is_pkl).map((r) => r.key);
+    const customPklKeys = customRoles.filter((r) => r.is_pkl).map((r) => r.key);
     return activeTab === "pkl"
-      ? ALL_ROLES.filter(r => isPKLRole(r))
-      : ALL_ROLES.filter(r => !isPKLRole(r));
-  }, [activeTab]);
+      ? [...ALL_ROLES.filter(r => isPKLRole(r)), ...customPklKeys]
+      : [...ALL_ROLES.filter(r => !isPKLRole(r)), ...customKeys];
+  }, [activeTab, customRoles]);
 
   const totalInTab = useMemo(
     () => users.filter(u => activeTab === "pkl" ? isPKLRole(u.role) : !isPKLRole(u.role)).length,
@@ -942,7 +971,6 @@ export default function UsersPage() {
     <DashboardLayout>
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* ── Modals ── */}
       {isAdmin && confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmReset(null)} />
@@ -988,7 +1016,6 @@ export default function UsersPage() {
       <div className="min-h-screen bg-[#F7F7F8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
 
-          {/* ── Page Header ── */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
@@ -1036,7 +1063,6 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* ── Stat Cards ── */}
           {!loading && isAdmin && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard icon="👥" value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
@@ -1047,383 +1073,400 @@ export default function UsersPage() {
             </div>
           )}
 
-          {/* ── Tab Karyawan / PKL ── */}
-          {isAdmin && (
-            <div className="bg-white rounded-2xl p-1.5"
-              style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+          {isRoleManager && (
+            <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
               <div className="flex gap-1.5">
                 {([
-                  { key: "karyawan", label: "Karyawan", emoji: "👥", count: totalKaryawan },
-                  { key: "pkl", label: "PKL", emoji: "🎓", count: totalPKL },
-                ] as const).map(t => (
-                  <button key={t.key}
-                    onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
+                  { key: "users", label: "Daftar User", emoji: "👥" },
+                  { key: "roles", label: "Role & Hak Akses", emoji: "🔐" },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setMainTab(t.key);
+                      if (t.key === "users") fetchCustomRoles();
+                    }}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
-                    style={activeTab === t.key
-                      ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                      : { background: "#f5f7ff", color: "#64748b" }}>
+                    style={
+                      mainTab === t.key
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        : { background: "#f5f7ff", color: "#64748b" }
+                    }
+                  >
                     <span>{t.emoji}</span>
                     <span>{t.label}</span>
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
-                      style={activeTab === t.key
-                        ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
-                        : { background: "#e8ecf5", color: "#64748b" }}>
-                      {t.count}
-                    </span>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ── Two-column layout ── */}
-          <div className="flex gap-5 items-start">
+          {mainTab === "roles" && isRoleManager ? (
+            <RoleAccessManager />
+          ) : (
+            <>
+              {isAdmin && (
+                <div className="bg-white rounded-2xl p-1.5"
+                  style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div className="flex gap-1.5">
+                    {([
+                      { key: "karyawan", label: "Karyawan", emoji: "👥", count: totalKaryawan },
+                      { key: "pkl", label: "PKL", emoji: "🎓", count: totalPKL },
+                    ] as const).map(t => (
+                      <button key={t.key}
+                        onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
+                        style={activeTab === t.key
+                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                          : { background: "#f5f7ff", color: "#64748b" }}>
+                        <span>{t.emoji}</span>
+                        <span>{t.label}</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
+                          style={activeTab === t.key
+                            ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
+                            : { background: "#e8ecf5", color: "#64748b" }}>
+                          {t.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* ── Left column ── */}
-            <div className="flex-1 min-w-0 space-y-3">
+              <div className="flex gap-5 items-start">
 
-              {/* Filter & Search bar */}
-              <div className="bg-white rounded-2xl overflow-hidden"
-                style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="px-4 pt-4 pb-3.5 space-y-3">
-                  <div className="flex gap-2 items-center">
-                    {/* Search */}
-                    <div className="relative flex-1 min-w-0">
-                      <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <input type="text" placeholder="Cari nama atau nomor..."
-                        value={search} onChange={e => setSearch(e.target.value)}
-                        className="w-full h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
-                        style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
-                      {search && (
-                        <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
-                          <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                <div className="flex-1 min-w-0 space-y-3">
+
+                  <div className="bg-white rounded-2xl overflow-hidden"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 pt-4 pb-3.5 space-y-3">
+                      <div className="flex gap-2 items-center">
+                        <div className="relative flex-1 min-w-0">
+                          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                           </svg>
+                          <input type="text" placeholder="Cari nama atau nomor..."
+                            value={search} onChange={e => setSearch(e.target.value)}
+                            className="w-full h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
+                            style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
+                          {search && (
+                            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
+                              <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
+                          className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d={sortOrder === "asc"
+                                ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4"
+                                : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
+                          </svg>
+                          {sortOrder === "asc" ? "A–Z" : "Z–A"}
                         </button>
+                      </div>
+
+                      <div className="flex gap-1.5 flex-wrap max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
+                        {["Semua", ...tabRoles].map(r => (
+                          <button key={r} onClick={() => setFilterRole(r)}
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
+                            style={filterRole === r
+                              ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                              : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
+                            {r === "Semua" ? `Semua (${totalInTab})` : `${getRoleIcon(r)} ${getRoleLabel(r)}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl overflow-hidden"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+
+                    <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between flex-wrap gap-2"
+                      style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                        <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
+                          {filtered.length === totalInTab
+                            ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
+                            : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
+                        </p>
+                      </div>
+                      {isAdmin && (
+                        <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
+                          </span>
+                        </div>
                       )}
                     </div>
-                    {/* Sort */}
-                    <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                      className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
-                      style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d={sortOrder === "asc"
-                            ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4"
-                            : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
-                      </svg>
-                      {sortOrder === "asc" ? "A–Z" : "Z–A"}
-                    </button>
-                  </div>
 
-                  {/* Role pills */}
-                  <div className="flex gap-1.5 flex-wrap max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
-                    {["Semua", ...tabRoles].map(r => (
-                      <button key={r} onClick={() => setFilterRole(r)}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
-                        style={filterRole === r
-                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                          : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
-                        {r === "Semua" ? `Semua (${totalInTab})` : `${ROLE_ICON[r] || ""} ${ROLE_LABEL[r] ?? r}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* ── User list card ── */}
-              <div className="bg-white rounded-2xl overflow-hidden"
-                style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-
-                {/* List header bar */}
-                <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between flex-wrap gap-2"
-                  style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                    <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
-                      {filtered.length === totalInTab
-                        ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
-                        : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
-                    </p>
-                  </div>
-                  {isAdmin && (
-                    <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
-                      <span className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Loading skeleton */}
-                {loading ? (
-                  <div>
-                    {Array(6).fill(0).map((_, i) => (
-                      <div key={i} className="px-4 sm:px-5 py-4 flex items-center gap-3.5 animate-pulse"
-                        style={{ borderBottom: "1px solid #f8f8fc" }}>
-                        <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-3 rounded-full w-32" style={{ background: "#e2e8f0" }} />
-                          <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
-                        </div>
-                        <div className="w-16 h-7 rounded-lg" style={{ background: "#f1f5f9" }} />
+                    {loading ? (
+                      <div>
+                        {Array(6).fill(0).map((_, i) => (
+                          <div key={i} className="px-4 sm:px-5 py-4 flex items-center gap-3.5 animate-pulse"
+                            style={{ borderBottom: "1px solid #f8f8fc" }}>
+                            <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-3 rounded-full w-32" style={{ background: "#e2e8f0" }} />
+                              <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
+                            </div>
+                            <div className="w-16 h-7 rounded-lg" style={{ background: "#f1f5f9" }} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
 
-                ) : filtered.length === 0 ? (
-                  <div className="text-center py-20">
-                    <div className="text-4xl mb-3">📭</div>
-                    <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
-                    <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
-                    {(search || filterRole !== "Semua") && (
-                      <button onClick={() => { setSearch(""); setFilterRole("Semua"); }}
-                        className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105"
-                        style={{ color: "#6366f1", background: "#eff3ff" }}>
-                        Reset filter
-                      </button>
-                    )}
-                  </div>
+                    ) : filtered.length === 0 ? (
+                      <div className="text-center py-20">
+                        <div className="text-4xl mb-3">📭</div>
+                        <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
+                        <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
+                        {(search || filterRole !== "Semua") && (
+                          <button onClick={() => { setSearch(""); setFilterRole("Semua"); }}
+                            className="mt-4 text-xs font-bold px-4 py-2 rounded-xl transition-all hover:scale-105"
+                            style={{ color: "#6366f1", background: "#eff3ff" }}>
+                            Reset filter
+                          </button>
+                        )}
+                      </div>
 
-                ) : (
-                  <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 340px)" }}>
-                    {filtered.map((user, idx) => {
-                      const avatarColor = getAvatarColor(user.role);
-                      const badgeStyle = ROLE_BADGE_STYLE[user.role] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
-                      const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
-                      const canChat = currentUserInfo && user.id !== currentUserInfo.id;
+                    ) : (
+                      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 340px)" }}>
+                        {filtered.map((user, idx) => {
+                          const avatarColor = getAvatarColor(user.role);
+                          const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
+                          const canChat = currentUserInfo && user.id !== currentUserInfo.id;
 
-                      return (
-                        <div key={user.id}
-                          className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/70 transition-colors group"
-                          style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
-                          <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+                          return (
+                            <div key={user.id}
+                              className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/70 transition-colors group"
+                              style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
+                              <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
-                            {/* Avatar */}
-                            <div className="relative flex-shrink-0">
-                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black"
-                                style={{
-                                  background: isFullAccess
-                                    ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
-                                    : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
-                                  boxShadow: `0 2px 8px ${avatarColor}30`,
-                                }}>
-                                {getInitials(user.name)}
+                                <div className="relative flex-shrink-0">
+                                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black"
+                                    style={{
+                                      background: isFullAccess
+                                        ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
+                                        : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
+                                      boxShadow: `0 2px 8px ${avatarColor}30`,
+                                    }}>
+                                    {getInitials(user.name)}
+                                  </div>
+                                  {isAdmin && user.face_embedding && (
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
+                                      style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
+                                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                    <span className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>
+                                      {user.name}
+                                    </span>
+                                    {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
+                                      const bs = getRoleBadge(r);
+                                      return (
+                                        <span key={r}
+                                          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                          style={{ background: bs.bg, color: bs.text, border: `1px solid ${bs.border}` }}>
+                                          {i === 0 && user.roles?.length > 1 && (
+                                            <span className="text-[8px] font-black opacity-60">★</span>
+                                          )}
+                                          {getRoleIcon(r)} {getRoleLabel(r)}
+                                        </span>
+                                      );
+                                    })}
+                                    {isAdmin && !user.password_set && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                        style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
+                                        🔑 Belum PW
+                                      </span>
+                                    )}
+                                    {isAdmin && user.force_logout_at && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                        style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
+                                        🚪 Forced Out
+                                      </span>
+                                    )}
+                                    {isBirthdayToday(user.birth_date) && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 animate-pulse"
+                                        style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                                        🎂 Ultah!
+                                      </span>
+                                    )}
+                                  </div>
+                                  {(isAdmin || isKepala) && user.phone_number && (
+                                    <p className="text-[11px] text-gray-400 font-medium mt-0.5">{user.phone_number}</p>
+                                  )}
+                                  {user.birth_date && (
+                                    <p className="text-[10px] text-gray-400 mt-0.5">
+                                      🎂 {formatBirthDate(user.birth_date)}
+                                      {isBirthdayToday(user.birth_date) && (
+                                        <span className="ml-1 text-amber-600 font-bold">— Hari ini! 🎉</span>
+                                      )}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                                  {canChat && (
+                                    <ActionBtn
+                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
+                                      title={`Chat dengan ${user.name}`}
+                                      bg="#eff6ff" color="#3b82f6">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && user.face_embedding && (
+                                    <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
+                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                </div>
                               </div>
-                              {isAdmin && user.face_embedding && (
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
-                                  style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+
+                              {(canChat || isAdmin) && (
+                                <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px]">
+                                  {canChat && (
+                                    <ActionBtn
+                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
+                                      title={`Chat dengan ${user.name}`}
+                                      bg="#eff6ff" color="#3b82f6">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && user.face_embedding && (
+                                    <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
+                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </ActionBtn>
+                                  )}
                                 </div>
                               )}
                             </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                <span className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>
-                                  {user.name}
-                                </span>
-                                {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
-                                  const bs = ROLE_BADGE_STYLE[r] ?? { bg: "#f8fafc", text: "#475569", border: "#e2e8f0" };
-                                  return (
-                                    <span key={r}
-                                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                      style={{ background: bs.bg, color: bs.text, border: `1px solid ${bs.border}` }}>
-                                      {i === 0 && user.roles?.length > 1 && (
-                                        <span className="text-[8px] font-black opacity-60">★</span>
-                                      )}
-                                      {ROLE_ICON[r] || "👤"} {ROLE_LABEL[r] ?? r}
-                                    </span>
-                                  );
-                                })}
-                                {isAdmin && !user.password_set && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                    style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
-                                    🔑 Belum PW
-                                  </span>
-                                )}
-                                {isAdmin && user.force_logout_at && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
-                                    style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
-                                    🚪 Forced Out
-                                  </span>
-                                )}
-                                {isBirthdayToday(user.birth_date) && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 animate-pulse"
-                                    style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
-                                    🎂 Ultah!
-                                  </span>
-                                )}
-                              </div>
-                              {(isAdmin || isKepala) && user.phone_number && (
-                                <p className="text-[11px] text-gray-400 font-medium mt-0.5">{user.phone_number}</p>
-                              )}
-                              {user.birth_date && (
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  🎂 {formatBirthDate(user.birth_date)}
-                                  {isBirthdayToday(user.birth_date) && (
-                                    <span className="ml-1 text-amber-600 font-bold">— Hari ini! 🎉</span>
-                                  )}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Action buttons — desktop/tablet inline */}
-                            <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-                              {canChat && (
-                                <ActionBtn
-                                  onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
-                                  title={`Chat dengan ${user.name}`}
-                                  bg="#eff6ff" color="#3b82f6">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && user.face_embedding && (
-                                <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
-                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
-                                <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action buttons — mobile row (di bawah nama, biar tidak sempit) */}
-                          {(canChat || isAdmin) && (
-                            <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px]">
-                              {canChat && (
-                                <ActionBtn
-                                  onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
-                                  title={`Chat dengan ${user.name}`}
-                                  bg="#eff6ff" color="#3b82f6">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setEditUser(user)} title="Edit user" bg="#f0f9ff" color="#0369a1">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && user.face_embedding && (
-                                <ActionBtn onClick={() => setConfirmReset(user)} title="Reset wajah" bg="#fff1f2" color="#dc2626">
-                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && (
-                                <ActionBtn onClick={() => setConfirmResetPwUser(user)} title={`Reset password ${user.name}`} bg="#fffbeb" color="#d97706">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                              {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
-                                <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </ActionBtn>
-                              )}
-                            </div>
-                          )}
+                {showOnlinePanel && (
+                  <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
+                    {isAdmin && (
+                      <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
+                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: "#dbeafe" }}>
+                          <svg className="w-4 h-4" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                         </div>
-                      );
-                    })}
+                        <div>
+                          <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
+                          <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
+                            Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <OnlineUsersPanel />
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* ── Right Column: online panel ── */}
-            {showOnlinePanel && (
-              <div className="hidden lg:flex flex-col gap-3 w-72 flex-shrink-0 sticky top-6 self-start">
-                {isAdmin && (
-                  <div className="px-4 py-3.5 rounded-2xl flex items-start gap-3"
-                    style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#dbeafe" }}>
-                      <svg className="w-4 h-4" style={{ color: "#1d4ed8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
-                      <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
-                        Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <OnlineUsersPanel />
-              </div>
-            )}
-          </div>
-
-          {/* ── Mobile Online Panel ── */}
-          {showOnlinePanel && (
-            <div className="lg:hidden space-y-3">
-              <OnlineUsersPanel />
-            </div>
+              {showOnlinePanel && (
+                <div className="lg:hidden space-y-3">
+                  <OnlineUsersPanel />
+                </div>
+              )}
+            </>
           )}
 
         </div>

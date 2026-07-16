@@ -4,7 +4,6 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { isValidPeriod } from "@/lib/accounting";
-import { isValidAccountDb, accountNameDb } from "@/lib/chartOfAccounts";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -39,11 +38,17 @@ export const GET = withAuth(async (req) => {
 
   const supabase = getAdmin();
 
-  if (!accountCode || !(await isValidAccountDb(supabase, accountCode)))
+  const { data: accRow } = await supabase
+    .from("chart_of_accounts")
+    .select("name")
+    .eq("code", accountCode)
+    .maybeSingle();
+
+  if (!accountCode || !accRow)
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
 
   try {
-    // ── 0) Saldo awal MANUAL (one-time input) — nilai dasar sebelum periode manapun ──
+    // ── 0) Saldo awal MANUAL (one-time input, bisa dikoreksi) — nilai dasar sebelum periode manapun ──
     // Rumus normal balance: DEBIT = +nominal, KREDIT = -nominal.
     const { data: openingRow, error: openingErr } = await supabase
       .from("journal_opening_balances")
@@ -84,7 +89,6 @@ export const GET = withAuth(async (req) => {
       }, 0);
     }
 
-    // Saldo awal periode berjalan = saldo awal manual + akumulasi mutasi periode-periode sebelumnya
     const saldoAwal = openingSigned + mutasiSebelumPeriode;
 
     // ── 2) Semua entry di periode berjalan ──
@@ -112,7 +116,6 @@ export const GET = withAuth(async (req) => {
       allLines = (linesData ?? []) as LineRow[];
     }
 
-    // Map: entry_id -> daftar kode akun lawan (selain akun yang sedang dibuka)
     const counterMap = new Map<string, string[]>();
     for (const l of allLines) {
       if (l.account_code === accountCode) continue;
@@ -121,7 +124,6 @@ export const GET = withAuth(async (req) => {
       counterMap.set(l.entry_id, arr);
     }
 
-    // ── 4) Baris milik akun yang sedang dibuka, urut tanggal lalu insert order ──
     const ownLines = allLines
       .filter((l) => l.account_code === accountCode)
       .sort((a, b) => {
@@ -157,7 +159,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({
       success: true,
       data: {
-        account: { code: accountCode, name: await accountNameDb(supabase, accountCode) },
+        account: { code: accountCode, name: accRow.name },
         saldo_awal: saldoAwal,
         opening_balance: openingRow
           ? { side: openingRow.side, nominal: Number(openingRow.nominal) }
