@@ -53,6 +53,8 @@ interface PicCandidate {
 
 type Tab = "USER" | "PEDAGANG";
 type Scope = "ACTIVE" | "ARCHIVED";
+// NEW: filter status follow-up — "BELUM" = perlu FU (is_due), "SUDAH" = sudah FU (belum jatuh tempo lagi)
+type FuFilter = "ALL" | "BELUM" | "SUDAH";
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
@@ -1315,6 +1317,7 @@ export default function ManagementSellerPage() {
   const [tab, setTab] = useState<Tab>("USER");
   const [scope, setScope] = useState<Scope>("ACTIVE");
   const [search, setSearch] = useState("");
+  const [fuFilter, setFuFilter] = useState<FuFilter>("ALL"); // NEW: filter status FU
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmFu, setConfirmFu] = useState<Followup | null>(null);
 
@@ -1370,6 +1373,11 @@ export default function ManagementSellerPage() {
     if (authUser) loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, authUser]);
+
+  // NEW: filter FU tidak relevan untuk tab Arsip — reset otomatis biar tidak nyangkut
+  useEffect(() => {
+    if (scope === "ARCHIVED") setFuFilter("ALL");
+  }, [scope]);
 
   // ── Load PIC candidates (untuk checklist & dropdown assign) ──
   const loadPics = async () => {
@@ -1477,6 +1485,8 @@ export default function ManagementSellerPage() {
   const userDue = useMemo(() => userItems.filter((i) => i.is_due).length, [userItems]);
   const pedagangDue = useMemo(() => pedagangItems.filter((i) => i.is_due).length, [pedagangItems]);
 
+  // Tab (USER/PEDAGANG) + pencarian — TIDAK terpengaruh oleh filter status FU,
+  // supaya angka badge "Belum/Sudah FU" di bawah selalu akurat terhadap konteks tab+pencarian aktif.
   const visible = useMemo(() => {
     const base = tab === "USER" ? userItems : pedagangItems;
     if (!search.trim()) return base;
@@ -1489,7 +1499,24 @@ export default function ManagementSellerPage() {
     );
   }, [tab, userItems, pedagangItems, search]);
 
-  const dueCount = visible.filter((i) => i.is_due).length;
+  // NEW: hitung untuk badge angka di tombol filter (berdasar visible, sebelum fuFilter diterapkan)
+  const belumFuCount = useMemo(
+    () => (scope === "ACTIVE" ? visible.filter((i) => i.is_due).length : 0),
+    [visible, scope]
+  );
+  const sudahFuCount = useMemo(
+    () => (scope === "ACTIVE" ? visible.filter((i) => !i.is_due).length : 0),
+    [visible, scope]
+  );
+
+  // NEW: hasil akhir setelah filter status FU diterapkan (hanya relevan untuk scope ACTIVE)
+  const filteredItems = useMemo(() => {
+    if (scope !== "ACTIVE" || fuFilter === "ALL") return visible;
+    if (fuFilter === "BELUM") return visible.filter((i) => i.is_due);
+    return visible.filter((i) => !i.is_due);
+  }, [visible, fuFilter, scope]);
+
+  const dueCount = filteredItems.filter((i) => i.is_due).length;
 
   // ── Akses ditolak ──
   if (authUser && !canView) {
@@ -1672,6 +1699,51 @@ export default function ManagementSellerPage() {
           </div>
         </div>
 
+        {/* ── NEW: Filter Status Follow-up (hanya untuk tab Aktif) ── */}
+        {scope === "ACTIVE" && (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+            {(
+              [
+                { key: "ALL" as FuFilter, label: "Semua", count: visible.length },
+                { key: "BELUM" as FuFilter, label: "Belum FU", count: belumFuCount },
+                { key: "SUDAH" as FuFilter, label: "Sudah FU", count: sudahFuCount },
+              ] as const
+            ).map((opt) => {
+              const isActive = fuFilter === opt.key;
+              const activeColor =
+                opt.key === "BELUM"
+                  ? "bg-red-600 border-red-600 text-white shadow-sm"
+                  : opt.key === "SUDAH"
+                    ? "bg-emerald-600 border-emerald-600 text-white shadow-sm"
+                    : "bg-gray-900 border-gray-900 text-white shadow-sm";
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setFuFilter(opt.key)}
+                  aria-pressed={isActive}
+                  className={cx(
+                    "flex-shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border text-xs font-bold transition-all duration-150 whitespace-nowrap",
+                    FOCUS_RING,
+                    isActive
+                      ? activeColor
+                      : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                  )}
+                >
+                  {opt.label}
+                  <span
+                    className={cx(
+                      "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums",
+                      isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                    )}
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── Content ── */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
@@ -1679,7 +1751,7 @@ export default function ManagementSellerPage() {
               <SkeletonCard key={i} />
             ))}
           </div>
-        ) : visible.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 py-14 sm:py-20 px-6 text-center">
             <div className="text-4xl sm:text-5xl mb-4 opacity-25">
               {scope === "ARCHIVED" ? "" : search.trim() ? "" : ""}
@@ -1689,9 +1761,13 @@ export default function ManagementSellerPage() {
                 ? "Tidak ada hasil pencarian"
                 : scope === "ARCHIVED"
                   ? "Belum ada yang diarsipkan"
-                  : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
+                  : fuFilter === "BELUM"
+                    ? "Tidak ada customer yang perlu di-follow-up"
+                    : fuFilter === "SUDAH"
+                      ? "Tidak ada customer yang sudah di-follow-up"
+                      : `Belum ada ${tab === "USER" ? "User" : "Pedagang"} untuk di-follow-up`}
             </p>
-            {search.trim() && (
+            {search.trim() ? (
               <button
                 onClick={() => setSearch("")}
                 className={cx(
@@ -1701,11 +1777,23 @@ export default function ManagementSellerPage() {
               >
                 Hapus pencarian
               </button>
+            ) : (
+              fuFilter !== "ALL" && (
+                <button
+                  onClick={() => setFuFilter("ALL")}
+                  className={cx(
+                    "mt-3 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition py-2 px-3",
+                    FOCUS_RING
+                  )}
+                >
+                  Tampilkan semua
+                </button>
+              )
             )}
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4">
-            {scope === "ACTIVE" && dueCount > 0 && (
+            {scope === "ACTIVE" && fuFilter === "ALL" && dueCount > 0 && (
               <div className="flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
                 <p className="text-[11px] sm:text-xs text-red-600 font-semibold tabular-nums">
@@ -1715,7 +1803,7 @@ export default function ManagementSellerPage() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 items-stretch">
-              {visible.map((f) => (
+              {filteredItems.map((f) => (
                 <FollowupCard
                   key={f.id}
                   f={f}
