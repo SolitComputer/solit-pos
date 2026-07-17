@@ -53,9 +53,11 @@ function isItemActive(href: string, pathname: string): boolean {
         !pathname.startsWith("/dashboard/preparation/history") &&
         !pathname.startsWith("/dashboard/preparation/pengantaran") &&
         !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
-        !pathname.startsWith("/dashboard/preparation/siap-kirim"))
+        !pathname.startsWith("/dashboard/preparation/siap-kirim") &&
+        !pathname.startsWith("/dashboard/preparation/riwayat-penyedia"))
     );
   }
+  
   if (href === "/dashboard/laptops") {
     return (
       pathname === "/dashboard/laptops" ||
@@ -376,6 +378,7 @@ const ITEM_AKUNTANSI: MenuItem = {
   icon: Icons.accounting,
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
+const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Riwayat Pekerjaan", href: "/dashboard/preparation/riwayat-penyedia", icon: Icons.leaderboard };
 
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
 const ITEM_DATA_BARANG: MenuItem = {
@@ -416,13 +419,13 @@ const ITEM_MISSION_ALL: MenuItem = {
   icon: Icons.missionAll,
 };
 
-// ── Preparation groups ────────────────────────────────────────────────────────
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
   items: [
     { name: "Dashboard Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     ITEM_ANTRIAN_MASUK,
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+    ITEM_RIWAYAT_PENYEDIA,
   ],
 };
 
@@ -459,6 +462,7 @@ const ADMIN_PENYEDIA_MENU: MenuGroup = {
     { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
+    ITEM_RIWAYAT_PENYEDIA,
   ],
 };
 
@@ -1868,7 +1872,7 @@ export default function Sidebar() {
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">
-               {prep.menungguUnacked.length} penyiapan baru — buka antrian
+              {prep.menungguUnacked.length} penyiapan baru — buka antrian
             </span>
           </button>
         </div>
@@ -1887,7 +1891,7 @@ export default function Sidebar() {
           >
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">
-               {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
+              {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
             </span>
           </button>
         </div>

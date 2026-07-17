@@ -147,7 +147,7 @@ export function getLegacyPageAccess(role: string, pageRoute: string): boolean {
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
     .filter((r) => pageRoute === r || pageRoute.startsWith(r + "/"))
     .sort((a, b) => b.length - a.length)[0];
- 
+
   if (!matchedRoute) return true;
   return (ROUTE_PERMISSIONS[matchedRoute] as string[]).includes(role);
 }
@@ -209,6 +209,12 @@ export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<Use
   "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
   "PENGANTARAN",
 ]));
+
+export const PROVIDER_PERFORMANCE_ROLES: UserRole[] = [
+  "KEPALA_PENYEDIA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG",
+];
+
+export const PROVIDER_PERFORMANCE_VIEW_ROLES: UserRole[] = [...PREPARATION_ANTRIAN_VIEW_ROLES];
 
 export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
@@ -437,6 +443,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
 
+  "/dashboard/preparation/riwayat-penyedia": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
+  "/api/preparation/provider-performance": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
+
   // ── Cashflow ───────────────────────────────────────────────────────────────
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
   "/dashboard/customer-birthdays": [...ALL_ROLES],
@@ -580,6 +589,8 @@ export const PERMISSIONS = {
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
   CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
   FORCE_COMPLETE_PREPARATION: [...PREPARATION_FORCE_COMPLETE_ROLES] as UserRole[],
+
+  VIEW_PROVIDER_PERFORMANCE: [...PROVIDER_PERFORMANCE_VIEW_ROLES] as UserRole[],
 
   // ── Voice HT ────────────────────────────────────────────────────────────────
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],
