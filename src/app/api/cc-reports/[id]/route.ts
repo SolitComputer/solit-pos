@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { computeStatus, isCCBrand, type CCReport } from "@/lib/ccReports";
-import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
-import type { UserRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 const TAKE_FIELDS = [
-  "videographer", "talent", "location", "equipment", "device",
+  "videographer", "talent", "location", "equipment",
   "take_start", "take_end", "take_received_editor", "take_done",
 ] as const;
 const EDIT_FIELDS = [
-  "editor_name", "editor_work", "edit_start", "edit_end",
+  "editor_name", "editor_work", "device", "edit_start", "edit_end",
   "ready_folder_link", "edit_done",
 ] as const;
 const POSTING_FIELDS = ["posting_done"] as const;
@@ -70,6 +68,25 @@ export async function PATCH(
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(
       { success: false, error: "Tidak ada field yang diupdate" },
+      { status: 400 }
+    );
+  }
+
+  // 🚫 Konten yang sudah di-Cancel (is_cancelled) terkunci total di level API —
+  //    bukan cuma di UI. Satu-satunya pengecualian: request yang memang membawa
+  //    field is_cancelled itu sendiri (mis. idempotent re-cancel).
+  const { data: existing, error: existingErr } = await supabaseAdmin
+    .from("cc_reports")
+    .select("is_cancelled")
+    .eq("id", id)
+    .single();
+
+  if (existingErr || !existing) {
+    return NextResponse.json({ success: false, error: "Konten tidak ditemukan" }, { status: 404 });
+  }
+  if (existing.is_cancelled && !("is_cancelled" in patch)) {
+    return NextResponse.json(
+      { success: false, error: "Konten sudah dibatalkan (Cancel) dan tidak bisa diubah lagi" },
       { status: 400 }
     );
   }
@@ -147,22 +164,7 @@ export async function PATCH(
   });
 }
 
-// DELETE — hanya head + full access (postings ikut kehapus via ON DELETE CASCADE)
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-
-  const roles = (req.headers.get("x-user-roles") ?? "").split(",").filter(Boolean);
-  if (!hasAnyRole(roles, CC_REPORT_MANAGE_ROLES as UserRole[])) {
-    return NextResponse.json({ success: false, error: "Tidak punya izin menghapus" }, { status: 403 });
-  }
-
-  const { error } = await supabaseAdmin.from("cc_reports").delete().eq("id", id);
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true });
-}
+// ⚠️ Endpoint DELETE (hard delete) sudah dihapus sesuai permintaan.
+// Konten tidak pernah benar-benar dihapus — gunakan PATCH { is_cancelled: true }
+// (lihat tombol "Batalkan Konten" / "Cancel Konten" di CCReportModal) untuk
+// membatalkan konten. Data tetap tersimpan, hanya statusnya berubah jadi "Batal".

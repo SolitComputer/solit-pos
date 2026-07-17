@@ -69,9 +69,6 @@ export async function GET(req: NextRequest) {
 
   if (statusRaw && STATUSES.includes(statusRaw as CCStatus)) {
     q = applyStatusFilter(q, statusRaw as CCStatus);
-  } else {
-    // ✅ Filter "Semua" (tanpa status spesifik) tetap sembunyikan yang Batal
-    q = q.eq("is_cancelled", false);
   }
 
   if (search) {

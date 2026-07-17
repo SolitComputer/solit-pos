@@ -1,4 +1,3 @@
-// src/components/cc/CCReportModal.tsx
 "use client";
 
 import { useState } from "react";
@@ -29,9 +28,12 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const canPost = canStartPosting(report);
   const finished = Boolean(report.posting_done);
   const readyToFinish = canFinish(report);
-  // ✅ Bisa ditandai revisi selama sudah lewat tahap Edit & belum sedang direvisi —
-  //    berlaku juga saat status POSTED / SELESAI, bukan cuma SIAP_POSTING.
-  const isRevisable = canPost && status !== "REVISI";
+
+  // 🚫 Konten yang sudah di-Cancel terkunci total — tidak bisa diubah lagi dari sisi mana pun.
+  const locked = Boolean(report.is_cancelled);
+  // Tombol Cancel hanya muncul setelah tahap Editing selesai & konten belum di-cancel,
+  // dan hanya untuk yang punya izin kelola (sama seperti tombol "Batalkan Konten" di footer).
+  const canCancel = canPost && !locked && canManage;
 
   const [tab, setTab] = useState<Tab>(
     report.edit_done ? "posting" : report.take_done ? "edit" : "take"
@@ -42,7 +44,6 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
     talent: report.talent ?? "",
     location: report.location ?? "",
     equipment: report.equipment ?? "",
-    device: report.device ?? "",
     take_start: isoToLocalInput(report.take_start),
     take_end: isoToLocalInput(report.take_end),
     take_received_editor: isoToLocalInput(report.take_received_editor),
@@ -51,6 +52,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
   const [edit, setEdit] = useState({
     editor_name: report.editor_name ?? "",
     editor_work: report.editor_work ?? "",
+    device: report.device ?? "", //  Device sekarang bagian dari tahap Editing, bukan Take
     edit_start: isoToLocalInput(report.edit_start),
     edit_end: isoToLocalInput(report.edit_end),
     ready_folder_link: report.ready_folder_link ?? "",
@@ -91,7 +93,6 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
       talent: take.talent,
       location: take.location,
       equipment: take.equipment,
-      device: take.device,
       take_start: localInputToIso(take.take_start),
       take_end: localInputToIso(take.take_end),
       take_received_editor: localInputToIso(take.take_received_editor),
@@ -102,24 +103,13 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
     await patch({
       editor_name: edit.editor_name,
       editor_work: edit.editor_work,
+      device: edit.device, //  ikut disimpan dari tab Editing
       edit_start: localInputToIso(edit.edit_start),
       edit_end: localInputToIso(edit.edit_end),
       ready_folder_link: edit.ready_folder_link,
       ...(markDone ? { edit_done: true, needs_revision: false } : {}),
     });
     if (markDone) setTab("posting"); //  langsung lempar ke posting
-  };
-
-  const markRevision = async () => {
-    const msg = finished
-      ? "Tandai konten ini perlu revisi? Status Selesai akan dibuka kembali, dan Posting tetap bisa diakses."
-      : "Tandai konten ini perlu revisi? Tab Editing akan menandai catatan, Posting tetap bisa diakses.";
-    if (!confirm(msg)) return;
-    await patch({
-      needs_revision: true,
-      ...(finished ? { posting_done: false } : {}), // ✅ reopen otomatis kalau sudah Selesai
-    });
-    setTab("edit");
   };
 
   const toggleFinish = async () => {
@@ -131,8 +121,15 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Batalkan konten "${report.title}"? Status akan berubah menjadi "Batal" — data tidak dihapus.`)) return;
+  // ✕ Cancel Konten — menggantikan "Tandai Perlu Revisi". Sekali di-cancel, konten
+  //    terkunci total (lihat `locked`) dan statusnya berubah jadi "Batal".
+  const handleCancelContent = async () => {
+    if (
+      !confirm(
+        `Batalkan konten "${report.title}"? Setelah dibatalkan, konten TIDAK BISA diubah lagi (data tidak dihapus).`
+      )
+    )
+      return;
     setSaving(true);
     try {
       const res = await fetch(`/api/cc-reports/${report.id}`, {
@@ -171,7 +168,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                   {meta.label}
                 </span>
 
-                {/*  Brand tujuan — bisa diubah kapan saja */}
+                {/*  Brand tujuan — bisa diubah kapan saja (kecuali sudah di-cancel) */}
                 <div className="relative">
                   <span
                     className="pointer-events-none absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full"
@@ -180,7 +177,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
                   <select
                     value={brand}
                     onChange={(e) => changeBrand(e.target.value as CCBrand)}
-                    disabled={saving}
+                    disabled={saving || locked}
                     className="appearance-none rounded-md border border-gray-200 bg-white py-0.5 pl-6 pr-6 text-[11px] font-bold text-gray-700 outline-none transition focus:ring-2 focus:ring-gray-900/10 disabled:opacity-50"
                   >
                     {CC_BRANDS.map((b) => (
@@ -249,6 +246,13 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
         {/* Body */}
         <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50/40 p-5">
+          {/*  Banner terkunci — tampil di semua tab kalau konten sudah di-cancel */}
+          {locked && (
+            <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 text-xs font-medium text-gray-600">
+              🚫 Konten ini sudah <b>dibatalkan (Cancel)</b> dan tidak bisa diubah lagi.
+            </div>
+          )}
+
           {/* ── TAKE ── */}
           {tab === "take" && (
             <div className="space-y-4 rounded-2xl bg-white p-4 ring-1 ring-gray-100">
@@ -260,29 +264,25 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Videographer">
-                  <input className={INPUT} value={take.videographer} onChange={(e) => setTake({ ...take, videographer: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={take.videographer} onChange={(e) => setTake({ ...take, videographer: e.target.value })} />
                 </Field>
                 <Field label="Talent">
-                  <input className={INPUT} value={take.talent} onChange={(e) => setTake({ ...take, talent: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={take.talent} onChange={(e) => setTake({ ...take, talent: e.target.value })} />
                 </Field>
                 <Field label="Tempat">
-                  <input className={INPUT} value={take.location} onChange={(e) => setTake({ ...take, location: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={take.location} onChange={(e) => setTake({ ...take, location: e.target.value })} />
                 </Field>
                 <Field label="Alat yang Dipakai">
-                  <input className={INPUT} value={take.equipment} onChange={(e) => setTake({ ...take, equipment: e.target.value })} />
-                </Field>
-                <Field label="Device">
-                  <input className={INPUT} placeholder="cth: iPhone 15 Pro, Sony A7III"
-                    value={take.device} onChange={(e) => setTake({ ...take, device: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={take.equipment} onChange={(e) => setTake({ ...take, equipment: e.target.value })} />
                 </Field>
                 <Field label="Mulai">
-                  <input type="datetime-local" className={INPUT} value={take.take_start} onChange={(e) => setTake({ ...take, take_start: e.target.value })} />
+                  <input type="datetime-local" className={INPUT} disabled={locked} value={take.take_start} onChange={(e) => setTake({ ...take, take_start: e.target.value })} />
                 </Field>
                 <Field label="Selesai">
-                  <input type="datetime-local" className={INPUT} value={take.take_end} onChange={(e) => setTake({ ...take, take_end: e.target.value })} />
+                  <input type="datetime-local" className={INPUT} disabled={locked} value={take.take_end} onChange={(e) => setTake({ ...take, take_end: e.target.value })} />
                 </Field>
                 <Field label="Diterima Editor">
-                  <input type="datetime-local" className={INPUT} value={take.take_received_editor} onChange={(e) => setTake({ ...take, take_received_editor: e.target.value })} />
+                  <input type="datetime-local" className={INPUT} disabled={locked} value={take.take_received_editor} onChange={(e) => setTake({ ...take, take_received_editor: e.target.value })} />
                 </Field>
                 <div className="flex items-end">
                   <p className="text-xs text-gray-400">
@@ -295,11 +295,11 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               </div>
 
               <div className="flex gap-2 pt-1">
-                <button onClick={() => saveTake(false)} disabled={saving}
+                <button onClick={() => saveTake(false)} disabled={saving || locked}
                   className="flex-1 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:opacity-40">
                   Simpan Draft
                 </button>
-                <button onClick={() => saveTake(true)} disabled={saving}
+                <button onClick={() => saveTake(true)} disabled={saving || locked}
                   className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-40">
                   {report.take_done ? "Update & Tetap Selesai" : "Tandai Take Selesai "}
                 </button>
@@ -321,31 +321,35 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Nama Editor">
-                  <input className={INPUT} value={edit.editor_name} onChange={(e) => setEdit({ ...edit, editor_name: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={edit.editor_name} onChange={(e) => setEdit({ ...edit, editor_name: e.target.value })} />
                 </Field>
                 <Field label="Dikerjakan Editor (catatan)">
-                  <input className={INPUT} value={edit.editor_work} onChange={(e) => setEdit({ ...edit, editor_work: e.target.value })} />
+                  <input className={INPUT} disabled={locked} value={edit.editor_work} onChange={(e) => setEdit({ ...edit, editor_work: e.target.value })} />
+                </Field>
+                <Field label="Device">
+                  <input className={INPUT} placeholder="cth: iPhone 15 Pro, Sony A7III" disabled={locked}
+                    value={edit.device} onChange={(e) => setEdit({ ...edit, device: e.target.value })} />
                 </Field>
                 <Field label="Jam Mulai">
-                  <input type="datetime-local" className={INPUT} value={edit.edit_start} onChange={(e) => setEdit({ ...edit, edit_start: e.target.value })} />
+                  <input type="datetime-local" className={INPUT} disabled={locked} value={edit.edit_start} onChange={(e) => setEdit({ ...edit, edit_start: e.target.value })} />
                 </Field>
                 <Field label="Jam Selesai">
-                  <input type="datetime-local" className={INPUT} value={edit.edit_end} onChange={(e) => setEdit({ ...edit, edit_end: e.target.value })} />
+                  <input type="datetime-local" className={INPUT} disabled={locked} value={edit.edit_end} onChange={(e) => setEdit({ ...edit, edit_end: e.target.value })} />
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Link Folder Siap Posting">
-                    <input className={INPUT} placeholder="https://drive.google.com/..." value={edit.ready_folder_link}
+                    <input className={INPUT} placeholder="https://drive.google.com/..." disabled={locked} value={edit.ready_folder_link}
                       onChange={(e) => setEdit({ ...edit, ready_folder_link: e.target.value })} />
                   </Field>
                 </div>
               </div>
 
               <div className="flex gap-2 pt-1">
-                <button onClick={() => saveEdit(false)} disabled={saving}
+                <button onClick={() => saveEdit(false)} disabled={saving || locked}
                   className="flex-1 rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:opacity-40">
                   Simpan Draft
                 </button>
-                <button onClick={() => saveEdit(true)} disabled={saving}
+                <button onClick={() => saveEdit(true)} disabled={saving || locked}
                   className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-40">
                   {report.edit_done ? "Update & Tetap Selesai" : "Tandai Edit Selesai → Posting "}
                 </button>
@@ -361,10 +365,11 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
               finished={finished}
               readyToFinish={readyToFinish}
               saving={saving}
+              locked={locked}
               onToggleFinish={toggleFinish}
               onChanged={onChanged}
-              onMarkRevision={markRevision}
-              isRevisable={isRevisable}
+              onCancel={handleCancelContent}
+              canCancel={canCancel}
             />
           )}
         </div>
@@ -372,7 +377,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
         {/* Footer */}
         {canManage && !report.is_cancelled && (
           <div className="border-t border-gray-100 bg-white p-3">
-            <button onClick={handleDelete} disabled={saving}
+            <button onClick={handleCancelContent} disabled={saving}
               className="w-full rounded-xl py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-40">
               Batalkan Konten
             </button>
@@ -394,18 +399,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 /* ── Sub-komponen posting ─────────────────────────────────────────────────── */
 function PostingSection({
-  report, canPost, finished, readyToFinish, saving, onToggleFinish, onChanged,
-  onMarkRevision, isRevisable,
+  report, canPost, finished, readyToFinish, saving, locked, onToggleFinish, onChanged,
+  onCancel, canCancel,
 }: {
   report: CCReport;
   canPost: boolean;
   finished: boolean;
   readyToFinish: boolean;
   saving: boolean;
+  locked: boolean;
   onToggleFinish: () => void;
   onChanged: () => void;
-  onMarkRevision: () => void;
-  isRevisable: boolean;
+  onCancel: () => void;
+  canCancel: boolean;
 }) {
   const [postings, setPostings] = useState<CCPosting[]>(report.postings ?? []);
   const [platform, setPlatform] = useState<string>("Instagram");
@@ -493,11 +499,7 @@ function PostingSection({
     }
   };
 
-  const deletePosting = async (p: CCPosting) => {
-    if (!confirm(`Hapus posting ${p.platform}?`)) return;
-    await fetch(`/api/cc-reports/${report.id}/postings/${p.id}`, { method: "DELETE" });
-    await reloadPostings();
-  };
+  // 🗑️ Fitur "Hapus" posting sudah dihilangkan sesuai permintaan — posting tidak bisa dihapus lagi dari sini.
 
   //  Gerbang: harus lewat Editing dulu
   if (!canPost) {
@@ -516,12 +518,12 @@ function PostingSection({
 
   return (
     <div className="space-y-3">
-      {isRevisable && (
+      {canCancel && (
         <button
-          onClick={onMarkRevision}
+          onClick={onCancel}
           className="w-full rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
         >
-          {finished ? "⟲ Buka & Tandai Perlu Revisi" : "⟲ Tandai Perlu Revisi"}
+          ✕ Cancel Konten
         </button>
       )}
 
@@ -536,18 +538,20 @@ function PostingSection({
               </span>
             )}
           </div>
-          <button
-            onClick={onToggleFinish}
-            disabled={saving}
-            className="flex-shrink-0 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-40"
-          >
-            Buka Lagi
-          </button>
+          {!locked && (
+            <button
+              onClick={onToggleFinish}
+              disabled={saving}
+              className="flex-shrink-0 rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-40"
+            >
+              Buka Lagi
+            </button>
+          )}
         </div>
       )}
 
       {/* Tambah posting */}
-      {!finished && (
+      {!finished && !locked && (
         <div className="space-y-2 rounded-2xl bg-white p-3 ring-1 ring-gray-100">
           <input
             className={input}
@@ -583,6 +587,7 @@ function PostingSection({
           const st = (p.sync_status ?? "PENDING") as SyncStatus;
           const sm = SYNC_STATUS_META[st];
           const busy = syncingId === p.id;
+          const rowDisabled = finished || locked;
 
           return (
             <div key={p.id} className="space-y-2 rounded-2xl bg-white p-3 ring-1 ring-gray-100">
@@ -597,23 +602,14 @@ function PostingSection({
                     {sm.label}
                   </span>
                 </span>
-                {!finished && (
-                  <div className="flex items-center gap-2">
-                    {auto && p.post_url && (
-                      <button
-                        onClick={() => syncOne(p.id)}
-                        disabled={busy}
-                        className="rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
-                      >
-                        {busy ? "Sync…" : "↻ Sync"}
-                      </button>
-                    )}
-                    {!finished && (
-                      <button onClick={() => deletePosting(p)} className="text-xs font-bold text-red-500 hover:underline">
-                        Hapus
-                      </button>
-                    )}
-                  </div>
+                {!rowDisabled && auto && p.post_url && (
+                  <button
+                    onClick={() => syncOne(p.id)}
+                    disabled={busy}
+                    className="rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
+                  >
+                    {busy ? "Sync…" : "↻ Sync"}
+                  </button>
                 )}
               </div>
 
@@ -627,7 +623,7 @@ function PostingSection({
                 className={input}
                 placeholder="Link posting (https://...)"
                 defaultValue={p.post_url ?? ""}
-                disabled={finished}
+                disabled={rowDisabled}
                 onBlur={(e) =>
                   e.target.value !== (p.post_url ?? "") && updatePosting(p, { post_url: e.target.value })
                 }
@@ -636,7 +632,7 @@ function PostingSection({
                 type="datetime-local"
                 className={input}
                 defaultValue={isoToLocalInput(p.posted_at)}
-                disabled={finished}
+                disabled={rowDisabled}
                 onBlur={(e) => updatePosting(p, { posted_at: localInputToIso(e.target.value) })}
               />
 
@@ -650,8 +646,8 @@ function PostingSection({
                       type="number"
                       min={0}
                       className={input}
-                      /*  platform auto → readonly (diisi API). Manual → boleh edit walau selesai. */
-                      disabled={auto && st === "OK"}
+                      /*  platform auto → readonly (diisi API). Manual → boleh edit selama belum locked/finished. */
+                      disabled={rowDisabled || (auto && st === "OK")}
                       title={auto && st === "OK" ? "Diisi otomatis dari API — klik ↻ Sync untuk update" : undefined}
                       defaultValue={p[mk]}
                       key={`${mk}-${p[mk]}-${p.last_synced_at ?? ""}`}
@@ -675,7 +671,7 @@ function PostingSection({
       )}
 
       {/*  Tombol SELESAI */}
-      {!finished && (
+      {!finished && !locked && (
         <button
           onClick={onToggleFinish}
           disabled={!readyToFinish || saving}
