@@ -2,7 +2,8 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, X } from "lucide-react";
+import { Inbox, X, FileSpreadsheet } from "lucide-react";
+import ExcelJS from "exceljs";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -207,6 +208,88 @@ export default function JurnalUmum({ period }: { period: string }) {
     const totalDebit = filtered.reduce((s, e) => s + sumSide(e.lines, "DEBIT"), 0);
     const totalKredit = filtered.reduce((s, e) => s + sumSide(e.lines, "KREDIT"), 0);
 
+    // ─── Export Excel ──────────────────────────────────────────────────────
+    // Meng-export data yang sedang tampil di tabel (mengikuti filter pencarian aktif).
+    // Kolom mengikuti struktur tabel Jurnal Umum: Tanggal, Sumber, Keterangan, Ref
+    // (kode akun, sama seperti kolom Ref di halaman), Nama Akun, Debit, Kredit —
+    // ditutup dengan baris TOTAL.
+    const handleExportExcel = async () => {
+        if (busy || filtered.length === 0) return;
+        setBusy(true);
+        try {
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet("Jurnal Umum");
+
+            ws.columns = [
+                { key: "tanggal", width: 12 },
+                { key: "sumber", width: 12 },
+                { key: "keterangan", width: 40 },
+                { key: "ref", width: 20 },
+                { key: "nama", width: 28 },
+                { key: "debit", width: 16 },
+                { key: "kredit", width: 16 },
+            ];
+
+            // Baris judul
+            ws.mergeCells("A1:G1");
+            ws.getCell("A1").value = `JURNAL UMUM — Periode ${period}`;
+            ws.getCell("A1").font = { bold: true, size: 13 };
+
+            // Baris header tabel
+            const headerRow = ws.addRow([
+                "Tanggal", "Sumber", "Keterangan", "Ref", "Nama Akun", "Debit", "Kredit",
+            ]);
+            headerRow.font = { bold: true };
+            headerRow.eachCell((cell) => {
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+                cell.border = { bottom: { style: "thin" } };
+            });
+
+            // Baris data — satu baris per baris jurnal (line), field entry hanya diisi di baris pertama
+            filtered.forEach((entry) => {
+                entry.lines.forEach((line, i) => {
+                    const row = ws.addRow({
+                        tanggal: i === 0 ? fmtTgl(entry.tanggal) : "",
+                        sumber: i === 0 ? (SOURCE_BADGE[entry.source_type]?.label ?? entry.source_type) : "",
+                        keterangan: i === 0 ? entry.keterangan : "",
+                        // Ref = kode akun (post reference) — sama seperti kolom Ref di halaman;
+                        // ref asli (entry.ref) ditambahkan di baris pertama saja kalau ada.
+                        ref: i === 0 && entry.ref ? `${line.account_code} · ${entry.ref}` : line.account_code,
+                        nama: line.account_name,
+                        debit: line.side === "DEBIT" ? Number(line.nominal) : null,
+                        kredit: line.side === "KREDIT" ? Number(line.nominal) : null,
+                    });
+                    row.getCell("debit").numFmt = "#,##0";
+                    row.getCell("kredit").numFmt = "#,##0";
+                });
+            });
+
+            // Baris total
+            const totalRow = ws.addRow({ keterangan: "TOTAL", debit: totalDebit, kredit: totalKredit });
+            totalRow.font = { bold: true };
+            totalRow.getCell("debit").numFmt = "#,##0";
+            totalRow.getCell("kredit").numFmt = "#,##0";
+            totalRow.eachCell((cell) => {
+                cell.border = { top: { style: "thin" } };
+            });
+
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Jurnal-Umum-${period}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            setToast("Gagal export excel");
+        } finally {
+            setBusy(false);
+        }
+    };
+
     useEffect(() => {
         if (!toast) return;
         const t = setTimeout(() => setToast(null), 3000);
@@ -310,6 +393,14 @@ export default function JurnalUmum({ period }: { period: string }) {
                     placeholder="Cari keterangan, akun, ref..."
                     className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 />
+                <button
+                    onClick={handleExportExcel}
+                    disabled={busy || filtered.length === 0}
+                    className="h-10 px-4 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition whitespace-nowrap disabled:opacity-40 flex items-center gap-1.5"
+                >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    Export Excel
+                </button>
                 <button
                     onClick={() => setShowManual(true)}
                     className="h-10 px-4 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 transition whitespace-nowrap"
