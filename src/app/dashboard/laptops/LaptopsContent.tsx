@@ -61,6 +61,32 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     SOLD: { badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", label: "Sold" },
 };
 
+const SORT_LABELS: Record<string, string> = {
+    DEFAULT: "Urutan Default",
+    AZ: "Nama: A → Z",
+    ZA: "Nama: Z → A",
+    NO_DESC: "No ↓",
+    BRAND_ASC: "Brand ↑",
+    BRAND_DESC: "Brand ↓",
+    CPU_ASC: "CPU ↑",
+    CPU_DESC: "CPU ↓",
+    RAM_ASC: "RAM ↑",
+    RAM_DESC: "RAM ↓",
+    STORAGE_ASC: "Storage ↑",
+    STORAGE_DESC: "Storage ↓",
+    PRICE_ASC: "Harga: Rendah → Tinggi",
+    PRICE_DESC: "Harga: Tinggi → Rendah",
+    STOK_ASC: "Stok ↑",
+    STOK_DESC: "Stok ↓",
+    SIAP_ASC: "Siap ↑",
+    SIAP_DESC: "Siap ↓",
+    MINUS_ASC: "Minus ↑",
+    MINUS_DESC: "Minus ↓",
+    TERJUAL_ASC: "Terjual ↑",
+    TERJUAL_DESC: "Terjual ↓",
+    SN: "Urut SN",
+};
+
 const Shimmer = ({
     w, h, r = "8px", style = {}, className = "",
 }: {
@@ -281,6 +307,10 @@ export function LaptopsContent() {
     const [sortBy, setSortBy] = useState("DEFAULT");
     const [filterSN, setFilterSN] = useState("");
 
+    const handleSort = (asc: string, desc: string) => {
+        setSortBy(prev => prev === asc ? desc : asc);
+    };
+
     const [modalMode, setModalMode] = useState<ModalMode>(null);
     const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
     const [formData, setFormData] = useState<Record<string, string>>(EMPTY_FORM);
@@ -406,8 +436,25 @@ export function LaptopsContent() {
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
             case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
+            case "NO_DESC": list.reverse(); break;
+            case "BRAND_ASC": list.sort((a, b) => (a.brand || "").localeCompare(b.brand || "")); break;
+            case "BRAND_DESC": list.sort((a, b) => (b.brand || "").localeCompare(a.brand || "")); break;
+            case "CPU_ASC": list.sort((a, b) => (a.cpu || "").localeCompare(b.cpu || "")); break;
+            case "CPU_DESC": list.sort((a, b) => (b.cpu || "").localeCompare(a.cpu || "")); break;
+            case "RAM_ASC": list.sort((a, b) => (a.ram || "").localeCompare(b.ram || "")); break;
+            case "RAM_DESC": list.sort((a, b) => (b.ram || "").localeCompare(a.ram || "")); break;
+            case "STORAGE_ASC": list.sort((a, b) => (a.storage || "").localeCompare(b.storage || "")); break;
+            case "STORAGE_DESC": list.sort((a, b) => (b.storage || "").localeCompare(a.storage || "")); break;
             case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "STOK_ASC": list.sort((a, b) => (a.stok_tersedia ?? 0) - (b.stok_tersedia ?? 0)); break;
+            case "STOK_DESC": list.sort((a, b) => (b.stok_tersedia ?? 0) - (a.stok_tersedia ?? 0)); break;
+            case "SIAP_ASC": list.sort((a, b) => (a.siap_jual ?? 0) - (b.siap_jual ?? 0)); break;
+            case "SIAP_DESC": list.sort((a, b) => (b.siap_jual ?? 0) - (a.siap_jual ?? 0)); break;
+            case "MINUS_ASC": list.sort((a, b) => (a.stok_minus ?? 0) - (b.stok_minus ?? 0)); break;
+            case "MINUS_DESC": list.sort((a, b) => (b.stok_minus ?? 0) - (a.stok_minus ?? 0)); break;
+            case "TERJUAL_ASC": list.sort((a, b) => (a.terjual ?? 0) - (b.terjual ?? 0)); break;
+            case "TERJUAL_DESC": list.sort((a, b) => (b.terjual ?? 0) - (a.terjual ?? 0)); break;
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
@@ -881,8 +928,8 @@ export function LaptopsContent() {
                                 {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
                                 {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                 {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
-                                {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${sortBy === "AZ" ? "A→Z" : sortBy === "ZA" ? "Z→A" : sortBy === "PRICE_ASC" ? "Harga ↑" : sortBy === "PRICE_DESC" ? "Harga ↓" : "SN"}`} onRemove={() => setSortBy("DEFAULT")} />}
-                            </div>
+                            {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
+                        </div>
                         )}
                     </div>
 
@@ -905,16 +952,15 @@ export function LaptopsContent() {
                                 <table className="w-full text-sm border-collapse">
                                     <thead>
                                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                            <Th center>No</Th>
-                                            <Th>Nama Laptop</Th>
-                                            <Th>Brand</Th>
-                                            <Th>CPU</Th>
-                                            <Th>RAM</Th>
-                                            <Th>Storage</Th>
-                                            <Th right>Harga Jual</Th>
-                                            {canViewTotalStok && <Th right>Stok Tersisa</Th>}
-                                            <Th right>Siap Jual</Th>
-                                            {canViewTotalStok && <Th right>Minus</Th>}
+                                            <Th center sortKey="NO" activeSort={sortBy} onSort={handleSort}>No</Th>
+                                            <Th sortKey="NAMA" activeSort={sortBy} onSort={handleSort}>Nama Laptop</Th>
+                                            <Th sortKey="CPU" activeSort={sortBy} onSort={handleSort}>CPU</Th>
+                                            <Th sortKey="RAM" activeSort={sortBy} onSort={handleSort}>RAM</Th>
+                                            <Th sortKey="STORAGE" activeSort={sortBy} onSort={handleSort}>Storage</Th>
+                                            <Th right sortKey="PRICE" activeSort={sortBy} onSort={handleSort}>Harga Jual</Th>
+                                            {canViewTotalStok && <Th right sortKey="STOK" activeSort={sortBy} onSort={handleSort}>Stok Tersisa</Th>}
+                                            <Th right sortKey="SIAP" activeSort={sortBy} onSort={handleSort}>Siap Jual</Th>
+                                            {canViewTotalStok && <Th right sortKey="MINUS" activeSort={sortBy} onSort={handleSort}>Minus</Th>}
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -926,9 +972,6 @@ export function LaptopsContent() {
                                                 </td>
                                                 <td className="px-4 py-3.5 max-w-[200px]">
                                                     <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 whitespace-nowrap">
-                                                    <span className="text-xs font-medium text-gray-500">{item.brand || <span className="text-gray-200">—</span>}</span>
                                                 </td>
                                                 <td className="px-4 py-3.5 max-w-[160px]">
                                                     <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
@@ -1366,7 +1409,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Terjual", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
@@ -1376,7 +1419,6 @@ function SkeletonTable() {
                             <tr key={r} className="border-b border-gray-50">
                                 <td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={140} h={13} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
                                 <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
@@ -1384,7 +1426,6 @@ function SkeletonTable() {
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={13} /></div></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={13} /></div></td>
-                                <td className="px-4 py-3.5"><Shimmer w={72} h={24} r="8px" /></td>
                                 <td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
                             </tr>
                         ))}
@@ -1461,10 +1502,30 @@ function Modal({ open, onClose, title, children, size = "md" }: {
     );
 }
 
-function Th({ children, right, center }: { children: React.ReactNode; right?: boolean; center?: boolean }) {
+function Th({ children, right, center, sortKey, activeSort, onSort }: {
+    children: React.ReactNode; right?: boolean; center?: boolean;
+    sortKey?: string; activeSort?: string; onSort?: (asc: string, desc: string) => void;
+}) {
+    const isSortable = !!sortKey && !!onSort;
+    const ascKey = sortKey === 'NAMA' ? 'AZ' : (sortKey === 'NO' ? 'DEFAULT' : `${sortKey}_ASC`);
+    const descKey = sortKey === 'NAMA' ? 'ZA' : (sortKey === 'NO' ? 'NO_DESC' : `${sortKey}_DESC`);
+    const isActiveAsc = activeSort === ascKey;
+    const isActiveDesc = activeSort === descKey;
+
     return (
-        <th className={`px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap ${right ? "text-right" : center ? "text-center" : "text-left"}`}>
-            {children}
+        <th
+            onClick={isSortable ? () => onSort(ascKey, descKey) : undefined}
+            className={`px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap ${right ? "text-right" : center ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-700 select-none group/th" : ""}`}
+        >
+            <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
+                {children}
+                {isSortable && (
+                    <div className="flex flex-col -space-y-[3px]">
+                        <svg className={`w-2.5 h-2.5 ${isActiveAsc ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg>
+                        <svg className={`w-2.5 h-2.5 ${isActiveDesc ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                )}
+            </div>
         </th>
     );
 }
